@@ -1,0 +1,134 @@
+import { useEffect, useMemo, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { useQuery } from "@tanstack/react-query";
+import { DashboardLayout } from "@/components/DashboardLayout";
+import { Brain, TrendingUp, Building2, Clock, Briefcase } from "lucide-react";
+import { auth } from "@/lib/firebase";
+import { fetchApplicationStats, fetchEmailMetrics } from "@/lib/emails";
+
+const OutcomeMemory = () => {
+  const [user, setUser] = useState(auth?.currentUser ?? null);
+  const isAuthed = Boolean(user);
+
+  useEffect(() => {
+    if (!auth) return undefined;
+    const unsub = onAuthStateChanged(auth, (nextUser) => setUser(nextUser));
+    return () => unsub();
+  }, []);
+
+  const metricsQuery = useQuery({
+    queryKey: ["outcome-memory", "metrics"],
+    queryFn: () => fetchEmailMetrics("all_time"),
+    enabled: isAuthed,
+    staleTime: 60_000,
+  });
+
+  const statsQuery = useQuery({
+    queryKey: ["outcome-memory", "application-stats"],
+    queryFn: () => fetchApplicationStats(),
+    enabled: isAuthed,
+    staleTime: 60_000,
+  });
+
+  const metrics = metricsQuery.data?.metrics;
+  const appStats = statsQuery.data?.stats;
+
+  const stats = useMemo(() => {
+    return [
+      { label: "Total Applications", value: metrics?.totalApplications ?? "-" },
+      { label: "Callbacks", value: metrics ? metrics.totalInterviewed + metrics.totalOffers : "-" },
+      { label: "Interviews", value: metrics?.totalInterviewed ?? "-" },
+      { label: "Rejected", value: metrics?.totalRejected ?? "-" },
+    ];
+  }, [metrics]);
+
+  const insights = useMemo(() => {
+    if (!metrics) return {};
+
+    const responseRate = metrics.responseRate.toFixed(1);
+    const interviewRate = metrics.interviewRate.toFixed(1);
+    const offerRate = metrics.offerRate.toFixed(1);
+    const rejectionRate = metrics.rejectionRate.toFixed(1);
+
+    const linked = appStats?.emails.linked ?? 0;
+    const totalEmails = appStats?.emails.total ?? metrics.totalEmails ?? 0;
+    const ungrouped = appStats?.emails.ungrouped ?? Math.max(0, totalEmails - linked);
+    const linkedRatio = totalEmails > 0 ? ((linked / totalEmails) * 100).toFixed(1) : "0.0";
+
+    return {
+      "Response Signals": [
+        { text: `Response rate is ${responseRate}%.`, icon: TrendingUp },
+        { text: `Interview rate is ${interviewRate}% of applications.`, icon: TrendingUp },
+        { text: `Offer rate is ${offerRate}% of applications.`, icon: TrendingUp },
+      ],
+      "Pipeline Health": [
+        { text: `${ungrouped} emails are not linked to applications.`, icon: Building2 },
+        { text: `${linkedRatio}% of emails are linked to applications.`, icon: Building2 },
+        { text: `Rejection rate is ${rejectionRate}%.`, icon: Building2 },
+      ],
+      "Timing and Volume": [
+        { text: `Total tracked emails: ${metrics.totalEmails}.`, icon: Clock },
+        { text: `Applied: ${metrics.totalApplications} - Interviews: ${metrics.totalInterviewed} - Offers: ${metrics.totalOffers}.`, icon: Clock },
+      ],
+      "Key Signals": [
+        { text: "Use interview rate to refine which roles convert best.", icon: Briefcase },
+        { text: "Track unlinked emails to improve application grouping.", icon: Briefcase },
+      ],
+    };
+  }, [appStats, metrics]);
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Brain className="w-6 h-6 text-accent" />
+            Outcome Memory
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm">Patterns and signals from all your applications.</p>
+        </div>
+
+        {!isAuthed ? (
+          <div className="glass-card rounded-xl p-6 text-sm text-muted-foreground">
+            Sign in to see outcome insights.
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {stats.map((s) => (
+                <div key={s.label} className="glass-card rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-foreground">{s.value}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-5">
+              {Object.keys(insights).length === 0 ? (
+                <div className="glass-card rounded-xl p-6 text-sm text-muted-foreground">
+                  Loading insights...
+                </div>
+              ) : (
+                Object.entries(insights).map(([group, items], gi) => (
+                  <div key={group} className="glass-card rounded-xl p-5 animate-fade-in" style={{ animationDelay: gi * 80 + "ms" }}>
+                    <h3 className="text-sm font-semibold text-foreground mb-3">{group}</h3>
+                    <div className="space-y-2.5">
+                      {items.map((item, j) => (
+                        <div key={`${group}-${j}`} className="flex items-start gap-3">
+                          <item.icon className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                          <p className="text-sm text-muted-foreground">{item.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </DashboardLayout>
+  );
+};
+
+export default OutcomeMemory;

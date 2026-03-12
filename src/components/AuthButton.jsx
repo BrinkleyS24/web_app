@@ -1,0 +1,58 @@
+import React, { useEffect, useState } from "react";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { auth, firebaseConfigured, signInWithGoogle } from "../lib/firebase.js";
+
+export default function AuthButton() {
+  const [user, setUser] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!auth) return;
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsub();
+  }, []);
+
+  async function handleSignIn() {
+    setError("");
+    setBusy(true);
+    try {
+      await signInWithGoogle();
+    } catch (e) {
+      setError(e?.message || "Sign-in failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSignOut() {
+    setError("");
+    setBusy(true);
+    try {
+      if (auth) await signOut(auth);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!firebaseConfigured) {
+    return <span className="pill">Auth not configured</span>;
+  }
+
+  if (!user) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+        {error ? <div className="error">{error}</div> : null}
+        <button className="btn btnPrimary" onClick={handleSignIn} disabled={busy}>
+          {busy ? "Signing in…" : "Sign in"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button className="btn" onClick={handleSignOut} disabled={busy}>
+      {busy ? "Signing out…" : "Sign out"}
+    </button>
+  );
+}
