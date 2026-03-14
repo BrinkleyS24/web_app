@@ -5,7 +5,6 @@ import Account from "./pages/Account.jsx";
 import Dashboard from "./pages/DashboardNew.tsx";
 import Upgrade from "./pages/Upgrade.tsx";
 import ApplyGate from "./pages/ApplyGate.tsx";
-import Prejection from "./pages/Prejection.tsx";
 import FixSuggestions from "./pages/FixSuggestions.tsx";
 import OutcomeMemory from "./pages/OutcomeMemory.tsx";
 import StrategyAlerts from "./pages/StrategyAlerts.tsx";
@@ -22,7 +21,6 @@ const queryClient = new QueryClient();
 const DASHBOARD_ROUTES = [
   "/dashboard",
   "/apply-gate",
-  "/prejection",
   "/fix-suggestions",
   "/outcome-memory",
   "/strategy-alerts",
@@ -122,14 +120,6 @@ export default function App() {
                 }
               />
               <Route
-                path="/prejection"
-                element={
-                  <RequirePremium>
-                    <Prejection />
-                  </RequirePremium>
-                }
-              />
-              <Route
                 path="/fix-suggestions"
                 element={
                   <RequirePremium>
@@ -190,4 +180,3 @@ function TopLink({ to, label }) {
     </NavLink>
   );
 }
-

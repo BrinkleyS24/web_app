@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   Shield,
-  AlertTriangle,
   Wrench,
   Brain,
   Bell,
@@ -27,7 +26,6 @@ import { useAuth } from "@/lib/AuthContext.jsx";
 const mainNav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Apply Gate", url: "/apply-gate", icon: Shield },
-  { title: "Pre-jection", url: "/prejection", icon: AlertTriangle },
   { title: "Fix Suggestions", url: "/fix-suggestions", icon: Wrench },
   { title: "Outcome Memory", url: "/outcome-memory", icon: Brain },
   { title: "Strategy Alerts", url: "/strategy-alerts", icon: Bell },
