@@ -44,7 +44,7 @@ export function AppSidebar() {
             <Crown className="w-4 h-4 text-sidebar-primary-foreground" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-sidebar-accent-foreground">Intrackt</h2>
+            <h2 className="text-sm font-semibold text-sidebar-accent-foreground">MorrowFold</h2>
             <p className="text-xs text-sidebar-muted">
               {planLoading ? "…" : isPremium ? "Premium" : "Free"}
             </p>
@@ -110,3 +110,4 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+

@@ -1,4 +1,4 @@
-# Intrackt Premium Web (starter)
+# MorrowFold Premium Web (starter)
 
 This is the starter web app for premium features (pricing, account, dashboards). It uses:
 
@@ -53,4 +53,5 @@ Open `http://localhost:5173`.
 - **Account**: calls `GET /api/subscriptions/status` and opens the customer portal
 
 If billing is not configured on the backend, subscription routes will return an error (expected).
+
 

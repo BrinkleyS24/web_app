@@ -105,10 +105,10 @@ const OutcomeMemory = () => {
     }
 
     return [
-      { label: "Suggestions shown", value: suggestionAnalytics.summary.shownApplications },
-      { label: "Completed", value: `${(suggestionAnalytics.summary.completedRate * 100).toFixed(1)}%` },
-      { label: "Positive outcomes", value: `${(suggestionAnalytics.summary.positiveOutcomeRate * 100).toFixed(1)}%` },
-      { label: "Observed lift", value: `${(suggestionAnalytics.outcomes.observedLift * 100).toFixed(1)} pts` },
+      { label: "Suggestions shown", value: suggestionAnalytics.followup.summary.shownApplications },
+      { label: "Completed", value: `${(suggestionAnalytics.followup.summary.completedRate * 100).toFixed(1)}%` },
+      { label: "Positive outcomes", value: `${(suggestionAnalytics.followup.summary.positiveOutcomeRate * 100).toFixed(1)}%` },
+      { label: "Observed lift", value: `${(suggestionAnalytics.followup.outcomes.observedLift * 100).toFixed(1)} pts` },
     ];
   }, [suggestionAnalytics]);
 
@@ -117,13 +117,13 @@ const OutcomeMemory = () => {
       return [];
     }
 
-    const topActionTypes = suggestionAnalytics.byActionType.slice(0, 3);
+    const topActionTypes = suggestionAnalytics.followup.byActionType.slice(0, 3);
     return [
       `Completed suggestions converted to interviews/offers ${(
-        suggestionAnalytics.outcomes.completed.positiveRate * 100
+        suggestionAnalytics.followup.outcomes.completed.positiveRate * 100
       ).toFixed(1)}% of the time.`,
       `Ignored suggestions converted to interviews/offers ${(
-        suggestionAnalytics.outcomes.ignored.positiveRate * 100
+        suggestionAnalytics.followup.outcomes.ignored.positiveRate * 100
       ).toFixed(1)}% of the time.`,
       ...topActionTypes.map(
         (item) =>
@@ -132,6 +132,32 @@ const OutcomeMemory = () => {
           ).toFixed(1)}% positive outcomes.`,
       ),
     ];
+  }, [suggestionAnalytics]);
+
+  const nonFollowupCompletionStats = useMemo(() => {
+    if (!suggestionAnalytics) {
+      return [
+        { label: "Fixes shown", value: "-" },
+        { label: "Completed", value: "-" },
+        { label: "Snoozed", value: "-" },
+        { label: "Still active", value: "-" },
+      ];
+    }
+
+    return [
+      { label: "Fixes shown", value: suggestionAnalytics.nonFollowup.summary.shownSuggestions },
+      { label: "Completed", value: `${(suggestionAnalytics.nonFollowup.summary.completionRate * 100).toFixed(1)}%` },
+      { label: "Snoozed", value: suggestionAnalytics.nonFollowup.summary.snoozedSuggestions },
+      { label: "Still active", value: suggestionAnalytics.nonFollowup.summary.activeSuggestions },
+    ];
+  }, [suggestionAnalytics]);
+
+  const nonFollowupBreakdown = useMemo(() => {
+    if (!suggestionAnalytics) return [];
+    return suggestionAnalytics.nonFollowup.bySource.slice(0, 4).map((item) => {
+      const sourceLabel = item.source.replace(/_/g, " ");
+      return `${sourceLabel}: ${item.completed}/${item.shown} completed, ${item.snoozed} snoozed, ${item.active} still active.`;
+    });
   }, [suggestionAnalytics]);
 
   return (
@@ -178,6 +204,32 @@ const OutcomeMemory = () => {
                 ) : (
                   suggestionInsights.map((item, index) => (
                     <div key={`suggestion-insight-${index}`} className="flex items-start gap-3">
+                      <TrendingUp className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                      <p className="text-sm text-muted-foreground">{item}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="glass-card rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-foreground mb-4">Non-follow-up Fix Completion</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {nonFollowupCompletionStats.map((s) => (
+                  <div key={s.label} className="rounded-xl border border-border/60 bg-background/40 p-4 text-center">
+                    <p className="text-2xl font-bold text-foreground">{s.value}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 space-y-2.5">
+                {nonFollowupBreakdown.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No Apply Gate, resume-proof, or cleanup completion history yet.
+                  </p>
+                ) : (
+                  nonFollowupBreakdown.map((item, index) => (
+                    <div key={`non-followup-insight-${index}`} className="flex items-start gap-3">
                       <TrendingUp className="w-4 h-4 text-accent shrink-0 mt-0.5" />
                       <p className="text-sm text-muted-foreground">{item}</p>
                     </div>

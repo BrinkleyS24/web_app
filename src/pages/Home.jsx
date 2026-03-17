@@ -39,7 +39,7 @@ export default function Home() {
 
   return (
     <div className="card" style={{ maxWidth: 520, margin: "40px auto" }}>
-      <h2 style={{ marginTop: 0 }}>Welcome to Intrackt</h2>
+      <h2 style={{ marginTop: 0 }}>Welcome to MorrowFold</h2>
 
       {!firebaseConfigured ? (
         <div className="error">
@@ -57,8 +57,8 @@ export default function Home() {
         <div style={{ marginTop: 12 }}>
           <p className="muted">
             {extensionDetected
-              ? "You're not signed into the Intrackt extension. Open the extension popup and sign in, then refresh this page."
-              : "This page works with the Intrackt Chrome extension. Make sure the extension is installed and you're signed in, then refresh this page."}
+              ? "You're not signed into the MorrowFold extension. Open the extension popup and sign in, then refresh this page."
+              : "This page works with the MorrowFold Chrome extension. Make sure the extension is installed and you're signed in, then refresh this page."}
           </p>
         </div>
       )}
@@ -67,3 +67,4 @@ export default function Home() {
     </div>
   );
 }
+

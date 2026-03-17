@@ -106,7 +106,7 @@ const Upgrade = () => {
           ) : !user ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground text-center">
-                Open the Intrackt extension and sign in to continue.
+                Open the MorrowFold extension and sign in to continue.
               </p>
             </div>
           ) : (
@@ -157,3 +157,4 @@ const Upgrade = () => {
 };
 
 export default Upgrade;
+

@@ -99,35 +99,54 @@ export type StrategyAlertsResponse = {
 export type SuggestionOutcomeAnalyticsResponse = {
   success: boolean;
   analytics?: {
-    summary: {
-      shownApplications: number;
-      completedApplications: number;
-      completedRate: number;
-      positiveOutcomeApplications: number;
-      positiveOutcomeRate: number;
-      averageDisplaysPerApplication: number;
-    };
-    outcomes: {
-      completed: {
-        applications: number;
-        positiveOutcomes: number;
-        positiveRate: number;
+    followup: {
+      summary: {
+        shownApplications: number;
+        completedApplications: number;
+        completedRate: number;
+        positiveOutcomeApplications: number;
+        positiveOutcomeRate: number;
+        averageDisplaysPerApplication: number;
       };
-      ignored: {
-        applications: number;
-        positiveOutcomes: number;
-        positiveRate: number;
+      outcomes: {
+        completed: {
+          applications: number;
+          positiveOutcomes: number;
+          positiveRate: number;
+        };
+        ignored: {
+          applications: number;
+          positiveOutcomes: number;
+          positiveRate: number;
+        };
+        observedLift: number;
       };
-      observedLift: number;
+      byActionType: Array<{
+        actionType: string;
+        shown: number;
+        completed: number;
+        positiveOutcomes: number;
+        completionRate: number;
+        positiveOutcomeRate: number;
+      }>;
     };
-    byActionType: Array<{
-      actionType: string;
-      shown: number;
-      completed: number;
-      positiveOutcomes: number;
-      completionRate: number;
-      positiveOutcomeRate: number;
-    }>;
+    nonFollowup: {
+      summary: {
+        shownSuggestions: number;
+        completedSuggestions: number;
+        snoozedSuggestions: number;
+        activeSuggestions: number;
+        completionRate: number;
+      };
+      bySource: Array<{
+        source: string;
+        shown: number;
+        completed: number;
+        snoozed: number;
+        active: number;
+        completionRate: number;
+      }>;
+    };
   };
 };
 

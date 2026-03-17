@@ -1,5 +1,5 @@
 {
-  "name": "intrackt-web",
+  "name": "morrowfold-web",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -43,3 +43,4 @@
     "vitest": "^1.6.1"
   }
 }
+
