@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Brain, TrendingUp, Building2, Clock, Briefcase } from "lucide-react";
 import { auth } from "@/lib/firebase";
-import { fetchApplicationStats, fetchEmailMetrics } from "@/lib/emails";
+import { fetchApplicationStats, fetchEmailMetrics, fetchSuggestionOutcomeAnalytics } from "@/lib/emails";
 
 const OutcomeMemory = () => {
   const [user, setUser] = useState(auth?.currentUser ?? null);
@@ -30,8 +30,25 @@ const OutcomeMemory = () => {
     staleTime: 60_000,
   });
 
+  const suggestionAnalyticsQuery = useQuery({
+    queryKey: ["outcome-memory", "suggestion-analytics"],
+    queryFn: async () => {
+      try {
+        return await fetchSuggestionOutcomeAnalytics();
+      } catch (err) {
+        return {
+          success: false,
+          analytics: undefined,
+        };
+      }
+    },
+    enabled: isAuthed,
+    staleTime: 60_000,
+  });
+
   const metrics = metricsQuery.data?.metrics;
   const appStats = statsQuery.data?.stats;
+  const suggestionAnalytics = suggestionAnalyticsQuery.data?.analytics;
 
   const stats = useMemo(() => {
     return [
@@ -77,6 +94,46 @@ const OutcomeMemory = () => {
     };
   }, [appStats, metrics]);
 
+  const suggestionFunnelStats = useMemo(() => {
+    if (!suggestionAnalytics) {
+      return [
+        { label: "Suggestions shown", value: "-" },
+        { label: "Completed", value: "-" },
+        { label: "Positive outcomes", value: "-" },
+        { label: "Observed lift", value: "-" },
+      ];
+    }
+
+    return [
+      { label: "Suggestions shown", value: suggestionAnalytics.summary.shownApplications },
+      { label: "Completed", value: `${(suggestionAnalytics.summary.completedRate * 100).toFixed(1)}%` },
+      { label: "Positive outcomes", value: `${(suggestionAnalytics.summary.positiveOutcomeRate * 100).toFixed(1)}%` },
+      { label: "Observed lift", value: `${(suggestionAnalytics.outcomes.observedLift * 100).toFixed(1)} pts` },
+    ];
+  }, [suggestionAnalytics]);
+
+  const suggestionInsights = useMemo(() => {
+    if (!suggestionAnalytics) {
+      return [];
+    }
+
+    const topActionTypes = suggestionAnalytics.byActionType.slice(0, 3);
+    return [
+      `Completed suggestions converted to interviews/offers ${(
+        suggestionAnalytics.outcomes.completed.positiveRate * 100
+      ).toFixed(1)}% of the time.`,
+      `Ignored suggestions converted to interviews/offers ${(
+        suggestionAnalytics.outcomes.ignored.positiveRate * 100
+      ).toFixed(1)}% of the time.`,
+      ...topActionTypes.map(
+        (item) =>
+          `${item.actionType.replace(/_/g, " ")}: ${item.completed}/${item.shown} completed, ${(
+            item.positiveOutcomeRate * 100
+          ).toFixed(1)}% positive outcomes.`,
+      ),
+    ];
+  }, [suggestionAnalytics]);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -101,6 +158,32 @@ const OutcomeMemory = () => {
                   <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
                 </div>
               ))}
+            </div>
+
+            <div className="glass-card rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-foreground mb-4">Suggestion Outcome Loop</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {suggestionFunnelStats.map((s) => (
+                  <div key={s.label} className="rounded-xl border border-border/60 bg-background/40 p-4 text-center">
+                    <p className="text-2xl font-bold text-foreground">{s.value}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 space-y-2.5">
+                {suggestionInsights.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No suggestion outcome data yet. This section fills in after suggestions are shown and applications resolve to outcomes.
+                  </p>
+                ) : (
+                  suggestionInsights.map((item, index) => (
+                    <div key={`suggestion-insight-${index}`} className="flex items-start gap-3">
+                      <TrendingUp className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                      <p className="text-sm text-muted-foreground">{item}</p>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
 
             <div className="space-y-5">

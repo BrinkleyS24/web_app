@@ -60,12 +60,15 @@ export type MetricsResponse = {
 
 export type FollowupSuggestion = {
   id?: string | number | null;
+  emailId?: string | number | null;
+  applicationId?: string | number | null;
   threadId?: string | null;
   subject?: string | null;
   title?: string | null;
   description?: string | null;
   company?: string | null;
   actionType?: string | null;
+  suggestionSource?: string | null;
   urgency?: "low" | "medium" | "high" | null;
   daysAgo?: number | null;
   estimatedTime?: string | null;
@@ -75,6 +78,82 @@ export type FollowupSuggestion = {
 export type FollowupSuggestionsResponse = {
   success: boolean;
   suggestions?: FollowupSuggestion[];
+};
+
+export type StrategyAlert = {
+  id: string;
+  kind: "performance" | "fit" | "focus" | "execution";
+  severity: "high" | "medium" | "low" | "positive";
+  title: string;
+  description: string;
+  recommendation?: string | null;
+  supporting_stat?: string | null;
+  timeframe_label?: string | null;
+};
+
+export type StrategyAlertsResponse = {
+  success: boolean;
+  alerts?: StrategyAlert[];
+};
+
+export type SuggestionOutcomeAnalyticsResponse = {
+  success: boolean;
+  analytics?: {
+    summary: {
+      shownApplications: number;
+      completedApplications: number;
+      completedRate: number;
+      positiveOutcomeApplications: number;
+      positiveOutcomeRate: number;
+      averageDisplaysPerApplication: number;
+    };
+    outcomes: {
+      completed: {
+        applications: number;
+        positiveOutcomes: number;
+        positiveRate: number;
+      };
+      ignored: {
+        applications: number;
+        positiveOutcomes: number;
+        positiveRate: number;
+      };
+      observedLift: number;
+    };
+    byActionType: Array<{
+      actionType: string;
+      shown: number;
+      completed: number;
+      positiveOutcomes: number;
+      completionRate: number;
+      positiveOutcomeRate: number;
+    }>;
+  };
+};
+
+export type SuggestionActionState = {
+  thread_id: string;
+  action_type: string;
+  state: "active" | "completed" | "snoozed";
+  email_id?: number | null;
+  application_id?: number | null;
+  suggestion_source?: string | null;
+  displayed_at?: string | null;
+  last_displayed_at?: string | null;
+  display_count?: number | null;
+  completed_at?: string | null;
+  dismissed_at?: string | null;
+  snoozed_until?: string | null;
+  outcome_label?: "interviewed" | "offered" | "rejected" | "withdrawn" | "no_response" | null;
+  outcome_recorded_at?: string | null;
+  outcome_source?: string | null;
+  actioned_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type SuggestionActionStatesResponse = {
+  success: boolean;
+  actions?: SuggestionActionState[];
 };
 
 export type ApplicationStatsResponse = {
@@ -115,6 +194,70 @@ export async function fetchFollowupSuggestions(): Promise<FollowupSuggestionsRes
   return apiFetch("/api/emails/followup-needed", {
     method: "POST",
     body: JSON.stringify({}),
+  });
+}
+
+export async function fetchStrategyAlerts(): Promise<StrategyAlertsResponse> {
+  return apiFetch("/api/suggestions/strategy-alerts", { method: "GET" });
+}
+
+export async function fetchSuggestionOutcomeAnalytics(): Promise<SuggestionOutcomeAnalyticsResponse> {
+  return apiFetch("/api/suggestions/analytics", { method: "GET" });
+}
+
+export async function fetchSuggestionActionStates(): Promise<SuggestionActionStatesResponse> {
+  return apiFetch("/api/suggestions/states", { method: "GET" });
+}
+
+export async function recordSuggestionImpressions(params: {
+  suggestions: Array<{
+    threadId: string;
+    actionType: string;
+    emailId?: string | number | null;
+    applicationId?: string | number | null;
+    suggestionSource?: string | null;
+  }>;
+}): Promise<{ success: boolean; recorded: number }> {
+  return apiFetch("/api/suggestions/impressions", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function completeSuggestionAction(params: {
+  threadId: string;
+  actionType: string;
+  emailId?: string | number | null;
+  applicationId?: string | number | null;
+  suggestionSource?: string | null;
+}): Promise<{ success: boolean; state: "completed" }> {
+  return apiFetch("/api/suggestions/action", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function snoozeSuggestionAction(params: {
+  threadId: string;
+  actionType: string;
+  snoozeDuration?: number;
+  emailId?: string | number | null;
+  applicationId?: string | number | null;
+  suggestionSource?: string | null;
+}): Promise<{ success: boolean; state: "snoozed"; snoozedUntil: string }> {
+  return apiFetch("/api/suggestions/snooze", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function undoSuggestionAction(params: {
+  threadId: string;
+  actionType: string;
+}): Promise<{ success: boolean; message: string }> {
+  return apiFetch("/api/suggestions/action", {
+    method: "DELETE",
+    body: JSON.stringify(params),
   });
 }
 

@@ -9,12 +9,53 @@ import { onAuthStateChanged } from "firebase/auth";
 import { useQuery } from "@tanstack/react-query";
 import { auth } from "@/lib/firebase";
 import {
+  fetchApplyGateHistory,
   fetchEmailMetrics,
-  fetchFollowupSuggestions,
-  fetchStoredEmails,
+  fetchStrategyAlerts,
   startEmailSync,
+  type ApplyGateResult,
 } from "@/lib/emails";
-import { getEmailCompany, getEmailTitle } from "@/lib/emailFormatting";
+
+function verdictToStatus(verdict: ApplyGateResult["verdict"]) {
+  if (verdict === "not_recommended") return "not-recommended" as const;
+  if (verdict === "risky") return "risky" as const;
+  if (verdict === "potential_fit") return "potential" as const;
+  return "strong" as const;
+}
+
+function companyFromUrl(rawUrl?: string | null) {
+  if (!rawUrl) return "Company unavailable";
+  try {
+    const hostname = new URL(rawUrl).hostname.replace(/^www\./i, "");
+    const root = hostname.split(".")[0] || "";
+    return root
+      .replace(/[-_]+/g, " ")
+      .split(" ")
+      .filter(Boolean)
+      .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+      .join(" ") || "Company unavailable";
+  } catch {
+    return "Company unavailable";
+  }
+}
+
+function splitRoleAndCompany(rawTitle?: string | null, fallbackUrl?: string | null) {
+  const title = String(rawTitle || "").trim();
+  if (!title) {
+    return { role: "Current Job Analysis", company: companyFromUrl(fallbackUrl) };
+  }
+
+  const separators = [" at ", " @ ", " - ", " | ", " — ", " – "];
+  for (const separator of separators) {
+    if (!title.includes(separator)) continue;
+    const parts = title.split(separator).map((part) => part.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      return { role: parts[0], company: parts.slice(1).join(" ") };
+    }
+  }
+
+  return { role: title, company: companyFromUrl(fallbackUrl) };
+}
 
 const Dashboard = () => {
   const [user, setUser] = useState(auth?.currentUser ?? null);
@@ -38,23 +79,23 @@ const Dashboard = () => {
     staleTime: 60_000,
   });
 
-  const storedEmailsQuery = useQuery({
-    queryKey: ["stored-emails", 4],
-    queryFn: () => fetchStoredEmails({ limit: 4, offset: 0 }),
+  const applyGateHistoryQuery = useQuery({
+    queryKey: ["dashboard", "apply-gate-history"],
+    queryFn: fetchApplyGateHistory,
     enabled: isAuthed,
     staleTime: 60_000,
   });
 
-  const followupQuery = useQuery({
-    queryKey: ["followup-suggestions"],
+  const strategyAlertsQuery = useQuery({
+    queryKey: ["strategy-alerts", "dashboard"],
     queryFn: async () => {
       try {
-        return await fetchFollowupSuggestions();
+        return await fetchStrategyAlerts();
       } catch (err) {
         return {
           success: false,
-          suggestions: [],
-          error: err instanceof Error ? err.message : "Unable to load suggestions",
+          alerts: [],
+          error: err instanceof Error ? err.message : "Unable to load strategy alerts",
         };
       }
     },
@@ -68,46 +109,35 @@ const Dashboard = () => {
   const interviewsCount = metrics?.totalInterviewed;
   const responseRate = metrics ? `${metrics.responseRate.toFixed(1)}%` : "-";
 
-  const recentEmails = storedEmailsQuery.data?.emails || [];
   const recentItems = useMemo(
     () =>
-      recentEmails.map((email) => {
-        const rawCategory = (email.category || "").toString().toLowerCase();
-        const status =
-          rawCategory === "applied" ||
-          rawCategory === "interviewed" ||
-          rawCategory === "offers" ||
-          rawCategory === "rejected"
-            ? rawCategory
-            : "applied";
-
+      (applyGateHistoryQuery.data?.history || []).slice(0, 4).map((item) => {
+        const { role, company } = splitRoleAndCompany(item.job_title, item.job_url);
         return {
-          id: email.id,
-          title: getEmailTitle(email),
-          company: getEmailCompany(email),
-          status: status as "applied" | "interviewed" | "offers" | "rejected",
+          id: item.id,
+          title: role,
+          company,
+          status: verdictToStatus(item.verdict),
         };
       }),
-    [recentEmails]
+    [applyGateHistoryQuery.data]
   );
 
   const alertItems = useMemo(() => {
-    const suggestions = followupQuery.data?.suggestions || [];
-    if (suggestions.length > 0) {
-      return suggestions.map((item) => {
-        const title = item.title || item.subject || "Follow up";
-        const company = item.company ? ` - ${item.company}` : "";
-        const days = typeof item.daysAgo === "number" ? ` - ${item.daysAgo}d ago` : "";
-        return `${title}${company}${days}`;
+    const alerts = strategyAlertsQuery.data?.alerts || [];
+    if (alerts.length > 0) {
+      return alerts.slice(0, 3).map((item) => {
+        const stat = item.supporting_stat ? ` - ${item.supporting_stat}` : "";
+        return `${item.title}${stat}`;
       });
     }
 
-    if (!isAuthed) return ["Sign in to see follow-up suggestions."];
-    if (followupQuery.data?.error?.includes("Premium feature required")) {
-      return ["Upgrade to Premium to see follow-up suggestions."];
+    if (!isAuthed) return ["Sign in to see strategy alerts."];
+    if (strategyAlertsQuery.data?.error?.includes("Premium feature required")) {
+      return ["Upgrade to Premium to see strategy alerts."];
     }
-    return ["No follow-up suggestions yet."];
-  }, [followupQuery.data, isAuthed]);
+    return ["No strategy alerts yet."];
+  }, [strategyAlertsQuery.data, isAuthed]);
 
   return (
     <DashboardLayout>
@@ -146,7 +176,7 @@ const Dashboard = () => {
           <div className="space-y-3">
             {recentItems.length === 0 ? (
               <div className="glass-card rounded-xl p-4 text-sm text-muted-foreground">
-                {isAuthed ? "No recent emails yet." : "Sign in to see recent emails."}
+                {isAuthed ? "No recent Apply Gate results yet." : "Sign in to see recent Apply Gate results."}
               </div>
             ) : (
               recentItems.map((job, i) => (
