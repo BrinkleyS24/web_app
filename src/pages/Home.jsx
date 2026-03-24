@@ -39,11 +39,12 @@ export default function Home() {
 
   return (
     <div className="card" style={{ maxWidth: 520, margin: "40px auto" }}>
-      <h2 style={{ marginTop: 0 }}>Welcome to MorrowFold</h2>
+      <p className="sectionEyebrow" style={{ marginBottom: 10 }}>Companion app</p>
+      <h2 style={{ marginTop: 0 }}>Open your Applendium workspace</h2>
 
       {!firebaseConfigured ? (
         <div className="error">
-          Firebase isn't configured yet. Set VITE_FIREBASE_* in frontend/web/.env.local.
+          The companion app is not configured yet. Set the VITE_FIREBASE_* build environment variables for this deployment.
         </div>
       ) : authLoading ? (
         <p className="muted" style={{ marginTop: 4 }}>Connecting to extension...</p>
@@ -57,13 +58,17 @@ export default function Home() {
         <div style={{ marginTop: 12 }}>
           <p className="muted">
             {extensionDetected
-              ? "You're not signed into the MorrowFold extension. Open the extension popup and sign in, then refresh this page."
-              : "This page works with the MorrowFold Chrome extension. Make sure the extension is installed and you're signed in, then refresh this page."}
+              ? "You're not signed into the Applendium extension. Open the extension popup and sign in, then refresh this page."
+              : "This page works with the Applendium Chrome extension. Make sure the extension is installed and you're signed in, then refresh this page."}
           </p>
         </div>
       )}
 
       {error ? <div className="error" style={{ marginTop: 12 }}>{error}</div> : null}
+
+      <p className="muted" style={{ marginTop: 16 }}>
+        Looking for the public site? <a href="/">Go back to applendium.com</a>.
+      </p>
     </div>
   );
 }

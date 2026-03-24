@@ -343,3 +343,597 @@ a {
 .animate-slide-in {
   animation: slide-in 0.3s ease-out both;
 }
+
+.publicSiteShell {
+  position: relative;
+  min-height: 100vh;
+  overflow: clip;
+  background:
+    radial-gradient(circle at top left, rgba(23, 132, 110, 0.16), transparent 26rem),
+    radial-gradient(circle at top right, rgba(40, 104, 171, 0.18), transparent 24rem),
+    linear-gradient(180deg, #f8fbfd 0%, #f2f5f8 100%);
+}
+
+.publicSiteBackdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.55) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.55) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.8), transparent 85%);
+}
+
+.publicSiteHeader,
+.publicSiteMain,
+.publicFooter {
+  position: relative;
+  z-index: 1;
+}
+
+.publicSiteHeader {
+  padding: 20px 24px 0;
+}
+
+.publicSiteHeaderInner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 18px 40px rgba(18, 31, 51, 0.08);
+}
+
+.publicBrand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.publicBrandMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, hsl(215 50% 23%), hsl(170 55% 40%));
+  color: white;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.publicNav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.publicNavLink {
+  padding: 8px 12px;
+  border-radius: 999px;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.publicNavLink:hover,
+.publicNavLinkActive {
+  color: var(--foreground);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.publicHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.publicSiteMain {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+}
+
+.publicButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  font-weight: 600;
+  line-height: 1;
+  border: 1px solid transparent;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+.publicButton:hover {
+  transform: translateY(-1px);
+}
+
+.publicButtonPrimary {
+  background: linear-gradient(135deg, hsl(215 50% 23%), hsl(197 61% 46%));
+  color: #fff;
+  box-shadow: 0 18px 35px rgba(22, 75, 135, 0.22);
+}
+
+.publicButtonSecondary {
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--foreground);
+  border-color: rgba(21, 42, 70, 0.1);
+}
+
+.heroSection {
+  position: relative;
+  padding: 56px 0 24px;
+}
+
+.heroGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 28px;
+  align-items: stretch;
+}
+
+.heroCopy {
+  position: relative;
+  padding: 34px;
+  border-radius: 36px;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 24px 60px rgba(24, 39, 64, 0.1);
+}
+
+.heroGlow {
+  position: absolute;
+  width: 18rem;
+  height: 18rem;
+  border-radius: 999px;
+  filter: blur(24px);
+  opacity: 0.35;
+}
+
+.heroGlowOne {
+  top: 2rem;
+  left: -3rem;
+  background: rgba(28, 146, 124, 0.35);
+}
+
+.heroGlowTwo {
+  right: 0;
+  bottom: 2rem;
+  background: rgba(48, 100, 185, 0.28);
+}
+
+.sectionEyebrow {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: hsl(197 61% 38%);
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: clamp(2.6rem, 5vw, 4.8rem);
+  line-height: 0.94;
+  letter-spacing: -0.06em;
+  max-width: 11ch;
+}
+
+.heroLead {
+  max-width: 56ch;
+  margin: 20px 0 0;
+  font-size: 1.05rem;
+  line-height: 1.75;
+  color: hsl(215 18% 33%);
+}
+
+.heroActions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+}
+
+.statusStrip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.statusCard {
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(24, 39, 64, 0.08);
+}
+
+.statusLabel {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted-foreground);
+  margin-bottom: 10px;
+}
+
+.heroPanel {
+  padding: 28px;
+  border-radius: 32px;
+}
+
+.heroPanelEyebrow {
+  margin: 0 0 18px;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.heroPanelList {
+  display: grid;
+  gap: 14px;
+}
+
+.heroPanelItem {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  align-items: start;
+  padding: 16px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(24, 39, 64, 0.08);
+}
+
+.heroPanelItem span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(21, 53, 96, 0.95), rgba(31, 126, 111, 0.9));
+  color: white;
+  font-weight: 700;
+}
+
+.heroPanelItem h2,
+.featureCard h3,
+.workflowCard h3,
+.faqCard h3,
+.legalCard h2,
+.supportContactCard h2 {
+  margin: 0 0 8px;
+}
+
+.heroPanelItem p,
+.featureCard p,
+.workflowCard p,
+.faqCard p,
+.legalCard p,
+.legalCard li,
+.supportContactCard p,
+.sectionHeading p,
+.trustPanel p {
+  margin: 0;
+  color: hsl(215 16% 35%);
+  line-height: 1.7;
+}
+
+.publicSection,
+.ctaSection,
+.legalSection {
+  padding: 32px 0;
+}
+
+.publicSectionAlt {
+  padding: 36px;
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  box-shadow: 0 20px 48px rgba(24, 39, 64, 0.06);
+}
+
+.sectionHeading {
+  max-width: 48rem;
+  margin-bottom: 24px;
+}
+
+.sectionHeading h2,
+.legalHero h1 {
+  margin: 0 0 10px;
+  font-size: clamp(2rem, 3vw, 3.1rem);
+  line-height: 1.02;
+  letter-spacing: -0.05em;
+}
+
+.featureGrid,
+.workflowGrid,
+.legalGrid,
+.supportContactGrid {
+  display: grid;
+  gap: 18px;
+}
+
+.featureGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.featureCard,
+.workflowCard,
+.faqCard,
+.legalCard,
+.supportContactCard,
+.checklistCard {
+  padding: 24px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(24, 39, 64, 0.08);
+}
+
+.workflowGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.workflowCard {
+  min-height: 100%;
+  position: relative;
+}
+
+.workflowCard::before {
+  content: "";
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 46px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, hsl(197 61% 46%), hsl(170 55% 40%));
+}
+
+.workflowCard h3 {
+  margin-top: 20px;
+}
+
+.trustPanel,
+.ctaCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 24px;
+  padding: 32px;
+  border-radius: 32px;
+  background: rgba(19, 38, 63, 0.95);
+  color: white;
+  box-shadow: 0 30px 70px rgba(11, 27, 49, 0.25);
+}
+
+.trustPanel p,
+.ctaCard p,
+.ctaCard h2,
+.trustPanel h2,
+.trustList li {
+  color: rgba(240, 245, 251, 0.92);
+}
+
+.trustList {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+.ctaActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.legalHero {
+  max-width: 52rem;
+  padding: 52px 0 12px;
+}
+
+.legalHero p {
+  margin: 0;
+  color: hsl(215 16% 35%);
+  line-height: 1.75;
+}
+
+.legalIntro {
+  max-width: 48rem;
+  display: grid;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.legalGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.legalCard ul,
+.checklistCard ul {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 10px;
+}
+
+.legalSectionCompact {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.supportContactGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.supportContactCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.faqList {
+  display: grid;
+  gap: 14px;
+}
+
+.publicFooter {
+  padding: 0 24px 32px;
+}
+
+.publicFooterInner,
+.publicFooterMeta {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.publicFooterInner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  padding: 28px 0 20px;
+  border-top: 1px solid rgba(21, 42, 70, 0.1);
+}
+
+.publicFooterBrand {
+  max-width: 34rem;
+}
+
+.publicFooterEyebrow,
+.publicFooterHeading {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.publicFooterCopy {
+  margin: 0;
+  color: hsl(215 16% 35%);
+  line-height: 1.7;
+}
+
+.publicFooterLinks {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 28px;
+}
+
+.publicFooterLinks div {
+  display: grid;
+  gap: 8px;
+}
+
+.publicFooterLinks a,
+.publicFooterMeta {
+  color: hsl(215 16% 35%);
+}
+
+.publicFooterMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 18px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+@media (max-width: 980px) {
+  .publicSiteHeaderInner,
+  .heroGrid,
+  .featureGrid,
+  .workflowGrid,
+  .trustPanel,
+  .ctaCard,
+  .legalGrid,
+  .legalSectionCompact,
+  .supportContactGrid,
+  .publicFooterInner {
+    grid-template-columns: 1fr;
+  }
+
+  .publicSiteHeaderInner {
+    border-radius: 28px;
+  }
+
+  .publicNav {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .publicHeaderActions {
+    margin-left: auto;
+  }
+
+  .ctaActions {
+    justify-content: flex-start;
+  }
+
+  .publicFooterLinks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .publicSiteHeader,
+  .publicSiteMain,
+  .publicFooter {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .heroCopy,
+  .heroPanel,
+  .publicSectionAlt,
+  .trustPanel,
+  .ctaCard,
+  .featureCard,
+  .workflowCard,
+  .faqCard,
+  .legalCard,
+  .supportContactCard,
+  .checklistCard {
+    padding: 20px;
+    border-radius: 22px;
+  }
+
+  .heroTitle {
+    max-width: none;
+  }
+
+  .statusStrip,
+  .publicFooterLinks {
+    grid-template-columns: 1fr;
+  }
+
+  .publicFooterMeta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

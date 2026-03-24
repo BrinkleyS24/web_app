@@ -1,6 +1,9 @@
 import React from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Home from "./pages/Home.jsx";
+import Landing from "./pages/Landing.jsx";
+import Privacy from "./pages/Privacy.jsx";
+import Support from "./pages/Support.jsx";
 import Account from "./pages/Account.jsx";
 import Dashboard from "./pages/DashboardNew.tsx";
 import Upgrade from "./pages/Upgrade.tsx";
@@ -74,9 +77,10 @@ export default function App() {
     location.pathname.startsWith(route)
   );
   const isUpgrade = location.pathname.startsWith("/upgrade");
+  const isPublicSite = location.pathname === "/" || location.pathname === "/privacy" || location.pathname === "/support";
   const containerClass = (isDashboard || isUpgrade)
     ? "container container--full"
-    : "container";
+    : (isPublicSite ? "container container--full" : "container");
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -85,7 +89,10 @@ export default function App() {
           <Toaster />
           <div className={containerClass}>
             <Routes>
-              <Route path="/" element={<Home />} />
+              <Route path="/" element={<Landing />} />
+              <Route path="/app" element={<Home />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/support" element={<Support />} />
               <Route path="/pricing" element={<Navigate to="/upgrade" replace />} />
               <Route
                 path="/account"

@@ -106,7 +106,7 @@ const Upgrade = () => {
           ) : !user ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground text-center">
-                Open the MorrowFold extension and sign in to continue.
+                Open the Applendium extension and sign in to continue.
               </p>
             </div>
           ) : (

@@ -4,8 +4,8 @@ import { auth, firebaseConfigured } from "./firebase.js";
 import { signInFromExtensionBridge } from "./extensionBridge.js";
 import { apiFetch } from "./api.js";
 
-const AUTH_STATE_PUSH = "MORROWFOLD_AUTH_STATE_PUSH";
-const EXTENSION_READY = "MORROWFOLD_EXTENSION_READY";
+const AUTH_STATE_PUSH = "APPLENDIUM_AUTH_STATE_PUSH";
+const EXTENSION_READY = "APPLENDIUM_EXTENSION_READY";
 
 const AuthContext = createContext({
   user: null,
@@ -62,20 +62,20 @@ export function AuthProvider({ children }) {
       for (let i = 0; i < 4; i++) {
         if (cancelled || auth?.currentUser) break;
         try {
-          console.log(`[MorrowFold] Bridge sign-in attempt ${i + 1}/4...`);
+          console.log(`[Applendium] Bridge sign-in attempt ${i + 1}/4...`);
           const result = await signInFromExtensionBridge();
           if (result?.success) {
-            console.log("[MorrowFold] Bridge sign-in succeeded!");
+            console.log("[Applendium] Bridge sign-in succeeded!");
             setExtensionDetected(true);
             break;
           }
           // If the bridge responded (even with failure), the extension is there
           if (result?.error && !result.error.includes("timed out")) {
-            console.log("[MorrowFold] Extension detected but sign-in failed:", result.error);
+            console.log("[Applendium] Extension detected but sign-in failed:", result.error);
             setExtensionDetected(true);
           }
         } catch (e) {
-          console.log("[MorrowFold] Bridge attempt error:", e?.message);
+          console.log("[Applendium] Bridge attempt error:", e?.message);
         }
         if (i < 3 && !cancelled) {
           await new Promise((r) => setTimeout(r, 2000));
@@ -142,7 +142,7 @@ export function AuthProvider({ children }) {
         }
       })
       .catch((err) => {
-        console.error("[MorrowFold] Failed to fetch user plan:", err);
+        console.error("[Applendium] Failed to fetch user plan:", err);
         if (!cancelled) {
           setPlan("free"); // Default to free on error (fail-closed)
           setPlanLoading(false);

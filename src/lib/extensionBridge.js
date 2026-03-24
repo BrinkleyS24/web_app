@@ -2,8 +2,8 @@ import { signInWithCustomToken } from "firebase/auth";
 import { auth, firebaseConfigured } from "./firebase.js";
 import { getApiBaseUrl } from "./api.js";
 
-const BRIDGE_REQUEST = "MORROWFOLD_EXTENSION_TOKEN_REQUEST";
-const BRIDGE_RESPONSE = "MORROWFOLD_EXTENSION_TOKEN_RESPONSE";
+const BRIDGE_REQUEST = "APPLENDIUM_EXTENSION_TOKEN_REQUEST";
+const BRIDGE_RESPONSE = "APPLENDIUM_EXTENSION_TOKEN_RESPONSE";
 const BRIDGE_TIMEOUT_MS = 6000;
 
 function requestExtensionIdToken() {
@@ -38,14 +38,14 @@ export async function signInFromExtensionBridge() {
     return { success: false, error: "Firebase is not configured." };
   }
 
-  console.log("[MorrowFold Bridge] Requesting ID token from extension...");
+  console.log("[Applendium Bridge] Requesting ID token from extension...");
   const tokenResponse = await requestExtensionIdToken();
   if (!tokenResponse?.success || !tokenResponse?.token) {
-    console.log("[MorrowFold Bridge] Token request failed:", tokenResponse?.error);
+    console.log("[Applendium Bridge] Token request failed:", tokenResponse?.error);
     return { success: false, error: tokenResponse?.error || "No extension token available." };
   }
 
-  console.log("[MorrowFold Bridge] Got token, exchanging with backend...");
+  console.log("[Applendium Bridge] Got token, exchanging with backend...");
   const apiBase = getApiBaseUrl();
   const response = await fetch(`${apiBase}/api/auth/extension-token`, {
     method: "POST",
@@ -57,13 +57,13 @@ export async function signInFromExtensionBridge() {
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || !payload?.firebaseToken) {
-    console.log("[MorrowFold Bridge] Backend token exchange failed:", response.status, payload?.error);
+    console.log("[Applendium Bridge] Backend token exchange failed:", response.status, payload?.error);
     return { success: false, error: payload?.error || "Failed to exchange extension token." };
   }
 
-  console.log("[MorrowFold Bridge] Signing in with custom token...");
+  console.log("[Applendium Bridge] Signing in with custom token...");
   await signInWithCustomToken(auth, payload.firebaseToken);
-  console.log("[MorrowFold Bridge] Sign-in complete!");
+  console.log("[Applendium Bridge] Sign-in complete!");
   return { success: true };
 }
 

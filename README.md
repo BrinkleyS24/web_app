@@ -1,4 +1,4 @@
-# MorrowFold Premium Web (starter)
+# Applendium Premium Web (starter)
 
 This is the starter web app for premium features (pricing, account, dashboards). It uses:
 
