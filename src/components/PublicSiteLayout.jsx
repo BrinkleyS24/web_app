@@ -31,7 +31,9 @@ export default function PublicSiteLayout({ children }) {
       <header className="publicSiteHeader">
         <div className="publicSiteHeaderInner">
           <Link className="publicBrand" to="/">
-            <span className="publicBrandMark">A</span>
+            <span className="publicBrandMark" aria-hidden="true">
+              <img className="publicBrandMarkImage" src="/favicon.png" alt="" />
+            </span>
             <span>Applendium</span>
           </Link>
 
