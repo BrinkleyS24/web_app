@@ -4,7 +4,7 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   setPersistence,
-  browserLocalPersistence,
+  browserSessionPersistence,
 } from "firebase/auth";
 
 function readEnv(name) {
@@ -33,8 +33,8 @@ if (firebaseConfigured) {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
 
-  // Keep user signed in across refreshes.
-  await setPersistence(auth, browserLocalPersistence);
+  // The companion app is extension-scoped; do not keep auth beyond the active browser session.
+  await setPersistence(auth, browserSessionPersistence);
 } else {
   // eslint-disable-next-line no-console
   console.warn(

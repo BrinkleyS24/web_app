@@ -77,6 +77,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
       </SidebarContent>
 
       <div className="mt-auto p-4 border-t border-sidebar-border space-y-2">

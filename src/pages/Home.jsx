@@ -1,54 +1,50 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import AuthButton from "../components/AuthButton.jsx";
 import { useAuth } from "../lib/AuthContext.jsx";
-import { apiFetch } from "../lib/api.js";
 import { firebaseConfigured } from "../lib/firebase.js";
 
 export default function Home() {
-  const { user, loading: authLoading, extensionDetected } = useAuth();
-  const [error, setError] = useState("");
-  const [checking, setChecking] = useState(false);
+  const {
+    user,
+    loading: authLoading,
+    extensionDetected,
+    plan,
+    planLoading,
+    planError,
+    adminEmail,
+  } = useAuth();
   const navigate = useNavigate();
 
   // Once authenticated, fetch plan and redirect
   useEffect(() => {
-    if (authLoading || !user) return;
+    if (authLoading || planLoading || !user) return;
 
-    let cancelled = false;
-    setChecking(true);
+    if (adminEmail) {
+      navigate("/admin/debug", { replace: true });
+      return;
+    }
 
-    (async () => {
-      try {
-        const resp = await apiFetch("/api/user", { method: "POST", body: "{}" });
-        if (cancelled) return;
-        const plan = resp?.plan ?? "free";
-        if (plan === "premium") {
-          navigate("/dashboard", { replace: true });
-        } else {
-          navigate("/upgrade", { replace: true });
-        }
-      } catch (e) {
-        if (!cancelled) setError(e?.message || "Failed to load user plan.");
-      } finally {
-        if (!cancelled) setChecking(false);
-      }
-    })();
+    if (plan === "premium") {
+      navigate("/dashboard", { replace: true });
+      return;
+    }
 
-    return () => { cancelled = true; };
-  }, [user, authLoading, navigate]);
+    navigate("/upgrade", { replace: true });
+  }, [user, authLoading, planLoading, adminEmail, plan, navigate]);
 
   return (
     <div className="card" style={{ maxWidth: 520, margin: "40px auto" }}>
       <p className="sectionEyebrow" style={{ marginBottom: 10 }}>Companion app</p>
       <h2 style={{ marginTop: 0 }}>Open your Applendium workspace</h2>
 
-      {!firebaseConfigured ? (
+      {!firebaseConfigured && !user ? (
         <div className="error">
           The companion app is not configured yet. Set the VITE_FIREBASE_* build environment variables for this deployment.
         </div>
       ) : authLoading ? (
         <p className="muted" style={{ marginTop: 4 }}>Connecting to extension...</p>
-      ) : checking ? (
+      ) : user && planLoading ? (
         <p className="muted" style={{ marginTop: 4 }}>Checking your plan...</p>
       ) : user ? (
         <p className="muted" style={{ marginTop: 4 }}>
@@ -61,10 +57,16 @@ export default function Home() {
               ? "You're not signed into the Applendium extension. Open the extension popup and sign in, then refresh this page."
               : "This page works with the Applendium Chrome extension. Make sure the extension is installed and you're signed in, then refresh this page."}
           </p>
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid rgba(148, 163, 184, 0.2)" }}>
+            <p className="muted" style={{ marginBottom: 10 }}>
+              For admin or internal debugging, you can also sign in directly on the web with Google.
+            </p>
+            <AuthButton />
+          </div>
         </div>
       )}
 
-      {error ? <div className="error" style={{ marginTop: 12 }}>{error}</div> : null}
+      {planError ? <div className="error" style={{ marginTop: 12 }}>{planError}</div> : null}
 
       <p className="muted" style={{ marginTop: 16 }}>
         Looking for the public site? <a href="/">Go back to applendium.com</a>.

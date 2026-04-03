@@ -13,6 +13,7 @@ import OutcomeMemory from "./pages/OutcomeMemory.tsx";
 import StrategyAlerts from "./pages/StrategyAlerts.tsx";
 import WeeklySummary from "./pages/WeeklySummary.tsx";
 import Settings from "./pages/Settings.tsx";
+import AdminDebug from "./pages/AdminDebug.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -22,6 +23,7 @@ import { AuthProvider, useAuth } from "./lib/AuthContext.jsx";
 const queryClient = new QueryClient();
 
 const DASHBOARD_ROUTES = [
+  "/admin",
   "/dashboard",
   "/apply-gate",
   "/fix-suggestions",
@@ -29,43 +31,59 @@ const DASHBOARD_ROUTES = [
   "/strategy-alerts",
   "/weekly-summary",
   "/settings",
+  "/admin/debug",
 ];
 
-function RequireAuth({ children }) {
-  const { user, loading } = useAuth();
+function LoadingScreen() {
+  return (
+    <div className="container" style={{ paddingTop: 48 }}>
+      <p className="muted">Loading...</p>
+    </div>
+  );
+}
 
-  if (loading) {
+function RequireNonAdminUser({ children }) {
+  const { user, loading, planLoading, adminEmail } = useAuth();
+
+  if (loading || planLoading) return <LoadingScreen />;
+  if (!user) return <NotFound />;
+  if (adminEmail) return <Navigate to="/admin/debug" replace />;
+
+  return children;
+}
+
+function RequirePremiumUser({ children }) {
+  const { user, loading, plan, planLoading, planError, adminEmail } = useAuth();
+
+  if (loading || planLoading) return <LoadingScreen />;
+  if (!user) return <NotFound />;
+  if (adminEmail) return <Navigate to="/admin/debug" replace />;
+
+  if (planError && plan !== "premium") {
     return (
       <div className="container" style={{ paddingTop: 48 }}>
-        <p className="muted">Loading...</p>
+        <div className="error">
+          Premium status could not be verified right now. Refresh and try again.
+          <div style={{ marginTop: 8 }}>{planError}</div>
+        </div>
       </div>
     );
   }
 
-  if (!user) {
-    return <NotFound />;
+  if (plan !== "premium") {
+    return <Navigate to="/upgrade" replace />;
   }
 
   return children;
 }
 
-function RequirePremium({ children }) {
-  const { user, loading, plan, planLoading } = useAuth();
+function RequireAdminEmail({ children }) {
+  const { user, loading, planLoading, adminEmail } = useAuth();
 
-  if (loading || planLoading) {
-    return (
-      <div className="container" style={{ paddingTop: 48 }}>
-        <p className="muted">Loading...</p>
-      </div>
-    );
-  }
+  if (loading || planLoading) return <LoadingScreen />;
 
-  if (!user) {
+  if (!user || !adminEmail) {
     return <NotFound />;
-  }
-
-  if (plan !== "premium") {
-    return <Navigate to="/upgrade" replace />;
   }
 
   return children;
@@ -97,73 +115,89 @@ export default function App() {
               <Route
                 path="/account"
                 element={
-                  <RequireAuth>
+                  <RequireNonAdminUser>
                     <Account />
-                  </RequireAuth>
+                  </RequireNonAdminUser>
                 }
               />
               <Route
                 path="/dashboard"
                 element={
-                  <RequirePremium>
+                  <RequirePremiumUser>
                     <Dashboard />
-                  </RequirePremium>
+                  </RequirePremiumUser>
                 }
               />
               <Route
                 path="/upgrade"
                 element={
-                  <RequireAuth>
+                  <RequireNonAdminUser>
                     <Upgrade />
-                  </RequireAuth>
+                  </RequireNonAdminUser>
                 }
               />
               <Route
                 path="/apply-gate"
                 element={
-                  <RequirePremium>
+                  <RequirePremiumUser>
                     <ApplyGate />
-                  </RequirePremium>
+                  </RequirePremiumUser>
                 }
               />
               <Route
                 path="/fix-suggestions"
                 element={
-                  <RequirePremium>
+                  <RequirePremiumUser>
                     <FixSuggestions />
-                  </RequirePremium>
+                  </RequirePremiumUser>
                 }
               />
               <Route
                 path="/outcome-memory"
                 element={
-                  <RequirePremium>
+                  <RequirePremiumUser>
                     <OutcomeMemory />
-                  </RequirePremium>
+                  </RequirePremiumUser>
                 }
               />
               <Route
                 path="/strategy-alerts"
                 element={
-                  <RequirePremium>
+                  <RequirePremiumUser>
                     <StrategyAlerts />
-                  </RequirePremium>
+                  </RequirePremiumUser>
                 }
               />
               <Route
                 path="/weekly-summary"
                 element={
-                  <RequirePremium>
+                  <RequirePremiumUser>
                     <WeeklySummary />
-                  </RequirePremium>
+                  </RequirePremiumUser>
                 }
               />
               <Route
                 path="/settings"
                 element={
-                  <RequireAuth>
+                  <RequireNonAdminUser>
                     <Settings />
-                  </RequireAuth>
+                  </RequireNonAdminUser>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <RequireAdminEmail>
+                    <Navigate to="/admin/debug" replace />
+                  </RequireAdminEmail>
+                }
+              />
+              <Route
+                path="/admin/debug"
+                element={
+                  <RequireAdminEmail>
+                    <AdminDebug />
+                  </RequireAdminEmail>
                 }
               />
               <Route path="*" element={<NotFound />} />

@@ -48,11 +48,11 @@ const trustPoints = [
 ];
 
 export default function Landing() {
-  const { user, loading, plan } = useAuth();
+  const { user, loading, plan, adminEmail } = useAuth();
 
   const signedIn = Boolean(user);
   const signedInTarget = signedIn
-    ? (plan === "premium" ? "/dashboard" : "/upgrade")
+    ? (adminEmail ? "/admin/debug" : plan === "premium" ? "/dashboard" : "/upgrade")
     : "/app";
 
   return (

@@ -1,6 +1,5 @@
 import { signInWithCustomToken } from "firebase/auth";
 import { auth, firebaseConfigured } from "./firebase.js";
-import { getApiBaseUrl } from "./api.js";
 
 const BRIDGE_REQUEST = "APPLENDIUM_EXTENSION_TOKEN_REQUEST";
 const BRIDGE_RESPONSE = "APPLENDIUM_EXTENSION_TOKEN_RESPONSE";
@@ -38,31 +37,15 @@ export async function signInFromExtensionBridge() {
     return { success: false, error: "Firebase is not configured." };
   }
 
-  console.log("[Applendium Bridge] Requesting ID token from extension...");
+  console.log("[Applendium Bridge] Requesting extension-backed web auth...");
   const tokenResponse = await requestExtensionIdToken();
-  if (!tokenResponse?.success || !tokenResponse?.token) {
+  if (!tokenResponse?.success || !tokenResponse?.firebaseToken) {
     console.log("[Applendium Bridge] Token request failed:", tokenResponse?.error);
     return { success: false, error: tokenResponse?.error || "No extension token available." };
   }
 
-  console.log("[Applendium Bridge] Got token, exchanging with backend...");
-  const apiBase = getApiBaseUrl();
-  const response = await fetch(`${apiBase}/api/auth/extension-token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${tokenResponse.token}`,
-    },
-  });
-
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok || !payload?.firebaseToken) {
-    console.log("[Applendium Bridge] Backend token exchange failed:", response.status, payload?.error);
-    return { success: false, error: payload?.error || "Failed to exchange extension token." };
-  }
-
   console.log("[Applendium Bridge] Signing in with custom token...");
-  await signInWithCustomToken(auth, payload.firebaseToken);
+  await signInWithCustomToken(auth, tokenResponse.firebaseToken);
   console.log("[Applendium Bridge] Sign-in complete!");
   return { success: true };
 }
