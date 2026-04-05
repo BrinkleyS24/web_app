@@ -1,5 +1,6 @@
 import React from "react";
 import PublicSiteLayout from "../components/PublicSiteLayout.jsx";
+import usePageMetadata from "../lib/usePageMetadata.js";
 
 const helpCards = [
   {
@@ -43,6 +44,12 @@ const faqItems = [
 ];
 
 export default function Support() {
+  usePageMetadata({
+    title: "Applendium | Support",
+    description:
+      "Contact Applendium support for installation issues, sync problems, billing questions, privacy requests, and launch-status help.",
+  });
+
   return (
     <PublicSiteLayout>
       <section className="legalHero">

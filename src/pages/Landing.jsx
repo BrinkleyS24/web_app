@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Clock3 } from "lucide-react";
 import PublicSiteLayout from "../components/PublicSiteLayout.jsx";
 import { useAuth } from "../lib/AuthContext.jsx";
+import usePageMetadata from "../lib/usePageMetadata.js";
 import {
   availableNowItems,
   launchStatusItems,
@@ -15,6 +16,12 @@ const CHROME_WEB_STORE_URL = (import.meta.env.VITE_CHROME_WEB_STORE_URL || "").t
 
 export default function Landing() {
   const { user, loading, plan, adminEmail } = useAuth();
+
+  usePageMetadata({
+    title: "Applendium | Extension Launch Status",
+    description:
+      "Applendium is launching its Gmail extension first. Privacy, support, and premium status pages are live while premium dashboard workflows remain closed.",
+  });
 
   const signedIn = Boolean(user);
   const signedInTarget = signedIn

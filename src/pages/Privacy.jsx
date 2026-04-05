@@ -1,5 +1,6 @@
 import React from "react";
 import PublicSiteLayout from "../components/PublicSiteLayout.jsx";
+import usePageMetadata from "../lib/usePageMetadata.js";
 
 const sections = [
   {
@@ -47,6 +48,12 @@ const sections = [
 ];
 
 export default function Privacy() {
+  usePageMetadata({
+    title: "Applendium | Privacy Policy",
+    description:
+      "Read how Applendium handles Gmail-derived data, account information, retention, and privacy requests for the Chrome extension and companion app.",
+  });
+
   return (
     <PublicSiteLayout>
       <section className="legalHero">

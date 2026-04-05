@@ -1,8 +1,9 @@
 import React from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Clock3 } from "lucide-react";
 import PublicSiteLayout from "../components/PublicSiteLayout.jsx";
 import { useAuth } from "../lib/AuthContext.jsx";
+import usePageMetadata from "../lib/usePageMetadata.js";
 import {
   premiumFeatureCards,
   premiumUpdatesHref,
@@ -12,11 +13,13 @@ import {
 const CHROME_WEB_STORE_URL = (import.meta.env.VITE_CHROME_WEB_STORE_URL || "").trim();
 
 const Upgrade = () => {
-  const { user, loading: authLoading, plan, planLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
-  if (!authLoading && !planLoading && plan === "premium") {
-    return <Navigate to="/dashboard" replace />;
-  }
+  usePageMetadata({
+    title: "Applendium | Premium Status",
+    description:
+      "Premium billing is temporarily closed while the Applendium premium dashboard is still in build. Use this page for current status and support paths.",
+  });
 
   const sessionLabel = authLoading
     ? "Checking session..."

@@ -130,11 +130,7 @@ export default function App() {
               />
               <Route
                 path="/upgrade"
-                element={
-                  <RequireNonAdminUser>
-                    <Upgrade />
-                  </RequireNonAdminUser>
-                }
+                element={<Upgrade />}
               />
               <Route
                 path="/apply-gate"
