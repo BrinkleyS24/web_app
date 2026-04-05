@@ -7,6 +7,7 @@
 :root {
   color-scheme: light;
   --radius: 0.625rem;
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
 
   /* Lovable theme — light */
   --background: hsl(210 20% 98%);
@@ -60,8 +61,7 @@
 
 body {
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Arial,
-    "Apple Color Emoji", "Segoe UI Emoji";
+  font-family: var(--font-sans);
   background: var(--background);
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
@@ -484,6 +484,42 @@ a {
   border-color: rgba(21, 42, 70, 0.1);
 }
 
+.publicBrand,
+.heroTitle,
+.sectionHeading h2,
+.legalHero h1,
+.trustPanel h2,
+.ctaCard h2,
+.launchMetricValue,
+.launchPanelHeader h2,
+.timelineCard h3 {
+  font-family: var(--font-display);
+}
+
+.launchBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(21, 42, 70, 0.12);
+  box-shadow: 0 12px 28px rgba(18, 31, 51, 0.08);
+  color: hsl(215 25% 22%);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.launchBadge svg,
+.launchMetricLink svg,
+.featureIcon svg,
+.launchPanelIcon svg {
+  width: 16px;
+  height: 16px;
+}
+
 .heroSection {
   position: relative;
   padding: 56px 0 24px;
@@ -558,6 +594,37 @@ a {
   margin-top: 28px;
 }
 
+.heroMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.launchMetricCard {
+  padding: 18px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(24, 39, 64, 0.08);
+}
+
+.launchMetricValue {
+  display: block;
+  margin-top: 4px;
+  font-size: clamp(1.1rem, 2vw, 1.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.launchMetricLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: hsl(197 61% 38%);
+  font-weight: 700;
+}
+
 .statusStrip {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -587,6 +654,12 @@ a {
   border-radius: 32px;
 }
 
+.launchPanel {
+  display: grid;
+  gap: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(241, 246, 251, 0.84));
+}
+
 .heroPanelEyebrow {
   margin: 0 0 18px;
   color: var(--muted-foreground);
@@ -597,6 +670,11 @@ a {
 }
 
 .heroPanelList {
+  display: grid;
+  gap: 14px;
+}
+
+.launchPanelList {
   display: grid;
   gap: 14px;
 }
@@ -624,9 +702,71 @@ a {
   font-weight: 700;
 }
 
+.launchPanelItem {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: start;
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(24, 39, 64, 0.08);
+}
+
+.launchPanelIcon,
+.featureIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(21, 53, 96, 0.95), rgba(31, 126, 111, 0.9));
+  color: white;
+  box-shadow: 0 14px 32px rgba(22, 75, 135, 0.18);
+}
+
+.launchPanelHeader,
+.launchCardHeader,
+.timelineCardTop,
+.featureCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.featureCardHeader {
+  margin-bottom: 14px;
+}
+
+.launchStateTag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(33, 132, 91, 0.1);
+  border: 1px solid rgba(33, 132, 91, 0.16);
+  color: hsl(158 63% 28%);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.launchStateTagSoon {
+  background: rgba(199, 142, 27, 0.12);
+  border-color: rgba(199, 142, 27, 0.18);
+  color: hsl(32 82% 34%);
+}
+
 .heroPanelItem h2,
+.launchPanelItem h2,
 .featureCard h3,
 .workflowCard h3,
+.timelineCard h3,
 .faqCard h3,
 .legalCard h2,
 .supportContactCard h2 {
@@ -634,14 +774,18 @@ a {
 }
 
 .heroPanelItem p,
+.launchPanelItem p,
 .featureCard p,
 .workflowCard p,
+.timelineCard p,
 .faqCard p,
 .legalCard p,
 .legalCard li,
 .supportContactCard p,
 .sectionHeading p,
-.trustPanel p {
+.trustPanel p,
+.launchCardList p,
+.ctaNote {
   margin: 0;
   color: hsl(215 16% 35%);
   line-height: 1.7;
@@ -686,6 +830,20 @@ a {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.launchColumns,
+.timelineGrid {
+  display: grid;
+  gap: 18px;
+}
+
+.launchColumns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.timelineGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .featureCard,
 .workflowCard,
 .faqCard,
@@ -696,6 +854,46 @@ a {
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.8);
   border: 1px solid rgba(24, 39, 64, 0.08);
+}
+
+.launchCard {
+  padding: 28px;
+}
+
+.launchCardContrast {
+  background: linear-gradient(180deg, rgba(255, 247, 231, 0.94), rgba(255, 255, 255, 0.88));
+}
+
+.launchCardEyebrow {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: hsl(197 61% 38%);
+}
+
+.launchCardList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 16px;
+}
+
+.launchCardList li {
+  padding-top: 16px;
+  border-top: 1px solid rgba(24, 39, 64, 0.08);
+}
+
+.launchCardList li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.launchCardList strong {
+  display: block;
+  margin-bottom: 4px;
 }
 
 .workflowGrid {
@@ -720,6 +918,26 @@ a {
 
 .workflowCard h3 {
   margin-top: 20px;
+}
+
+.timelineCard {
+  padding: 26px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(24, 39, 64, 0.08);
+  box-shadow: 0 16px 38px rgba(24, 39, 64, 0.06);
+}
+
+.timelineStep {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(21, 53, 96, 0.95), rgba(31, 126, 111, 0.9));
+  color: white;
+  font-weight: 700;
 }
 
 .trustPanel,
@@ -755,6 +973,11 @@ a {
   justify-content: flex-end;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.ctaNote {
+  margin-top: 10px;
+  max-width: 42rem;
 }
 
 .legalHero {
@@ -875,8 +1098,11 @@ a {
 @media (max-width: 980px) {
   .publicSiteHeaderInner,
   .heroGrid,
+  .heroMetaGrid,
   .featureGrid,
+  .launchColumns,
   .workflowGrid,
+  .timelineGrid,
   .trustPanel,
   .ctaCard,
   .legalGrid,
@@ -936,9 +1162,17 @@ a {
     max-width: none;
   }
 
+  .heroMetaGrid,
   .statusStrip,
   .publicFooterLinks {
     grid-template-columns: 1fr;
+  }
+
+  .launchPanelHeader,
+  .launchCardHeader,
+  .timelineCardTop,
+  .featureCardHeader {
+    flex-direction: column;
   }
 
   .publicFooterMeta {

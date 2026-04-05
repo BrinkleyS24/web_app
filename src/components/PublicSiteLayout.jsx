@@ -58,6 +58,12 @@ export default function PublicSiteLayout({ children }) {
               Support
             </NavLink>
             <NavLink
+              to="/upgrade"
+              className={({ isActive }) => `publicNavLink ${isActive ? "publicNavLinkActive" : ""}`.trim()}
+            >
+              Premium
+            </NavLink>
+            <NavLink
               to="/app"
               className={({ isActive }) => `publicNavLink ${isActive ? "publicNavLinkActive" : ""}`.trim()}
             >
@@ -81,7 +87,7 @@ export default function PublicSiteLayout({ children }) {
           <div className="publicFooterBrand">
             <p className="publicFooterEyebrow">Applendium</p>
             <p className="publicFooterCopy">
-              A Gmail companion for turning application emails into a structured, reviewable job search record.
+              The Gmail extension is live. Premium dashboard workflows are still in active build.
             </p>
           </div>
 
@@ -89,6 +95,7 @@ export default function PublicSiteLayout({ children }) {
             <div>
               <p className="publicFooterHeading">Company</p>
               <Link to="/">Home</Link>
+              <Link to="/upgrade">Premium Status</Link>
               <Link to="/app">Companion App</Link>
             </div>
             <div>
