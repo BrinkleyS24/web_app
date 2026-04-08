@@ -21,7 +21,7 @@ export default function Home() {
     if (authLoading || planLoading || !user) return;
 
     if (adminEmail) {
-      navigate("/admin/debug", { replace: true });
+      navigate("/admin/review", { replace: true });
       return;
     }
 

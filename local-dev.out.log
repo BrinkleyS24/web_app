@@ -1,0 +1,23 @@
+
+> applendium-web@0.1.0 dev
+> vite
+
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m603[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[2m1:42:34 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/lib/AuthContext.jsx, /src/styles.css[22m
+[2m3:41:34 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminDebug.tsx, /src/styles.css[22m
+[2m3:42:11 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminDebug.tsx, /src/styles.css[22m
+[2m3:42:19 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/C:\Users\stace\OneDrive\Desktop\intrackt-project-root\frontend\web\src\components\AdminLayout.tsx, /src/styles.css[22m
+[2m4:03:06 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/C:\Users\stace\OneDrive\Desktop\intrackt-project-root\frontend\web\src\components\AdminReviewQueue.tsx, /src/styles.css[22m
+[2m4:03:18 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/C:\Users\stace\OneDrive\Desktop\intrackt-project-root\frontend\web\src\components\AdminReviewQueue.tsx, /src/styles.css[22m
+[2m4:03:26 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/C:\Users\stace\OneDrive\Desktop\intrackt-project-root\frontend\web\src\components\AdminReviewQueue.tsx, /src/styles.css[22m
+[2m4:03:44 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/C:\Users\stace\OneDrive\Desktop\intrackt-project-root\frontend\web\src\components\AdminReviewQueue.tsx, /src/styles.css[22m
+[2m4:06:49 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminDebug.tsx, /src/styles.css[22m
+[2m4:06:57 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AdminDebug.tsx, /src/styles.css[22m
+[2m4:08:45 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/styles.css[22m
+[2m4:08:52 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Home.jsx, /src/styles.css[22m
+[2m4:08:52 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Landing.jsx, /src/styles.css[22m
+[2m4:09:05 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/C:\Users\stace\OneDrive\Desktop\intrackt-project-root\frontend\web\src\components\AdminSidebar.tsx, /src/styles.css[22m

@@ -54,12 +54,12 @@ export function AuthProvider({ children }) {
   const [bridgeDone, setBridgeDone] = useState(isLocalDevBypass || !firebaseConfigured);
   const [extensionDetected, setExtensionDetected] = useState(false);
   const [extensionAuthResolved, setExtensionAuthResolved] = useState(isLocalDevBypass || !firebaseConfigured);
-  const [plan, setPlan] = useState(null);
-  const [planLoading, setPlanLoading] = useState(true);
+  const [plan, setPlan] = useState(isLocalDevBypass ? "premium" : null);
+  const [planLoading, setPlanLoading] = useState(!isLocalDevBypass);
   const [planError, setPlanError] = useState("");
-  const [adminEmail, setAdminEmail] = useState(false);
-  const [debugRoutesEnabled, setDebugRoutesEnabled] = useState(false);
-  const [debugAdminAccess, setDebugAdminAccess] = useState(false);
+  const [adminEmail, setAdminEmail] = useState(isLocalDevBypass);
+  const [debugRoutesEnabled, setDebugRoutesEnabled] = useState(isLocalDevBypass);
+  const [debugAdminAccess, setDebugAdminAccess] = useState(isLocalDevBypass);
 
   useEffect(() => {
     if (isLocalDevBypass) {
@@ -167,6 +167,16 @@ export function AuthProvider({ children }) {
   }, [isLocalDevBypass]);
 
   useEffect(() => {
+    if (isLocalDevBypass) {
+      setPlan("premium");
+      setPlanLoading(false);
+      setPlanError("");
+      setAdminEmail(true);
+      setDebugRoutesEnabled(true);
+      setDebugAdminAccess(true);
+      return undefined;
+    }
+
     if (!user) {
       setPlan(null);
       setPlanLoading(false);
@@ -206,7 +216,7 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, isLocalDevBypass]);
 
   const loading = !authReady || (extensionDetected && !extensionAuthResolved) || (!user && !bridgeDone);
 

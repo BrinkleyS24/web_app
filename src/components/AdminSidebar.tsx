@@ -1,4 +1,4 @@
-import { Bug, Crown, LogOut, ShieldAlert } from "lucide-react";
+import { BarChart3, Crown, ListChecks, LogOut, ShieldAlert, Wrench } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 
@@ -56,12 +56,36 @@ export function AdminSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <NavLink
-                    to="/admin/debug"
+                    to="/admin/review"
                     className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
                     activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                   >
-                    <Bug className="w-4 h-4 shrink-0" />
-                    <span>Admin Dashboard</span>
+                    <ListChecks className="w-4 h-4 shrink-0" />
+                    <span>Review Queue</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink
+                    to="/admin/analytics"
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                    activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                  >
+                    <BarChart3 className="w-4 h-4 shrink-0" />
+                    <span>Analytics</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink
+                    to="/admin/jobs"
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                    activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                  >
+                    <Wrench className="w-4 h-4 shrink-0" />
+                    <span>Jobs</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

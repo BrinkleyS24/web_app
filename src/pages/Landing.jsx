@@ -25,7 +25,7 @@ export default function Landing() {
 
   const signedIn = Boolean(user);
   const signedInTarget = signedIn
-    ? (adminEmail ? "/admin/debug" : plan === "premium" ? "/dashboard" : "/upgrade")
+    ? (adminEmail ? "/admin/review" : plan === "premium" ? "/dashboard" : "/upgrade")
     : "/app";
   const premiumTarget = signedIn && plan === "premium" ? "/dashboard" : "/upgrade";
   const sessionLabel = loading

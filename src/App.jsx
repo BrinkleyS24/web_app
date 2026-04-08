@@ -13,7 +13,10 @@ import OutcomeMemory from "./pages/OutcomeMemory.tsx";
 import StrategyAlerts from "./pages/StrategyAlerts.tsx";
 import WeeklySummary from "./pages/WeeklySummary.tsx";
 import Settings from "./pages/Settings.tsx";
+import AdminAnalytics from "./pages/AdminAnalytics.tsx";
 import AdminDebug from "./pages/AdminDebug.tsx";
+import AdminJobs from "./pages/AdminJobs.tsx";
+import AdminReview from "./pages/AdminReview.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -32,6 +35,9 @@ const DASHBOARD_ROUTES = [
   "/weekly-summary",
   "/settings",
   "/admin/debug",
+  "/admin/review",
+  "/admin/analytics",
+  "/admin/jobs",
 ];
 
 function LoadingScreen() {
@@ -47,7 +53,7 @@ function RequireNonAdminUser({ children }) {
 
   if (loading || planLoading) return <LoadingScreen />;
   if (!user) return <NotFound />;
-  if (adminEmail) return <Navigate to="/admin/debug" replace />;
+  if (adminEmail) return <Navigate to="/admin/review" replace />;
 
   return children;
 }
@@ -57,7 +63,7 @@ function RequirePremiumUser({ children }) {
 
   if (loading || planLoading) return <LoadingScreen />;
   if (!user) return <NotFound />;
-  if (adminEmail) return <Navigate to="/admin/debug" replace />;
+  if (adminEmail) return <Navigate to="/admin/review" replace />;
 
   if (planError && plan !== "premium") {
     return (
@@ -184,7 +190,31 @@ export default function App() {
                 path="/admin"
                 element={
                   <RequireAdminEmail>
-                    <Navigate to="/admin/debug" replace />
+                    <Navigate to="/admin/review" replace />
+                  </RequireAdminEmail>
+                }
+              />
+              <Route
+                path="/admin/review"
+                element={
+                  <RequireAdminEmail>
+                    <AdminReview />
+                  </RequireAdminEmail>
+                }
+              />
+              <Route
+                path="/admin/analytics"
+                element={
+                  <RequireAdminEmail>
+                    <AdminAnalytics />
+                  </RequireAdminEmail>
+                }
+              />
+              <Route
+                path="/admin/jobs"
+                element={
+                  <RequireAdminEmail>
+                    <AdminJobs />
                   </RequireAdminEmail>
                 }
               />

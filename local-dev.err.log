@@ -1,0 +1,6 @@
+[Error: EPERM: operation not permitted, rmdir 'C:\Users\stace\OneDrive\Desktop\intrackt-project-root\frontend\web\node_modules\.vite\deps_temp_7d708379'] {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'rmdir',
+  path: 'C:\\Users\\stace\\OneDrive\\Desktop\\intrackt-project-root\\frontend\\web\\node_modules\\.vite\\deps_temp_7d708379'
+}
