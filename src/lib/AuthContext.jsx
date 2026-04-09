@@ -10,9 +10,9 @@ const DEV_AUTH_BYPASS_ENABLED =
   import.meta.env.DEV
   && String(import.meta.env.VITE_DEV_AUTH_BYPASS || "").trim().toLowerCase() === "true";
 const DEV_AUTH_BYPASS_EMAIL =
-  String(import.meta.env.VITE_DEV_AUTH_EMAIL || "admin@applendium.com").trim() || "admin@applendium.com";
+  String(import.meta.env.VITE_DEV_AUTH_EMAIL || "").trim() || "dev@example.test";
 const DEV_AUTH_BYPASS_UID =
-  String(import.meta.env.VITE_DEV_AUTH_UID || "dev-admin-user").trim() || "dev-admin-user";
+  String(import.meta.env.VITE_DEV_AUTH_UID || "").trim() || "local-dev-user";
 
 function buildDevBypassUser() {
   return {
