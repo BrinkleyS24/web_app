@@ -5,11 +5,11 @@ import PublicSiteLayout from "../components/PublicSiteLayout.jsx";
 import usePageMetadata from "../lib/usePageMetadata.js";
 import {
   availableNowItems,
+  getLaunchStatusItems,
+  getRolloutSteps,
   heroFactItems,
-  launchStatusItems,
   premiumFeatureCards,
   premiumUpdatesHref,
-  rolloutSteps,
 } from "../lib/premiumLaunchContent.js";
 import {
   CHROME_EXTENSION_IS_LIVE,
@@ -28,19 +28,27 @@ export default function Landing() {
 
   const heroTitle = CHROME_EXTENSION_IS_LIVE
     ? "Track job applications from Gmail in one Chrome extension."
-    : "A Gmail job tracker for Chrome, now heading through store review.";
+    : "A Gmail job tracker for Chrome, with the first release in review.";
   const heroLead = CHROME_EXTENSION_IS_LIVE
     ? "Applendium reads job-application emails with Gmail read-only access, groups them by stage inside the popup, and keeps the search record usable without a manual spreadsheet."
-    : "The Chrome Web Store listing is in review. Applendium is built to read job-application emails with Gmail read-only access, group them by stage inside the popup, and give users a cleaner search record once the listing is approved.";
+    : "The Chrome Web Store listing is in review. The first public release is the Chrome extension: Gmail read-only access, popup-based stage tracking, search, refresh, and application-history review without a manual spreadsheet.";
   const liveSectionTitle = CHROME_EXTENSION_IS_LIVE
     ? "The extension is the product today, and the site supports the install."
-    : "The extension is the first product surface, and the site should set expectations clearly.";
+    : "The first release is the extension, and the site should set expectations clearly.";
   const liveCardTitle = CHROME_EXTENSION_IS_LIVE
     ? "What users get in the live extension"
-    : "What the extension will do at launch";
+    : "What ships in the first release";
   const ctaTitle = CHROME_EXTENSION_IS_LIVE
     ? "Install the extension now. Premium can wait until the dashboard is ready."
-    : "Follow the Chrome Store listing now. Premium can wait until the dashboard is ready.";
+    : "Follow the Chrome Store listing now. Premium stays closed until the dashboard is ready.";
+  const launchStatusItems = getLaunchStatusItems(CHROME_EXTENSION_IS_LIVE);
+  const rolloutSteps = getRolloutSteps(CHROME_EXTENSION_IS_LIVE);
+  const howItWorksTitle = CHROME_EXTENSION_IS_LIVE
+    ? "Three steps from install to a cleaner job-search record"
+    : "What happens once the first release is approved";
+  const howItWorksLead = CHROME_EXTENSION_IS_LIVE
+    ? "The product story should stay simple: install the extension, connect Gmail with read-only access, and review the pipeline from the popup."
+    : "The product story should stay simple: watch the listing, install after approval, then use the popup to track applications from Gmail with read-only access.";
 
   return (
     <PublicSiteLayout>
@@ -111,7 +119,7 @@ export default function Landing() {
                       <div className="launchPanelHeader">
                         <h2>{item.title}</h2>
                         <span
-                          className={`launchStateTag ${item.state === "Coming soon" ? "launchStateTagSoon" : ""}`}
+                          className={`launchStateTag ${item.state === "Coming soon" || item.state === "Closed for now" ? "launchStateTagSoon" : ""}`}
                         >
                           {item.state}
                         </span>
@@ -185,12 +193,8 @@ export default function Landing() {
       <section id="how-it-works" className="publicSection">
         <div className="sectionHeading">
           <p className="sectionEyebrow">How it works</p>
-          <h2>Three steps from store listing to a cleaner job-search record</h2>
-          <p>
-            The launch story should stay simple: follow the Chrome Web Store listing,
-            connect Gmail with read-only access once the extension is available, and
-            review the pipeline from the popup.
-          </p>
+          <h2>{howItWorksTitle}</h2>
+          <p>{howItWorksLead}</p>
         </div>
 
         <div className="timelineGrid">

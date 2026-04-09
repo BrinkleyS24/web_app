@@ -7,7 +7,6 @@ import {
   ShieldCheck,
   Sparkles,
   Wrench,
-  Zap,
 } from "lucide-react";
 
 export const premiumUpdatesHref =
@@ -34,29 +33,32 @@ export const heroFactItems = [
   },
 ];
 
-export const launchStatusItems = [
-  {
-    icon: Inbox,
-    state: "Live now",
-    title: "Chrome extension",
-    body:
-      "Install the Chrome extension, sign in with Google, and start tracking job-application emails directly from Gmail.",
-  },
-  {
-    icon: ShieldCheck,
-    state: "Live now",
-    title: "Read-only Gmail access",
-    body:
-      "The shipped extension uses Gmail read-only access, so users can review application history without granting send-mail access.",
-  },
-  {
-    icon: LayoutDashboard,
-    state: "Coming soon",
-    title: "Premium dashboard",
-    body:
-      "Advanced review workflows and premium analytics stay closed until the paid dashboard can support a complete release.",
-  },
-];
+export function getLaunchStatusItems(isExtensionLive) {
+  return [
+    {
+      icon: Inbox,
+      state: isExtensionLive ? "Live now" : "In review",
+      title: "Chrome extension",
+      body: isExtensionLive
+        ? "Install the Chrome extension, sign in with Google, and start tracking job-application emails directly from Gmail."
+        : "The first Applendium release is in Chrome Web Store review. Once approved, users will install it from the listing and launch it from the Chrome toolbar.",
+    },
+    {
+      icon: ShieldCheck,
+      state: isExtensionLive ? "Live now" : "Ready at launch",
+      title: "Read-only Gmail access",
+      body:
+        "The extension uses Gmail read-only access so users can review application history without granting send-mail permission.",
+    },
+    {
+      icon: LayoutDashboard,
+      state: isExtensionLive ? "Coming soon" : "Closed for now",
+      title: "Premium dashboard",
+      body:
+        "Advanced review workflows and premium analytics stay intentionally closed until the paid dashboard can support a complete public release.",
+    },
+  ];
+}
 
 export const availableNowItems = [
   {
@@ -86,63 +88,83 @@ export const premiumFeatureCards = [
     icon: ShieldCheck,
     title: "Apply Gate",
     body:
-      "Review jobs before you apply, with premium verdicts and clearer risk framing.",
-  },
-  {
-    icon: Zap,
-    title: "Pre-jection Simulator",
-    body:
-      "Model likely rejection reasons before you spend time on an application.",
+      "Run one pre-apply decision brief that combines fit review, likely rejection risks, and fix-first guidance before you spend time applying.",
   },
   {
     icon: Wrench,
     title: "Fix Suggestions",
     body:
-      "Get targeted resume and application edits tied to the job in front of you.",
+      "Turn weak applications into targeted edits, follow-up tasks, and cleanup work instead of generic advice.",
   },
   {
     icon: Brain,
     title: "Outcome Memory",
     body:
-      "Track patterns across applications so the dashboard can surface what keeps happening.",
+      "Track repeated misses and evidence gaps across applications so the dashboard can surface what keeps happening.",
   },
   {
     icon: Bell,
     title: "Strategy Alerts",
     body:
-      "Receive premium nudges when your search pattern looks weak, noisy, or off target.",
+      "Surface high-confidence warnings when your search pattern looks weak, noisy, stalled, or off target.",
   },
   {
     icon: FileText,
     title: "Weekly Summary",
     body:
-      "See a cleaner premium digest of what changed and what deserves attention next.",
+      "Package the week into a shorter premium digest that highlights what changed and what deserves attention next.",
   },
 ];
 
-export const rolloutSteps = [
-  {
-    step: "01",
-    phase: "Install",
-    title: "Install the Chrome extension",
-    body:
-      "Add Applendium to Chrome and launch it from the toolbar instead of starting from a manual spreadsheet or notes app.",
-  },
-  {
-    step: "02",
-    phase: "Sign in",
-    title: "Connect Gmail with read-only access",
-    body:
-      "Sign in with Google and let the extension read job-application emails so it can classify and group them without send-mail access.",
-  },
-  {
-    step: "03",
-    phase: "Review",
-    title: "Review your search from the popup",
-    body:
-      "Search companies and roles, refresh from the popup, and open a thread to see how one application moved through the pipeline.",
-  },
-];
+export function getRolloutSteps(isExtensionLive) {
+  return isExtensionLive
+    ? [
+        {
+          step: "01",
+          phase: "Install",
+          title: "Install the Chrome extension",
+          body:
+            "Add Applendium to Chrome and launch it from the toolbar instead of starting from a manual spreadsheet or notes app.",
+        },
+        {
+          step: "02",
+          phase: "Sign in",
+          title: "Connect Gmail with read-only access",
+          body:
+            "Sign in with Google and let the extension read job-application emails so it can classify and group them without send-mail access.",
+        },
+        {
+          step: "03",
+          phase: "Review",
+          title: "Review your search from the popup",
+          body:
+            "Search companies and roles, refresh from the popup, and open a thread to see how one application moved through the pipeline.",
+        },
+      ]
+    : [
+        {
+          step: "01",
+          phase: "Review",
+          title: "Open the Chrome Store listing",
+          body:
+            "Use the listing to understand the product, privacy scope, and launch status while the first release is still in review.",
+        },
+        {
+          step: "02",
+          phase: "Install",
+          title: "Install once the listing is approved",
+          body:
+            "After approval, add Applendium to Chrome and launch it from the toolbar instead of starting from a manual spreadsheet or notes app.",
+        },
+        {
+          step: "03",
+          phase: "Track",
+          title: "Sign in and review from the popup",
+          body:
+            "Connect Gmail with read-only access, then search, refresh, and review the application pipeline from the popup.",
+        },
+      ];
+}
 
 export const upgradeStatusCards = [
   {
