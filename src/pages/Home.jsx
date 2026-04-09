@@ -34,6 +34,31 @@ export default function Home() {
     navigate("/upgrade", { replace: true });
   }, [user, authLoading, planLoading, adminEmail, plan, navigate]);
 
+  const hideInternalWorkspaceDetails = !WEB_WORKSPACE_IS_PUBLIC && !user;
+
+  if (hideInternalWorkspaceDetails) {
+    return (
+      <div className="card" style={{ maxWidth: 520, margin: "40px auto" }}>
+        <p className="sectionEyebrow" style={{ marginBottom: 10 }}>Web workspace</p>
+        <h2 style={{ marginTop: 0 }}>This web workspace is not public yet</h2>
+
+        <div className="card" style={{ marginTop: 12, background: "rgba(255,255,255,0.65)" }}>
+          <p className="muted" style={{ margin: 0 }}>
+            The public launch is centered on the Chrome extension. This route remains
+            reserved for internal testing and staged rollout work, and should not be
+            presented as a public product surface yet.
+          </p>
+        </div>
+
+        <div className="row" style={{ marginTop: 16 }}>
+          <a className="btn btnPrimary" href="/">
+            Go back to applendium.com
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="card" style={{ maxWidth: 520, margin: "40px auto" }}>
       <p className="sectionEyebrow" style={{ marginBottom: 10 }}>
