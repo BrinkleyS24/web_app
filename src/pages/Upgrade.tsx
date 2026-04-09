@@ -9,8 +9,11 @@ import {
   premiumUpdatesHref,
   upgradeStatusCards,
 } from "../lib/premiumLaunchContent.js";
-
-const CHROME_WEB_STORE_URL = (import.meta.env.VITE_CHROME_WEB_STORE_URL || "").trim();
+import {
+  CHROME_EXTENSION_IS_LIVE,
+  CHROME_STORE_CTA_LABEL,
+  CHROME_WEB_STORE_URL,
+} from "../lib/publicSiteConfig.js";
 
 const Upgrade = () => {
   const { user, loading: authLoading } = useAuth();
@@ -35,13 +38,18 @@ const Upgrade = () => {
           <div className="heroCopy animate-fade-in">
             <div className="launchBadge">
               <Clock3 aria-hidden="true" />
-              <span>Premium purchase flow: temporarily closed</span>
+              <span>
+                {CHROME_EXTENSION_IS_LIVE
+                  ? "Premium purchase flow: temporarily closed"
+                  : "Premium purchase flow: closed while the Chrome listing is in review"}
+              </span>
             </div>
             <h1 className="heroTitle">The premium dashboard is still in build.</h1>
             <p className="heroLead">
               Billing is intentionally disabled while the premium workspace is being
-              finished. The extension and public support surface stay available, but
-              nobody should be sent through checkout for an unfinished dashboard.
+              finished. The public product story should stay honest: the Chrome extension
+              launches first, and nobody should be sent through checkout for an unfinished
+              dashboard or a web workspace that is not publicly open yet.
             </p>
 
             <div className="heroActions">
@@ -58,11 +66,11 @@ const Upgrade = () => {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Install the extension
+                  {CHROME_STORE_CTA_LABEL}
                 </a>
               ) : (
-                <Link className="publicButton publicButtonPrimary" to="/app">
-                  Open companion app
+                <Link className="publicButton publicButtonPrimary" to="/support">
+                  Contact support
                 </Link>
               )}
             </div>

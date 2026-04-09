@@ -13,45 +13,71 @@ import {
 export const premiumUpdatesHref =
   "mailto:support@applendium.com?subject=Applendium%20Premium%20Updates";
 
+export const heroFactItems = [
+  {
+    label: "Access",
+    value: "Read-only Gmail",
+    body:
+      "The extension asks for Gmail read-only access so users can review tracked applications without granting send-mail permission.",
+  },
+  {
+    label: "Pipeline",
+    value: "Applied to rejected",
+    body:
+      "The popup groups job-application emails by stage so users can scan interviews, offers, and rejections in one place.",
+  },
+  {
+    label: "Workflow",
+    value: "Search, refresh, review",
+    body:
+      "Users can search companies and roles, refresh from the popup, and open a thread to review the application journey.",
+  },
+];
+
 export const launchStatusItems = [
   {
     icon: Inbox,
-    state: "Available now",
+    state: "Live now",
     title: "Chrome extension",
     body:
-      "Install the extension, connect Gmail, and start turning application emails into a cleaner search record.",
+      "Install the Chrome extension, sign in with Google, and start tracking job-application emails directly from Gmail.",
   },
   {
     icon: ShieldCheck,
-    state: "Available now",
-    title: "Public support surface",
+    state: "Live now",
+    title: "Read-only Gmail access",
     body:
-      "Privacy, support, and launch-status pages stay live on applendium.com for users and store reviewers.",
+      "The shipped extension uses Gmail read-only access, so users can review application history without granting send-mail access.",
   },
   {
     icon: LayoutDashboard,
     state: "Coming soon",
     title: "Premium dashboard",
     body:
-      "Advanced review workflows and premium analytics stay closed until the dashboard is polished and release-ready.",
+      "Advanced review workflows and premium analytics stay closed until the paid dashboard can support a complete release.",
   },
 ];
 
 export const availableNowItems = [
   {
-    title: "Extension-first onboarding",
+    title: "Sign in from the popup",
     body:
-      "Users can install the Chrome extension, sign in, and connect the Gmail account they already use for applications.",
+      "Users start in the Chrome toolbar, sign in with Google, and connect the Gmail account they already use for applications.",
   },
   {
-    title: "Clear public documentation",
+    title: "Track applications by stage",
     body:
-      "The main site remains the public source for privacy details, support contact, and product-status communication.",
+      "The popup groups job-application emails into Applied, Interviews, Offers, and Rejected so the pipeline is readable at a glance.",
   },
   {
-    title: "Controlled web access",
+    title: "Search and review thread history",
     body:
-      "The companion app can stay online for account access and staged rollout support without pretending premium is already open.",
+      "Users can search companies and roles from the popup, then open a thread to inspect the application journey without losing context.",
+  },
+  {
+    title: "Clear privacy and support surface",
+    body:
+      "Applendium.com stays live for support, privacy details, and launch communication while premium workflows remain intentionally gated.",
   },
 ];
 
@@ -97,24 +123,24 @@ export const premiumFeatureCards = [
 export const rolloutSteps = [
   {
     step: "01",
-    phase: "Now",
-    title: "Launch the extension first",
+    phase: "Install",
+    title: "Install the Chrome extension",
     body:
-      "Ship the inbox-based product surface and public trust pages without overpromising unfinished dashboard workflows.",
+      "Add Applendium to Chrome and launch it from the toolbar instead of starting from a manual spreadsheet or notes app.",
   },
   {
     step: "02",
-    phase: "Now",
-    title: "Keep the site explicit",
+    phase: "Sign in",
+    title: "Connect Gmail with read-only access",
     body:
-      "Use applendium.com to set expectations, answer support questions, and explain what is and is not live yet.",
+      "Sign in with Google and let the extension read job-application emails so it can classify and group them without send-mail access.",
   },
   {
     step: "03",
-    phase: "Soon",
-    title: "Open premium when ready",
+    phase: "Review",
+    title: "Review your search from the popup",
     body:
-      "Turn on billing and dashboard access only after the review flow, polish, and reliability meet the release bar.",
+      "Search companies and roles, refresh from the popup, and open a thread to see how one application moved through the pipeline.",
   },
 ];
 

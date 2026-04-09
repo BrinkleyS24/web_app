@@ -1,41 +1,46 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Clock3 } from "lucide-react";
+import { Clock3 } from "lucide-react";
 import PublicSiteLayout from "../components/PublicSiteLayout.jsx";
-import { useAuth } from "../lib/AuthContext.jsx";
 import usePageMetadata from "../lib/usePageMetadata.js";
 import {
   availableNowItems,
+  heroFactItems,
   launchStatusItems,
   premiumFeatureCards,
   premiumUpdatesHref,
   rolloutSteps,
 } from "../lib/premiumLaunchContent.js";
-
-const CHROME_WEB_STORE_URL = (import.meta.env.VITE_CHROME_WEB_STORE_URL || "").trim();
+import {
+  CHROME_EXTENSION_IS_LIVE,
+  CHROME_STORE_CTA_LABEL,
+  CHROME_STORE_STATUS_LABEL,
+  CHROME_STORE_STATUS_SENTENCE,
+  CHROME_WEB_STORE_URL,
+} from "../lib/publicSiteConfig.js";
 
 export default function Landing() {
-  const { user, loading, plan, adminEmail } = useAuth();
-
   usePageMetadata({
-    title: "Applendium | Extension Launch Status",
+    title: "Applendium | Gmail Job Tracker for Chrome",
     description:
-      "Applendium is launching its Gmail extension first. Privacy, support, and premium status pages are live while premium dashboard workflows remain closed.",
+      "Applendium helps track job-application emails from Gmail. The Chrome Web Store listing is under review while premium dashboard workflows remain closed.",
   });
 
-  const signedIn = Boolean(user);
-  const signedInTarget = signedIn
-    ? (adminEmail ? "/admin/review" : plan === "premium" ? "/dashboard" : "/upgrade")
-    : "/app";
-  const premiumTarget = signedIn && plan === "premium" ? "/dashboard" : "/upgrade";
-  const sessionLabel = loading
-    ? "Checking session..."
-    : signedIn
-      ? "Signed in"
-      : "Public visitor";
-  const nextStepLabel = signedIn
-    ? (plan === "premium" ? "Open premium dashboard" : "View premium launch status")
-    : (CHROME_WEB_STORE_URL ? "Install the extension" : "Open companion app");
+  const heroTitle = CHROME_EXTENSION_IS_LIVE
+    ? "Track job applications from Gmail in one Chrome extension."
+    : "A Gmail job tracker for Chrome, now heading through store review.";
+  const heroLead = CHROME_EXTENSION_IS_LIVE
+    ? "Applendium reads job-application emails with Gmail read-only access, groups them by stage inside the popup, and keeps the search record usable without a manual spreadsheet."
+    : "The Chrome Web Store listing is in review. Applendium is built to read job-application emails with Gmail read-only access, group them by stage inside the popup, and give users a cleaner search record once the listing is approved.";
+  const liveSectionTitle = CHROME_EXTENSION_IS_LIVE
+    ? "The extension is the product today, and the site supports the install."
+    : "The extension is the first product surface, and the site should set expectations clearly.";
+  const liveCardTitle = CHROME_EXTENSION_IS_LIVE
+    ? "What users get in the live extension"
+    : "What the extension will do at launch";
+  const ctaTitle = CHROME_EXTENSION_IS_LIVE
+    ? "Install the extension now. Premium can wait until the dashboard is ready."
+    : "Follow the Chrome Store listing now. Premium can wait until the dashboard is ready.";
 
   return (
     <PublicSiteLayout>
@@ -47,16 +52,10 @@ export default function Landing() {
           <div className="heroCopy animate-fade-in">
             <div className="launchBadge">
               <Clock3 aria-hidden="true" />
-              <span>Premium dashboard status: coming soon</span>
+              <span>{CHROME_STORE_STATUS_LABEL}</span>
             </div>
-            <h1 className="heroTitle">
-              Applendium Premium is coming soon. The extension launches first.
-            </h1>
-            <p className="heroLead">
-              Applendium.com now sets the expectation directly: the Gmail extension and
-              public support pages are live, while premium dashboard workflows stay closed
-              until the experience is ready to ship.
-            </p>
+            <h1 className="heroTitle">{heroTitle}</h1>
+            <p className="heroLead">{heroLead}</p>
 
             <div className="heroActions">
               {CHROME_WEB_STORE_URL ? (
@@ -66,39 +65,31 @@ export default function Landing() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Install the extension
+                  {CHROME_STORE_CTA_LABEL}
                 </a>
               ) : (
-                <Link className="publicButton publicButtonPrimary" to={signedInTarget}>
-                  {signedIn ? "Open your workspace" : "Open companion app"}
-                </Link>
+                <a className="publicButton publicButtonPrimary" href={premiumUpdatesHref}>
+                  Get launch updates
+                </a>
               )}
 
-              <Link className="publicButton publicButtonSecondary" to={premiumTarget}>
-                View premium status
-              </Link>
-
-              <a className="publicButton publicButtonSecondary" href={premiumUpdatesHref}>
-                Request launch updates
+              <a className="publicButton publicButtonSecondary" href="#how-it-works">
+                See how it works
               </a>
+
+              <Link className="publicButton publicButtonSecondary" to="/support">
+                Get support
+              </Link>
             </div>
 
             <div className="heroMetaGrid">
-              <article className="launchMetricCard">
-                <span className="statusLabel">Session</span>
-                <strong className="launchMetricValue">{sessionLabel}</strong>
-              </article>
-              <article className="launchMetricCard">
-                <span className="statusLabel">Premium availability</span>
-                <strong className="launchMetricValue">In active build</strong>
-              </article>
-              <article className="launchMetricCard">
-                <span className="statusLabel">Best next step</span>
-                <Link className="launchMetricLink" to={signedInTarget}>
-                  <span>{nextStepLabel}</span>
-                  <ArrowRight aria-hidden="true" />
-                </Link>
-              </article>
+              {heroFactItems.map((item) => (
+                <article key={item.label} className="launchMetricCard">
+                  <span className="statusLabel">{item.label}</span>
+                  <strong className="launchMetricValue">{item.value}</strong>
+                  <p>{item.body}</p>
+                </article>
+              ))}
             </div>
           </div>
 
@@ -106,7 +97,7 @@ export default function Landing() {
             className="heroPanel glass-card launchPanel animate-fade-in"
             style={{ animationDelay: "120ms" }}
           >
-            <p className="heroPanelEyebrow">Release snapshot</p>
+            <p className="heroPanelEyebrow">What ships first</p>
             <div className="launchPanelList">
               {launchStatusItems.map((item) => {
                 const Icon = item.icon;
@@ -137,12 +128,12 @@ export default function Landing() {
 
       <section className="publicSection">
         <div className="sectionHeading">
-          <p className="sectionEyebrow">Release clarity</p>
-          <h2>What users can use now, and what is deliberately still behind the curtain</h2>
+          <p className="sectionEyebrow">What is available</p>
+          <h2>{liveSectionTitle}</h2>
           <p>
-            The site now says the quiet part out loud: ship the extension and public
-            trust pages now, and only open paid dashboard workflows when they are
-            actually ready.
+            {CHROME_STORE_STATUS_SENTENCE} Applendium.com should help a new visitor
+            understand the read-only Gmail scope, what the popup is designed to do, and
+            what is intentionally not public yet.
           </p>
         </div>
 
@@ -150,10 +141,10 @@ export default function Landing() {
           <article className="checklistCard launchCard">
             <div className="launchCardHeader">
               <div>
-                <p className="launchCardEyebrow">Available now</p>
-                <h3>What ships with the extension rollout</h3>
+                <p className="launchCardEyebrow">Extension-first</p>
+                <h3>{liveCardTitle}</h3>
               </div>
-              <span className="launchStateTag">Live</span>
+              <span className="launchStateTag">Primary focus</span>
             </div>
             <ul className="launchCardList">
               {availableNowItems.map((item) => (
@@ -168,10 +159,10 @@ export default function Landing() {
           <article className="checklistCard launchCard launchCardContrast">
             <div className="launchCardHeader">
               <div>
-                <p className="launchCardEyebrow">Coming soon</p>
-                <h3>What stays closed until premium is ready</h3>
+                <p className="launchCardEyebrow">Not public yet</p>
+                <h3>What stays gated until premium is ready</h3>
               </div>
-              <span className="launchStateTag launchStateTagSoon">In build</span>
+              <span className="launchStateTag launchStateTagSoon">Closed</span>
             </div>
             <ul className="launchCardList">
               <li>
@@ -183,21 +174,47 @@ export default function Landing() {
                 <p>Purchase flows stay disabled so users are not sold access to unfinished product surface.</p>
               </li>
               <li>
-                <strong>Advanced premium intelligence</strong>
-                <p>Strategy layers, deeper review tools, and premium summaries open later as one coherent release.</p>
+                <strong>Public web workspace access</strong>
+                <p>The broader web workspace is not part of the public launch yet, so the site should not imply it is open today.</p>
               </li>
             </ul>
           </article>
         </div>
       </section>
 
+      <section id="how-it-works" className="publicSection">
+        <div className="sectionHeading">
+          <p className="sectionEyebrow">How it works</p>
+          <h2>Three steps from store listing to a cleaner job-search record</h2>
+          <p>
+            The launch story should stay simple: follow the Chrome Web Store listing,
+            connect Gmail with read-only access once the extension is available, and
+            review the pipeline from the popup.
+          </p>
+        </div>
+
+        <div className="timelineGrid">
+          {rolloutSteps.map((step) => (
+            <article key={step.step} className="timelineCard">
+              <div className="timelineCardTop">
+                <span className="timelineStep">{step.step}</span>
+                <span className="launchStateTag">{step.phase}</span>
+              </div>
+              <h3>{step.title}</h3>
+              <p>{step.body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <section className="publicSection publicSectionAlt">
         <div className="sectionHeading">
           <p className="sectionEyebrow">Premium roadmap</p>
-          <h2>What premium will unlock when the dashboard opens</h2>
+          <h2>Premium is a later layer, not the first thing users need to understand</h2>
           <p>
-            The premium layer is still the destination. It just is not being presented
-            as live before the dashboard can support it properly.
+            The extension and public trust surface should stand on their own. Premium
+            stays below the fold as future depth, not as the headline for a web app that
+            is not publicly open yet.
           </p>
         </div>
 
@@ -223,36 +240,15 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="publicSection">
-        <div className="sectionHeading">
-          <p className="sectionEyebrow">Rollout plan</p>
-          <h2>A cleaner staged launch for applendium.com</h2>
-        </div>
-
-        <div className="timelineGrid">
-          {rolloutSteps.map((step) => (
-            <article key={step.step} className="timelineCard">
-              <div className="timelineCardTop">
-                <span className="timelineStep">{step.step}</span>
-                <span className={`launchStateTag ${step.phase === "Soon" ? "launchStateTagSoon" : ""}`}>
-                  {step.phase}
-                </span>
-              </div>
-              <h3>{step.title}</h3>
-              <p>{step.body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
       <section className="ctaSection">
         <div className="ctaCard">
           <div>
-            <p className="sectionEyebrow">Need help?</p>
-            <h2>Use the extension now, and we will announce premium when the dashboard is actually ready.</h2>
+            <p className="sectionEyebrow">Ready to follow the launch?</p>
+            <h2>{ctaTitle}</h2>
             <p className="ctaNote">
-              If you want launch updates or need support during the staged rollout, use
-              the links below instead of guessing what is live.
+              {CHROME_STORE_STATUS_SENTENCE} Support and privacy pages stay live here,
+              and premium updates stay available without overselling unfinished dashboard
+              workflows or a web workspace that is not public yet.
             </p>
           </div>
 
@@ -260,8 +256,11 @@ export default function Landing() {
             <Link className="publicButton publicButtonSecondary" to="/support">
               Get support
             </Link>
+            <Link className="publicButton publicButtonSecondary" to="/upgrade">
+              Premium roadmap
+            </Link>
             <a className="publicButton publicButtonSecondary" href={premiumUpdatesHref}>
-              Premium updates
+              Launch updates
             </a>
             {CHROME_WEB_STORE_URL ? (
               <a
@@ -270,12 +269,12 @@ export default function Landing() {
                 target="_blank"
                 rel="noreferrer"
               >
-                Install the extension
+                {CHROME_STORE_CTA_LABEL}
               </a>
             ) : (
-              <Link className="publicButton publicButtonPrimary" to={signedInTarget}>
-                {signedIn ? "Open your workspace" : "Open companion app"}
-              </Link>
+              <a className="publicButton publicButtonPrimary" href={premiumUpdatesHref}>
+                Get launch updates
+              </a>
             )}
           </div>
         </div>

@@ -1,7 +1,11 @@
 import React from "react";
 import { Link, NavLink } from "react-router-dom";
-
-const CHROME_WEB_STORE_URL = (import.meta.env.VITE_CHROME_WEB_STORE_URL || "").trim();
+import {
+  CHROME_EXTENSION_IS_LIVE,
+  CHROME_STORE_CTA_LABEL,
+  CHROME_WEB_STORE_URL,
+  WEB_WORKSPACE_IS_PUBLIC,
+} from "../lib/publicSiteConfig.js";
 
 function ExternalOrInternalCta({ className, label }) {
   if (CHROME_WEB_STORE_URL) {
@@ -18,7 +22,7 @@ function ExternalOrInternalCta({ className, label }) {
   }
 
   return (
-    <Link className={className} to="/app">
+    <Link className={className} to={WEB_WORKSPACE_IS_PUBLIC ? "/app" : "/support"}>
       {label}
     </Link>
   );
@@ -63,18 +67,20 @@ export default function PublicSiteLayout({ children }) {
             >
               Premium
             </NavLink>
-            <NavLink
-              to="/app"
-              className={({ isActive }) => `publicNavLink ${isActive ? "publicNavLinkActive" : ""}`.trim()}
-            >
-              Companion App
-            </NavLink>
+            {WEB_WORKSPACE_IS_PUBLIC ? (
+              <NavLink
+                to="/app"
+                className={({ isActive }) => `publicNavLink ${isActive ? "publicNavLinkActive" : ""}`.trim()}
+              >
+                Web Workspace
+              </NavLink>
+            ) : null}
           </nav>
 
           <div className="publicHeaderActions">
             <ExternalOrInternalCta
               className="publicButton publicButtonPrimary"
-              label={CHROME_WEB_STORE_URL ? "Install Extension" : "Open Companion App"}
+              label={CHROME_WEB_STORE_URL ? CHROME_STORE_CTA_LABEL : "Get support"}
             />
           </div>
         </div>
@@ -87,7 +93,9 @@ export default function PublicSiteLayout({ children }) {
           <div className="publicFooterBrand">
             <p className="publicFooterEyebrow">Applendium</p>
             <p className="publicFooterCopy">
-              The Gmail extension is live. Premium dashboard workflows are still in active build.
+              {CHROME_EXTENSION_IS_LIVE
+                ? "The Chrome extension is live. Premium dashboard workflows are still in active build."
+                : "The Chrome Web Store listing is under review. Premium dashboard workflows are still in active build."}
             </p>
           </div>
 
@@ -96,7 +104,12 @@ export default function PublicSiteLayout({ children }) {
               <p className="publicFooterHeading">Company</p>
               <Link to="/">Home</Link>
               <Link to="/upgrade">Premium Status</Link>
-              <Link to="/app">Companion App</Link>
+              {CHROME_WEB_STORE_URL ? (
+                <a href={CHROME_WEB_STORE_URL} target="_blank" rel="noreferrer">
+                  Chrome Store
+                </a>
+              ) : null}
+              {WEB_WORKSPACE_IS_PUBLIC ? <Link to="/app">Web Workspace</Link> : null}
             </div>
             <div>
               <p className="publicFooterHeading">Legal</p>

@@ -16,7 +16,7 @@ const sections = [
   {
     title: "How Applendium uses that information",
     items: [
-      "To authenticate you across the extension and companion app.",
+      "To authenticate you across the extension and any enabled Applendium web surfaces.",
       "To sync Gmail application emails, group them into application records, and surface them in the dashboard and extension UI.",
       "To support features such as lifecycle tracking, corrections, follow-up workflows, and subscription enforcement.",
       "To debug reliability issues, investigate support requests, and improve classification quality and product safety.",
@@ -51,7 +51,7 @@ export default function Privacy() {
   usePageMetadata({
     title: "Applendium | Privacy Policy",
     description:
-      "Read how Applendium handles Gmail-derived data, account information, retention, and privacy requests for the Chrome extension and companion app.",
+      "Read how Applendium handles Gmail-derived data, account information, retention, and privacy requests for the Chrome extension and related support surfaces.",
   });
 
   return (
@@ -67,7 +67,7 @@ export default function Privacy() {
       <section className="legalSection">
         <div className="legalIntro">
           <p>
-            Applendium is a Gmail-connected job application tracking product. The extension and companion app process only the information needed to authenticate users, sync relevant application emails, and present that information back to the user as a structured application record.
+            Applendium is a Gmail-connected job application tracking product. The extension and related account or support surfaces process only the information needed to authenticate users, sync relevant application emails, and present that information back to the user as a structured application record.
           </p>
           <p>
             If this policy changes in a material way, the updated version will be posted on this page with a revised effective date.

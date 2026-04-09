@@ -6,7 +6,7 @@ const helpCards = [
   {
     title: "Installation and sign-in",
     body:
-      "Install the Chrome extension, sign in from the popup, then open the companion app if you need a larger workspace for review.",
+      "Follow the Chrome Web Store listing, install the extension once it is approved, and sign in from the popup to connect Gmail with read-only access.",
   },
   {
     title: "Sync and classification issues",
@@ -22,9 +22,9 @@ const helpCards = [
 
 const faqItems = [
   {
-    title: "The extension is installed, but the web app says I am not signed in.",
+    title: "Is the web workspace public yet?",
     body:
-      "Open the extension popup first and confirm you are signed in there. The companion app relies on the extension bridge and shared auth state rather than a separate web-only login.",
+      "Not yet. The current public launch is centered on the Chrome extension, while the site remains the support, privacy, and premium-status surface.",
   },
   {
     title: "A company or role was linked incorrectly.",

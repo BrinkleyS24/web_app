@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import AuthButton from "../components/AuthButton.jsx";
 import { useAuth } from "../lib/AuthContext.jsx";
 import { firebaseConfigured } from "../lib/firebase.js";
+import { WEB_WORKSPACE_IS_PUBLIC } from "../lib/publicSiteConfig.js";
 
 export default function Home() {
   const {
@@ -35,12 +36,28 @@ export default function Home() {
 
   return (
     <div className="card" style={{ maxWidth: 520, margin: "40px auto" }}>
-      <p className="sectionEyebrow" style={{ marginBottom: 10 }}>Companion app</p>
-      <h2 style={{ marginTop: 0 }}>Open your Applendium workspace</h2>
+      <p className="sectionEyebrow" style={{ marginBottom: 10 }}>
+        {WEB_WORKSPACE_IS_PUBLIC ? "Web workspace" : "Internal workspace"}
+      </p>
+      <h2 style={{ marginTop: 0 }}>
+        {WEB_WORKSPACE_IS_PUBLIC
+          ? "Open your Applendium workspace"
+          : "This web workspace is not public yet"}
+      </h2>
+
+      {!WEB_WORKSPACE_IS_PUBLIC ? (
+        <div className="card" style={{ marginTop: 12, background: "rgba(255,255,255,0.65)" }}>
+          <p className="muted" style={{ margin: 0 }}>
+            The public launch is centered on the Chrome extension. This route remains
+            available for internal testing and staged rollout work, but it should not be
+            presented as a public product surface yet.
+          </p>
+        </div>
+      ) : null}
 
       {!firebaseConfigured && !user ? (
         <div className="error">
-          The companion app is not configured yet. Set the VITE_FIREBASE_* build environment variables for this deployment.
+          The web workspace is not configured yet. Set the VITE_FIREBASE_* build environment variables for this deployment.
         </div>
       ) : authLoading ? (
         <p className="muted" style={{ marginTop: 4 }}>Connecting to extension...</p>
