@@ -92,9 +92,9 @@ export const premiumFeatureCards = [
   },
   {
     icon: Wrench,
-    title: "Fix Suggestions",
+    title: "Daily Action Queue",
     body:
-      "Turn weak applications into targeted edits, follow-up tasks, and cleanup work instead of generic advice.",
+      "Prioritize the next few follow-ups, ghosting checks, resume-proof fixes, and cleanup actions with a clear reason behind each move.",
   },
   {
     icon: Brain,

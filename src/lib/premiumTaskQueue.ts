@@ -7,8 +7,9 @@ import type {
   SuggestionActionState,
 } from "@/lib/emails";
 
-export type QueueSource = "followup" | "apply_gate" | "resume" | "cleanup";
+export type QueueSource = "followup" | "stale" | "apply_gate" | "resume" | "cleanup";
 export type QueueUrgency = "high" | "medium" | "low";
+export type QueueConfidence = "high" | "medium" | "low";
 
 export type QueueItem = {
   id: string;
@@ -20,6 +21,10 @@ export type QueueItem = {
   estimatedTime: string;
   daysAgo?: number | null;
   playbook: string[];
+  whyNow?: string | null;
+  evidence?: string[];
+  actionConfidence?: QueueConfidence;
+  hasDraft?: boolean;
   sourceLabel: string;
   sourceDescription: string;
   threadId?: string | null;
@@ -32,6 +37,32 @@ export type QueueItem = {
   routeLabel?: string | null;
 };
 
+export type UpcomingFollowupWindow = {
+  id: string;
+  threadId: string;
+  emailId?: string | number | null;
+  applicationId?: string | number | null;
+  category: "applied" | "interviewed";
+  company: string;
+  role: string;
+  subject?: string | null;
+  daysAgo: number;
+  opensInDays: number;
+  windowStartDay: number;
+  windowEndDay: number;
+  title: string;
+  description: string;
+  sourceDescription: string;
+};
+
+export type OutreachDiagnostic = {
+  id: string;
+  label: string;
+  count: number;
+  description: string;
+  examples: string[];
+};
+
 export const urgencyClasses: Record<QueueUrgency, string> = {
   high: "bg-destructive/10 text-destructive border border-destructive/20",
   medium: "bg-warning/10 text-warning border border-warning/20",
@@ -40,6 +71,7 @@ export const urgencyClasses: Record<QueueUrgency, string> = {
 
 export const sourceClasses: Record<QueueSource, string> = {
   followup: "bg-primary/10 text-primary border border-primary/20",
+  stale: "bg-warning/10 text-warning border border-warning/20",
   apply_gate: "bg-accent/10 text-accent border border-accent/20",
   resume: "bg-success/10 text-success border border-success/20",
   cleanup: "bg-secondary text-secondary-foreground border border-border",
@@ -54,6 +86,10 @@ export const actionTypeLabels: Record<string, string> = {
   portfolio: "Portfolio",
   strategic_timing: "Timing",
   referral_request: "Referral",
+  stale_application_status_check: "Final check",
+  stale_interview_status_check: "Interview check",
+  close_stale_application: "Close stale",
+  close_stale_interview: "Close interview",
   apply_gate_fix: "Apply Gate fix",
   resume_proof_gap: "Resume proof",
   cleanup_structured_fields: "Extraction cleanup",
@@ -95,6 +131,26 @@ const actionPlaybook: Record<string, string[]> = {
   ],
 };
 
+const OUTREACH_ACTION_TYPES = new Set([
+  "thank_you",
+  "follow_up",
+  "status_check",
+  "research",
+  "networking",
+  "stale_application_status_check",
+  "stale_interview_status_check",
+  "close_stale_application",
+  "close_stale_interview",
+]);
+
+const APPLIED_ACTIVE_WINDOW_DAYS = 30;
+const INTERVIEW_ACTIVE_WINDOW_DAYS = 21;
+
+type ThreadIdentity = {
+  company: string | null;
+  role: string | null;
+};
+
 function uniqueStrings(values: Array<string | null | undefined>, limit = 4) {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -110,9 +166,13 @@ function uniqueStrings(values: Array<string | null | undefined>, limit = 4) {
   return out;
 }
 
+function normalizeKey(value?: string | null) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function getRelevantTrackedEmails(emails: StoredEmail[]) {
   return emails.filter((email) => {
-    const category = String(email.category || "").toLowerCase();
+    const category = normalizeKey(email.category);
     return (
       category === "applied" ||
       category === "interviewed" ||
@@ -122,22 +182,102 @@ function getRelevantTrackedEmails(emails: StoredEmail[]) {
   });
 }
 
-export function getCleanupStructuredCandidates(emails: StoredEmail[]) {
+function buildTerminalCompanyKeys(emails: StoredEmail[]) {
+  const terminalCompanyKeys = new Set<string>();
+  for (const email of getRelevantTrackedEmails(emails)) {
+    const companyKey = normalizeKey(email.company_name);
+    if (!companyKey) continue;
+    const category = normalizeKey(email.category);
+    if (category === "offers" || category === "rejected" || email.isClosed || email.isUserClosed) {
+      terminalCompanyKeys.add(companyKey);
+    }
+  }
+  return terminalCompanyKeys;
+}
+
+function getOpenTrackedEmails(emails: StoredEmail[]) {
   return getRelevantTrackedEmails(emails).filter((email) => {
-    const company = String(email.company_name || "").trim();
-    const position = String(email.position || "").trim();
-    return !company || !position;
+    const category = normalizeKey(email.category);
+    return category !== "offers" && category !== "rejected" && !email.isClosed && !email.isUserClosed;
+  });
+}
+
+function groupEmailsByThread(emails: StoredEmail[]) {
+  const grouped = new Map<string, StoredEmail[]>();
+
+  for (const email of emails) {
+    const key = String(email.thread_id || email.email_id || email.id || "").trim();
+    if (!key) continue;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key)?.push(email);
+  }
+
+  return grouped;
+}
+
+function buildThreadIdentityMap(emails: StoredEmail[]) {
+  const grouped = groupEmailsByThread(getRelevantTrackedEmails(emails));
+  const identities = new Map<string, ThreadIdentity>();
+
+  for (const [threadId, threadEmails] of grouped.entries()) {
+    const sorted = [...threadEmails].sort(
+      (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(),
+    );
+    const company = sorted.find((email) => String(email.company_name || "").trim())?.company_name || null;
+    const role = sorted.find((email) => String(email.position || "").trim())?.position || null;
+    identities.set(threadId, {
+      company: company ? String(company).trim() : null,
+      role: role ? String(role).trim() : null,
+    });
+  }
+
+  return identities;
+}
+
+function getResolvedThreadIdentity(email: StoredEmail, threadIdentityMap: Map<string, ThreadIdentity>) {
+  const threadKey = String(email.thread_id || email.email_id || email.id || "").trim();
+  const inherited = threadKey ? threadIdentityMap.get(threadKey) : null;
+  const company = String(email.company_name || inherited?.company || "").trim();
+  const role = String(email.position || inherited?.role || "").trim();
+  return {
+    company,
+    role,
+  };
+}
+
+function hasResolvedThreadIdentity(email: StoredEmail, threadIdentityMap: Map<string, ThreadIdentity>) {
+  const identity = getResolvedThreadIdentity(email, threadIdentityMap);
+  return Boolean(identity.company && identity.role);
+}
+
+function getOpenAttentionWindowDays(email: StoredEmail) {
+  const category = normalizeKey(email.category);
+  if (category === "applied") return APPLIED_ACTIVE_WINDOW_DAYS;
+  if (category === "interviewed") return INTERVIEW_ACTIVE_WINDOW_DAYS;
+  return null;
+}
+
+function isWithinOpenAttentionWindow(email: StoredEmail) {
+  const age = daysSince(email.date);
+  const windowDays = getOpenAttentionWindowDays(email);
+  if (typeof age !== "number" || typeof windowDays !== "number") return false;
+  return age < windowDays;
+}
+
+export function getCleanupStructuredCandidates(emails: StoredEmail[]) {
+  const threadIdentityMap = buildThreadIdentityMap(emails);
+  return getOpenTrackedEmails(emails).filter((email) => {
+    return isWithinOpenAttentionWindow(email) && !hasResolvedThreadIdentity(email, threadIdentityMap);
   });
 }
 
 export function getCleanupUnlinkedCandidates(emails: StoredEmail[]) {
-  return getRelevantTrackedEmails(emails).filter((email) => {
-    const category = String(email.category || "").toLowerCase();
+  const threadIdentityMap = buildThreadIdentityMap(emails);
+  return getOpenTrackedEmails(emails).filter((email) => {
     return (
-      (category === "applied" || category === "interviewed") &&
       !email.applicationId &&
-      !email.isClosed &&
-      !email.isUserClosed
+      isWithinOpenAttentionWindow(email) &&
+      hasResolvedThreadIdentity(email, threadIdentityMap)
     );
   });
 }
@@ -164,7 +304,11 @@ function buildFollowupQueue(suggestions: FollowupSuggestion[]): QueueItem[] {
       "Review the thread and choose the smallest useful next action.",
       "Keep the message specific to this role and this company.",
     ],
-    sourceLabel: "Follow-up task",
+    whyNow: item.whyNow || item.description || null,
+    evidence: uniqueStrings(item.evidence || [], 4),
+    actionConfidence: item.actionConfidence || "medium",
+    hasDraft: Boolean(item.draftAvailable) && Boolean(item.threadId),
+    sourceLabel: "Outreach task",
     sourceDescription:
       item.category?.toLowerCase() === "interviewed" ? "Interview timing signal" : "Email timing signal",
     threadId: item.threadId,
@@ -211,6 +355,19 @@ function buildApplyGateQueue(history: ApplyGateHistoryItem[]): QueueItem[] {
       estimatedTime: quickFixes.length > 1 ? "20 mins" : "15 mins",
       daysAgo: daysSince(item.created_at),
       playbook: uniqueStrings([...quickFixes, ...longTerm, ...drivers], 3),
+      whyNow:
+        explanation?.decision === "fix_first"
+          ? "Apply Gate marked this as fix-first, so applying before resolving the top issue would weaken the application."
+          : "Apply Gate found unresolved fit issues that should be addressed before this role leaves active consideration.",
+      evidence: uniqueStrings(
+        [
+          ...drivers,
+          ...quickFixes,
+          explanation?.assessment_confidence ? `Assessment confidence: ${explanation.assessment_confidence}` : null,
+        ],
+        4,
+      ),
+      actionConfidence: explanation?.assessment_confidence || "medium",
       sourceLabel: "Apply Gate",
       sourceDescription: item.hard_blocker ? "Hard-blocker or high-risk fit issue" : "Role-specific fit action plan",
       threadId: `apply-gate:${item.id}`,
@@ -276,6 +433,18 @@ function buildResumeQueue(history: ApplyGateHistoryItem[]): QueueItem[] {
         ],
         3,
       ),
+      whyNow:
+        repeatedGaps.length > 0
+          ? "The same proof gap is appearing across multiple recent screenings."
+          : "Recent screenings found resume-proof issues that are fixable before the next application batch.",
+      evidence: uniqueStrings(
+        [
+          repeatedGaps.length > 0 ? `${repeatedGaps.length} repeated gap(s): ${recurringGapText}` : null,
+          ...topResumeFixes,
+        ],
+        4,
+      ),
+      actionConfidence: repeatedGaps.length > 0 ? "high" : "medium",
       sourceLabel: "Resume-proof gap",
       sourceDescription: "Repeated evidence gaps across recent role screenings",
       threadId: "resume-proof:aggregate",
@@ -286,6 +455,178 @@ function buildResumeQueue(history: ApplyGateHistoryItem[]): QueueItem[] {
       stageLabel: "Resume proof",
     },
   ];
+}
+
+function buildStaleQueue(emails: StoredEmail[]): QueueItem[] {
+  const grouped = groupEmailsByThread(getRelevantTrackedEmails(emails));
+  const terminalCompanyKeys = buildTerminalCompanyKeys(emails);
+  const threadIdentityMap = buildThreadIdentityMap(emails);
+
+  const queue: QueueItem[] = [];
+
+  for (const [threadId, threadEmails] of grouped.entries()) {
+    const sorted = [...threadEmails].sort(
+      (a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime(),
+    );
+    const latest = sorted[sorted.length - 1];
+    if (!latest) continue;
+
+    const hasTerminalSignal = sorted.some((email) => {
+      const category = String(email.category || "").toLowerCase();
+      return category === "rejected" || category === "offers" || email.isClosed || email.isUserClosed;
+    });
+    if (hasTerminalSignal) continue;
+
+    const latestCompanyKey = normalizeKey(latest.company_name);
+    if (latestCompanyKey && terminalCompanyKeys.has(latestCompanyKey)) continue;
+
+    const category = normalizeKey(latest.category);
+    if (category !== "applied" && category !== "interviewed") continue;
+    if (!hasResolvedThreadIdentity(latest, threadIdentityMap)) continue;
+
+    const age = daysSince(latest.date);
+    if (typeof age !== "number") continue;
+
+    const identity = getResolvedThreadIdentity(latest, threadIdentityMap);
+    const company = identity.company || getEmailCompany(latest);
+    const role = identity.role || getEmailTitle(latest);
+    const evidence = uniqueStrings(
+      [
+        latest.subject ? `Latest thread: ${latest.subject}` : null,
+        latest.from ? `Latest sender: ${latest.from}` : null,
+        `No tracked terminal outcome for ${age} day(s).`,
+      ],
+      4,
+    );
+
+    if (category === "applied" && age >= 21 && age < 30) {
+      queue.push({
+        id: `stale:${threadId}:status-check`,
+        source: "stale",
+        urgency: age >= 21 ? "high" : "medium",
+        title: `Send one final status check for ${role}`,
+        description: `${company} has not sent a tracked next-step update in ${age} days.`,
+        company,
+        estimatedTime: "8 mins",
+        daysAgo: age,
+        playbook: [
+          "Send one short status check that asks for timing, not a decision.",
+          "If there is no response after this touch, move the role out of active focus.",
+        ],
+        whyNow: `${age} days have passed since the latest tracked application activity, so waiting silently is no longer useful.`,
+        evidence,
+        actionConfidence: "medium",
+        hasDraft: true,
+        sourceLabel: "Ghosting signal",
+        sourceDescription: "No tracked next-step update",
+        threadId,
+        emailId: latest.id ?? null,
+        applicationId: latest.applicationId ?? null,
+        actionType: "stale_application_status_check",
+        suggestionSource: "stale_role_signal",
+        stageLabel: "Stale application",
+        routeHref: "/fix-suggestions",
+        routeLabel: "Open queue",
+      });
+    }
+
+    if (category === "applied" && age >= 30) {
+      queue.push({
+        id: `stale:${threadId}:close-application`,
+        source: "stale",
+        urgency: "low",
+        title: `Move ${role} out of active focus`,
+        description: `${company} has been quiet for ${age} days after the application signal.`,
+        company,
+        estimatedTime: "5 mins",
+        daysAgo: age,
+        playbook: [
+          "Send a final close-the-loop note only if this role still matters.",
+          "Otherwise mark the action done and stop treating this application as active work.",
+        ],
+        whyNow: "The role is old enough that it should not keep consuming active search attention.",
+        evidence,
+        actionConfidence: "medium",
+        hasDraft: true,
+        sourceLabel: "Ghosting signal",
+        sourceDescription: "Application appears stale",
+        threadId,
+        emailId: latest.id ?? null,
+        applicationId: latest.applicationId ?? null,
+        actionType: "close_stale_application",
+        suggestionSource: "stale_role_signal",
+        stageLabel: "Close out",
+        routeHref: "/fix-suggestions",
+        routeLabel: "Open queue",
+      });
+    }
+
+    if (category === "interviewed" && age >= 11 && age < 21) {
+      queue.push({
+        id: `stale:${threadId}:interview-check`,
+        source: "stale",
+        urgency: "high",
+        title: `Check interview status for ${role}`,
+        description: `${company} has not sent a tracked post-interview update in ${age} days.`,
+        company,
+        estimatedTime: "8 mins",
+        daysAgo: age,
+        playbook: [
+          "Send a polite status check that references the interview and asks for timeline.",
+          "Keep it short; the goal is clarity, not a second pitch.",
+        ],
+        whyNow: "Post-interview silence is high-ambiguity and deserves one clear status check.",
+        evidence,
+        actionConfidence: "high",
+        hasDraft: true,
+        sourceLabel: "Ghosting signal",
+        sourceDescription: "Post-interview silence",
+        threadId,
+        emailId: latest.id ?? null,
+        applicationId: latest.applicationId ?? null,
+        actionType: "stale_interview_status_check",
+        suggestionSource: "stale_role_signal",
+        stageLabel: "Interview follow-up",
+        routeHref: "/fix-suggestions",
+        routeLabel: "Open queue",
+      });
+    }
+
+    if (category === "interviewed" && age >= 21) {
+      queue.push({
+        id: `stale:${threadId}:close-interview`,
+        source: "stale",
+        urgency: "medium",
+        title: `Close the loop on ${role}`,
+        description: `${company} has been silent for ${age} days after the interview signal.`,
+        company,
+        estimatedTime: "5 mins",
+        daysAgo: age,
+        playbook: [
+          "Send one final note if this opportunity is still important.",
+          "If there is no response, stop letting this role occupy active search bandwidth.",
+        ],
+        whyNow: "This interview thread is old enough that the next action is closure, not repeated follow-up.",
+        evidence,
+        actionConfidence: "medium",
+        hasDraft: true,
+        sourceLabel: "Ghosting signal",
+        sourceDescription: "Interview appears stale",
+        threadId,
+        emailId: latest.id ?? null,
+        applicationId: latest.applicationId ?? null,
+        actionType: "close_stale_interview",
+        suggestionSource: "stale_role_signal",
+        stageLabel: "Close out",
+        routeHref: "/fix-suggestions",
+        routeLabel: "Open queue",
+      });
+    }
+  }
+
+  return queue
+    .sort((a, b) => (b.daysAgo || 0) - (a.daysAgo || 0))
+    .slice(0, 5);
 }
 
 function buildCleanupQueue(emails: StoredEmail[]): QueueItem[] {
@@ -312,6 +653,9 @@ function buildCleanupQueue(emails: StoredEmail[]): QueueItem[] {
         ],
         3,
       ),
+      whyNow: "Missing company or role data makes the rest of the premium recommendations less reliable.",
+      evidence: uniqueStrings(examples, 3),
+      actionConfidence: "high",
       sourceLabel: "Cleanup task",
       sourceDescription: "Structured data is incomplete",
       threadId: "cleanup:structured-fields",
@@ -344,6 +688,9 @@ function buildCleanupQueue(emails: StoredEmail[]): QueueItem[] {
         ],
         3,
       ),
+      whyNow: "Unlinked active threads weaken pipeline metrics and can hide stale or follow-up opportunities.",
+      evidence: uniqueStrings(examples, 3),
+      actionConfidence: "medium",
       sourceLabel: "Cleanup task",
       sourceDescription: "Application tracking is incomplete",
       threadId: "cleanup:unlinked-applications",
@@ -363,11 +710,13 @@ function queueSortValue(item: QueueItem) {
   const sourceScore =
     item.source === "followup"
       ? 0
-      : item.source === "apply_gate"
+      : item.source === "stale"
         ? 1
-        : item.source === "resume"
+        : item.source === "apply_gate"
           ? 2
-          : 3;
+          : item.source === "resume"
+            ? 3
+            : 4;
   const ageScore = typeof item.daysAgo === "number" ? -item.daysAgo : 0;
   return `${urgencyScore}:${sourceScore}:${String(ageScore).padStart(4, "0")}`;
 }
@@ -425,6 +774,7 @@ export function buildCombinedSuggestionQueue(params: {
   const hiddenActionKeys = buildHiddenActionKeys(params.actionStates || []);
   const queue = [
     ...buildFollowupQueue(params.followupSuggestions),
+    ...buildStaleQueue(params.storedEmails),
     ...buildApplyGateQueue(params.applyGateHistory),
     ...buildResumeQueue(params.applyGateHistory),
     ...buildCleanupQueue(params.storedEmails),
@@ -433,6 +783,295 @@ export function buildCombinedSuggestionQueue(params: {
   return queue
     .filter((item) => !hiddenActionKeys.has(buildActionKey(item.threadId, item.actionType)))
     .sort((a, b) => queueSortValue(a).localeCompare(queueSortValue(b)));
+}
+
+export function buildUpcomingFollowupWindows(params: {
+  storedEmails: StoredEmail[];
+  followupSuggestions?: FollowupSuggestion[];
+  actionStates?: SuggestionActionState[];
+}) {
+  const activeKeys = new Set(
+    (params.followupSuggestions || [])
+      .filter((item) => item.threadId && item.actionType)
+      .map((item) => buildActionKey(item.threadId, item.actionType)),
+  );
+  const activeOpportunityKeys = new Set(
+    (params.followupSuggestions || [])
+      .map((item) => {
+        if (item.applicationId) return `app:${item.applicationId}`;
+        const companyKey = normalizeKey(item.company);
+        return companyKey ? `company:${companyKey}` : null;
+      })
+      .filter(Boolean) as string[],
+  );
+  const hiddenActionKeys = buildHiddenActionKeys(params.actionStates || []);
+  const grouped = groupEmailsByThread(getOpenTrackedEmails(params.storedEmails));
+  const terminalCompanyKeys = buildTerminalCompanyKeys(params.storedEmails);
+  const threadIdentityMap = buildThreadIdentityMap(params.storedEmails);
+  const windows: UpcomingFollowupWindow[] = [];
+
+  for (const [threadId, threadEmails] of grouped.entries()) {
+    const sorted = [...threadEmails].sort(
+      (a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime(),
+    );
+    const latest = sorted[sorted.length - 1];
+    if (!latest) continue;
+
+    const latestCompanyKey = normalizeKey(latest.company_name);
+    if (latestCompanyKey && terminalCompanyKeys.has(latestCompanyKey)) continue;
+    const latestOpportunityKeys = [
+      latest.applicationId ? `app:${latest.applicationId}` : null,
+      latestCompanyKey ? `company:${latestCompanyKey}` : null,
+    ].filter(Boolean) as string[];
+    if (latestOpportunityKeys.some((key) => activeOpportunityKeys.has(key))) continue;
+
+    const category = normalizeKey(latest.category);
+    if (category !== "applied" && category !== "interviewed") continue;
+    if (!hasResolvedThreadIdentity(latest, threadIdentityMap)) continue;
+
+    const age = daysSince(latest.date);
+    if (typeof age !== "number") continue;
+
+    const identity = getResolvedThreadIdentity(latest, threadIdentityMap);
+    const company = identity.company || getEmailCompany(latest);
+    const role = identity.role || getEmailTitle(latest);
+    const base = {
+      threadId,
+      emailId: latest.id ?? null,
+      applicationId: latest.applicationId ?? null,
+      company,
+      role,
+      subject: latest.subject,
+      daysAgo: age,
+    };
+
+    if (category === "applied") {
+      const firstFollowupKey = buildActionKey(threadId, "follow_up");
+      const finalFollowupKey = buildActionKey(threadId, "stale_application_status_check");
+
+      if (age <= 14 && !activeKeys.has(firstFollowupKey) && !hiddenActionKeys.has(firstFollowupKey)) {
+        windows.push({
+          ...base,
+          id: `upcoming:${threadId}:application-follow-up`,
+          category: "applied",
+          opensInDays: Math.max(0, 10 - age),
+          windowStartDay: 10,
+          windowEndDay: 14,
+          title: `First follow-up window for ${role}`,
+          description:
+            age >= 10
+              ? `${company} is inside the day 10-14 application follow-up window.`
+              : `${company} is ${age} day(s) after application. A status follow-up is usually better around day 10-14.`,
+          sourceDescription: age >= 10 ? "Application follow-up due now" : "Application follow-up opens soon",
+        });
+      } else if (
+        age > 14
+        && age < 21
+        && !activeKeys.has(finalFollowupKey)
+        && !hiddenActionKeys.has(finalFollowupKey)
+      ) {
+        windows.push({
+          ...base,
+          id: `upcoming:${threadId}:final-application-check`,
+          category: "applied",
+          opensInDays: 21 - age,
+          windowStartDay: 21,
+          windowEndDay: 29,
+          title: `Final check-in window for ${role}`,
+          description: `${company} is past the first follow-up window. If nothing changes, one final status check becomes reasonable around day 21.`,
+          sourceDescription: "Final application check opens soon",
+        });
+      }
+    }
+
+    if (category === "interviewed") {
+      const thankYouKey = buildActionKey(threadId, "thank_you");
+      const interviewFollowupKey = buildActionKey(threadId, "follow_up");
+      const statusCheckKey = buildActionKey(threadId, "status_check");
+      const staleInterviewKey = buildActionKey(threadId, "stale_interview_status_check");
+
+      if (age <= 1 && !activeKeys.has(thankYouKey) && !hiddenActionKeys.has(thankYouKey)) {
+        windows.push({
+          ...base,
+          id: `upcoming:${threadId}:interview-thank-you`,
+          category: "interviewed",
+          opensInDays: 0,
+          windowStartDay: 0,
+          windowEndDay: 1,
+          title: `Thank-you note for ${role}`,
+          description: `${company} is inside the 24-hour interview thank-you window.`,
+          sourceDescription: "Interview thank-you due now",
+        });
+      } else if (age <= 5 && !activeKeys.has(interviewFollowupKey) && !hiddenActionKeys.has(interviewFollowupKey)) {
+        windows.push({
+          ...base,
+          id: `upcoming:${threadId}:interview-follow-up`,
+          category: "interviewed",
+          opensInDays: 0,
+          windowStartDay: 2,
+          windowEndDay: 5,
+          title: `Interview follow-up for ${role}`,
+          description: `${company} is inside the early post-interview follow-up window.`,
+          sourceDescription: "Interview follow-up due now",
+        });
+      } else if (age <= 10 && !activeKeys.has(statusCheckKey) && !hiddenActionKeys.has(statusCheckKey)) {
+        windows.push({
+          ...base,
+          id: `upcoming:${threadId}:interview-status-check`,
+          category: "interviewed",
+          opensInDays: Math.max(0, 6 - age),
+          windowStartDay: 6,
+          windowEndDay: 10,
+          title: `Status-check window for ${role}`,
+          description:
+            age >= 6
+              ? `${company} is inside the post-interview status-check window.`
+              : `${company} is ${age} day(s) after the interview signal. If no timeline was given, status checks become more appropriate after several business days.`,
+          sourceDescription: age >= 6 ? "Interview status check due now" : "Interview status check opens soon",
+        });
+      } else if (
+        age > 10
+        && age < 21
+        && !activeKeys.has(staleInterviewKey)
+        && !hiddenActionKeys.has(staleInterviewKey)
+      ) {
+        windows.push({
+          ...base,
+          id: `upcoming:${threadId}:interview-close-loop`,
+          category: "interviewed",
+          opensInDays: Math.max(0, 21 - age),
+          windowStartDay: 21,
+          windowEndDay: 21,
+          title: `Close-loop window for ${role}`,
+          description: `${company} is ${age} day(s) after the interview signal. If silence continues, this should move from follow-up to close-out.`,
+          sourceDescription: "Interview close-out window approaching",
+        });
+      }
+    }
+  }
+
+  function upcomingPriority(item: UpcomingFollowupWindow) {
+    if (item.category === "interviewed" && item.windowStartDay <= 1) return 5;
+    if (item.category === "interviewed" && item.windowStartDay <= 2) return 4;
+    if (item.category === "interviewed") return 3;
+    if (item.category === "applied" && item.windowStartDay <= 10) return 2;
+    return 1;
+  }
+
+  const seenWindows = new Set<string>();
+  return windows
+    .filter((item) => item.opensInDays > 0)
+    .sort((a, b) => (
+      a.opensInDays - b.opensInDays
+      || upcomingPriority(b) - upcomingPriority(a)
+      || b.daysAgo - a.daysAgo
+    ))
+    .filter((item) => {
+      const key = item.applicationId
+        ? `app:${item.applicationId}`
+        : `${normalizeKey(item.company)}:${normalizeKey(item.role)}`;
+      if (seenWindows.has(key)) return false;
+      seenWindows.add(key);
+      return true;
+    })
+    .slice(0, 5);
+}
+
+export function buildOutreachDiagnostics(params: {
+  storedEmails: StoredEmail[];
+  followupSuggestions?: FollowupSuggestion[];
+  actionStates?: SuggestionActionState[];
+  upcomingWindows?: UpcomingFollowupWindow[];
+}) {
+  const upcomingWindows = params.upcomingWindows || buildUpcomingFollowupWindows(params);
+  const grouped = groupEmailsByThread(getRelevantTrackedEmails(params.storedEmails));
+  const terminalCompanyKeys = buildTerminalCompanyKeys(params.storedEmails);
+  const threadIdentityMap = buildThreadIdentityMap(params.storedEmails);
+  const closedExamples: string[] = [];
+  const ghostingExamples: string[] = [];
+  let closedCount = 0;
+  let ghostingCount = 0;
+
+  for (const [, threadEmails] of grouped.entries()) {
+    const sorted = [...threadEmails].sort(
+      (a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime(),
+    );
+    const latest = sorted[sorted.length - 1];
+    if (!latest) continue;
+
+    const hasTerminalSignal = sorted.some((email) => {
+      const category = normalizeKey(email.category);
+      return category === "offers" || category === "rejected" || email.isClosed || email.isUserClosed;
+    });
+
+    const latestCompanyKey = normalizeKey(latest.company_name);
+    if (hasTerminalSignal || (latestCompanyKey && terminalCompanyKeys.has(latestCompanyKey))) {
+      closedCount += 1;
+      closedExamples.push(`${getEmailCompany(latest)} - ${getEmailTitle(latest)}`);
+      continue;
+    }
+
+    const category = normalizeKey(latest.category);
+    const age = daysSince(latest.date);
+    if (typeof age !== "number") continue;
+    if (!hasResolvedThreadIdentity(latest, threadIdentityMap)) continue;
+
+    const identity = getResolvedThreadIdentity(latest, threadIdentityMap);
+    const company = identity.company || getEmailCompany(latest);
+    const role = identity.role || getEmailTitle(latest);
+
+    if ((category === "applied" && age >= 21) || (category === "interviewed" && age >= 11)) {
+      ghostingCount += 1;
+      ghostingExamples.push(`${company} - ${role}`);
+    }
+  }
+
+  const hiddenOutreachStates = (params.actionStates || []).filter((item) => {
+    return (
+      OUTREACH_ACTION_TYPES.has(String(item.action_type || "")) &&
+      (item.state === "completed" || item.state === "snoozed")
+    );
+  });
+
+  const diagnostics: OutreachDiagnostic[] = [
+    {
+      id: "active",
+      label: "Active outreach",
+      count: params.followupSuggestions?.length || 0,
+      description: "Backend cards currently due in the Outreach lane.",
+      examples: uniqueStrings((params.followupSuggestions || []).map((item) => item.title || item.subject), 3),
+    },
+    {
+      id: "upcoming",
+      label: "Upcoming windows",
+      count: upcomingWindows.length,
+      description: "Tracked roles that are too early or waiting for a better follow-up window.",
+      examples: uniqueStrings(upcomingWindows.map((item) => item.title), 3),
+    },
+    {
+      id: "hidden",
+      label: "Hidden by you",
+      count: hiddenOutreachStates.length,
+      description: "Outreach actions already completed or snoozed.",
+      examples: uniqueStrings(hiddenOutreachStates.map((item) => actionTypeLabels[item.action_type] || item.action_type), 3),
+    },
+    {
+      id: "ghosting",
+      label: "Moved to ghosting",
+      count: ghostingCount,
+      description: "Older open roles managed by the Ghosting lane instead of normal follow-up.",
+      examples: uniqueStrings(ghostingExamples, 3),
+    },
+    {
+      id: "closed",
+      label: "Closed outcomes",
+      count: closedCount,
+      description: "Threads with rejection, offer, or manually closed signals suppressed from outreach.",
+      examples: uniqueStrings(closedExamples, 3),
+    },
+  ];
+
+  return diagnostics;
 }
 
 export function buildSuggestionQueueStats(queue: QueueItem[], actionStates: SuggestionActionState[]) {

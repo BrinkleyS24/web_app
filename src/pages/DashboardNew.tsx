@@ -472,7 +472,7 @@ const Dashboard = () => {
                     <ArrowRight className="w-4 h-4" />
                   </Link>
                   <Link to="/fix-suggestions" className={dashboardButtonSecondary}>
-                    Open fix queue
+                    Open action queue
                   </Link>
                 </div>
               </>
@@ -488,7 +488,7 @@ const Dashboard = () => {
                     Today's 3 moves
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    The queue is already telling you what matters. This surfaces the top three moves instead of making you sift through five separate pages first.
+                    The queue ranks follow-ups, ghosting signals, job-fit work, and cleanup so you can act without sifting through separate pages first.
                   </p>
                 </div>
                 <Link to="/fix-suggestions" className="text-sm text-accent hover:underline">
@@ -603,7 +603,7 @@ const Dashboard = () => {
             </div>
             <div className="space-y-2">
               {[
-                { label: "Fix Suggestions", to: "/fix-suggestions" },
+                { label: "Next Actions", to: "/fix-suggestions" },
                 { label: "Outcome Memory", to: "/outcome-memory" },
                 { label: "Strategy Alerts", to: "/strategy-alerts" },
                 { label: "Weekly Summary", to: "/weekly-summary" },
@@ -626,7 +626,7 @@ const Dashboard = () => {
 };
 
 function TodayMoveCard({ move }: { move: QueueItem }) {
-  const gmailUrl = move.source === "followup" ? buildGmailThreadUrl(move.threadId) : null;
+  const gmailUrl = move.source === "followup" || move.source === "stale" ? buildGmailThreadUrl(move.threadId) : null;
   const primaryHref = gmailUrl || move.routeHref || "/fix-suggestions";
   const primaryLabel = gmailUrl ? "Open in Gmail" : move.routeLabel || "Open queue";
 

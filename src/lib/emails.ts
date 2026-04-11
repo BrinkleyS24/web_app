@@ -73,11 +73,20 @@ export type FollowupSuggestion = {
   daysAgo?: number | null;
   estimatedTime?: string | null;
   category?: string | null;
+  whyNow?: string | null;
+  evidence?: string[] | null;
+  actionConfidence?: "low" | "medium" | "high" | null;
+  draftAvailable?: boolean | null;
 };
 
 export type FollowupSuggestionsResponse = {
   success: boolean;
   suggestions?: FollowupSuggestion[];
+  meta?: {
+    suppressed?: boolean;
+    suppressionReason?: string | null;
+    message?: string | null;
+  };
 };
 
 export type StrategyAlert = {
@@ -173,6 +182,28 @@ export type SuggestionActionState = {
 export type SuggestionActionStatesResponse = {
   success: boolean;
   actions?: SuggestionActionState[];
+};
+
+export type SuggestionDraftTone =
+  | "warm"
+  | "concise"
+  | "direct"
+  | "post_interview"
+  | "recruiter_went_cold"
+  | "referral";
+
+export type SuggestionDraft = {
+  subject: string;
+  body: string;
+  context: SuggestionDraftTone | string;
+  recipient?: string | null;
+  company?: string | null;
+  role?: string | null;
+  actionType: string;
+  confidence: "low" | "medium" | "high";
+  warning?: string | null;
+  evidence?: string[];
+  threadPreview?: string | null;
 };
 
 export type ApplicationStatsResponse = {
@@ -319,6 +350,48 @@ export async function undoSuggestionAction(params: {
     method: "DELETE",
     body: JSON.stringify(params),
   });
+}
+
+export async function generateSuggestionDraft(params: {
+  threadId: string;
+  actionType: string;
+  tone?: SuggestionDraftTone;
+  emailId?: string | number | null;
+  applicationId?: string | number | null;
+  suggestionSource?: string | null;
+}): Promise<{ success: boolean; draft: SuggestionDraft }> {
+  return apiFetch("/api/suggestions/draft", {
+    method: "POST",
+    body: JSON.stringify(params),
+    timeoutMs: 20_000,
+  });
+}
+
+export async function closeApplication(params: {
+  applicationId?: string | number | null;
+  emailId?: string | number | null;
+  reason?: string | null;
+}): Promise<{ success: boolean; application?: unknown; message?: string }> {
+  const payload = {
+    ...(params.reason ? { reason: params.reason } : {}),
+    ...(params.emailId ? { emailId: params.emailId } : {}),
+  };
+
+  if (params.applicationId) {
+    return apiFetch(`/api/emails/applications/${encodeURIComponent(String(params.applicationId))}/close`, {
+      method: "POST",
+      body: payload,
+    });
+  }
+
+  if (params.emailId) {
+    return apiFetch("/api/emails/applications/close-by-email", {
+      method: "POST",
+      body: payload,
+    });
+  }
+
+  throw new Error("Application or email id is required to close an application.");
 }
 
 export async function fetchApplicationStats(): Promise<ApplicationStatsResponse> {
