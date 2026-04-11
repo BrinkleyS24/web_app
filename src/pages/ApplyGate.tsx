@@ -5,6 +5,10 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Shield, AlertTriangle } from "lucide-react";
+import {
+  normalizeCompanyName,
+  splitRoleAndCompany as splitApplyGateRoleAndCompany,
+} from "@/lib/applyGateDisplay";
 import { auth } from "@/lib/firebase";
 import {
   analyzeJobAlignment,
@@ -78,33 +82,17 @@ function warningPrefixForStatus(status: VerdictStatus) {
   return "Risk note";
 }
 
-const KNOWN_COMPANIES: Record<string, string> = {
-  citadelsecurities: "Citadel Securities",
-  goldmansachs: "Goldman Sachs",
-  spotandtango: "Spot & Tango",
-  rockstargames: "Rockstar Games",
-};
 
-function companyFromUrl(rawUrl: string | null | undefined) {
-  if (!rawUrl || !rawUrl.trim()) return null;
-  try {
-    const hostname = new URL(rawUrl.trim()).hostname.replace(/^www\./i, "");
-    const root = (hostname.split(".")[0] || "").toLowerCase();
-    if (!root) return null;
-    if (KNOWN_COMPANIES[root]) return KNOWN_COMPANIES[root];
-    return root
-      .replace(/[-_]+/g, " ")
-      .split(" ")
-      .filter(Boolean)
-      .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
-      .join(" ");
-  } catch {
-    return null;
-  }
+function splitRoleAndCompany(
+  rawTitle: string | null | undefined,
+  explicitCompany?: string | null,
+  fallbackUrl?: string | null,
+) {
+  return splitApplyGateRoleAndCompany(rawTitle, explicitCompany, fallbackUrl);
 }
 
-function splitRoleAndCompany(rawTitle: string | null | undefined, fallbackUrl?: string | null) {
-  const title = String(rawTitle || "").trim();
+function legacySplitRoleAndCompanyPlaceholder() { return splitApplyGateRoleAndCompany(null, null, null); }
+/* legacy placeholder removed
   if (!title) {
     return {
       role: "Current Job Analysis",
@@ -125,7 +113,7 @@ function splitRoleAndCompany(rawTitle: string | null | undefined, fallbackUrl?: 
     role: title,
     company: companyFromUrl(fallbackUrl) || "Company unavailable",
   };
-}
+*/
 
 function truncateReason(reason: string, maxLength = 110) {
   const safe = String(reason || "").trim();
@@ -279,6 +267,13 @@ function normalizeHistoryTitle(value: string | null | undefined) {
     .trim();
 }
 
+function normalizeHistoryCompany(value: string | null | undefined) {
+  return String(normalizeCompanyName(value) || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function normalizeHistoryUrl(value: string | null | undefined) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -296,17 +291,24 @@ function normalizeHistoryUrl(value: string | null | undefined) {
   }
 }
 
-function historyIdentityFor(jobTitle: string | null | undefined, jobUrl: string | null | undefined) {
+function historyIdentityFor(
+  jobTitle: string | null | undefined,
+  jobUrl: string | null | undefined,
+  companyName?: string | null,
+) {
   const normalizedUrl = normalizeHistoryUrl(jobUrl);
   if (normalizedUrl) return `url:${normalizedUrl}`;
+
+  const normalizedCompany = normalizeHistoryCompany(companyName);
   const normalizedTitle = normalizeHistoryTitle(jobTitle);
+  if (normalizedTitle && normalizedCompany) return `title-company:${normalizedTitle}:${normalizedCompany}`;
   if (normalizedTitle) return `title:${normalizedTitle}`;
   return null;
 }
 
 function sameHistoryPosting(
-  a: { job_title?: string | null; job_url?: string | null },
-  b: { job_title?: string | null; job_url?: string | null },
+  a: { job_title?: string | null; job_url?: string | null; company_name?: string | null },
+  b: { job_title?: string | null; job_url?: string | null; company_name?: string | null },
 ) {
   const aUrl = normalizeHistoryUrl(a.job_url);
   const bUrl = normalizeHistoryUrl(b.job_url);
@@ -314,12 +316,18 @@ function sameHistoryPosting(
 
   const aTitle = normalizeHistoryTitle(a.job_title);
   const bTitle = normalizeHistoryTitle(b.job_title);
-  if (aTitle && bTitle && aTitle === bTitle) return true;
+  if (!aTitle || !bTitle || aTitle !== bTitle) return false;
 
-  return false;
+  const aCompany = normalizeHistoryCompany(a.company_name);
+  const bCompany = normalizeHistoryCompany(b.company_name);
+  if (aCompany || bCompany) {
+    return Boolean(aCompany && bCompany && aCompany === bCompany);
+  }
+
+  return true;
 }
 
-function dedupeHistoryItems<T extends { job_title: string; job_url?: string | null; id: string }>(items: T[]) {
+function dedupeHistoryItems<T extends { job_title: string; job_url?: string | null; company_name?: string | null; id: string }>(items: T[]) {
   const deduped: T[] = [];
   for (const item of items) {
     if (deduped.some((existing) => sameHistoryPosting(existing, item))) continue;
@@ -331,13 +339,15 @@ function dedupeHistoryItems<T extends { job_title: string; job_url?: string | nu
 function buildHistoryDisplayItemFromResult(
   result: ApplyGateResult | null,
   fallbackJobTitle: string,
+  fallbackCompanyName: string,
   fallbackJobUrl: string,
 ): ApplyGateHistoryDisplayItem | null {
   if (!result) return null;
 
   const resolvedJobTitle = String(result.jobTitle || fallbackJobTitle || "").trim() || "Current Job Analysis";
+  const resolvedCompanyName = normalizeCompanyName(result.companyName || fallbackCompanyName || null);
   const resolvedJobUrl = String(result.jobUrl || fallbackJobUrl || "").trim() || null;
-  const identity = historyIdentityFor(resolvedJobTitle, resolvedJobUrl);
+  const identity = historyIdentityFor(resolvedJobTitle, resolvedJobUrl, resolvedCompanyName);
   const scoreValue = Number(result.scoringBreakdown?.totalScore);
   const score = Number.isFinite(scoreValue) ? scoreValue : 0;
   const persistedId = String(result.id || "").trim();
@@ -345,6 +355,7 @@ function buildHistoryDisplayItemFromResult(
   return {
     id: persistedId || `unsaved:${identity || "current"}`,
     job_title: resolvedJobTitle,
+    company_name: resolvedCompanyName,
     job_url: resolvedJobUrl,
     verdict: result.verdict,
     score,
@@ -361,6 +372,7 @@ function buildHistoryDisplayItemFromResult(
 const ApplyGate = () => {
   const [user, setUser] = useState(auth?.currentUser ?? null);
   const [jobTitle, setJobTitle] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [jobUrl, setJobUrl] = useState("");
   const [result, setResult] = useState<ApplyGateResult | null>(null);
@@ -392,8 +404,8 @@ const ApplyGate = () => {
 
   const rawHistory: ApplyGateHistoryItem[] = historyQuery.data?.history ?? [];
   const currentHistoryProjection = useMemo(
-    () => buildHistoryDisplayItemFromResult(result, jobTitle, jobUrl),
-    [jobTitle, jobUrl, result],
+    () => buildHistoryDisplayItemFromResult(result, jobTitle, companyName, jobUrl),
+    [companyName, jobTitle, jobUrl, result],
   );
   const history = useMemo<ApplyGateHistoryDisplayItem[]>(() => {
     const deduped = dedupeHistoryItems(rawHistory);
@@ -402,11 +414,11 @@ const ApplyGate = () => {
   }, [currentHistoryProjection, rawHistory]);
 
   const analyzeMutation = useMutation({
-    mutationFn: () => analyzeJobAlignment({ jobTitle, jobDescription, jobUrl }),
+    mutationFn: () => analyzeJobAlignment({ jobTitle, jobDescription, companyName, jobUrl }),
     onSuccess: (data) => {
       setResult(data);
       setIsCurrentWarningExpanded(false);
-      const currentAsHistory = buildHistoryDisplayItemFromResult(data, jobTitle, jobUrl);
+      const currentAsHistory = buildHistoryDisplayItemFromResult(data, jobTitle, companyName, jobUrl);
       if (currentAsHistory && !currentAsHistory._unsaved) {
         const persistedHistoryItem = currentAsHistory as ApplyGateHistoryItem;
         queryClient.setQueryData<ApplyGateHistoryQueryData>(["apply-gate-history"], (previous) => {
@@ -471,7 +483,11 @@ const ApplyGate = () => {
       Boolean(result.scoringBreakdown?.hardBlocker),
     )
     : null;
-  const currentRoleCompany = splitRoleAndCompany(jobTitle || null, result?.jobUrl || jobUrl || null);
+  const currentRoleCompany = splitRoleAndCompany(
+    result?.jobTitle || jobTitle || null,
+    result?.companyName || companyName || null,
+    result?.jobUrl || jobUrl || null,
+  );
   const structuredCurrent = structuredWarningAndBullets(result?.explanation);
   const fallbackCurrentMostLikelyReason = pickWarningReason(hardBlockers.length > 0 ? hardBlockers : (result?.reasons || []));
   const currentMostLikelyReason = structuredCurrent.warning || fallbackCurrentMostLikelyReason;
@@ -523,6 +539,17 @@ const ApplyGate = () => {
             />
           </div>
           <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground" htmlFor="company-name">Company Name (optional)</label>
+            <input
+              id="company-name"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              placeholder="e.g., Acme Corp"
+            />
+            <p className="text-xs text-muted-foreground">Useful when you paste a job description instead of starting from a posting URL.</p>
+          </div>
+          <div className="space-y-2">
             <label className="text-sm font-medium text-foreground" htmlFor="job-description">Job Description</label>
             <textarea
               id="job-description"
@@ -560,7 +587,9 @@ const ApplyGate = () => {
             <div className="flex items-start justify-between">
               <div>
                 <p className="font-semibold text-foreground leading-tight">{currentRoleCompany.role}</p>
-                <p className="text-sm text-muted-foreground leading-tight mt-0.5">{currentRoleCompany.company}</p>
+                {currentRoleCompany.company ? (
+                  <p className="text-sm text-muted-foreground leading-tight mt-0.5">{currentRoleCompany.company}</p>
+                ) : null}
               </div>
               <StatusBadge status={currentStatus || "risky"} />
             </div>
@@ -686,13 +715,15 @@ const ApplyGate = () => {
                     : (bulletReasons.length > 0
                       ? bulletReasons
                       : reasons.slice(0, 1).map((entry) => truncateReason(entry, 160)));
-                  const roleCompany = splitRoleAndCompany(item.job_title, item.job_url || null);
+                  const roleCompany = splitRoleAndCompany(item.job_title, item.company_name, item.job_url || null);
                   return (
                     <>
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-sm font-semibold text-foreground leading-tight">{roleCompany.role}</p>
-                    <p className="text-xs text-muted-foreground leading-tight mt-0.5">{roleCompany.company}</p>
+                    {roleCompany.company ? (
+                      <p className="text-xs text-muted-foreground leading-tight mt-0.5">{roleCompany.company}</p>
+                    ) : null}
                   </div>
                   <StatusBadge status={status} />
                 </div>

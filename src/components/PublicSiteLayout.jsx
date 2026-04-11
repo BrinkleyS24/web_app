@@ -1,5 +1,6 @@
 import React from "react";
 import { Link, NavLink } from "react-router-dom";
+import { useAuth } from "../lib/AuthContext.jsx";
 import {
   CHROME_EXTENSION_IS_LIVE,
   CHROME_STORE_CTA_LABEL,
@@ -29,6 +30,11 @@ function ExternalOrInternalCta({ className, label }) {
 }
 
 export default function PublicSiteLayout({ children }) {
+  const { plan, planLoading, adminEmail } = useAuth();
+  const premiumEntryPath = !planLoading && adminEmail
+    ? "/admin/review"
+    : (!planLoading && plan === "premium" ? "/dashboard" : "/upgrade");
+
   return (
     <div className="publicSiteShell">
       <div className="publicSiteBackdrop" aria-hidden="true" />
@@ -56,13 +62,19 @@ export default function PublicSiteLayout({ children }) {
               Privacy
             </NavLink>
             <NavLink
+              to="/terms"
+              className={({ isActive }) => `publicNavLink ${isActive ? "publicNavLinkActive" : ""}`.trim()}
+            >
+              Terms
+            </NavLink>
+            <NavLink
               to="/support"
               className={({ isActive }) => `publicNavLink ${isActive ? "publicNavLinkActive" : ""}`.trim()}
             >
               Support
             </NavLink>
             <NavLink
-              to="/upgrade"
+              to={premiumEntryPath}
               className={({ isActive }) => `publicNavLink ${isActive ? "publicNavLinkActive" : ""}`.trim()}
             >
               Premium
@@ -103,7 +115,7 @@ export default function PublicSiteLayout({ children }) {
             <div>
               <p className="publicFooterHeading">Company</p>
               <Link to="/">Home</Link>
-              <Link to="/upgrade">Premium Status</Link>
+              <Link to={premiumEntryPath}>{adminEmail || plan === "premium" ? "Dashboard" : "Premium Status"}</Link>
               {CHROME_WEB_STORE_URL ? (
                 <a href={CHROME_WEB_STORE_URL} target="_blank" rel="noreferrer">
                   Chrome Store
@@ -114,6 +126,7 @@ export default function PublicSiteLayout({ children }) {
             <div>
               <p className="publicFooterHeading">Legal</p>
               <Link to="/privacy">Privacy Policy</Link>
+              <Link to="/terms">Terms of Service</Link>
               <Link to="/support">Support</Link>
             </div>
             <div>

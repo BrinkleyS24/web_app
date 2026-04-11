@@ -6,7 +6,7 @@ const helpCards = [
   {
     title: "Installation and sign-in",
     body:
-      "Follow the Chrome Web Store listing, install the extension once it is approved, and sign in from the popup to connect Gmail with read-only access.",
+      "Install Applendium from the Chrome Web Store and sign in from the popup to connect Gmail with read-only access.",
   },
   {
     title: "Sync and classification issues",
@@ -47,7 +47,7 @@ export default function Support() {
   usePageMetadata({
     title: "Applendium | Support",
     description:
-      "Contact Applendium support for installation issues, sync problems, billing questions, privacy requests, and launch-status help.",
+      "Contact Applendium support for installation issues, sync problems, billing questions, privacy requests, and extension help.",
   });
 
   return (

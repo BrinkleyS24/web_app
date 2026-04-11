@@ -23,7 +23,7 @@ export default function Landing() {
   usePageMetadata({
     title: "Applendium | Gmail Job Tracker for Chrome",
     description:
-      "Applendium helps track job-application emails from Gmail. The Chrome Web Store listing is under review while premium dashboard workflows remain closed.",
+      "Install Applendium from the Chrome Web Store to track job-application emails from Gmail with read-only access.",
   });
 
   const heroTitle = CHROME_EXTENSION_IS_LIVE
@@ -139,9 +139,9 @@ export default function Landing() {
           <p className="sectionEyebrow">What is available</p>
           <h2>{liveSectionTitle}</h2>
           <p>
-            {CHROME_STORE_STATUS_SENTENCE} Applendium.com should help a new visitor
-            understand the read-only Gmail scope, what the popup is designed to do, and
-            what is intentionally not public yet.
+            {CHROME_STORE_STATUS_SENTENCE} Applendium.com explains the read-only Gmail
+            scope, what the popup is designed to do, and what is intentionally not
+            public yet.
           </p>
         </div>
 
@@ -216,9 +216,9 @@ export default function Landing() {
           <p className="sectionEyebrow">Premium roadmap</p>
           <h2>Premium is a later layer, not the first thing users need to understand</h2>
           <p>
-            The extension and public trust surface should stand on their own. Premium
-            stays below the fold as future depth, not as the headline for a web app that
-            is not publicly open yet.
+            The extension and public trust surface stand on their own. Premium stays
+            below the fold as future depth, not as the headline for a web app that is not
+            publicly open yet.
           </p>
         </div>
 
@@ -247,12 +247,14 @@ export default function Landing() {
       <section className="ctaSection">
         <div className="ctaCard">
           <div>
-            <p className="sectionEyebrow">Ready to follow the launch?</p>
+            <p className="sectionEyebrow">
+              {CHROME_EXTENSION_IS_LIVE ? "Ready to install?" : "Ready to follow the launch?"}
+            </p>
             <h2>{ctaTitle}</h2>
             <p className="ctaNote">
-              {CHROME_STORE_STATUS_SENTENCE} Support and privacy pages stay live here,
-              and premium updates stay available without overselling unfinished dashboard
-              workflows or a web workspace that is not public yet.
+              {CHROME_STORE_STATUS_SENTENCE} Support, privacy, and terms pages stay live
+              here, and premium updates stay available without overselling unfinished
+              dashboard workflows or a web workspace that is not public yet.
             </p>
           </div>
 
@@ -264,7 +266,7 @@ export default function Landing() {
               Premium roadmap
             </Link>
             <a className="publicButton publicButtonSecondary" href={premiumUpdatesHref}>
-              Launch updates
+              {CHROME_EXTENSION_IS_LIVE ? "Premium updates" : "Launch updates"}
             </a>
             {CHROME_WEB_STORE_URL ? (
               <a

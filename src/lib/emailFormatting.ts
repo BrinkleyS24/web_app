@@ -1,11 +1,11 @@
 import type { StoredEmail } from "@/lib/emails";
 
 export function getEmailCompany(email: StoredEmail) {
-  return email.company_name_corrected || email.company_name || "Unknown company";
+  return email.company_name || "Unknown company";
 }
 
 export function getEmailTitle(email: StoredEmail) {
-  return email.position_corrected || email.position || email.subject || "Untitled role";
+  return email.position || email.subject || "Untitled role";
 }
 
 export function getEmailCategoryLabel(email: StoredEmail) {

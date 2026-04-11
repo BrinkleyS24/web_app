@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth, firebaseConfigured } from "./firebase.js";
-import { signInFromExtensionBridge } from "./extensionBridge.js";
+import { signInFromExtensionBridge, signOutFromExtensionBridge } from "./extensionBridge.js";
 import { apiFetch } from "./api.js";
 
 const AUTH_STATE_PUSH = "APPLENDIUM_AUTH_STATE_PUSH";
@@ -13,6 +13,10 @@ const DEV_AUTH_BYPASS_EMAIL =
   String(import.meta.env.VITE_DEV_AUTH_EMAIL || "").trim() || "dev@example.test";
 const DEV_AUTH_BYPASS_UID =
   String(import.meta.env.VITE_DEV_AUTH_UID || "").trim() || "local-dev-user";
+const DEV_AUTH_BYPASS_ADMIN =
+  import.meta.env.DEV
+  && String(import.meta.env.VITE_DEV_AUTH_ADMIN || "").trim().toLowerCase() === "true";
+const DEV_AUTH_BYPASS_SIGNED_OUT_KEY = "APPLENDIUM_DEV_AUTH_BYPASS_SIGNED_OUT";
 
 function buildDevBypassUser() {
   return {
@@ -21,6 +25,27 @@ function buildDevBypassUser() {
     displayName: DEV_AUTH_BYPASS_EMAIL,
     isBypass: true,
   };
+}
+
+function readDevBypassSignedOutState() {
+  try {
+    return typeof window !== "undefined" && window.sessionStorage.getItem(DEV_AUTH_BYPASS_SIGNED_OUT_KEY) === "true";
+  } catch (_) {
+    return false;
+  }
+}
+
+function writeDevBypassSignedOutState(nextValue) {
+  try {
+    if (typeof window === "undefined") return;
+    if (nextValue) {
+      window.sessionStorage.setItem(DEV_AUTH_BYPASS_SIGNED_OUT_KEY, "true");
+    } else {
+      window.sessionStorage.removeItem(DEV_AUTH_BYPASS_SIGNED_OUT_KEY);
+    }
+  } catch (_) {
+    // Ignore storage failures in restricted browsing modes.
+  }
 }
 
 const AuthContext = createContext({
@@ -33,6 +58,7 @@ const AuthContext = createContext({
   adminEmail: false,
   debugRoutesEnabled: false,
   debugAdminAccess: false,
+  logout: async () => {},
 });
 
 export function useAuth() {
@@ -45,10 +71,14 @@ export function useAuth() {
  * Auth comes exclusively from the Chrome extension via the content-script bridge.
  */
 export function AuthProvider({ children }) {
+  const isLocalHost =
+    typeof window !== "undefined"
+    && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  const [devBypassSignedOut, setDevBypassSignedOut] = useState(readDevBypassSignedOutState);
   const isLocalDevBypass =
     DEV_AUTH_BYPASS_ENABLED
-    && typeof window !== "undefined"
-    && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    && isLocalHost
+    && !devBypassSignedOut;
   const [user, setUser] = useState(isLocalDevBypass ? buildDevBypassUser() : null);
   const [authReady, setAuthReady] = useState(isLocalDevBypass || false);
   const [bridgeDone, setBridgeDone] = useState(isLocalDevBypass || !firebaseConfigured);
@@ -57,9 +87,60 @@ export function AuthProvider({ children }) {
   const [plan, setPlan] = useState(isLocalDevBypass ? "premium" : null);
   const [planLoading, setPlanLoading] = useState(!isLocalDevBypass);
   const [planError, setPlanError] = useState("");
-  const [adminEmail, setAdminEmail] = useState(isLocalDevBypass);
-  const [debugRoutesEnabled, setDebugRoutesEnabled] = useState(isLocalDevBypass);
-  const [debugAdminAccess, setDebugAdminAccess] = useState(isLocalDevBypass);
+  const [adminEmail, setAdminEmail] = useState(isLocalDevBypass && DEV_AUTH_BYPASS_ADMIN);
+  const [debugRoutesEnabled, setDebugRoutesEnabled] = useState(isLocalDevBypass && DEV_AUTH_BYPASS_ADMIN);
+  const [debugAdminAccess, setDebugAdminAccess] = useState(isLocalDevBypass && DEV_AUTH_BYPASS_ADMIN);
+
+  async function logout() {
+    let signedOut = false;
+    let lastError = null;
+    const shouldRequestExtensionLogout = extensionDetected;
+
+    if (DEV_AUTH_BYPASS_ENABLED && isLocalHost) {
+      setDevBypassSignedOut(true);
+      writeDevBypassSignedOutState(true);
+      signedOut = true;
+    }
+
+    if (shouldRequestExtensionLogout) {
+      try {
+        const extensionResult = await signOutFromExtensionBridge();
+        if (extensionResult?.success) {
+          signedOut = true;
+        } else if (extensionResult?.error) {
+          lastError = new Error(extensionResult.error);
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error("Extension logout failed.");
+      }
+    }
+
+    try {
+      if (auth?.currentUser) {
+        await signOut(auth);
+        signedOut = true;
+      }
+    } catch (error) {
+      if (!lastError) {
+        lastError = error instanceof Error ? error : new Error("Web sign-out failed.");
+      }
+    }
+
+    setUser(null);
+    setAuthReady(true);
+    setBridgeDone(true);
+    setExtensionAuthResolved(true);
+    setPlan(null);
+    setPlanLoading(false);
+    setPlanError("");
+    setAdminEmail(false);
+    setDebugRoutesEnabled(false);
+    setDebugAdminAccess(false);
+
+    if (!signedOut && lastError) {
+      throw lastError;
+    }
+  }
 
   useEffect(() => {
     if (isLocalDevBypass) {
@@ -171,9 +252,9 @@ export function AuthProvider({ children }) {
       setPlan("premium");
       setPlanLoading(false);
       setPlanError("");
-      setAdminEmail(true);
-      setDebugRoutesEnabled(true);
-      setDebugAdminAccess(true);
+      setAdminEmail(DEV_AUTH_BYPASS_ADMIN);
+      setDebugRoutesEnabled(DEV_AUTH_BYPASS_ADMIN);
+      setDebugAdminAccess(DEV_AUTH_BYPASS_ADMIN);
       return undefined;
     }
 
@@ -218,7 +299,7 @@ export function AuthProvider({ children }) {
     };
   }, [user, isLocalDevBypass]);
 
-  const loading = !authReady || (extensionDetected && !extensionAuthResolved) || (!user && !bridgeDone);
+  const loading = !authReady || (extensionDetected && !extensionAuthResolved);
 
   return (
     <AuthContext.Provider value={{
@@ -231,6 +312,7 @@ export function AuthProvider({ children }) {
       adminEmail,
       debugRoutesEnabled,
       debugAdminAccess,
+      logout,
     }}>
       {children}
     </AuthContext.Provider>

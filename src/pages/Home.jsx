@@ -16,6 +16,10 @@ export default function Home() {
     adminEmail,
   } = useAuth();
   const navigate = useNavigate();
+  const isLocalDevWorkspace =
+    import.meta.env.DEV
+    && typeof window !== "undefined"
+    && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 
   // Once authenticated, fetch plan and redirect
   useEffect(() => {
@@ -31,10 +35,14 @@ export default function Home() {
       return;
     }
 
-    navigate("/upgrade", { replace: true });
-  }, [user, authLoading, planLoading, adminEmail, plan, navigate]);
+    if (planError && !plan) {
+      return;
+    }
 
-  const hideInternalWorkspaceDetails = !WEB_WORKSPACE_IS_PUBLIC && !user;
+    navigate("/upgrade", { replace: true });
+  }, [user, authLoading, planLoading, adminEmail, plan, planError, navigate]);
+
+  const hideInternalWorkspaceDetails = !WEB_WORKSPACE_IS_PUBLIC && !user && !isLocalDevWorkspace;
 
   if (hideInternalWorkspaceDetails) {
     return (

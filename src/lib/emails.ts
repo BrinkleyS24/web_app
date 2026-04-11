@@ -13,9 +13,9 @@ export type StoredEmail = {
   is_read?: boolean | null;
   is_starred?: boolean | null;
   company_name?: string | null;
-  company_name_corrected?: string | null;
+  company_name_corrected?: boolean | null;
   position?: string | null;
-  position_corrected?: string | null;
+  position_corrected?: boolean | null;
   extraction_method?: string | null;
   applicationId?: string | null;
   isClosed?: boolean | null;
@@ -216,6 +216,47 @@ export async function fetchFollowupSuggestions(): Promise<FollowupSuggestionsRes
   });
 }
 
+export async function updateEmailCompany(params: {
+  emailId: string | number;
+  companyName: string;
+}): Promise<{ success: boolean; email?: StoredEmail; message?: string }> {
+  return apiFetch(`/api/emails/${encodeURIComponent(String(params.emailId))}/company`, {
+    method: "PATCH",
+    body: {
+      companyName: params.companyName,
+    },
+  });
+}
+
+export async function updateEmailPosition(params: {
+  emailId: string | number;
+  position: string;
+}): Promise<{ success: boolean; email?: StoredEmail; message?: string }> {
+  return apiFetch(`/api/emails/${encodeURIComponent(String(params.emailId))}/position`, {
+    method: "PATCH",
+    body: {
+      position: params.position,
+    },
+  });
+}
+
+export async function linkRoleEmails(params: {
+  emailId: string | number;
+}): Promise<{
+  success: boolean;
+  matched?: number;
+  relinked?: number;
+  failed?: number;
+  applicationId?: string | number | null;
+}> {
+  return apiFetch("/api/emails/applications/link-role", {
+    method: "POST",
+    body: {
+      emailId: params.emailId,
+    },
+  });
+}
+
 export async function fetchStrategyAlerts(): Promise<StrategyAlertsResponse> {
   return apiFetch("/api/suggestions/strategy-alerts", { method: "GET" });
 }
@@ -326,6 +367,7 @@ export type ApplyGateResult = {
   success: boolean;
   id?: string | null;
   jobTitle?: string | null;
+  companyName?: string | null;
   jobUrl?: string | null;
   extractionMeta?: {
     attempted: boolean;
@@ -403,6 +445,7 @@ export type ApplyGateResult = {
 export type ApplyGateHistoryItem = {
   id: string;
   job_title: string;
+  company_name?: string | null;
   job_url?: string | null;
   verdict: ApplyGateVerdict;
   score: number;
@@ -424,6 +467,7 @@ export type ApplyGateOutcome = "interviewed" | "offered" | "rejected" | "withdra
 export async function analyzeJobAlignment(params: {
   jobTitle: string;
   jobDescription: string;
+  companyName?: string;
   jobUrl?: string;
 }): Promise<ApplyGateResult> {
   return apiFetch("/api/emails/apply-gate/analyze", {

@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ReactNode } from "react";
+
 import ApplyGate from "./ApplyGate";
 
 const {
@@ -63,7 +64,7 @@ function renderPage() {
 
 const baseResult = {
   success: true,
-  id: "123",
+  id: "verdict-123",
   verdict: "risky",
   confidence: "high",
   reasons: ["Missing required: plc programming.", "Education gap."],
@@ -94,19 +95,17 @@ const baseResult = {
     hardBlocker: true,
   },
   fixSuggestion: "Target adjacent automation roles first.",
-  discipline_alignment_score: 53,
-  discipline_transition_label: "Stretch",
-  discipline_dimension_breakdown: {
-    scope: 60,
-    execution: 50,
-    environment: 40,
-    autonomy: 62,
-  },
 };
 
-async function runAnalyze() {
-  await userEvent.type(screen.getByLabelText("Job Title"), "Automation Engineer");
-  await userEvent.type(screen.getByLabelText("Job Description"), "Requires PLC and controls experience.");
+async function runAnalyze(options?: { companyName?: string; jobTitle?: string; jobDescription?: string }) {
+  await userEvent.type(screen.getByLabelText("Job Title"), options?.jobTitle || "Automation Engineer");
+  if (options?.companyName) {
+    await userEvent.type(screen.getByLabelText("Company Name (optional)"), options.companyName);
+  }
+  await userEvent.type(
+    screen.getByLabelText("Job Description"),
+    options?.jobDescription || "Requires PLC and controls experience.",
+  );
   await userEvent.click(screen.getByRole("button", { name: /Check Alignment/i }));
 }
 
@@ -120,62 +119,27 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("ApplyGate discipline UI", () => {
-  test("snapshot: verdict card renders discipline row when present", async () => {
-    analyzeJobAlignment.mockResolvedValue({ ...baseResult, discipline_transition_label: "Adjacent", discipline_alignment_score: 84 });
+describe("ApplyGate current UI", () => {
+  test("snapshot: risky verdict renders the current card layout", async () => {
+    analyzeJobAlignment.mockResolvedValue(baseResult);
     const { container } = renderPage();
 
     await runAnalyze();
 
     await waitFor(() => {
-      expect(screen.getByText("Discipline Alignment")).toBeInTheDocument();
-      expect(screen.getByText("84/100")).toBeInTheDocument();
-      expect(screen.getByText(/transition: Adjacent/)).toBeInTheDocument();
+      expect(screen.getByText("Automation Engineer")).toBeInTheDocument();
+      expect(screen.getByText("High-risk application")).toBeInTheDocument();
+      expect(screen.getByText("Fix First")).toBeInTheDocument();
     });
 
     expect(container).toMatchSnapshot();
   });
 
-  test('interaction: "What we compared" reveals discipline dimension details', async () => {
-    analyzeJobAlignment.mockResolvedValue(baseResult);
-    renderPage();
-
-    await runAnalyze();
-
-    await waitFor(() => expect(screen.getByText("Discipline Alignment")).toBeInTheDocument());
-    await userEvent.click(screen.getByRole("button", { name: /What we compared/i }));
-
-    expect(screen.getByText(/Discipline dimensions — scope 60, execution 50, environment 40, autonomy 62/i)).toBeInTheDocument();
-  });
-
-  test("integration: strong discipline alignment shows Adjacent label and score", async () => {
+  test("translates hard-blocker flags into the warning banner", async () => {
     analyzeJobAlignment.mockResolvedValue({
       ...baseResult,
-      verdict: "potential_fit",
-      scoringBreakdown: { ...baseResult.scoringBreakdown, hardBlocker: false, riskFlags: [] },
-      discipline_alignment_score: 88,
-      discipline_transition_label: "Adjacent",
-      discipline_dimension_breakdown: { scope: 90, execution: 85, environment: 84, autonomy: 93 },
-    });
-    renderPage();
-
-    await runAnalyze();
-
-    await waitFor(() => {
-      expect(screen.getByText("Discipline Alignment")).toBeInTheDocument();
-      expect(screen.getByText("88/100")).toBeInTheDocument();
-      expect(screen.getByText(/transition: Adjacent/)).toBeInTheDocument();
-    });
-  });
-
-  test("integration: mismatch + hard blocker shows Hard Blockers panel", async () => {
-    analyzeJobAlignment.mockResolvedValue({
-      ...baseResult,
-      discipline_alignment_score: 32,
-      discipline_transition_label: "Mismatch",
       scoringBreakdown: {
         ...baseResult.scoringBreakdown,
-        hardBlocker: true,
         riskFlags: ["education_gap", "critical_skill_gap", "discipline_mismatch"],
       },
     });
@@ -184,10 +148,72 @@ describe("ApplyGate discipline UI", () => {
     await runAnalyze();
 
     await waitFor(() => {
-      expect(screen.getByText("Hard Blockers")).toBeInTheDocument();
-      expect(screen.getByText("Required education level is missing")).toBeInTheDocument();
-      expect(screen.getByText("A required critical skill is missing")).toBeInTheDocument();
-      expect(screen.getByText("Core discipline/environment mismatch is high-risk")).toBeInTheDocument();
+      expect(screen.getByText("Likely rejection driver: Required education level is missing")).toBeInTheDocument();
+      expect(screen.queryByText("Company unavailable")).not.toBeInTheDocument();
+    });
+  });
+
+  test("passes optional company name and renders it for pasted descriptions", async () => {
+    analyzeJobAlignment.mockResolvedValue({
+      ...baseResult,
+      companyName: "Acme Robotics",
+    });
+    renderPage();
+
+    await runAnalyze({ companyName: "Acme Robotics" });
+
+    await waitFor(() => {
+      expect(analyzeJobAlignment).toHaveBeenCalledWith({
+        jobTitle: "Automation Engineer",
+        companyName: "Acme Robotics",
+        jobDescription: "Requires PLC and controls experience.",
+        jobUrl: "",
+      });
+      expect(screen.getByText("Acme Robotics")).toBeInTheDocument();
+    });
+  });
+
+  test("shows persisted company names in history and hides unresolved placeholders", async () => {
+    fetchApplyGateHistory.mockResolvedValue({
+      success: true,
+      history: [
+        {
+          id: "history-1",
+          job_title: "QA Engineer",
+          company_name: "Beta Systems",
+          job_url: null,
+          verdict: "potential_fit",
+          score: 67,
+          hard_blocker: false,
+          reasons: JSON.stringify(["Some missing preferred skills."]),
+          explanation_payload: null,
+          fix_suggestion: "Tailor the resume.",
+          user_action: null,
+          created_at: "2026-04-09T10:00:00.000Z",
+        },
+        {
+          id: "history-2",
+          job_title: "SDET",
+          company_name: null,
+          job_url: null,
+          verdict: "risky",
+          score: 42,
+          hard_blocker: true,
+          reasons: JSON.stringify(["Missing required skills."]),
+          explanation_payload: null,
+          fix_suggestion: "Fix first.",
+          user_action: null,
+          created_at: "2026-04-08T10:00:00.000Z",
+        },
+      ],
+    });
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("QA Engineer")).toBeInTheDocument();
+      expect(screen.getByText("Beta Systems")).toBeInTheDocument();
+      expect(screen.getByText("SDET")).toBeInTheDocument();
+      expect(screen.queryByText("Company unavailable")).not.toBeInTheDocument();
     });
   });
 });

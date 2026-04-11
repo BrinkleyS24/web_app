@@ -15,12 +15,10 @@ import {
   CheckCircle2,
   LogOut,
 } from "lucide-react";
-import { auth } from "../lib/firebase.js";
-import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 
 export default function Settings() {
-  const { user, plan, planLoading } = useAuth();
+  const { user, plan, planLoading, logout } = useAuth();
   const navigate = useNavigate();
 
   // ── Subscription status ─────────────────────────────────────
@@ -65,8 +63,8 @@ export default function Settings() {
   }, []);
 
   async function handleSignOut() {
-    await signOut(auth);
-    navigate("/");
+    await logout();
+    navigate("/app");
   }
 
   const isPremium = plan === "premium";

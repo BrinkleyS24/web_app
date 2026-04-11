@@ -3,6 +3,7 @@ import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom"
 import Home from "./pages/Home.jsx";
 import Landing from "./pages/Landing.jsx";
 import Privacy from "./pages/Privacy.jsx";
+import Terms from "./pages/Terms.jsx";
 import Support from "./pages/Support.jsx";
 import Account from "./pages/Account.jsx";
 import Dashboard from "./pages/DashboardNew.tsx";
@@ -17,6 +18,7 @@ import AdminAnalytics from "./pages/AdminAnalytics.tsx";
 import AdminDebug from "./pages/AdminDebug.tsx";
 import AdminJobs from "./pages/AdminJobs.tsx";
 import AdminReview from "./pages/AdminReview.tsx";
+import AdminUsers from "./pages/AdminUsers.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -38,6 +40,7 @@ const DASHBOARD_ROUTES = [
   "/admin/review",
   "/admin/analytics",
   "/admin/jobs",
+  "/admin/users",
 ];
 
 function LoadingScreen() {
@@ -52,7 +55,7 @@ function RequireNonAdminUser({ children }) {
   const { user, loading, planLoading, adminEmail } = useAuth();
 
   if (loading || planLoading) return <LoadingScreen />;
-  if (!user) return <NotFound />;
+  if (!user) return <Navigate to="/app" replace />;
   if (adminEmail) return <Navigate to="/admin/review" replace />;
 
   return children;
@@ -62,7 +65,7 @@ function RequirePremiumUser({ children }) {
   const { user, loading, plan, planLoading, planError, adminEmail } = useAuth();
 
   if (loading || planLoading) return <LoadingScreen />;
-  if (!user) return <NotFound />;
+  if (!user) return <Navigate to="/app" replace />;
   if (adminEmail) return <Navigate to="/admin/review" replace />;
 
   if (planError && plan !== "premium") {
@@ -88,7 +91,11 @@ function RequireAdminEmail({ children }) {
 
   if (loading || planLoading) return <LoadingScreen />;
 
-  if (!user || !adminEmail) {
+  if (!user) {
+    return <Navigate to="/app" replace />;
+  }
+
+  if (!adminEmail) {
     return <NotFound />;
   }
 
@@ -101,7 +108,7 @@ export default function App() {
     location.pathname.startsWith(route)
   );
   const isUpgrade = location.pathname.startsWith("/upgrade");
-  const isPublicSite = location.pathname === "/" || location.pathname === "/privacy" || location.pathname === "/support";
+  const isPublicSite = location.pathname === "/" || location.pathname === "/privacy" || location.pathname === "/terms" || location.pathname === "/support";
   const containerClass = (isDashboard || isUpgrade)
     ? "container container--full"
     : (isPublicSite ? "container container--full" : "container");
@@ -116,6 +123,7 @@ export default function App() {
               <Route path="/" element={<Landing />} />
               <Route path="/app" element={<Home />} />
               <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
               <Route path="/support" element={<Support />} />
               <Route path="/pricing" element={<Navigate to="/upgrade" replace />} />
               <Route
@@ -215,6 +223,14 @@ export default function App() {
                 element={
                   <RequireAdminEmail>
                     <AdminJobs />
+                  </RequireAdminEmail>
+                }
+              />
+              <Route
+                path="/admin/users"
+                element={
+                  <RequireAdminEmail>
+                    <AdminUsers />
                   </RequireAdminEmail>
                 }
               />

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth, firebaseConfigured, signInWithGoogle } from "../lib/firebase.js";
+import { useAuth } from "../lib/AuthContext.jsx";
 
 export default function AuthButton() {
+  const { logout } = useAuth();
   const [user, setUser] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -29,7 +31,9 @@ export default function AuthButton() {
     setError("");
     setBusy(true);
     try {
-      if (auth) await signOut(auth);
+      await logout();
+    } catch (e) {
+      setError(e?.message || "Sign-out failed.");
     } finally {
       setBusy(false);
     }

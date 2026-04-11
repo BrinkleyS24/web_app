@@ -1,5 +1,5 @@
 const DEFAULT_CHROME_WEB_STORE_URL =
-  "https://chromewebstore.google.com/detail/aaalkagnioipinkfogjlgkdoacebaoji?utm_source=item-share-cb";
+  "https://chromewebstore.google.com/detail/applendium/aaalkagnioipinkfogjlgkdoacebaoji?hl=en&authuser=0";
 
 function normalizeStoreState(value) {
   const normalized = (value || "").trim().toLowerCase();
@@ -10,7 +10,7 @@ export const CHROME_WEB_STORE_URL =
   (import.meta.env.VITE_CHROME_WEB_STORE_URL || DEFAULT_CHROME_WEB_STORE_URL).trim();
 
 export const CHROME_WEB_STORE_STATE = normalizeStoreState(
-  import.meta.env.VITE_CHROME_WEB_STORE_STATE || "review",
+  import.meta.env.VITE_CHROME_WEB_STORE_STATE || "live",
 );
 
 export const CHROME_EXTENSION_IS_LIVE = CHROME_WEB_STORE_STATE === "live";

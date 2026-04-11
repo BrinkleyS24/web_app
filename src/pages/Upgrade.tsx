@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { Clock3 } from "lucide-react";
 import PublicSiteLayout from "../components/PublicSiteLayout.jsx";
 import { useAuth } from "../lib/AuthContext.jsx";
@@ -16,13 +16,21 @@ import {
 } from "../lib/publicSiteConfig.js";
 
 const Upgrade = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, plan, planLoading, adminEmail } = useAuth();
 
   usePageMetadata({
     title: "Applendium | Premium Status",
     description:
       "Premium billing is temporarily closed while the Applendium premium dashboard is still in build. Use this page for current status and support paths.",
   });
+
+  if (!authLoading && !planLoading && user && adminEmail) {
+    return <Navigate to="/admin/review" replace />;
+  }
+
+  if (!authLoading && !planLoading && user && plan === "premium") {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const sessionLabel = authLoading
     ? "Checking session..."
@@ -48,7 +56,7 @@ const Upgrade = () => {
             <p className="heroLead">
               Billing is intentionally disabled while the premium workspace is being
               finished. The public product story should stay honest: the Chrome extension
-              launches first, and nobody should be sent through checkout for an unfinished
+              is live first, and nobody should be sent through checkout for an unfinished
               dashboard or a web workspace that is not publicly open yet.
             </p>
 
@@ -169,6 +177,9 @@ const Upgrade = () => {
             </Link>
             <Link className="publicButton publicButtonSecondary" to="/privacy">
               Privacy policy
+            </Link>
+            <Link className="publicButton publicButtonSecondary" to="/terms">
+              Terms
             </Link>
             <Link className="publicButton publicButtonPrimary" to="/support">
               Support
