@@ -192,11 +192,22 @@ export type SuggestionDraftTone =
   | "recruiter_went_cold"
   | "referral";
 
+export type SuggestionDraftFeedbackLabel =
+  | "helpful"
+  | "too_generic"
+  | "wrong_recipient"
+  | "wrong_grounding"
+  | "wrong_tone";
+
 export type SuggestionDraft = {
   subject: string;
   body: string;
   context: SuggestionDraftTone | string;
+  contextLabel?: string | null;
+  contextDescription?: string | null;
   recipient?: string | null;
+  recipientName?: string | null;
+  latestSender?: string | null;
   company?: string | null;
   role?: string | null;
   actionType: string;
@@ -204,6 +215,10 @@ export type SuggestionDraft = {
   warning?: string | null;
   evidence?: string[];
   threadPreview?: string | null;
+  coachingPoints?: string[];
+  sendStrategy?: string | null;
+  sendStrategyLabel?: string | null;
+  sendStrategyDescription?: string | null;
 };
 
 export type ApplicationStatsResponse = {
@@ -364,6 +379,36 @@ export async function generateSuggestionDraft(params: {
     method: "POST",
     body: JSON.stringify(params),
     timeoutMs: 20_000,
+  });
+}
+
+export async function recordSuggestionDraftFeedback(params: {
+  threadId: string;
+  actionType: string;
+  feedbackLabel: SuggestionDraftFeedbackLabel;
+  tone?: SuggestionDraftTone;
+  emailId?: string | number | null;
+  applicationId?: string | number | null;
+  suggestionSource?: string | null;
+  draft?: {
+    subject: string;
+    body: string;
+    context: string;
+    confidence?: "low" | "medium" | "high";
+    sendStrategy?: string | null;
+    sendStrategyLabel?: string | null;
+    recipient?: string | null;
+    recipientName?: string | null;
+    latestSender?: string | null;
+    warning?: string | null;
+    evidence?: string[];
+    threadPreview?: string | null;
+  };
+  feedback?: Record<string, unknown>;
+}): Promise<{ success: boolean }> {
+  return apiFetch("/api/suggestions/feedback", {
+    method: "POST",
+    body: JSON.stringify(params),
   });
 }
 
