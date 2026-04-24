@@ -3,16 +3,22 @@ import { splitRoleAndCompany } from "@/lib/applyGateDisplay";
 import type {
   ApplyGateHistoryItem,
   FollowupSuggestion,
+  RankedAction,
+  RankedActionQueue,
   StoredEmail,
   SuggestionActionState,
 } from "@/lib/emails";
 
-export type QueueSource = "followup" | "stale" | "apply_gate" | "resume" | "cleanup";
+export type QueueSource = NonNullable<RankedAction["queueSource"]>;
 export type QueueUrgency = "high" | "medium" | "low";
 export type QueueConfidence = "high" | "medium" | "low";
 
 export type QueueItem = {
   id: string;
+  logicalKey?: string;
+  dedupeKey?: string;
+  status?: "open" | "blocked" | "done" | "dismissed" | "expired";
+  bucket?: "doToday" | "thisWeek" | "later" | "blocked";
   source: QueueSource;
   urgency: QueueUrgency;
   title: string;
@@ -30,11 +36,15 @@ export type QueueItem = {
   threadId?: string | null;
   emailId?: string | number | null;
   applicationId?: string | number | null;
+  intent?: RankedAction["intent"];
+  intentLabel?: string | null;
   actionType?: string | null;
   suggestionSource?: string | null;
   stageLabel?: string | null;
   routeHref?: string | null;
   routeLabel?: string | null;
+  blockerTitles?: string[];
+  blockingReason?: string | null;
 };
 
 export type UpcomingFollowupWindow = {
@@ -77,7 +87,15 @@ export const sourceClasses: Record<QueueSource, string> = {
   cleanup: "bg-secondary text-secondary-foreground border border-border",
 };
 
+const rankedQueueSourceSet = new Set<QueueSource>(["followup", "stale", "apply_gate", "resume", "cleanup"]);
+
 export const actionTypeLabels: Record<string, string> = {
+  apply: "Apply",
+  cleanup: "Cleanup",
+  fix_targeting: "Fix targeting",
+  prepare_interview: "Prepare interview",
+  reply: "Reply",
+  tailor_resume: "Tailor resume",
   thank_you: "Thank-you",
   follow_up: "Follow-up",
   status_check: "Status check",
@@ -1082,6 +1100,150 @@ export function buildSuggestionQueueStats(queue: QueueItem[], actionStates: Sugg
     snoozed: actionStates.filter((item) => item.state === "snoozed").length,
     completed: actionStates.filter((item) => item.state === "completed").length,
   };
+}
+
+function mapConfidence(level?: string | null): QueueConfidence | undefined {
+  if (level === "strong") return "high";
+  if (level === "moderate") return "medium";
+  if (level === "weak") return "low";
+  return undefined;
+}
+
+function formatEstimatedTime(minutes?: number | null) {
+  const value = typeof minutes === "number" && Number.isFinite(minutes) ? Math.max(1, Math.round(minutes)) : 10;
+  return `${value} mins`;
+}
+
+function getRankedActionDebugKey(action: RankedAction) {
+  return action.dedupeKey || action.logicalKey || action.id || "unknown";
+}
+
+function requireRankedSource(action: RankedAction): QueueSource {
+  const queueSource = action.queueSource;
+  if (queueSource && rankedQueueSourceSet.has(queueSource)) return queueSource;
+  throw new Error(`[premiumTaskQueue] Ranked action ${getRankedActionDebugKey(action)} missing queueSource`);
+}
+
+function requireRankedString(action: RankedAction, fieldName: string, value?: string | null) {
+  if (typeof value === "string" && value.trim().length > 0) return value;
+  throw new Error(`[premiumTaskQueue] Ranked action ${getRankedActionDebugKey(action)} missing ${fieldName}`);
+}
+
+function requireRankedIntent(action: RankedAction) {
+  return requireRankedString(action, "intent", action.intent) as NonNullable<RankedAction["intent"]>;
+}
+
+function requireRankedStringArray(action: RankedAction, fieldName: string, value?: string[] | null) {
+  if (Array.isArray(value)) {
+    const normalized = value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    if (normalized.length > 0) return normalized;
+  }
+  throw new Error(`[premiumTaskQueue] Ranked action ${getRankedActionDebugKey(action)} missing ${fieldName}`);
+}
+
+function requireRankedBoolean(action: RankedAction, fieldName: string, value?: boolean) {
+  if (typeof value === "boolean") return value;
+  throw new Error(`[premiumTaskQueue] Ranked action ${getRankedActionDebugKey(action)} missing ${fieldName}`);
+}
+
+function buildRankedDescription(action: RankedAction) {
+  if (action.effectiveStatus === "blocked") {
+    return action.blockingReason || "A prerequisite action is still open.";
+  }
+  return action.whyNow || action.targetOutcome;
+}
+
+function mapRankedActionToQueueItem(
+  action: RankedAction,
+  blockerMap: Map<string, RankedAction>,
+  bucket: "doToday" | "thisWeek" | "later" | "blocked",
+): QueueItem {
+  const source = requireRankedSource(action);
+  const intent = requireRankedIntent(action);
+  const intentLabel = requireRankedString(action, "intentLabel", action.intentLabel);
+  const blockers = (action.unresolvedBlockedBy || [])
+    .map((key) => blockerMap.get(key))
+    .filter(Boolean) as RankedAction[];
+  const playbook = requireRankedStringArray(action, "playbook", action.playbook);
+  const sourceLabel = requireRankedString(action, "sourceLabel", action.sourceLabel);
+  const stageLabel = requireRankedString(action, "stageLabel", action.stageLabel);
+  const routeHref = requireRankedString(action, "routeHref", action.routeHref);
+  const routeLabel = requireRankedString(action, "routeLabel", action.routeLabel);
+  const draftEligible = requireRankedBoolean(action, "draftEligible", action.draftEligible);
+
+  return {
+    id: action.id,
+    logicalKey: action.logicalKey,
+    dedupeKey: action.dedupeKey,
+    status: action.effectiveStatus || action.status,
+    bucket,
+    source,
+    urgency: (action.urgencyLevel || "medium") as QueueUrgency,
+    title: action.title,
+    description: buildRankedDescription(action),
+    company: action.company || null,
+    estimatedTime: formatEstimatedTime(action.effortMinutes),
+    daysAgo: daysSince(action.createdAt),
+    playbook,
+    whyNow: action.whyNow || null,
+    evidence: uniqueStrings(action.evidence || [], 4),
+    actionConfidence: mapConfidence(action.confidenceLevel),
+    hasDraft: draftEligible,
+    sourceLabel,
+    sourceDescription: action.targetOutcome,
+    threadId: action.threadId || null,
+    emailId: action.emailId ?? null,
+    applicationId: action.applicationId ?? null,
+    intent,
+    intentLabel,
+    actionType: action.legacyActionType || action.actionType,
+    suggestionSource: action.suggestionSource || action.source,
+    stageLabel,
+    routeHref,
+    routeLabel,
+    blockerTitles: blockers.map((item) => item.title),
+    blockingReason: action.blockingReason || null,
+  };
+}
+
+export function buildQueueItemsFromRankedQueue(queue?: RankedActionQueue | null) {
+  if (!queue) return [] as QueueItem[];
+
+  const blockerMap = new Map((queue.resolvedActions || []).map((action) => [action.logicalKey, action]));
+
+  return [
+    ...(queue.doToday || []).map((action) => mapRankedActionToQueueItem(action, blockerMap, "doToday")),
+    ...(queue.thisWeek || []).map((action) => mapRankedActionToQueueItem(action, blockerMap, "thisWeek")),
+    ...(queue.blocked || []).map((action) => mapRankedActionToQueueItem(action, blockerMap, "blocked")),
+    ...(queue.later || []).map((action) => mapRankedActionToQueueItem(action, blockerMap, "later")),
+  ];
+}
+
+export function buildRankedQueueStats(queue?: RankedActionQueue | null) {
+  const active = [
+    ...(queue?.doToday || []),
+    ...(queue?.thisWeek || []),
+    ...(queue?.later || []),
+    ...(queue?.blocked || []),
+  ];
+
+  return {
+    active: active.length,
+    highPriority: active.filter((item) => item.urgencyLevel === "high").length,
+    totalMinutes: active.reduce((sum, item) => sum + (item.effortMinutes || 0), 0),
+    snoozed: queue?.dismissed?.length || 0,
+    completed: queue?.done?.length || 0,
+  };
+}
+
+export function buildQueueImpressionPayload(actions: RankedAction[]) {
+  return (actions || []).map((item) => ({
+    logicalKey: item.logicalKey,
+    dedupeKey: item.dedupeKey,
+  }));
 }
 
 export function buildSnoozedSuggestionItems(actionStates: SuggestionActionState[]) {

@@ -184,6 +184,99 @@ export type SuggestionActionStatesResponse = {
   actions?: SuggestionActionState[];
 };
 
+export type RankedAction = {
+  id: string;
+  logicalKey: string;
+  dedupeKey: string;
+  primaryEntityId: string;
+  evidenceVersion: string;
+  actionType: string;
+  actionCategory: "communication" | "application" | "optimization" | "system";
+  title: string;
+  whyNow: string;
+  targetOutcome: string;
+  effortMinutes: number;
+  urgencyLevel: "high" | "medium" | "low";
+  confidenceLevel: "strong" | "moderate" | "weak";
+  expiresAt?: string | null;
+  blockedByLogicalKeys?: string[];
+  blockingReason?: string | null;
+  source: "followup_engine" | "apply_gate" | "strategy_pattern" | "user";
+  status: "open" | "blocked" | "done" | "dismissed" | "expired";
+  refreshCondition?: Record<string, unknown> | null;
+  dismissedUntil?: string | null;
+  dismissedAt?: string | null;
+  lastShownAt?: string | null;
+  timesShown?: number;
+  createdAt?: string | null;
+  evidence?: string[];
+  rankScore?: number;
+  effectiveStatus?: "open" | "blocked" | "done" | "dismissed" | "expired";
+  stateReason?: string | null;
+  unresolvedBlockedBy?: string[];
+  threadId?: string | null;
+  emailId?: string | number | null;
+  applicationId?: string | number | null;
+  legacyActionType?: string | null;
+  suggestionSource?: string | null;
+  queueSource?: "followup" | "stale" | "apply_gate" | "resume" | "cleanup";
+  intent?:
+    | "SEND_THANK_YOU"
+    | "FOLLOW_UP_THREAD"
+    | "STATUS_CHECK"
+    | "NETWORKING_OUTREACH"
+    | "APPLY_TO_ROLE"
+    | "TAILOR_RESUME"
+    | "FIX_TARGETING"
+    | "PREP_INTERVIEW"
+    | "CLEANUP_STRUCTURED_FIELDS"
+    | "LINK_APPLICATIONS"
+    | "CLOSE_STALE_ROLE"
+    | "CLEANUP_DATA";
+  intentLabel?: string | null;
+  playbook?: string[];
+  sourceLabel?: string | null;
+  draftEligible?: boolean;
+  routeHref?: string | null;
+  routeLabel?: string | null;
+  stageLabel?: string | null;
+  company?: string | null;
+};
+
+export type RankedActionQueue = {
+  now: string;
+  doToday: RankedAction[];
+  thisWeek: RankedAction[];
+  later: RankedAction[];
+  blocked: RankedAction[];
+  dismissed: RankedAction[];
+  expired: RankedAction[];
+  done: RankedAction[];
+  emptyState?: {
+    title: string;
+    nextSteps: string[];
+  } | null;
+  resolvedActions?: RankedAction[];
+};
+
+export type RankedActionQueueResponse = {
+  success: boolean;
+  queue: RankedActionQueue;
+};
+
+export type QueueActionMutationResponse = {
+  success: boolean;
+  state: "active" | "completed" | "snoozed";
+  logicalKey: string;
+  dedupeKey: string;
+  wasStale: boolean;
+  displayCount?: number;
+  snoozedUntil?: string | null;
+  stale?: boolean;
+  requiresRefresh?: boolean;
+  currentDedupeKey?: string;
+};
+
 export type SuggestionDraftTone =
   | "warm"
   | "concise"
@@ -313,6 +406,40 @@ export async function fetchSuggestionOutcomeAnalytics(): Promise<SuggestionOutco
 
 export async function fetchSuggestionActionStates(): Promise<SuggestionActionStatesResponse> {
   return apiFetch("/api/suggestions/states", { method: "GET" });
+}
+
+export async function fetchRankedActionQueue(): Promise<RankedActionQueueResponse> {
+  return apiFetch("/api/suggestions/queue", { method: "GET" });
+}
+
+export async function recordQueueActionImpression(params: {
+  logicalKey: string;
+  dedupeKey?: string;
+}): Promise<QueueActionMutationResponse> {
+  return apiFetch("/api/suggestions/queue/actions/impression", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function completeQueueAction(params: {
+  logicalKey: string;
+  dedupeKey?: string;
+}): Promise<QueueActionMutationResponse> {
+  return apiFetch("/api/suggestions/queue/actions/complete", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function dismissQueueAction(params: {
+  logicalKey: string;
+  dedupeKey: string;
+}): Promise<QueueActionMutationResponse> {
+  return apiFetch("/api/suggestions/queue/actions/dismiss", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
 }
 
 export async function recordSuggestionImpressions(params: {
@@ -458,6 +585,84 @@ export async function startEmailSync(options: {
 export type ApplyGateVerdict = "strong_fit" | "good_fit" | "potential_fit" | "risky" | "not_recommended";
 export type ApplyGateConfidence = "high" | "medium" | "low";
 
+export type ApplyGateUniversalConstraint = {
+  key: string;
+  type: string;
+  label: string;
+  priority: string;
+  statement: string;
+  status: string | null;
+  evidence: string | null;
+  blocksApplication: boolean;
+  evidenceExpected: boolean;
+};
+
+export type ApplyGateRequirementLedgerItem = {
+  id: string;
+  source_key?: string | null;
+  type: string;
+  label: string;
+  priority: "hard" | "preferred" | string;
+  source_sentence: string;
+  evidence_needed: string[];
+  candidate_status: "satisfied" | "missing" | "unclear";
+  candidate_evidence: string | null;
+  confidence: "high" | "medium" | "low" | string;
+  blocks_application: boolean;
+};
+
+export type ApplyGateRequirementLedger = {
+  version: number;
+  source: string;
+  summary?: {
+    hard_total?: number;
+    hard_missing?: number;
+    hard_unclear?: number;
+    preferred_total?: number;
+    preferred_missing?: number;
+    blocking_labels?: string[];
+  };
+  items: ApplyGateRequirementLedgerItem[];
+};
+
+export type ApplyGateRiskComponent = {
+  key: string;
+  label: string;
+  score: number;
+  impact: "low" | "moderate" | "elevated" | "high" | "severe" | string;
+  evidence: string | null;
+};
+
+export type ApplyGateRiskBreakdown = {
+  version: number;
+  score: number;
+  label: "low" | "moderate" | "elevated" | "high" | "severe" | string;
+  basis: string;
+  calibration?: string;
+  summary: string;
+  components: ApplyGateRiskComponent[];
+};
+
+export type ApplyGateOccupationMatch = {
+  id: string;
+  title: string;
+  family: string;
+  onetSoc?: string | null;
+  score: number;
+  matchedSignals?: string[];
+};
+
+export type ApplyGateOccupationGrounding = {
+  version: string;
+  source: string;
+  job: ApplyGateOccupationMatch | null;
+  candidate: ApplyGateOccupationMatch | null;
+  alignmentScore: number;
+  alignmentLabel: string;
+  confidence: number;
+  matchedFamilies?: string[];
+};
+
 export type ApplyGateScoringBreakdown = {
   experienceScore: number;
   skillScore: number;
@@ -476,8 +681,27 @@ export type ApplyGateScoringBreakdown = {
   };
   riskFlags?: string[];
   hardBlocker?: boolean;
+  applicationRiskScore?: number;
+  applicationRiskLabel?: string;
+  applicationRiskSummary?: string;
+  applicationRiskBasis?: string;
+  riskBreakdown?: ApplyGateRiskBreakdown | null;
+  occupationGrounding?: ApplyGateOccupationGrounding | null;
   educationBlock?: boolean;
   skillBlock?: boolean;
+  certificationBlock?: boolean;
+  onsiteEligibilityBlock?: boolean;
+  universalConstraintBlock?: boolean;
+  universalConstraintFit?: {
+    block: boolean;
+    scoreCap: number;
+    constraints: ApplyGateUniversalConstraint[];
+    blockingConstraints: ApplyGateUniversalConstraint[];
+    unclearHardConstraints: ApplyGateUniversalConstraint[];
+    riskFlags: string[];
+    summaryLabels: string[];
+  };
+  requirementLedger?: ApplyGateRequirementLedger | null;
   totalScore: number;
 };
 
@@ -511,6 +735,8 @@ export type ApplyGateResult = {
   reasons: string[];
   explanation?: {
     hard_blockers: string[];
+    application_risk_score?: number | null;
+    risk_breakdown?: ApplyGateRiskBreakdown | null;
     role_core_gaps?: string[];
     missing_required: string[];
     missing_preferred: string[];
@@ -520,6 +746,7 @@ export type ApplyGateResult = {
     decision?: "apply_now" | "apply_with_caveats" | "fix_first" | "skip";
     assessment_confidence?: "high" | "medium" | "low";
     uncertainty_notes?: string[];
+    requirement_ledger?: ApplyGateRequirementLedger | null;
     action_plan?: {
       quick_fixes?: string[];
       resume_proof_improvements?: string[];

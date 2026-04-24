@@ -6,6 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 import type { ReactNode } from "react";
 
 import FixSuggestions from "./FixSuggestions";
+import { resetCanonicalQueueImpressionSession } from "@/hooks/useCanonicalQueueImpressions";
 
 const useAuth = vi.fn();
 const toastSuccess = vi.fn();
@@ -14,28 +15,26 @@ let dateNowSpy: ReturnType<typeof vi.spyOn>;
 
 const {
   closeApplication,
-  completeSuggestionAction,
-  fetchApplyGateHistory,
+  completeQueueAction,
   fetchFollowupSuggestions,
+  fetchRankedActionQueue,
   fetchStoredEmails,
   fetchSuggestionActionStates,
+  dismissQueueAction,
   generateSuggestionDraft,
-  recordSuggestionImpressions,
+  recordQueueActionImpression,
   recordSuggestionDraftFeedback,
-  snoozeSuggestionAction,
-  undoSuggestionAction,
 } = vi.hoisted(() => ({
   closeApplication: vi.fn(),
-  completeSuggestionAction: vi.fn(),
-  fetchApplyGateHistory: vi.fn(),
+  completeQueueAction: vi.fn(),
   fetchFollowupSuggestions: vi.fn(),
+  fetchRankedActionQueue: vi.fn(),
   fetchStoredEmails: vi.fn(),
   fetchSuggestionActionStates: vi.fn(),
+  dismissQueueAction: vi.fn(),
   generateSuggestionDraft: vi.fn(),
-  recordSuggestionImpressions: vi.fn(),
+  recordQueueActionImpression: vi.fn(),
   recordSuggestionDraftFeedback: vi.fn(),
-  snoozeSuggestionAction: vi.fn(),
-  undoSuggestionAction: vi.fn(),
 }));
 
 vi.mock("@/lib/AuthContext.jsx", () => ({
@@ -62,16 +61,15 @@ vi.mock("@/lib/emails", async () => {
   return {
     ...actual,
     closeApplication,
-    completeSuggestionAction,
-    fetchApplyGateHistory,
+    completeQueueAction,
     fetchFollowupSuggestions,
+    fetchRankedActionQueue,
     fetchStoredEmails,
     fetchSuggestionActionStates,
+    dismissQueueAction,
     generateSuggestionDraft,
-    recordSuggestionImpressions,
+    recordQueueActionImpression,
     recordSuggestionDraftFeedback,
-    snoozeSuggestionAction,
-    undoSuggestionAction,
   };
 });
 
@@ -162,7 +160,125 @@ const storedEmails = [
   },
 ];
 
+function buildQueueResponse(overrides: Partial<Record<"doToday" | "thisWeek" | "later" | "blocked" | "dismissed" | "done" | "expired", unknown[]>> = {}) {
+  const followupAction = {
+    id: "queue-followup-1",
+    logicalKey: "followup:wf-thread",
+    dedupeKey: "followup:wf-thread:v1",
+    primaryEntityId: "wf-thread",
+    evidenceVersion: "v1",
+    actionType: "thank_you",
+    actionCategory: "communication",
+    title: "Send thank-you note to Wells Fargo",
+    whyNow: "Interview thank-you notes are most useful while the conversation is still fresh.",
+    targetOutcome: "Increase the odds of a recruiter response.",
+    effortMinutes: 5,
+    urgencyLevel: "high",
+    confidenceLevel: "strong",
+    source: "followup_engine",
+    status: "open",
+    effectiveStatus: "open",
+    createdAt: "2026-04-10T12:00:00.000Z",
+    evidence: [
+      "Latest update: The Early Careers Engineering Assessment - Submission Confirmation",
+      "Latest activity: 4/9/2026",
+    ],
+    threadId: "wf-thread",
+    emailId: "wf-email",
+    applicationId: "wf-app",
+    suggestionSource: "email_followup",
+    queueSource: "followup",
+    intent: "SEND_THANK_YOU",
+    intentLabel: "Thank-you",
+    playbook: [
+      "Latest update: The Early Careers Engineering Assessment - Submission Confirmation",
+      "Keep the message concise and specific to the current thread.",
+      "Ask for timing or next steps, not a decision.",
+    ],
+    sourceLabel: "Outreach task",
+    draftEligible: true,
+    routeHref: "/fix-suggestions",
+    routeLabel: "Open queue",
+    stageLabel: "Outreach",
+    company: "Wells Fargo",
+  };
+
+  const staleAction = {
+    id: "queue-stale-1",
+    logicalKey: "stale:ghost-thread",
+    dedupeKey: "stale:ghost-thread:v1",
+    primaryEntityId: "stale:ghost-thread",
+    evidenceVersion: "v1",
+    actionType: "close_stale_application",
+    actionCategory: "communication",
+    title: "Move Associate Quality Engineer - Software (QA) out of active focus",
+    whyNow: "The tracked thread has gone cold and is now in close-out territory.",
+    targetOutcome: "Stop stale roles from taking space in the active search.",
+    effortMinutes: 4,
+    urgencyLevel: "low",
+    confidenceLevel: "moderate",
+    source: "followup_engine",
+    status: "open",
+    effectiveStatus: "open",
+    createdAt: "2026-03-10T12:00:00.000Z",
+    evidence: [
+      "No tracked terminal outcome.",
+      "Last activity: 32 days ago",
+    ],
+    threadId: "ghost-thread",
+    emailId: "ghost-email",
+    applicationId: "ghost-app",
+    suggestionSource: "stale_role_signal",
+    queueSource: "stale",
+    intent: "CLOSE_STALE_ROLE",
+    intentLabel: "Close stale role",
+    playbook: [
+      "No tracked terminal outcome.",
+      "Resolve the blocker before relying on the rest of the queue.",
+      "Clear the smallest high-signal task first.",
+    ],
+    sourceLabel: "Ghosting signal",
+    draftEligible: true,
+    routeHref: "/fix-suggestions",
+    routeLabel: "Open queue",
+    stageLabel: "Ghosting",
+    company: "Standard Bots",
+  };
+
+  const base = {
+    success: true,
+    queue: {
+      now: "2026-04-11T12:00:00.000Z",
+      doToday: [followupAction],
+      thisWeek: [staleAction],
+      later: [],
+      blocked: [],
+      dismissed: [],
+      expired: [],
+      done: [],
+      emptyState: null,
+      resolvedActions: [followupAction, staleAction],
+    },
+  };
+
+  return {
+    ...base,
+    queue: {
+      ...base.queue,
+      ...overrides,
+      resolvedActions: [
+        ...((overrides.doToday as typeof base.queue.doToday | undefined) || base.queue.doToday),
+        ...((overrides.thisWeek as typeof base.queue.thisWeek | undefined) || base.queue.thisWeek),
+        ...((overrides.blocked as typeof base.queue.blocked | undefined) || base.queue.blocked),
+        ...((overrides.later as typeof base.queue.later | undefined) || base.queue.later),
+        ...((overrides.dismissed as typeof base.queue.dismissed | undefined) || base.queue.dismissed),
+      ],
+    },
+  };
+}
+
 beforeEach(() => {
+  resetCanonicalQueueImpressionSession();
   dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(new Date("2026-04-11T12:00:00.000Z").getTime());
 
   useAuth.mockReturnValue({
@@ -201,26 +317,24 @@ beforeEach(() => {
 
   fetchSuggestionActionStates.mockResolvedValue({
     success: true,
-    actions: [
-      {
-        thread_id: "hidden-thread",
-        action_type: "follow_up",
-        state: "completed",
-      },
-    ],
+    actions: [],
   });
 
-  fetchApplyGateHistory.mockResolvedValue({
-    success: true,
-    history: [],
-  });
+  fetchRankedActionQueue.mockResolvedValue(buildQueueResponse());
 
   fetchStoredEmails.mockResolvedValue({
     success: true,
     emails: storedEmails,
   });
 
-  recordSuggestionImpressions.mockResolvedValue({ success: true, recorded: 2 });
+  recordQueueActionImpression.mockResolvedValue({
+    success: true,
+    state: "active",
+    logicalKey: "followup:wf-thread",
+    dedupeKey: "followup:wf-thread:v1",
+    wasStale: false,
+    displayCount: 1,
+  });
   recordSuggestionDraftFeedback.mockResolvedValue({ success: true });
   generateSuggestionDraft.mockResolvedValue({
     success: true,
@@ -252,14 +366,22 @@ beforeEach(() => {
         "Hello, Thanks for completing the Early Careers Engineering Assessment. We have your submission to Wells Fargo.",
     },
   });
-  completeSuggestionAction.mockResolvedValue({ success: true, state: "completed" });
+  completeQueueAction.mockResolvedValue({
+    success: true,
+    state: "completed",
+    logicalKey: "stale:ghost-thread",
+    dedupeKey: "stale:ghost-thread:v1",
+    wasStale: false,
+  });
   closeApplication.mockResolvedValue({ success: true });
-  snoozeSuggestionAction.mockResolvedValue({
+  dismissQueueAction.mockResolvedValue({
     success: true,
     state: "snoozed",
+    logicalKey: "stale:ghost-thread",
+    dedupeKey: "stale:ghost-thread:v1",
+    wasStale: false,
     snoozedUntil: "2026-04-12T12:00:00.000Z",
   });
-  undoSuggestionAction.mockResolvedValue({ success: true, message: "restored" });
 });
 
 afterEach(() => {
@@ -281,8 +403,8 @@ describe("FixSuggestions", () => {
       }),
     ).toBeInTheDocument();
 
-    const outreachLane = screen.getByText("Outreach").closest("button");
-    const ghostingLane = screen.getByText("Ghosting").closest("button");
+    const outreachLane = screen.getAllByText("Outreach")[0]?.closest("button");
+    const ghostingLane = screen.getAllByText("Ghosting")[0]?.closest("button");
     const cleanupLane = screen.getByText("Cleanup").closest("button");
 
     expect(outreachLane).toBeTruthy();
@@ -301,43 +423,135 @@ describe("FixSuggestions", () => {
     expect(screen.getAllByText("Evidence").length).toBeGreaterThan(0);
 
     await waitFor(() => {
-      expect(recordSuggestionImpressions).toHaveBeenCalled();
+      expect(recordQueueActionImpression).toHaveBeenCalled();
     });
   });
 
   test("groups multiple low-urgency stale close-out cards into one batch card", async () => {
-    fetchStoredEmails.mockResolvedValueOnce({
-      success: true,
-      emails: [
-        ...storedEmails,
-        {
-          id: "ghost-email-2",
-          thread_id: "ghost-thread-2",
-          subject: "Arbol Application Confirmation",
-          from: "Arbol <no-reply@hire.lever.example.test>",
-          date: "2026-03-09T12:00:00.000Z",
-          category: "applied",
-          company_name: "Arbol",
-          position: "Backend Engineer - AI Infrastructure",
-          applicationId: "ghost-app-2",
-        },
-        {
-          id: "ghost-email-3",
-          thread_id: "ghost-thread-3",
-          subject: "Broadridge Application Received",
-          from: "Workday Broadridge <broadridge@example.test>",
-          date: "2026-03-08T12:00:00.000Z",
-          category: "applied",
-          company_name: "Broadridge",
-          position: "SDET Quality Assurance Specialist with Automation",
-          applicationId: "ghost-app-3",
-        },
-      ],
-    });
+    fetchRankedActionQueue.mockResolvedValueOnce(
+      buildQueueResponse({
+        thisWeek: [
+          {
+            id: "queue-stale-1",
+            logicalKey: "stale:ghost-thread",
+            dedupeKey: "stale:ghost-thread:v1",
+            primaryEntityId: "stale:ghost-thread",
+            evidenceVersion: "v1",
+            actionType: "close_stale_application",
+            actionCategory: "communication",
+            title: "Move Associate Quality Engineer - Software (QA) out of active focus",
+            whyNow: "The tracked thread has gone cold and is now in close-out territory.",
+            targetOutcome: "Stop stale roles from taking space in the active search.",
+            effortMinutes: 4,
+            urgencyLevel: "low",
+            confidenceLevel: "moderate",
+            source: "followup_engine",
+            status: "open",
+            effectiveStatus: "open",
+            createdAt: "2026-03-10T12:00:00.000Z",
+            evidence: ["No tracked terminal outcome."],
+            threadId: "ghost-thread",
+            emailId: "ghost-email",
+            applicationId: "ghost-app",
+            suggestionSource: "stale_role_signal",
+            queueSource: "stale",
+            intent: "CLOSE_STALE_ROLE",
+            intentLabel: "Close stale role",
+            playbook: [
+              "No tracked terminal outcome.",
+              "Resolve the blocker before relying on the rest of the queue.",
+              "Clear the smallest high-signal task first.",
+            ],
+            sourceLabel: "Ghosting signal",
+            draftEligible: true,
+            routeHref: "/fix-suggestions",
+            routeLabel: "Open queue",
+            stageLabel: "Ghosting",
+            company: "Standard Bots",
+          },
+          {
+            id: "queue-stale-2",
+            logicalKey: "stale:ghost-thread-2",
+            dedupeKey: "stale:ghost-thread-2:v1",
+            primaryEntityId: "stale:ghost-thread-2",
+            evidenceVersion: "v1",
+            actionType: "close_stale_application",
+            actionCategory: "communication",
+            title: "Move Backend Engineer - AI Infrastructure out of active focus",
+            whyNow: "This application has gone cold.",
+            targetOutcome: "Clear stale roles.",
+            effortMinutes: 4,
+            urgencyLevel: "low",
+            confidenceLevel: "moderate",
+            source: "followup_engine",
+            status: "open",
+            effectiveStatus: "open",
+            createdAt: "2026-03-09T12:00:00.000Z",
+            evidence: ["No tracked terminal outcome."],
+            threadId: "ghost-thread-2",
+            emailId: "ghost-email-2",
+            applicationId: "ghost-app-2",
+            suggestionSource: "stale_role_signal",
+            queueSource: "stale",
+            intent: "CLOSE_STALE_ROLE",
+            intentLabel: "Close stale role",
+            playbook: [
+              "No tracked terminal outcome.",
+              "Resolve the blocker before relying on the rest of the queue.",
+              "Clear the smallest high-signal task first.",
+            ],
+            sourceLabel: "Ghosting signal",
+            draftEligible: true,
+            routeHref: "/fix-suggestions",
+            routeLabel: "Open queue",
+            stageLabel: "Ghosting",
+            company: "Arbol",
+          },
+          {
+            id: "queue-stale-3",
+            logicalKey: "stale:ghost-thread-3",
+            dedupeKey: "stale:ghost-thread-3:v1",
+            primaryEntityId: "stale:ghost-thread-3",
+            evidenceVersion: "v1",
+            actionType: "close_stale_application",
+            actionCategory: "communication",
+            title: "Move SDET Quality Assurance Specialist with Automation out of active focus",
+            whyNow: "This application has gone cold.",
+            targetOutcome: "Clear stale roles.",
+            effortMinutes: 4,
+            urgencyLevel: "low",
+            confidenceLevel: "moderate",
+            source: "followup_engine",
+            status: "open",
+            effectiveStatus: "open",
+            createdAt: "2026-03-08T12:00:00.000Z",
+            evidence: ["No tracked terminal outcome."],
+            threadId: "ghost-thread-3",
+            emailId: "ghost-email-3",
+            applicationId: "ghost-app-3",
+            suggestionSource: "stale_role_signal",
+            queueSource: "stale",
+            intent: "CLOSE_STALE_ROLE",
+            intentLabel: "Close stale role",
+            playbook: [
+              "No tracked terminal outcome.",
+              "Resolve the blocker before relying on the rest of the queue.",
+              "Clear the smallest high-signal task first.",
+            ],
+            sourceLabel: "Ghosting signal",
+            draftEligible: true,
+            routeHref: "/fix-suggestions",
+            routeLabel: "Open queue",
+            stageLabel: "Ghosting",
+            company: "Broadridge",
+          },
+        ],
+      }),
+    );
 
     renderPage();
 
-    expect(await screen.findByRole("heading", { name: "Review 3 stale roles in one pass" })).toBeInTheDocument();
+    expect(await screen.findByText("Review 3 stale roles in one pass")).toBeInTheDocument();
     expect(screen.getByText("Batch close-out lane")).toBeInTheDocument();
     expect(screen.getByText("Move Associate Quality Engineer - Software (QA) out of active focus")).toBeInTheDocument();
     expect(screen.getByText("Move Backend Engineer - AI Infrastructure out of active focus")).toBeInTheDocument();
@@ -360,12 +574,9 @@ describe("FixSuggestions", () => {
       });
     });
 
-    expect(completeSuggestionAction).toHaveBeenCalledWith({
-      threadId: "ghost-thread",
-      actionType: "close_stale_application",
-      emailId: "ghost-email",
-      applicationId: "ghost-app",
-      suggestionSource: "stale_role_signal",
+    expect(completeQueueAction).toHaveBeenCalledWith({
+      logicalKey: "stale:ghost-thread",
+      dedupeKey: "stale:ghost-thread:v1",
     });
   });
 
@@ -373,7 +584,7 @@ describe("FixSuggestions", () => {
     const user = userEvent.setup();
     renderPage();
 
-    const generateDraftButton = await screen.findByRole("button", { name: "Generate draft" });
+    const [generateDraftButton] = await screen.findAllByRole("button", { name: "Generate draft" });
     await user.click(generateDraftButton);
 
     await waitFor(() => {
@@ -396,8 +607,8 @@ describe("FixSuggestions", () => {
     expect(screen.getAllByText("Reply to human contact").length).toBeGreaterThan(0);
     expect(screen.getByText("Before sending")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy subject + body" })).toBeInTheDocument();
-    expect(screen.getByText("Latest update: The Early Careers Engineering Assessment - Submission Confirmation")).toBeInTheDocument();
-    expect(screen.getByText("Latest activity: 4/9/2026")).toBeInTheDocument();
+    expect(screen.getAllByText("Latest update: The Early Careers Engineering Assessment - Submission Confirmation").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Latest activity: 4/9/2026").length).toBeGreaterThan(0);
     expect(screen.getByText(/Thanks for completing the Early Careers Engineering Assessment\./)).toBeInTheDocument();
     expect(screen.getByText("Suggested reply contact: Jordan Lee <jordan@example.test>")).toBeInTheDocument();
     expect(screen.getByText("Latest sender in reply thread: Wells Fargo Talent Acquisition <support@example.test>")).toBeInTheDocument();
@@ -408,7 +619,7 @@ describe("FixSuggestions", () => {
     const user = userEvent.setup();
     renderPage();
 
-    const generateDraftButton = await screen.findByRole("button", { name: "Generate draft" });
+    const [generateDraftButton] = await screen.findAllByRole("button", { name: "Generate draft" });
     await user.click(generateDraftButton);
 
     await user.click(await screen.findByText("Report draft issue"));

@@ -26,36 +26,35 @@ import { toast } from "sonner";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { CleanupTaskInlinePanel } from "@/components/CleanupTaskInlinePanel";
 import { Button } from "@/components/ui/button";
+import { useCanonicalQueueImpressions } from "@/hooks/useCanonicalQueueImpressions";
 import { useAuth } from "@/lib/AuthContext.jsx";
+import { ApiRequestError } from "@/lib/api.js";
 import {
   closeApplication,
-  completeSuggestionAction,
-  fetchApplyGateHistory,
+  completeQueueAction,
+  dismissQueueAction,
+  fetchRankedActionQueue,
   fetchFollowupSuggestions,
   fetchStoredEmails,
   fetchSuggestionActionStates,
   generateSuggestionDraft,
-  recordSuggestionImpressions,
   recordSuggestionDraftFeedback,
-  type ApplyGateHistoryItem,
   type FollowupSuggestion,
+  type RankedAction,
+  type RankedActionQueue,
   type StoredEmail,
   type SuggestionDraft,
   type SuggestionDraftFeedbackLabel,
   type SuggestionDraftTone,
   type SuggestionActionState,
-  snoozeSuggestionAction,
-  undoSuggestionAction,
 } from "@/lib/emails";
 import {
   actionTypeLabels,
   buildActionKey,
-  buildCombinedSuggestionQueue,
+  buildQueueItemsFromRankedQueue,
+  buildRankedQueueStats,
   buildGmailThreadUrl,
   buildOutreachDiagnostics,
-  buildSnoozedSuggestionItems,
-  buildSuggestionImpressionPayload,
-  buildSuggestionQueueStats,
   buildUpcomingFollowupWindows,
   formatRelativeAge,
   formatSnoozedUntil,
@@ -114,13 +113,17 @@ const sourceRailClasses: Record<QueueSource, string> = {
 
 type PrimaryActionKind = "cleanup" | "close" | "draft" | "gmail" | "route" | "complete" | null;
 
-function isCloseAction(actionType?: string | null) {
-  return actionType === "close_stale_application" || actionType === "close_stale_interview";
+function isCloseIntent(intent?: QueueItem["intent"] | null) {
+  return intent === "CLOSE_STALE_ROLE";
 }
 
-function getCleanupPrimaryLabel(actionType?: string | null, inlineOpen = false) {
+function isInlineCleanupIntent(intent?: QueueItem["intent"] | null) {
+  return intent === "CLEANUP_STRUCTURED_FIELDS" || intent === "LINK_APPLICATIONS";
+}
+
+function getCleanupPrimaryLabel(intent?: QueueItem["intent"] | null, inlineOpen = false) {
   if (inlineOpen) return "Hide repair panel";
-  if (actionType === "cleanup_application_links") return "Link applications";
+  if (intent === "LINK_APPLICATIONS") return "Link applications";
   return "Resolve missing data";
 }
 
@@ -133,7 +136,7 @@ function getPrimaryActionKind(params: {
   item: QueueItem;
 }): PrimaryActionKind {
   if (params.inlineCleanupTask) return "cleanup";
-  if (params.canCloseFromCard && isCloseAction(params.item.actionType)) return "close";
+  if (params.canCloseFromCard && isCloseIntent(params.item.intent)) return "close";
   if (params.canDraft) return "draft";
   if (params.gmailUrl) return "gmail";
   if (params.showRouteAction) return "route";
@@ -148,7 +151,7 @@ function getPrimaryActionLabel(
   inlineOpen: boolean,
   draftOpen = false,
 ) {
-  if (kind === "cleanup") return getCleanupPrimaryLabel(item.actionType, inlineOpen);
+  if (kind === "cleanup") return getCleanupPrimaryLabel(item.intent, inlineOpen);
   if (kind === "close") return "Close application";
   if (kind === "draft") return draftOpen ? "Hide copilot" : draft ? "Show copilot" : "Generate draft";
   if (kind === "gmail") return "Open Gmail thread";
@@ -159,7 +162,7 @@ function getPrimaryActionLabel(
 
 function getPrimaryActionHelper(kind: PrimaryActionKind, item: QueueItem) {
   if (kind === "cleanup") {
-    return item.actionType === "cleanup_application_links"
+    return item.intent === "LINK_APPLICATIONS"
       ? "Repair application links before trusting pipeline metrics."
       : "Fix extracted company and role fields so recommendations stop drifting.";
   }
@@ -173,7 +176,7 @@ function getPrimaryActionHelper(kind: PrimaryActionKind, item: QueueItem) {
 
 function buildDisplayQueueEntries(queue: QueueItem[]): DisplayQueueEntry[] {
   const groupedStaleCloseouts = queue.filter(
-    (item) => item.source === "stale" && item.urgency === "low" && isCloseAction(item.actionType),
+    (item) => item.source === "stale" && item.urgency === "low" && isCloseIntent(item.intent),
   );
 
   if (groupedStaleCloseouts.length < 2) {
@@ -279,25 +282,26 @@ const draftFeedbackOptions: DraftFeedbackOption[] = [
 
 const draftToneOptionByValue = new Map(draftToneOptions.map((option) => [option.value, option]));
 
-function getDraftToneOptionsForAction(actionType?: string | null): DraftToneOption[] {
-  switch (actionType) {
-    case "thank_you":
+function getDraftToneOptionsForItem(item: QueueItem): DraftToneOption[] {
+  switch (item.intent) {
+    case "SEND_THANK_YOU":
       return draftToneOptions.filter((option) => ["post_interview", "warm", "concise"].includes(option.value));
-    case "networking":
+    case "NETWORKING_OUTREACH":
       return draftToneOptions.filter((option) => ["referral", "warm", "concise"].includes(option.value));
-    case "status_check":
+    case "STATUS_CHECK":
       return draftToneOptions.filter((option) => ["direct", "warm", "concise"].includes(option.value));
-    case "stale_interview_status_check":
-      return draftToneOptions.filter((option) =>
-        ["post_interview", "recruiter_went_cold", "direct", "concise"].includes(option.value),
-      );
-    case "stale_application_status_check":
-    case "close_stale_application":
-    case "close_stale_interview":
+    case "CLOSE_STALE_ROLE":
       return draftToneOptions.filter((option) =>
         ["recruiter_went_cold", "direct", "concise"].includes(option.value),
       );
-    case "follow_up":
+    case "FOLLOW_UP_THREAD":
+    case "APPLY_TO_ROLE":
+    case "TAILOR_RESUME":
+    case "FIX_TARGETING":
+    case "PREP_INTERVIEW":
+    case "CLEANUP_STRUCTURED_FIELDS":
+    case "LINK_APPLICATIONS":
+    case "CLEANUP_DATA":
     default:
       return draftToneOptions.filter((option) => ["warm", "concise", "direct"].includes(option.value));
   }
@@ -307,17 +311,13 @@ function getDraftToneMeta(tone?: SuggestionDraftTone | string | null) {
   return tone ? draftToneOptionByValue.get(tone as SuggestionDraftTone) || null : null;
 }
 
-function defaultDraftTone(actionType?: string | null): SuggestionDraftTone {
-  if (actionType === "thank_you" || actionType === "stale_interview_status_check") return "post_interview";
-  if (actionType === "networking") return "referral";
-  if (
-    actionType === "close_stale_application"
-    || actionType === "close_stale_interview"
-    || actionType === "stale_application_status_check"
-  ) {
+function defaultDraftTone(item: QueueItem): SuggestionDraftTone {
+  if (item.intent === "SEND_THANK_YOU") return "post_interview";
+  if (item.intent === "NETWORKING_OUTREACH") return "referral";
+  if (item.intent === "CLOSE_STALE_ROLE") {
     return "recruiter_went_cold";
   }
-  if (actionType === "status_check") return "direct";
+  if (item.intent === "STATUS_CHECK") return "direct";
   return "warm";
 }
 
@@ -595,17 +595,22 @@ function SuggestionDraftPanel({
 
 function invalidateSuggestionQueries(queryClient: ReturnType<typeof useQueryClient>) {
   return Promise.all([
-    queryClient.invalidateQueries({ queryKey: ["followup-suggestions"] }),
-    queryClient.invalidateQueries({ queryKey: ["strategy-alerts", "followup"] }),
+    queryClient.invalidateQueries({ queryKey: ["fix-suggestions", "queue"] }),
     queryClient.invalidateQueries({ queryKey: ["fix-suggestions", "followup"] }),
     queryClient.invalidateQueries({ queryKey: ["fix-suggestions", "states"] }),
-    queryClient.invalidateQueries({ queryKey: ["fix-suggestions", "apply-gate"] }),
     queryClient.invalidateQueries({ queryKey: ["fix-suggestions", "stored-emails"] }),
-    queryClient.invalidateQueries({ queryKey: ["dashboard", "followup-suggestions"] }),
-    queryClient.invalidateQueries({ queryKey: ["dashboard", "suggestion-states"] }),
-    queryClient.invalidateQueries({ queryKey: ["dashboard", "apply-gate-history"] }),
-    queryClient.invalidateQueries({ queryKey: ["dashboard", "stored-emails"] }),
+    queryClient.invalidateQueries({ queryKey: ["dashboard", "queue"] }),
   ]);
+}
+
+function getRankedQueueVisibleActions(queue?: RankedActionQueue | null): RankedAction[] {
+  if (!queue) return [];
+  return [
+    ...(queue.doToday || []),
+    ...(queue.thisWeek || []),
+    ...(queue.blocked || []),
+    ...(queue.later || []),
+  ];
 }
 
 const FixSuggestions = () => {
@@ -620,8 +625,37 @@ const FixSuggestions = () => {
   const [draftToneByTaskId, setDraftToneByTaskId] = useState<Record<string, SuggestionDraftTone>>({});
   const [draftByTaskId, setDraftByTaskId] = useState<Record<string, SuggestionDraft>>({});
   const [draftFeedbackByTaskId, setDraftFeedbackByTaskId] = useState<Record<string, SuggestionDraftFeedbackLabel>>({});
+  const [pendingLogicalKeys, setPendingLogicalKeys] = useState<Record<string, true>>({});
 
   const isAuthed = Boolean(user);
+
+  const queueQuery = useQuery({
+    queryKey: ["fix-suggestions", "queue"],
+    queryFn: async () => {
+      try {
+        return await fetchRankedActionQueue();
+      } catch (err) {
+        return {
+          success: false,
+          queue: {
+            now: new Date().toISOString(),
+            doToday: [],
+            thisWeek: [],
+            later: [],
+            blocked: [],
+            dismissed: [],
+            expired: [],
+            done: [],
+            emptyState: null,
+            resolvedActions: [],
+          },
+          error: err instanceof Error ? err.message : "Unable to load the action queue",
+        };
+      }
+    },
+    enabled: isAuthed,
+    staleTime: 30_000,
+  });
 
   const followupQuery = useQuery({
     queryKey: ["fix-suggestions", "followup"],
@@ -657,23 +691,6 @@ const FixSuggestions = () => {
     staleTime: 60_000,
   });
 
-  const applyGateQuery = useQuery({
-    queryKey: ["fix-suggestions", "apply-gate"],
-    queryFn: async () => {
-      try {
-        return await fetchApplyGateHistory();
-      } catch (err) {
-        return {
-          success: false,
-          history: [],
-          error: err instanceof Error ? err.message : "Unable to load Apply Gate history",
-        };
-      }
-    },
-    enabled: isAuthed,
-    staleTime: 120_000,
-  });
-
   const storedEmailsQuery = useQuery({
     queryKey: ["fix-suggestions", "stored-emails"],
     queryFn: async () => {
@@ -690,40 +707,6 @@ const FixSuggestions = () => {
     enabled: isAuthed,
     staleTime: 120_000,
   });
-  const completeMutation = useMutation({
-    mutationFn: completeSuggestionAction,
-    onSuccess: async () => {
-      await invalidateSuggestionQueries(queryClient);
-      toast.success("Suggestion marked complete.");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Unable to mark suggestion complete.");
-    },
-  });
-
-  const snoozeMutation = useMutation({
-    mutationFn: snoozeSuggestionAction,
-    onSuccess: async (_, variables) => {
-      await invalidateSuggestionQueries(queryClient);
-      const hours = variables.snoozeDuration ?? 24;
-      toast.success(hours >= 168 ? "Suggestion snoozed for a week." : "Suggestion snoozed for a day.");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Unable to snooze suggestion.");
-    },
-  });
-
-  const undoMutation = useMutation({
-    mutationFn: undoSuggestionAction,
-    onSuccess: async () => {
-      await invalidateSuggestionQueries(queryClient);
-      toast.success("Suggestion restored.");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Unable to restore suggestion.");
-    },
-  });
-
   const draftMutation = useMutation({
     mutationFn: generateSuggestionDraft,
     onSuccess: (data, variables) => {
@@ -754,46 +737,14 @@ const FixSuggestions = () => {
     },
   });
 
-  const closeApplicationMutation = useMutation({
-    mutationFn: async (item: QueueItem) => {
-      await closeApplication({
-        applicationId: item.applicationId ?? null,
-        emailId: item.emailId ?? null,
-        reason: `Closed from Daily Action Queue ghosting signal: ${item.title}`,
-      });
-
-      if (item.threadId && item.actionType) {
-        await completeSuggestionAction({
-          threadId: item.threadId,
-          actionType: item.actionType,
-          emailId: item.emailId ?? null,
-          applicationId: item.applicationId ?? null,
-          suggestionSource: item.suggestionSource || item.source,
-        });
-      }
-    },
-    onSuccess: async () => {
-      await invalidateSuggestionQueries(queryClient);
-      toast.success("Application closed and removed from active focus.");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message || "Unable to close application.");
-    },
-  });
-
   const activeFollowupSuggestions = (followupQuery.data?.suggestions || []) as FollowupSuggestion[];
   const actionStates = (statesQuery.data?.actions || []) as SuggestionActionState[];
-  const applyGateHistory = (applyGateQuery.data?.history || []) as ApplyGateHistoryItem[];
   const storedEmails = (storedEmailsQuery.data?.emails || []) as StoredEmail[];
-
-  const combinedSuggestions = useMemo(() => {
-    return buildCombinedSuggestionQueue({
-      followupSuggestions: activeFollowupSuggestions,
-      applyGateHistory,
-      storedEmails,
-      actionStates,
-    });
-  }, [actionStates, activeFollowupSuggestions, applyGateHistory, storedEmails]);
+  const rankedQueue = (queueQuery.data?.queue || null) as RankedActionQueue | null;
+  const combinedSuggestions = useMemo(
+    () => buildQueueItemsFromRankedQueue(rankedQueue),
+    [rankedQueue],
+  );
 
   const filteredSuggestions = useMemo(() => {
     return combinedSuggestions.filter((item) => {
@@ -803,10 +754,7 @@ const FixSuggestions = () => {
     });
   }, [combinedSuggestions, sourceFilter, urgencyFilter]);
 
-  const stats = useMemo(
-    () => buildSuggestionQueueStats(combinedSuggestions, actionStates),
-    [actionStates, combinedSuggestions],
-  );
+  const stats = useMemo(() => buildRankedQueueStats(rankedQueue), [rankedQueue]);
 
   const upcomingFollowupWindows = useMemo(() => {
     return buildUpcomingFollowupWindows({
@@ -844,38 +792,132 @@ const FixSuggestions = () => {
     );
   }, [combinedSuggestions]);
 
-  const snoozedItems = useMemo(() => buildSnoozedSuggestionItems(actionStates), [actionStates]);
+  const queueVisibleActions = useMemo(() => getRankedQueueVisibleActions(rankedQueue), [rankedQueue]);
+  const snoozedItems = useMemo(() => {
+    if (!rankedQueue?.dismissed?.length) return [] as QueueItem[];
+    return buildQueueItemsFromRankedQueue({
+      ...rankedQueue,
+      doToday: [],
+      thisWeek: [],
+      blocked: [],
+      later: rankedQueue.dismissed,
+    });
+  }, [rankedQueue]);
 
   const emptyMessage = useMemo(() => {
     if (loading) return "Loading your action queue...";
     if (!isAuthed) return "Sign in to see next-best actions.";
-    if ((followupQuery.data as { error?: string } | undefined)?.error?.includes("Premium feature required")) {
+    if ((queueQuery.data as { error?: string } | undefined)?.error?.includes("Premium feature required")) {
       return "Upgrade to Premium to unlock the daily action queue.";
     }
-    if (followupQuery.isLoading || applyGateQuery.isLoading || storedEmailsQuery.isLoading) {
+    if (queueQuery.isLoading) {
       return "Building your action queue...";
     }
-    if (combinedSuggestions.length === 0) return "No active next-best actions right now.";
+    if (combinedSuggestions.length === 0) return rankedQueue?.emptyState?.title || "No active next-best actions right now.";
     return "No suggestions match the current filters.";
   }, [
-    applyGateQuery.isLoading,
     combinedSuggestions.length,
-    followupQuery.data,
-    followupQuery.isLoading,
     isAuthed,
     loading,
-    storedEmailsQuery.isLoading,
+    queueQuery.data,
+    queueQuery.isLoading,
+    rankedQueue,
   ]);
 
-  useEffect(() => {
-    if (!isAuthed || combinedSuggestions.length === 0) return;
+  useCanonicalQueueImpressions({
+    enabled: isAuthed,
+    actions: queueVisibleActions,
+  });
 
-    const impressionPayload = buildSuggestionImpressionPayload(combinedSuggestions);
+  const withPendingLogicalKey = async <T,>(logicalKey: string | undefined, fn: () => Promise<T>) => {
+    if (!logicalKey) return fn();
+    setPendingLogicalKeys((current) => ({ ...current, [logicalKey]: true }));
+    try {
+      return await fn();
+    } finally {
+      setPendingLogicalKeys((current) => {
+        if (!current[logicalKey]) return current;
+        const next = { ...current };
+        delete next[logicalKey];
+        return next;
+      });
+    }
+  };
 
-    if (impressionPayload.length === 0) return;
+  const refreshQueueState = async () => {
+    await invalidateSuggestionQueries(queryClient);
+  };
 
-    recordSuggestionImpressions({ suggestions: impressionPayload }).catch(() => undefined);
-  }, [combinedSuggestions, isAuthed]);
+  const isStaleQueueActionError = (error: unknown) =>
+    error instanceof ApiRequestError && Boolean(error.payload?.stale && error.payload?.requiresRefresh);
+
+  const completeQueueItem = async (item: QueueItem, successMessage = "Suggestion marked complete.") => {
+    if (!item.logicalKey) return;
+
+    await withPendingLogicalKey(item.logicalKey, async () => {
+      try {
+        await completeQueueAction({
+          logicalKey: item.logicalKey,
+          dedupeKey: item.dedupeKey,
+        });
+        await refreshQueueState();
+        toast.success(successMessage);
+      } catch (error) {
+        if (isStaleQueueActionError(error)) {
+          await refreshQueueState();
+          return;
+        }
+        toast.error(error instanceof Error ? error.message : "Unable to mark suggestion complete.");
+      }
+    });
+  };
+
+  const dismissQueueItem = async (item: QueueItem) => {
+    if (!item.logicalKey || !item.dedupeKey) return;
+
+    await withPendingLogicalKey(item.logicalKey, async () => {
+      try {
+        await dismissQueueAction({
+          logicalKey: item.logicalKey,
+          dedupeKey: item.dedupeKey,
+        });
+        await refreshQueueState();
+        toast.success("Suggestion snoozed for a day.");
+      } catch (error) {
+        if (isStaleQueueActionError(error)) {
+          await refreshQueueState();
+          return;
+        }
+        toast.error(error instanceof Error ? error.message : "Unable to snooze suggestion.");
+      }
+    });
+  };
+
+  const closeQueueItem = async (item: QueueItem) => {
+    if (!item.logicalKey) return;
+
+    await withPendingLogicalKey(item.logicalKey, async () => {
+      try {
+        await closeApplication({
+          applicationId: item.applicationId ?? null,
+          emailId: item.emailId ?? null,
+          reason: `Closed from Daily Action Queue ghosting signal: ${item.title}`,
+        });
+        await completeQueueAction({
+          logicalKey: item.logicalKey,
+          dedupeKey: item.dedupeKey,
+        });
+        await refreshQueueState();
+        toast.success("Application closed and removed from active focus.");
+      } catch (error) {
+        if (isStaleQueueActionError(error)) {
+          await refreshQueueState();
+          return;
+        }
+        toast.error(error instanceof Error ? error.message : "Unable to close application.");
+      }
+    });
+  };
 
   const copyDraft = async (draft: SuggestionDraft, includeSubject = false) => {
     try {
@@ -894,11 +936,11 @@ const FixSuggestions = () => {
     const draftKey = buildDraftTaskKey(item.threadId, item.actionType, item.emailId);
     const draft = draftByTaskId[draftKey];
     const draftOpen = openDraftTaskId === draftKey;
-    const availableDraftToneOptions = getDraftToneOptionsForAction(item.actionType);
-    const preferredDraftTone = (draftToneByTaskId[draftKey] || defaultDraftTone(item.actionType)) as SuggestionDraftTone;
+    const availableDraftToneOptions = getDraftToneOptionsForItem(item);
+    const preferredDraftTone = (draftToneByTaskId[draftKey] || defaultDraftTone(item)) as SuggestionDraftTone;
     const draftTone = availableDraftToneOptions.some((option) => option.value === preferredDraftTone)
       ? preferredDraftTone
-      : availableDraftToneOptions[0]?.value || defaultDraftTone(item.actionType);
+      : availableDraftToneOptions[0]?.value || defaultDraftTone(item);
     const draftToneMeta = getDraftToneMeta(draft?.context || draftTone);
     const canDraft = Boolean(item.hasDraft && item.threadId && item.actionType);
 
@@ -1166,11 +1208,7 @@ const FixSuggestions = () => {
 
                         <div className="space-y-3">
                           {entry.items.map((item) => {
-                            const mutationBusy =
-                              completeMutation.isPending
-                              || snoozeMutation.isPending
-                              || undoMutation.isPending
-                              || closeApplicationMutation.isPending;
+                            const mutationBusy = Boolean(item.logicalKey && pendingLogicalKeys[item.logicalKey]);
                             const { gmailUrl, draft, draftOpen, draftTone, canDraft } = getDraftUiForItem(item);
 
                             return (
@@ -1213,7 +1251,7 @@ const FixSuggestions = () => {
                                       variant="destructive"
                                       size="sm"
                                       disabled={mutationBusy}
-                                      onClick={() => closeApplicationMutation.mutate(item)}
+                                      onClick={() => void closeQueueItem(item)}
                                     >
                                       <XCircle className="h-4 w-4" />
                                       Close
@@ -1232,14 +1270,8 @@ const FixSuggestions = () => {
                 }
 
                 const item = entry.item;
-                const mutationBusy =
-                  completeMutation.isPending
-                  || snoozeMutation.isPending
-                  || undoMutation.isPending
-                  || closeApplicationMutation.isPending;
-                const inlineCleanupTask =
-                  item.actionType === "cleanup_structured_fields"
-                  || item.actionType === "cleanup_application_links";
+                const mutationBusy = Boolean(item.logicalKey && pendingLogicalKeys[item.logicalKey]);
+                const inlineCleanupTask = isInlineCleanupIntent(item.intent);
                 const inlineOpen = expandedInlineTaskId === item.id;
                 const {
                   gmailUrl,
@@ -1252,7 +1284,8 @@ const FixSuggestions = () => {
                   canDraft,
                 } = getDraftUiForItem(item);
                 const showRouteAction = Boolean(item.routeHref && item.routeHref !== "/fix-suggestions");
-                const canCloseFromCard = item.source === "stale" && Boolean(item.applicationId || item.emailId);
+                const canCloseFromCard =
+                  isCloseIntent(item.intent) && Boolean(item.applicationId || item.emailId);
                 const actionMenuOpen = openActionMenuId === item.id;
                 const primaryActionKind = getPrimaryActionKind({
                   inlineCleanupTask,
@@ -1276,19 +1309,13 @@ const FixSuggestions = () => {
                   || Boolean(gmailUrl && primaryActionKind !== "gmail")
                   || Boolean(showRouteAction && primaryActionKind !== "route");
                 const runDraftAction = () => toggleDraftForItem(item, draftTone);
-                const runCompleteAction = () => completeMutation.mutate({
-                  threadId: item.threadId || "",
-                  actionType: item.actionType || "",
-                  emailId: item.emailId ?? null,
-                  applicationId: item.applicationId ?? null,
-                  suggestionSource: item.suggestionSource || item.source,
-                });
+                const runCompleteAction = () => void completeQueueItem(item);
                 const runPrimaryAction = () => {
                   setOpenActionMenuId("");
                   if (primaryActionKind === "cleanup") {
                     setExpandedInlineTaskId((current) => (current === item.id ? "" : item.id));
                   } else if (primaryActionKind === "close") {
-                    closeApplicationMutation.mutate(item);
+                    void closeQueueItem(item);
                   } else if (primaryActionKind === "draft") {
                     runDraftAction();
                   } else if (primaryActionKind === "gmail" && gmailUrl) {
@@ -1322,9 +1349,9 @@ const FixSuggestions = () => {
                                 {item.stageLabel}
                               </span>
                             ) : null}
-                            {item.actionType ? (
+                            {item.intentLabel || item.actionType ? (
                               <span className="inline-flex items-center rounded-full border border-border bg-background/80 px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                                {actionTypeLabels[item.actionType] || item.actionType}
+                                {item.intentLabel || (item.actionType ? actionTypeLabels[item.actionType] || item.actionType : "")}
                               </span>
                             ) : null}
                           </div>
@@ -1334,6 +1361,16 @@ const FixSuggestions = () => {
                             <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
                               {item.description}
                             </p>
+                            {item.status === "blocked" && (item.blockingReason || item.blockerTitles?.length) ? (
+                              <div className="mt-3 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-warning">Blocked by</p>
+                                <p className="mt-1 text-sm text-warning">
+                                  {item.blockerTitles?.length
+                                    ? item.blockerTitles.join(", ")
+                                    : item.blockingReason || "A prerequisite action is still open."}
+                                </p>
+                              </div>
+                            ) : null}
                           </div>
 
                           <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
@@ -1452,7 +1489,7 @@ const FixSuggestions = () => {
                                           disabled={mutationBusy}
                                           onClick={() => {
                                             setOpenActionMenuId("");
-                                            closeApplicationMutation.mutate(item);
+                                            void closeQueueItem(item);
                                           }}
                                         >
                                           <XCircle className="h-4 w-4" />
@@ -1502,7 +1539,7 @@ const FixSuggestions = () => {
                                     </div>
                                   ) : null}
 
-                                  {item.threadId && item.actionType ? (
+                                  {item.logicalKey && item.dedupeKey ? (
                                     <div className={`${hasSecondaryContextActions ? "border-t border-border/70" : ""} p-2`}>
                                       <button
                                         type="button"
@@ -1510,14 +1547,7 @@ const FixSuggestions = () => {
                                         disabled={mutationBusy}
                                         onClick={() => {
                                           setOpenActionMenuId("");
-                                          snoozeMutation.mutate({
-                                            threadId: item.threadId || "",
-                                            actionType: item.actionType || "",
-                                            snoozeDuration: 24,
-                                            emailId: item.emailId ?? null,
-                                            applicationId: item.applicationId ?? null,
-                                            suggestionSource: item.suggestionSource || item.source,
-                                          });
+                                          void dismissQueueItem(item);
                                         }}
                                       >
                                         <PauseCircle className="h-4 w-4" />
@@ -1689,7 +1719,7 @@ const FixSuggestions = () => {
                   <FileSearch className="h-4 w-4 text-accent" />
                   <h2 className="text-sm font-semibold text-foreground">Hidden right now</h2>
                 </div>
-                {statesQuery.isLoading ? (
+                {queueQuery.isLoading ? (
                   <p className="mt-4 text-sm text-muted-foreground">Loading action state...</p>
                 ) : snoozedItems.length === 0 ? (
                   <p className="mt-4 text-sm leading-6 text-muted-foreground">
@@ -1698,24 +1728,17 @@ const FixSuggestions = () => {
                 ) : (
                   <div className="mt-4 space-y-3">
                     {snoozedItems.map((item) => (
-                      <div key={`${item.thread_id}:${item.action_type}`} className="rounded-2xl border border-border/70 bg-card/80 p-3">
+                      <div key={item.id} className="rounded-2xl border border-border/70 bg-card/80 p-3">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold text-foreground">
-                              {actionTypeLabels[item.action_type] || item.action_type}
-                            </p>
+                            <p className="text-sm font-semibold text-foreground">{item.title}</p>
                             <p className="mt-1 text-xs text-muted-foreground">
-                              Resurfaces {formatSnoozedUntil(item.snoozed_until) || "later"}
+                              Resurfaces {formatSnoozedUntil(rankedQueue?.dismissed?.find((entry) => entry.dedupeKey === item.dedupeKey)?.dismissedUntil || null) || "later"}
                             </p>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={undoMutation.isPending}
-                            onClick={() => undoMutation.mutate({ threadId: item.thread_id, actionType: item.action_type })}
-                          >
-                            Restore
-                          </Button>
+                          <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                            Hidden
+                          </span>
                         </div>
                       </div>
                     ))}

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   Bell,
+  Brain,
   CheckSquare,
   Clock3,
   Mail,
@@ -23,22 +24,20 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { splitRoleAndCompany } from "@/lib/applyGateDisplay";
 import { auth } from "@/lib/firebase";
 import {
+  fetchApplicationStats,
   fetchApplyGateHistory,
   fetchEmailMetrics,
-  fetchFollowupSuggestions,
-  fetchStoredEmails,
+  fetchRankedActionQueue,
+  fetchSuggestionOutcomeAnalytics,
   fetchStrategyAlerts,
-  fetchSuggestionActionStates,
-  recordSuggestionImpressions,
   startEmailSync,
   type ApplyGateHistoryItem,
   type ApplyGateResult,
 } from "@/lib/emails";
 import {
-  buildCombinedSuggestionQueue,
+  buildQueueItemsFromRankedQueue,
+  buildRankedQueueStats,
   buildGmailThreadUrl,
-  buildSuggestionImpressionPayload,
-  buildSuggestionQueueStats,
   formatRelativeAge,
   sourceClasses,
   urgencyClasses,
@@ -106,6 +105,136 @@ function confidenceLabel(value: "high" | "medium" | "low" | null | undefined) {
   if (value === "medium") return "Medium confidence";
   if (value === "low") return "Low confidence";
   return null;
+}
+
+function formatFractionPercent(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "-";
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatPointDelta(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "-";
+  const sign = value >= 0 ? "+" : "";
+  return `${sign}${(value * 100).toFixed(1)} pts`;
+}
+
+function buildOutcomeMemoryBrief({
+  metrics,
+  appStats,
+  suggestionAnalytics,
+}: {
+  metrics?: {
+    totalApplications: number;
+    totalInterviewed: number;
+    totalOffers: number;
+    responseRate: number;
+    interviewRate: number;
+  };
+  appStats?: {
+    emails: {
+      linked: number;
+      total: number;
+      ungrouped: number;
+    };
+  };
+  suggestionAnalytics?: {
+    followup: {
+      summary: {
+        shownApplications: number;
+        completedApplications: number;
+      };
+      outcomes: {
+        completed: {
+          positiveRate: number;
+        };
+        ignored: {
+          positiveRate: number;
+        };
+        observedLift: number;
+      };
+    };
+    nonFollowup: {
+      summary: {
+        shownSuggestions: number;
+        completedSuggestions: number;
+        completionRate: number;
+      };
+      bySource: Array<{
+        source: string;
+        shown: number;
+      }>;
+    };
+  };
+}) {
+  const followup = suggestionAnalytics?.followup;
+  const nonFollowup = suggestionAnalytics?.nonFollowup;
+
+  if ((followup?.summary.shownApplications || 0) >= 2) {
+    const completedRate = followup?.outcomes.completed.positiveRate || 0;
+    const ignoredRate = followup?.outcomes.ignored.positiveRate || 0;
+    const observedLift = followup?.outcomes.observedLift || 0;
+    const improved = observedLift >= 0.05;
+    const lagging = observedLift <= -0.05;
+
+    if (improved || lagging) {
+      return {
+        title: improved
+          ? "Completed follow-ups are showing better outcomes"
+          : "Follow-up quality needs a closer look",
+        body: improved
+          ? `Completed follow-up actions reached interviews or offers ${formatFractionPercent(completedRate)} of the time versus ${formatFractionPercent(ignoredRate)} when left untouched. Keep clearing the highest-signal outreach first.`
+          : "Completed follow-up actions are not beating ignored suggestions yet. Review timing, message quality, and whether the right threads are getting attention.",
+        stat: `Observed lift ${formatPointDelta(observedLift)}`,
+        ctaLabel: "Review Outcome Memory",
+      };
+    }
+
+    return {
+      title: "Follow-up outcomes are still calibrating",
+      body: `${followup?.summary.completedApplications || 0} of ${followup?.summary.shownApplications || 0} shown follow-up opportunities have been marked complete. Keep marking actions so the memory can separate useful habits from noise.`,
+      stat: `Completed vs ignored ${formatPointDelta(observedLift)}`,
+      ctaLabel: "Review Outcome Memory",
+    };
+  }
+
+  if ((nonFollowup?.summary.shownSuggestions || 0) >= 2) {
+    const topSource = nonFollowup?.bySource?.[0]?.source?.replace(/_/g, " ") || "fix work";
+    return {
+      title: "Fix work is becoming part of the memory",
+      body: `${nonFollowup?.summary.completedSuggestions || 0} of ${nonFollowup?.summary.shownSuggestions || 0} Apply Gate, resume-proof, and cleanup tasks have been completed. ${topSource} is the biggest current source of fix work.`,
+      stat: `${formatFractionPercent(nonFollowup?.summary.completionRate)} completion rate`,
+      ctaLabel: "Open Outcome Memory",
+    };
+  }
+
+  if (metrics && metrics.totalApplications > 0) {
+    const callbacks = metrics.totalInterviewed + metrics.totalOffers;
+    return {
+      title: callbacks > 0 ? "Your search has early conversion signal" : "Your search memory is still warming up",
+      body:
+        callbacks > 0
+          ? `${callbacks} callbacks are tracked from ${metrics.totalApplications} applications in this window. Use Apply Gate before the next batch so the system can learn which roles are worth repeating.`
+          : `${metrics.totalApplications} applications are tracked in this window, but no callbacks are visible yet. Run Apply Gate and keep follow-up actions marked so the memory has better signal.`,
+      stat: `Interview rate ${metrics.interviewRate.toFixed(1)}%`,
+      ctaLabel: "Open Outcome Memory",
+    };
+  }
+
+  if ((appStats?.emails.ungrouped || 0) > 0) {
+    return {
+      title: "Clean data will make the advisor sharper",
+      body: `${appStats?.emails.ungrouped || 0} tracked emails are not linked to applications yet. Cleaning them up improves follow-up timing, outcome memory, and strategy alerts.`,
+      stat: `${appStats?.emails.linked || 0} linked emails`,
+      ctaLabel: "Open Outcome Memory",
+    };
+  }
+
+  return {
+    title: "Search memory starts with the next action",
+    body: "Connect more application history, run Apply Gate before applying, and mark queue actions complete so Applendium can learn what is actually working.",
+    stat: "Calibrating",
+    ctaLabel: "Open Outcome Memory",
+  };
 }
 
 function formatDecisionBrief(item: ApplyGateHistoryItem | null) {
@@ -209,6 +338,40 @@ const Dashboard = () => {
     staleTime: 60_000,
   });
 
+  const applicationStatsQuery = useQuery({
+    queryKey: ["dashboard", "application-stats"],
+    queryFn: async () => {
+      try {
+        return await fetchApplicationStats();
+      } catch (err) {
+        return {
+          success: false,
+          stats: undefined,
+          error: err instanceof Error ? err.message : "Unable to load application stats",
+        };
+      }
+    },
+    enabled: isAuthed,
+    staleTime: 120_000,
+  });
+
+  const suggestionAnalyticsQuery = useQuery({
+    queryKey: ["dashboard", "suggestion-outcome-analytics"],
+    queryFn: async () => {
+      try {
+        return await fetchSuggestionOutcomeAnalytics();
+      } catch (err) {
+        return {
+          success: false,
+          analytics: undefined,
+          error: err instanceof Error ? err.message : "Unable to load outcome analytics",
+        };
+      }
+    },
+    enabled: isAuthed,
+    staleTime: 120_000,
+  });
+
   const applyGateHistoryQuery = useQuery({
     queryKey: ["dashboard", "apply-gate-history"],
     queryFn: fetchApplyGateHistory,
@@ -233,58 +396,44 @@ const Dashboard = () => {
     staleTime: 120_000,
   });
 
-  const followupQuery = useQuery({
-    queryKey: ["dashboard", "followup-suggestions"],
+  const queueQuery = useQuery({
+    queryKey: ["dashboard", "queue"],
     queryFn: async () => {
       try {
-        return await fetchFollowupSuggestions();
+        return await fetchRankedActionQueue();
       } catch (err) {
         return {
           success: false,
-          suggestions: [],
-          error: err instanceof Error ? err.message : "Unable to load follow-up suggestions",
+          queue: {
+            now: new Date().toISOString(),
+            doToday: [],
+            thisWeek: [],
+            later: [],
+            blocked: [],
+            dismissed: [],
+            expired: [],
+            done: [],
+            emptyState: null,
+            resolvedActions: [],
+          },
+          error: err instanceof Error ? err.message : "Unable to load the action queue",
         };
       }
     },
     enabled: isAuthed,
-    staleTime: 120_000,
-  });
-
-  const statesQuery = useQuery({
-    queryKey: ["dashboard", "suggestion-states"],
-    queryFn: async () => {
-      try {
-        return await fetchSuggestionActionStates();
-      } catch (err) {
-        return {
-          success: false,
-          actions: [],
-          error: err instanceof Error ? err.message : "Unable to load suggestion states",
-        };
-      }
-    },
-    enabled: isAuthed,
-    staleTime: 60_000,
-  });
-
-  const storedEmailsQuery = useQuery({
-    queryKey: ["dashboard", "stored-emails"],
-    queryFn: async () => {
-      try {
-        return await fetchStoredEmails({ limit: 200, offset: 0 });
-      } catch (err) {
-        return {
-          success: false,
-          emails: [],
-          error: err instanceof Error ? err.message : "Unable to load tracked emails",
-        };
-      }
-    },
-    enabled: isAuthed,
-    staleTime: 120_000,
+    staleTime: 30_000,
   });
 
   const metrics = metricsQuery.data?.metrics;
+  const outcomeMemoryBrief = useMemo(
+    () =>
+      buildOutcomeMemoryBrief({
+        metrics,
+        appStats: applicationStatsQuery.data?.stats,
+        suggestionAnalytics: suggestionAnalyticsQuery.data?.analytics,
+      }),
+    [applicationStatsQuery.data?.stats, metrics, suggestionAnalyticsQuery.data?.analytics],
+  );
   const appliedCount = metrics?.totalApplications;
   const callbacksCount = metrics ? metrics.totalInterviewed + metrics.totalOffers : undefined;
   const interviewsCount = metrics?.totalInterviewed;
@@ -320,37 +469,22 @@ const Dashboard = () => {
   );
   const strategyHighlights = useMemo(() => strategyAlerts.slice(0, 2), [strategyAlerts]);
 
-  const activeQueue = useMemo(
-    () =>
-      buildCombinedSuggestionQueue({
-        followupSuggestions: followupQuery.data?.suggestions || [],
-        applyGateHistory,
-        storedEmails: storedEmailsQuery.data?.emails || [],
-        actionStates: statesQuery.data?.actions || [],
-      }),
-    [applyGateHistory, followupQuery.data, statesQuery.data, storedEmailsQuery.data],
+  const rankedQueue = queueQuery.data?.queue || null;
+  const activeQueue = useMemo(() => buildQueueItemsFromRankedQueue(rankedQueue), [rankedQueue]);
+  const queueStats = useMemo(() => buildRankedQueueStats(rankedQueue), [rankedQueue]);
+  const todaysMoves = useMemo(
+    () => buildQueueItemsFromRankedQueue(rankedQueue).filter((item) => item.bucket === "doToday").slice(0, 3),
+    [rankedQueue],
   );
-  const queueStats = useMemo(
-    () => buildSuggestionQueueStats(activeQueue, statesQuery.data?.actions || []),
-    [activeQueue, statesQuery.data],
-  );
-  const todaysMoves = useMemo(() => activeQueue.slice(0, 3), [activeQueue]);
-
-  useEffect(() => {
-    if (!isAuthed || todaysMoves.length === 0) return;
-    const suggestions = buildSuggestionImpressionPayload(todaysMoves);
-    if (suggestions.length === 0) return;
-    recordSuggestionImpressions({ suggestions }).catch(() => undefined);
-  }, [isAuthed, todaysMoves]);
 
   return (
     <DashboardLayout>
       <div className="space-y-8">
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent">Premium workspace</p>
-          <h1 className="text-3xl font-bold text-foreground">One better decision, then the next three moves.</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent">Today's search brief</p>
+          <h1 className="text-3xl font-bold text-foreground">Know the next decision before you apply again.</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            Premium should tell you whether to push forward, what to fix first, and what deserves attention today across follow-ups, job-fit gaps, resume proof, and cleanup work.
+            Start with the role decision, then clear the few moves that matter across follow-ups, job-fit gaps, resume proof, and stale opportunities.
           </p>
         </div>
 
@@ -377,10 +511,10 @@ const Dashboard = () => {
               <div>
                 <div className="flex items-center gap-2 text-sm font-medium text-accent">
                   <Shield className="w-4 h-4" />
-                  Decision Brief
+                  Next decision
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Your next premium decision should be explicit: apply now, apply with caveats, fix first, or skip.
+                  Decide whether to apply now, fix first, or skip before another application eats time.
                 </p>
               </div>
               {decisionBrief?.status ? <StatusBadge status={decisionBrief.status} /> : null}
@@ -389,7 +523,7 @@ const Dashboard = () => {
             {!decisionBrief ? (
               <div className="rounded-xl border border-dashed border-border bg-background/40 p-5 space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Run Apply Gate on one target role and this card will turn that analysis into a single recommendation with the top reasons and next steps.
+                  Check one target role and get a clear apply, fix, or skip recommendation before you spend time on the application.
                 </p>
                 <Link to="/apply-gate" className={dashboardButtonPrimary}>
                   <Shield className="w-4 h-4" />
@@ -485,10 +619,10 @@ const Dashboard = () => {
                 <div>
                   <div className="flex items-center gap-2 text-sm font-medium text-accent">
                     <CheckSquare className="w-4 h-4" />
-                    Today's 3 moves
+                    Today's top moves
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    The queue ranks follow-ups, ghosting signals, job-fit work, and cleanup so you can act without sifting through separate pages first.
+                    Follow-ups, ghosting signals, job-fit work, and cleanup are ranked so you can act without sifting through separate pages first.
                   </p>
                 </div>
                 <Link to="/fix-suggestions" className="text-sm text-accent hover:underline">
@@ -514,12 +648,32 @@ const Dashboard = () => {
               <div className="space-y-3">
                 {todaysMoves.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-border bg-background/40 p-4 text-sm text-muted-foreground">
-                    No active moves right now. Premium gets stronger once Apply Gate, follow-up timing, and cleanup work have more history to rank.
+                    No active moves right now. Your queue gets stronger once Apply Gate, follow-up timing, and cleanup work have more history to rank.
                   </div>
                 ) : (
                   todaysMoves.map((move) => <TodayMoveCard key={move.id} move={move} />)
                 )}
               </div>
+            </div>
+
+            <div className="glass-card rounded-2xl p-5 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-accent">
+                <Brain className="w-4 h-4" />
+                Search memory
+              </div>
+              <div className="rounded-xl border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-foreground">{outcomeMemoryBrief.title}</h3>
+                  <span className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                    {outcomeMemoryBrief.stat}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{outcomeMemoryBrief.body}</p>
+              </div>
+              <Link to="/outcome-memory" className="inline-flex items-center gap-2 text-sm text-accent hover:underline">
+                {outcomeMemoryBrief.ctaLabel}
+                <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
 
             <div className="glass-card rounded-2xl p-5 space-y-3">
@@ -565,7 +719,7 @@ const Dashboard = () => {
                   Recent screening history
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  The last few Apply Gate verdicts should still be one click away while the premium dashboard stays focused on decisions and actions.
+                  Keep the latest role checks nearby while the main brief stays focused on today's decision and next actions.
                 </p>
               </div>
               <Link to="/apply-gate" className="text-sm text-accent hover:underline">

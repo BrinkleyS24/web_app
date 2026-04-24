@@ -2,6 +2,15 @@ import { auth } from "./firebase.js";
 
 const DEFAULT_API_TIMEOUT_MS = 15000;
 
+export class ApiRequestError extends Error {
+  constructor(message, { status = null, payload = null } = {}) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+    this.payload = payload;
+  }
+}
+
 export function getApiBaseUrl() {
   return (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/+$/, "");
 }
@@ -96,7 +105,10 @@ export async function apiFetch(path, options = {}) {
     }
     if (!res.ok) {
       const err = json?.error || (text && !text.startsWith("<") ? text : null) || `Server error (${res.status}). Please try again.`;
-      throw new Error(err);
+      throw new ApiRequestError(err, {
+        status: res.status,
+        payload: json,
+      });
     }
     return json;
   } catch (error) {
@@ -104,6 +116,9 @@ export async function apiFetch(path, options = {}) {
       throw new Error(`Request timed out after ${timeoutMs}ms.`);
     }
     if (error?.name === "AbortError") {
+      throw error;
+    }
+    if (error instanceof ApiRequestError) {
       throw error;
     }
     throw error instanceof Error ? error : new Error("Network request failed.");

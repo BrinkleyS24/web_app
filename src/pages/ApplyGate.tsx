@@ -24,6 +24,12 @@ const HARD_BLOCKER_LABELS: Record<string, string> = {
   education_gap: "Required education level is missing",
   recent_program_completion_gap: "Recent program completion window may not be met",
   critical_skill_gap: "A required critical skill is missing",
+  universal_hard_constraint_gap: "A non-negotiable job requirement is missing",
+  license_credential_gap: "A required license or credential is missing",
+  clearance_gap: "A required clearance is missing",
+  required_prior_role_gap: "A required prior-role background is missing",
+  required_program_completion_gap: "A required program or training completion is missing",
+  language_requirement_gap: "A required language capability is missing",
   discipline_mismatch: "Core discipline/environment mismatch is high-risk",
 };
 
@@ -43,20 +49,54 @@ function reviewLabelForStatus(status: VerdictStatus) {
   return "Likely not worth applying";
 }
 
-function rejectionRiskPercent(
+function fallbackRiskPercent(
   score: number | null | undefined,
   status: VerdictStatus,
   hasHardBlocker = false,
 ) {
-  if (hasHardBlocker) return 85;
   if (typeof score === "number" && Number.isFinite(score)) {
     const base = Math.max(0, Math.min(100, 100 - Math.round(score)));
+    if (hasHardBlocker) return Math.max(base, 75);
     return status === "strong" ? Math.min(base, 35) : base;
   }
   if (status === "strong") return 20;
   if (status === "potential") return 45;
-  if (status === "risky") return 60;
+  if (status === "risky") return hasHardBlocker ? 80 : 60;
   return 90;
+}
+
+function validRiskPercent(value: unknown) {
+  const risk = Number(value);
+  return Number.isFinite(risk) ? Math.max(0, Math.min(99, Math.round(risk))) : null;
+}
+
+function resultApplicationRiskPercent(result: ApplyGateResult | null | undefined, status: VerdictStatus) {
+  return validRiskPercent(result?.scoringBreakdown?.applicationRiskScore)
+    ?? validRiskPercent(result?.explanation?.application_risk_score)
+    ?? fallbackRiskPercent(
+      result?.scoringBreakdown?.totalScore,
+      status,
+      Boolean(result?.scoringBreakdown?.hardBlocker),
+    );
+}
+
+function historyApplicationRiskPercent(item: ApplyGateHistoryDisplayItem, status: VerdictStatus) {
+  return validRiskPercent(item.explanation_payload?.application_risk_score)
+    ?? fallbackRiskPercent(item.score, status, Boolean(item.hard_blocker));
+}
+
+function riskBreakdownFromResult(result: ApplyGateResult | null | undefined) {
+  return result?.scoringBreakdown?.riskBreakdown || result?.explanation?.risk_breakdown || null;
+}
+
+function occupationAlignmentLabel(value: string | null | undefined) {
+  const label = String(value || "").replace(/_/g, " ").trim();
+  if (!label) return "Unknown";
+  return label[0].toUpperCase() + label.slice(1);
+}
+
+function riskBreakdownFromHistory(item: ApplyGateHistoryDisplayItem) {
+  return item.explanation_payload?.risk_breakdown || null;
 }
 
 function riskTone(risk: number) {
@@ -140,13 +180,27 @@ function formatSkillGapSummary(items: string[] | null | undefined, prefix: strin
   return `${prefix}: ${clean.slice(0, maxItems).join(", ")}${clean.length > maxItems ? ", ..." : ""}.`;
 }
 
+function formatRequirementSummary(items: string[] | null | undefined, prefix = "Missing non-negotiable requirements", maxItems = 4) {
+  return formatSkillGapSummary(items, prefix, maxItems);
+}
+
 function isGenericStrategicFitNote(note: string) {
   const text = String(note || "").trim().toLowerCase();
   if (!text) return false;
   return /looks like an? (aligned|adjacent|stretch) move .*responsibility overlap/.test(text);
 }
 
-function structuredWarningAndBullets(explanation: ApplyGateResult["explanation"] | null | undefined) {
+function universalBlockingLabelsFromResult(result: ApplyGateResult | null | undefined) {
+  const constraints = result?.scoringBreakdown?.universalConstraintFit?.blockingConstraints || [];
+  return constraints
+    .map((constraint) => String(constraint?.label || "").trim())
+    .filter(Boolean);
+}
+
+function structuredWarningAndBullets(
+  explanation: ApplyGateResult["explanation"] | null | undefined,
+  universalBlockingLabels: string[] = [],
+) {
   if (!explanation) {
     return { warning: null as string | null, bullets: [] as string[] };
   }
@@ -157,12 +211,17 @@ function structuredWarningAndBullets(explanation: ApplyGateResult["explanation"]
   const missingRequired = (explanation.missing_required || []).map((s) => String(s || "").trim()).filter(Boolean);
   const missingPreferred = (explanation.missing_preferred || []).map((s) => String(s || "").trim()).filter(Boolean);
   const allFitNotes = (explanation.fit_notes || []).map((s) => String(s || "").trim()).filter(Boolean);
-  const hasGapSignal = hardBlockers.length > 0 || roleCoreGaps.length > 0 || missingRequired.length > 0 || missingPreferred.length > 0;
+  const universalBlockers = [...new Set(universalBlockingLabels.map((s) => String(s || "").trim()).filter(Boolean))];
+  const hasUniversalHardGate = universalBlockers.length > 0;
+  const hasGapSignal = hasUniversalHardGate || hardBlockers.length > 0 || roleCoreGaps.length > 0 || missingRequired.length > 0 || missingPreferred.length > 0;
   const fitNotes = hasGapSignal
     ? allFitNotes.filter((note) => !isGenericStrategicFitNote(note))
     : allFitNotes;
 
-  const warning = hardBlockers[0]
+  const warning = (hasUniversalHardGate
+    ? `This posting has hard eligibility requirements not shown in your resume: ${universalBlockers.slice(0, 4).join(", ")}.`
+    : null)
+    || hardBlockers[0]
     || primaryDrivers[0]
     || formatSkillGapSummary(roleCoreGaps, "Role-core domain gaps")
     || formatSkillGapSummary(missingRequired, "Missing required skills")
@@ -171,7 +230,10 @@ function structuredWarningAndBullets(explanation: ApplyGateResult["explanation"]
 
   const bullets: string[] = [];
 
-  if (hardBlockers.length > 0 && missingRequired.length > 0) {
+  if (hasUniversalHardGate) {
+    const missingGateSummary = formatRequirementSummary(universalBlockers);
+    if (missingGateSummary) bullets.push(missingGateSummary);
+  } else if (hardBlockers.length > 0 && missingRequired.length > 0) {
     const missingRequiredSummary = formatSkillGapSummary(missingRequired, "Missing required skills");
     if (missingRequiredSummary) bullets.push(missingRequiredSummary);
   } else if (hardBlockers.length === 0) {
@@ -229,6 +291,20 @@ function confidenceLabel(value: ApplyGateResult["explanation"] extends infer E
   return null;
 }
 
+function requirementStatusLabel(status: string | null | undefined) {
+  if (status === "missing") return "Missing";
+  if (status === "unclear") return "Confirm";
+  if (status === "satisfied") return "Shown";
+  return "Review";
+}
+
+function requirementStatusClass(status: string | null | undefined) {
+  if (status === "missing") return "border-destructive/20 bg-destructive/5 text-destructive";
+  if (status === "unclear") return "border-warning/30 bg-warning/10 text-warning";
+  if (status === "satisfied") return "border-accent/20 bg-accent/10 text-accent";
+  return "border-border bg-muted text-muted-foreground";
+}
+
 function explanationActionSections(explanation: ApplyGateResult["explanation"] | null | undefined) {
   if (!explanation?.action_plan) return [] as Array<{ title: string; items: string[] }>;
 
@@ -259,6 +335,130 @@ type ApplyGateHistoryQueryData = {
 type ApplyGateHistoryDisplayItem = ApplyGateHistoryItem & {
   _unsaved?: boolean;
 };
+
+type ApplyGateAction = "applied" | "fixed" | "skipped";
+
+type DecisionAction = {
+  action: ApplyGateAction;
+  label: string;
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+  className?: string;
+};
+
+function decisionCopyForStatus(status: VerdictStatus, recommendation: string | null, risk: number | null, hardBlocker = false) {
+  const recommendsSkip = recommendation?.toLowerCase().includes("skip") === true;
+
+  if (status === "strong") {
+    return {
+      title: "Apply now",
+      body: "This role has the strongest fit signal. Keep the application tight and send it while the posting is still fresh.",
+      toneClass: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700",
+    };
+  }
+
+  if (status === "potential") {
+    return {
+      title: "Apply with caveats",
+      body: "This can be worth applying to, but only after you review the gaps and avoid sending a generic version.",
+      toneClass: "border-amber-500/30 bg-amber-500/10 text-amber-700",
+    };
+  }
+
+  if (status === "risky") {
+    if (recommendsSkip) {
+      return {
+        title: "Skip this role",
+        body: hardBlocker
+          ? "This is not a quick resume tailoring issue unless you already have the required credentials and forgot to list them."
+          : "The fit signal is weak enough that this is likely to be a low-probability application.",
+        toneClass: "border-red-500/30 bg-red-500/10 text-red-700",
+      };
+    }
+
+    return {
+      title: "Fix first before applying",
+      body: hardBlocker
+        ? "A hard blocker or major proof gap is visible. Fix the strongest issue before this becomes another low-probability application."
+        : "The fit signal is weak enough that applying without edits is likely to waste time.",
+      toneClass: "border-red-500/30 bg-red-500/10 text-red-700",
+    };
+  }
+
+  return {
+    title: recommendation || "Skip this posting",
+    body: risk && risk >= 90
+      ? "The blocker stack is high enough that this is probably not worth the application time."
+      : "This role is outside the current high-probability lane. Save the time for a better match.",
+    toneClass: "border-red-500/30 bg-red-500/10 text-red-700",
+  };
+}
+
+function decisionActionsForStatus(status: VerdictStatus, recommendation: string | null = null, hardBlocker = false): DecisionAction[] {
+  const recommendsSkip = recommendation?.toLowerCase().includes("skip") === true;
+
+  if (status === "strong") {
+    return [
+      { action: "applied", label: "Apply now", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
+      { action: "skipped", label: "Skip anyway", variant: "ghost", className: "text-muted-foreground" },
+    ];
+  }
+
+  if (status === "potential") {
+    return [
+      { action: "applied", label: "Apply with caveats", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
+      { action: "fixed", label: "Fix first", variant: "outline" },
+      { action: "skipped", label: "Skip role", variant: "ghost", className: "text-muted-foreground" },
+    ];
+  }
+
+  if (status === "risky") {
+    if (recommendsSkip && hardBlocker) {
+      return [
+        { action: "skipped", label: "Skip this role", variant: "destructive" },
+        { action: "applied", label: "Apply anyway", variant: "outline" },
+      ];
+    }
+
+    return [
+      { action: "fixed", label: "I'll fix first", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
+      { action: "applied", label: "Apply anyway", variant: "outline" },
+      { action: "skipped", label: "Skip role", variant: "ghost", className: "text-muted-foreground" },
+    ];
+  }
+
+  return [
+    { action: "skipped", label: "Skip this role", variant: "destructive" },
+    { action: "applied", label: "Apply anyway", variant: "outline" },
+  ];
+}
+
+function buildApplyGateActionFeedback(params: {
+  surface: "current_result" | "history";
+  action: ApplyGateAction;
+  status: VerdictStatus;
+  recommendation: string | null;
+  risk: number | null;
+  role: string | null;
+  company: string | null;
+  verdict?: string | null;
+  score?: number | null;
+  decision?: string | null;
+  hardBlocker?: boolean | null;
+}) {
+  return {
+    surface: params.surface,
+    action_label: params.action,
+    status: params.status,
+    recommendation: params.recommendation || null,
+    risk_percent: typeof params.risk === "number" ? params.risk : null,
+    role: params.role || null,
+    company: params.company || null,
+    verdict: params.verdict || null,
+    score: typeof params.score === "number" && Number.isFinite(params.score) ? params.score : null,
+    decision: params.decision || null,
+    hard_blocker: Boolean(params.hardBlocker),
+  };
+}
 
 function normalizeHistoryTitle(value: string | null | undefined) {
   return String(value || "")
@@ -374,7 +574,6 @@ const ApplyGate = () => {
   const [jobTitle, setJobTitle] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [jobDescription, setJobDescription] = useState("");
-  const [jobUrl, setJobUrl] = useState("");
   const [result, setResult] = useState<ApplyGateResult | null>(null);
   const [isCurrentWarningExpanded, setIsCurrentWarningExpanded] = useState(false);
   const [expandedHistoryWarnings, setExpandedHistoryWarnings] = useState<Record<string, boolean>>({});
@@ -404,8 +603,8 @@ const ApplyGate = () => {
 
   const rawHistory: ApplyGateHistoryItem[] = historyQuery.data?.history ?? [];
   const currentHistoryProjection = useMemo(
-    () => buildHistoryDisplayItemFromResult(result, jobTitle, companyName, jobUrl),
-    [companyName, jobTitle, jobUrl, result],
+    () => buildHistoryDisplayItemFromResult(result, jobTitle, companyName, null),
+    [companyName, jobTitle, result],
   );
   const history = useMemo<ApplyGateHistoryDisplayItem[]>(() => {
     const deduped = dedupeHistoryItems(rawHistory);
@@ -414,11 +613,11 @@ const ApplyGate = () => {
   }, [currentHistoryProjection, rawHistory]);
 
   const analyzeMutation = useMutation({
-    mutationFn: () => analyzeJobAlignment({ jobTitle, jobDescription, companyName, jobUrl }),
+    mutationFn: () => analyzeJobAlignment({ jobTitle, jobDescription, companyName }),
     onSuccess: (data) => {
       setResult(data);
       setIsCurrentWarningExpanded(false);
-      const currentAsHistory = buildHistoryDisplayItemFromResult(data, jobTitle, companyName, jobUrl);
+      const currentAsHistory = buildHistoryDisplayItemFromResult(data, jobTitle, companyName, null);
       if (currentAsHistory && !currentAsHistory._unsaved) {
         const persistedHistoryItem = currentAsHistory as ApplyGateHistoryItem;
         queryClient.setQueryData<ApplyGateHistoryQueryData>(["apply-gate-history"], (previous) => {
@@ -441,30 +640,95 @@ const ApplyGate = () => {
     },
   });
 
+  const canAnalyze = jobDescription.trim().length > 0;
+
   const handleAnalyze = useCallback(() => {
-    if (!jobTitle.trim() && !jobDescription.trim() && !jobUrl.trim()) return;
+    if (!jobDescription.trim()) return;
     analyzeMutation.mutate();
-  }, [analyzeMutation, jobDescription, jobTitle, jobUrl]);
+  }, [analyzeMutation, jobDescription]);
+
+  const markVerdictActionInCache = useCallback(
+    (verdictId: string, action: ApplyGateAction) => {
+      queryClient.setQueryData<ApplyGateHistoryQueryData>(["apply-gate-history"], (previous) => {
+        if (!previous?.history) return previous;
+        return {
+          ...previous,
+          history: previous.history.map((item) =>
+            item.id === verdictId
+              ? { ...item, user_action: action, user_action_at: new Date().toISOString() }
+              : item,
+          ),
+        };
+      });
+    },
+    [queryClient],
+  );
 
   const handleAction = useCallback(
-    (action: "applied" | "fixed" | "skipped") => {
-      const targetUrl = (result?.jobUrl || jobUrl || "").trim();
+    (action: ApplyGateAction) => {
+      const targetUrl = (result?.jobUrl || "").trim();
       if (result?.id) {
-        updateApplyGateAction(result.id, action).catch(() => {});
+        const status = verdictToStatus(result.verdict);
+        const risk = resultApplicationRiskPercent(result, status);
+        const roleCompany = splitRoleAndCompany(
+          result.jobTitle || jobTitle || null,
+          result.companyName || companyName || null,
+          result.jobUrl || null,
+        );
+        const recommendation = recommendationLabelForDecision(result.explanation?.decision, status);
+        const feedback = buildApplyGateActionFeedback({
+          surface: "current_result",
+          action,
+          status,
+          recommendation,
+          risk,
+          role: roleCompany.role,
+          company: roleCompany.company,
+          verdict: result.verdict,
+          score: result.scoringBreakdown?.totalScore,
+          decision: result.explanation?.decision || null,
+          hardBlocker: result.scoringBreakdown?.hardBlocker,
+        });
+
+        markVerdictActionInCache(result.id, action);
+        updateApplyGateAction(result.id, action, { feedback })
+          .then(() => queryClient.invalidateQueries({ queryKey: ["apply-gate-history"] }))
+          .catch(() => {});
       }
       if (action === "applied" && targetUrl) {
         window.open(targetUrl, "_blank", "noopener,noreferrer");
       }
       setResult(null);
     },
-    [jobUrl, result],
+    [companyName, jobTitle, markVerdictActionInCache, queryClient, result],
   );
 
   const handleHistoryAction = useCallback(
-    (verdictId: string, action: "applied" | "fixed" | "skipped") => {
-      updateApplyGateAction(verdictId, action).catch(() => {});
+    (item: ApplyGateHistoryDisplayItem, action: ApplyGateAction) => {
+      const status = verdictToStatus(item.verdict);
+      const risk = historyApplicationRiskPercent(item, status);
+      const roleCompany = splitRoleAndCompany(item.job_title, item.company_name, item.job_url || null);
+      const recommendation = recommendationLabelForDecision(item.explanation_payload?.decision, status);
+      const feedback = buildApplyGateActionFeedback({
+        surface: "history",
+        action,
+        status,
+        recommendation,
+        risk,
+        role: roleCompany.role,
+        company: roleCompany.company,
+        verdict: item.verdict,
+        score: item.score,
+        decision: item.explanation_payload?.decision || null,
+        hardBlocker: item.hard_blocker,
+      });
+
+      markVerdictActionInCache(item.id, action);
+      updateApplyGateAction(item.id, action, { feedback })
+        .then(() => queryClient.invalidateQueries({ queryKey: ["apply-gate-history"] }))
+        .catch(() => {});
     },
-    [],
+    [markVerdictActionInCache, queryClient],
   );
 
   const hardBlockers = useMemo(() => {
@@ -477,18 +741,18 @@ const ApplyGate = () => {
 
   const currentStatus = result ? verdictToStatus(result.verdict) : null;
   const currentRisk = result
-    ? rejectionRiskPercent(
-      result.scoringBreakdown?.totalScore,
-      currentStatus || "risky",
-      Boolean(result.scoringBreakdown?.hardBlocker),
-    )
+    ? resultApplicationRiskPercent(result, currentStatus || "risky")
     : null;
+  const currentRiskBreakdown = riskBreakdownFromResult(result);
+  const currentOccupationGrounding = result?.scoringBreakdown?.occupationGrounding || null;
   const currentRoleCompany = splitRoleAndCompany(
     result?.jobTitle || jobTitle || null,
     result?.companyName || companyName || null,
-    result?.jobUrl || jobUrl || null,
+    result?.jobUrl || null,
   );
-  const structuredCurrent = structuredWarningAndBullets(result?.explanation);
+  const currentUniversalBlockingLabels = universalBlockingLabelsFromResult(result);
+  const currentHasUniversalHardGate = currentUniversalBlockingLabels.length > 0;
+  const structuredCurrent = structuredWarningAndBullets(result?.explanation, currentUniversalBlockingLabels);
   const fallbackCurrentMostLikelyReason = pickWarningReason(hardBlockers.length > 0 ? hardBlockers : (result?.reasons || []));
   const currentMostLikelyReason = structuredCurrent.warning || fallbackCurrentMostLikelyReason;
   const fallbackCurrentBulletReasons = (result?.reasons || [])
@@ -509,11 +773,32 @@ const ApplyGate = () => {
     .filter(Boolean)
     .slice(0, 2);
   const currentActionSections = explanationActionSections(result?.explanation);
+  const currentRequirementLedgerItems = (
+    result?.explanation?.requirement_ledger?.items
+    || result?.scoringBreakdown?.requirementLedger?.items
+    || []
+  )
+    .filter((item) => (
+      item?.priority !== "preferred"
+      && (item?.candidate_status === "missing" || item?.candidate_status === "unclear")
+    ))
+    .slice(0, 6);
   const currentWarningFull = currentMostLikelyReason ? String(currentMostLikelyReason).trim() : null;
   const currentWarningCanExpand = Boolean(currentWarningFull && currentWarningFull.length > 150);
   const currentWarning = currentWarningFull
     ? (isCurrentWarningExpanded ? currentWarningFull : warningText(currentWarningFull, 150))
     : null;
+  const currentDecisionCopy = currentStatus
+    ? decisionCopyForStatus(
+      currentStatus,
+      currentRecommendation,
+      currentRisk,
+      Boolean(result?.scoringBreakdown?.hardBlocker),
+    )
+    : null;
+  const currentDecisionActions = currentStatus
+    ? decisionActionsForStatus(currentStatus, currentRecommendation, Boolean(result?.scoringBreakdown?.hardBlocker))
+    : [];
 
   return (
     <DashboardLayout>
@@ -523,7 +808,9 @@ const ApplyGate = () => {
             <Shield className="w-6 h-6 text-accent" />
             Apply Gate
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm">Verdict on each saved job before you apply.</p>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Decide whether to apply, fix first, or skip before you spend time on a posting.
+          </p>
         </div>
 
         <div className="glass-card rounded-xl p-5 space-y-3">
@@ -547,7 +834,7 @@ const ApplyGate = () => {
               onChange={(e) => setCompanyName(e.target.value)}
               placeholder="e.g., Acme Corp"
             />
-            <p className="text-xs text-muted-foreground">Useful when you paste a job description instead of starting from a posting URL.</p>
+            <p className="text-xs text-muted-foreground">Useful when the pasted job description does not clearly name the employer.</p>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground" htmlFor="job-description">Job Description</label>
@@ -558,51 +845,108 @@ const ApplyGate = () => {
               onChange={(e) => setJobDescription(e.target.value)}
               placeholder="Paste the job description"
             />
+            <p className="text-xs text-muted-foreground">Paste the full job description. URL import is temporarily disabled while we harden extraction.</p>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground" htmlFor="job-url">Job URL (optional)</label>
-            <input
-              id="job-url"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              value={jobUrl}
-              onChange={(e) => setJobUrl(e.target.value)}
-              placeholder="https://company.com/jobs/..."
-            />
-            <p className="text-xs text-muted-foreground">If description is empty, Apply Gate will fetch and analyze the posting from this URL.</p>
-          </div>
-          <Button onClick={handleAnalyze} disabled={analyzeMutation.isPending}>
-            {analyzeMutation.isPending ? "Checking..." : "Check Alignment"}
+          <Button onClick={handleAnalyze} disabled={analyzeMutation.isPending || !canAnalyze}>
+            {analyzeMutation.isPending ? "Checking..." : "Get decision"}
           </Button>
           {analyzeMutation.isError && (
             <p className="text-xs text-destructive">
               {analyzeMutation.error instanceof Error
                 ? analyzeMutation.error.message
-                : "Apply Gate could not analyze this role. Paste the job description or try a direct job posting URL."}
+                : "Apply Gate could not analyze this role. Paste the full job description and try again."}
             </p>
           )}
         </div>
 
         {result && (
           <div className="glass-card rounded-xl p-6 space-y-3">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="font-semibold text-foreground leading-tight">{currentRoleCompany.role}</p>
-                {currentRoleCompany.company ? (
-                  <p className="text-sm text-muted-foreground leading-tight mt-0.5">{currentRoleCompany.company}</p>
-                ) : null}
+            {currentDecisionCopy && (
+              <div className={`rounded-xl border px-4 py-3 ${currentDecisionCopy.toneClass}`}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide">Decision</p>
+                  <StatusBadge status={currentStatus || "risky"} />
+                </div>
+                <h2 className="mt-2 text-xl font-semibold">{currentDecisionCopy.title}</h2>
+                <p className="mt-1 text-sm leading-relaxed">{currentDecisionCopy.body}</p>
               </div>
-              <StatusBadge status={currentStatus || "risky"} />
+            )}
+
+            <div>
+              <p className="font-semibold text-foreground leading-tight">{currentRoleCompany.role}</p>
+              {currentRoleCompany.company ? (
+                <p className="text-sm text-muted-foreground leading-tight mt-0.5">{currentRoleCompany.company}</p>
+              ) : null}
             </div>
 
-            <div className="flex items-center gap-3 text-xs pt-0.5">
-              <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground">{reviewLabelForStatus(currentStatus || "risky")}</span>
+            <div className="flex flex-wrap items-center gap-3 text-xs pt-0.5">
+              <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                Fit label: {reviewLabelForStatus(currentStatus || "risky")}
+              </span>
               {currentRecommendation && (
                 <span className="px-2 py-0.5 rounded border border-accent/20 bg-accent/10 text-accent">
-                  Recommended: {currentRecommendation}
+                  Recommended move: {currentRecommendation}
                 </span>
               )}
-              <span className="text-muted-foreground">Rejection risk: <span className={riskTone(currentRisk ?? 60)}>{currentRisk ?? 60}%</span></span>
+              <span className="text-muted-foreground">
+                Application risk: <span className={riskTone(currentRisk ?? 60)}>{currentRisk ?? 60}%</span>
+              </span>
             </div>
+
+            {currentRiskBreakdown?.components?.length ? (
+              <div className="rounded-lg border border-border/70 bg-background/70 p-3 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-foreground">Risk breakdown</p>
+                  <span className="text-xs text-muted-foreground">{currentRiskBreakdown.summary}</span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {currentRiskBreakdown.components.slice(0, 4).map((component) => (
+                    <div key={component.key} className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium text-foreground">{component.label}</p>
+                        <span className={`text-xs font-semibold ${riskTone(component.score)}`}>{component.score}%</span>
+                      </div>
+                      {component.evidence ? (
+                        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{component.evidence}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {currentOccupationGrounding?.job || currentOccupationGrounding?.candidate ? (
+              <div className="rounded-lg border border-border/70 bg-background/70 p-3 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-foreground">Occupation grounding</p>
+                  <span className={`text-xs font-semibold ${riskTone(100 - Math.round(currentOccupationGrounding.alignmentScore ?? 50))}`}>
+                    {Math.round(currentOccupationGrounding.alignmentScore ?? 50)}/100
+                  </span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Posting</p>
+                    <p className="text-xs font-medium text-foreground">{currentOccupationGrounding.job?.title || "Unknown occupation"}</p>
+                    {currentOccupationGrounding.job?.onetSoc ? (
+                      <p className="text-xs text-muted-foreground">O*NET-SOC {currentOccupationGrounding.job.onetSoc}</p>
+                    ) : null}
+                  </div>
+                  <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Profile</p>
+                    <p className="text-xs font-medium text-foreground">{currentOccupationGrounding.candidate?.title || "Unknown occupation"}</p>
+                    {currentOccupationGrounding.candidate?.onetSoc ? (
+                      <p className="text-xs text-muted-foreground">O*NET-SOC {currentOccupationGrounding.candidate.onetSoc}</p>
+                    ) : null}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {occupationAlignmentLabel(currentOccupationGrounding.alignmentLabel)}
+                  {Number.isFinite(Number(currentOccupationGrounding.confidence))
+                    ? ` - Confidence ${Math.round(Number(currentOccupationGrounding.confidence) * 100)}%`
+                    : ""}
+                </p>
+              </div>
+            ) : null}
 
             <div className="space-y-1.5">
               {currentVisibleReasons.map((reason, idx) => (
@@ -628,11 +972,32 @@ const ApplyGate = () => {
               </div>
             )}
 
+            {currentRequirementLedgerItems.length > 0 && (
+              <div className="rounded-lg border border-border/70 bg-background/70 p-3 space-y-2">
+                <p className="text-xs font-semibold text-foreground">Requirement check</p>
+                <div className="space-y-2">
+                  {currentRequirementLedgerItems.map((item) => (
+                    <div key={item.id || `${item.type}-${item.label}`} className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`rounded border px-2 py-0.5 text-[11px] font-medium ${requirementStatusClass(item.candidate_status)}`}>
+                          {requirementStatusLabel(item.candidate_status)}
+                        </span>
+                        <span className="text-xs font-medium text-foreground">{item.label}</span>
+                      </div>
+                      {item.source_sentence && item.source_sentence !== item.label ? (
+                        <p className="text-xs text-muted-foreground leading-relaxed">{item.source_sentence}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {(currentAssessmentConfidence || currentUncertaintyNotes.length > 0) && (
               <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 space-y-1">
                 {currentAssessmentConfidence && (
                   <p className="text-xs text-muted-foreground">
-                    Verdict confidence: <span className="text-foreground font-medium">{currentAssessmentConfidence}</span>
+                    Decision confidence: <span className="text-foreground font-medium">{currentAssessmentConfidence}</span>
                   </p>
                 )}
                 {currentUncertaintyNotes.map((note, idx) => (
@@ -643,7 +1008,7 @@ const ApplyGate = () => {
 
             {currentActionSections.length > 0 && (
               <div className="rounded-lg border border-border/70 bg-background/70 p-3 space-y-2">
-                <p className="text-xs font-semibold text-foreground">How to improve your odds</p>
+                <p className="text-xs font-semibold text-foreground">{currentHasUniversalHardGate ? "What this means" : "How to improve your odds"}</p>
                 <div className="space-y-2">
                   {currentActionSections.map((section) => (
                     <div key={section.title} className="space-y-1">
@@ -657,33 +1022,25 @@ const ApplyGate = () => {
               </div>
             )}
 
-            <div className="flex items-center gap-2 pt-1">
-              {currentStatus === "strong" ? (
-                <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90 text-xs h-8" onClick={() => handleAction("applied")}>
-                  Apply Now
-                </Button>
-              ) : (
-                <>
+            <div className="space-y-2 pt-1">
+              <div className="flex flex-wrap items-center gap-2">
+                {currentDecisionActions.map((item) => (
                   <Button
+                    key={`${item.action}-${item.label}`}
                     size="sm"
-                    variant="outline"
-                    className="text-xs h-8"
-                    onClick={() => handleAction("applied")}
+                    variant={item.variant || "default"}
+                    className={`${item.className || ""} text-xs h-8`.trim()}
+                    onClick={() => handleAction(item.action)}
                   >
-                    Apply Anyway
+                    {item.label}
                   </Button>
-                  {currentRisk !== null && currentRisk >= 40 && currentRisk <= 90 && (
-                    <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90 text-xs h-8" onClick={() => handleAction("fixed")}>
-                      Fix First
-                    </Button>
-                  )}
-                </>
-              )}
-              {currentStatus !== "strong" && currentRisk !== null && currentRisk > 90 && (
-                <Button size="sm" variant="ghost" className="text-xs h-8 text-muted-foreground" onClick={() => handleAction("skipped")}>
-                  Skip
-                </Button>
-              )}
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {currentHasUniversalHardGate
+                  ? "Apply anyway only if you already meet these requirements and your resume is missing the proof."
+                  : "Your choice is saved to improve future targeting, action queues, and outcome memory."}
+              </p>
             </div>
           </div>
         )}
@@ -695,7 +1052,8 @@ const ApplyGate = () => {
               <div key={item.id} className="glass-card rounded-xl p-5 space-y-3">
                 {(() => {
                   const status = verdictToStatus(item.verdict);
-                  const risk = rejectionRiskPercent(item.score, status, Boolean(item.hard_blocker));
+                  const risk = historyApplicationRiskPercent(item, status);
+                  const riskBreakdown = riskBreakdownFromHistory(item);
                   const reasons = parseHistoryReasons(item.reasons);
                   const structuredHistory = structuredWarningAndBullets(item.explanation_payload);
                   const fallbackMostLikelyReason = pickWarningReason(reasons);
@@ -716,6 +1074,9 @@ const ApplyGate = () => {
                       ? bulletReasons
                       : reasons.slice(0, 1).map((entry) => truncateReason(entry, 160)));
                   const roleCompany = splitRoleAndCompany(item.job_title, item.company_name, item.job_url || null);
+                  const recommendation = recommendationLabelForDecision(item.explanation_payload?.decision, status);
+                  const decisionCopy = decisionCopyForStatus(status, recommendation, risk, Boolean(item.hard_blocker));
+                  const decisionActions = decisionActionsForStatus(status, recommendation, Boolean(item.hard_blocker));
                   return (
                     <>
                 <div className="flex items-start justify-between">
@@ -728,9 +1089,12 @@ const ApplyGate = () => {
                   <StatusBadge status={status} />
                 </div>
                 <div className="flex items-center gap-3 text-xs pt-0.5">
-                  <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground">{reviewLabelForStatus(status)}</span>
-                  <span className="text-muted-foreground">Rejection risk: <span className={riskTone(risk)}>{risk}%</span></span>
+                  <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground">{decisionCopy.title}</span>
+                  <span className="text-muted-foreground">Application risk: <span className={riskTone(risk)}>{risk}%</span></span>
                 </div>
+                {riskBreakdown?.summary ? (
+                  <p className="text-xs text-muted-foreground leading-relaxed">Risk driver: {riskBreakdown.summary}</p>
+                ) : null}
                 {visibleReasons.map((reason, index) => (
                   <p key={index} className="text-sm text-muted-foreground leading-relaxed">• {reason}</p>
                 ))}
@@ -751,46 +1115,23 @@ const ApplyGate = () => {
                     </div>
                   </div>
                 )}
-                <div className="flex items-center gap-2 pt-1">
-                  {status === "strong" ? (
-                    <Button
-                      size="sm"
-                      className="bg-accent text-accent-foreground hover:bg-accent/90 text-xs h-8"
-                      onClick={() => handleHistoryAction(item.id, "applied")}
-                    >
-                      Apply Now
-                    </Button>
-                  ) : (
-                    <>
+                <div className="space-y-2 pt-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {decisionActions.map((actionItem) => (
                       <Button
+                        key={`${item.id}-${actionItem.action}-${actionItem.label}`}
                         size="sm"
-                        variant="outline"
-                        className="text-xs h-8"
-                        onClick={() => handleHistoryAction(item.id, "applied")}
+                        variant={actionItem.variant || "default"}
+                        className={`${actionItem.className || ""} text-xs h-8`.trim()}
+                        onClick={() => handleHistoryAction(item, actionItem.action)}
                       >
-                        Apply Anyway
+                        {actionItem.label}
                       </Button>
-                      {risk >= 40 && risk <= 90 && (
-                        <Button
-                          size="sm"
-                          className="bg-accent text-accent-foreground hover:bg-accent/90 text-xs h-8"
-                          onClick={() => handleHistoryAction(item.id, "fixed")}
-                        >
-                          Fix First
-                        </Button>
-                      )}
-                    </>
-                  )}
-                  {status !== "strong" && risk > 90 && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-xs h-8 text-muted-foreground"
-                      onClick={() => handleHistoryAction(item.id, "skipped")}
-                    >
-                      Skip
-                    </Button>
-                  )}
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Saving this choice keeps Strategy Alerts and Outcome Memory grounded in what you actually did.
+                  </p>
                 </div>
                     </>
                   );

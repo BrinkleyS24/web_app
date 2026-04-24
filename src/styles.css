@@ -303,18 +303,43 @@ a {
 }
 
 .status-applied {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 20%, transparent);
+  background: var(--secondary);
+  color: var(--primary);
+  border-color: var(--border);
 }
 
 .status-interviewed {
-  background: color-mix(in srgb, var(--chart-2) 10%, transparent);
-  color: var(--chart-2);
-  border-color: color-mix(in srgb, var(--chart-2) 20%, transparent);
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: var(--warning-foreground);
+  border-color: color-mix(in srgb, var(--warning) 20%, transparent);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.status-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
 }
 
 .status-offer {
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 20%, transparent);
+}
+
+.status-offers {
   background: color-mix(in srgb, var(--success) 10%, transparent);
   color: var(--success);
   border-color: color-mix(in srgb, var(--success) 20%, transparent);
@@ -324,6 +349,45 @@ a {
   background: color-mix(in srgb, var(--destructive) 10%, transparent);
   color: var(--destructive);
   border-color: color-mix(in srgb, var(--destructive) 20%, transparent);
+}
+
+.status-closed {
+  background: color-mix(in srgb, var(--muted) 100%, transparent);
+  color: var(--muted-foreground);
+  border-color: color-mix(in srgb, var(--muted-foreground) 18%, transparent);
+}
+
+.popup-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(29, 53, 87, 0.22) transparent;
+}
+
+.popup-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.popup-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.popup-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(29, 53, 87, 0.22);
+  border-radius: 999px;
+}
+
+.popup-line-clamp-1,
+.popup-line-clamp-2 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+}
+
+.popup-line-clamp-1 {
+  -webkit-line-clamp: 1;
+}
+
+.popup-line-clamp-2 {
+  -webkit-line-clamp: 2;
 }
 
 @keyframes fade-in {
@@ -342,6 +406,163 @@ a {
 
 .animate-slide-in {
   animation: slide-in 0.3s ease-out both;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+.landingPage {
+  font-family: "Satoshi", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.landingDisplay {
+  font-family: "Cabinet Grotesk", "Satoshi", sans-serif;
+}
+
+.landingMono {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+.landingLinkUnderline {
+  position: relative;
+}
+
+.landingLinkUnderline::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -0.25rem;
+  width: 100%;
+  height: 1px;
+  transform: scaleX(0);
+  transform-origin: left center;
+  background: currentColor;
+  transition: transform 0.2s ease;
+}
+
+.landingLinkUnderline:hover::after,
+.landingLinkUnderline:focus-visible::after {
+  transform: scaleX(1);
+}
+
+.landingButtonDark,
+.landingButtonDark:hover,
+.landingButtonDark:visited {
+  color: #fff !important;
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.bg-grid-dark {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float-card {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(var(--rot, 0deg));
+  }
+
+  50% {
+    transform: translate3d(0, -10px, 0) rotate(var(--rot, 0deg));
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.8;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes landing-marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-float {
+  animation: float-card 5s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3.6s ease-in-out infinite;
+}
+
+.landingTickerTrack {
+  display: flex;
+  width: max-content;
+  animation: landing-marquee 32s linear infinite;
+}
+
+.landingPopupScrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 23, 42, 0.18) transparent;
+}
+
+.landingPopupScrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.landingPopupScrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.landingPopupScrollbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-fade-up,
+  .animate-float,
+  .animate-pulse-glow,
+  .landingTickerTrack {
+    animation: none !important;
+  }
+
+  .landingLinkUnderline::after {
+    transition: none;
+  }
 }
 
 .publicSiteShell {
@@ -449,6 +670,13 @@ a {
   gap: 12px;
 }
 
+.publicHeaderError {
+  max-width: 14rem;
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
 .publicSiteMain {
   max-width: 1180px;
   margin: 0 auto;
@@ -468,8 +696,19 @@ a {
   transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
 }
 
+button.publicButton {
+  cursor: pointer;
+  font: inherit;
+}
+
 .publicButton:hover {
   transform: translateY(-1px);
+}
+
+.publicButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+  transform: none;
 }
 
 .publicButtonPrimary {

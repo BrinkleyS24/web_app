@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../lib/AuthContext.jsx";
 import {
@@ -30,10 +30,25 @@ function ExternalOrInternalCta({ className, label }) {
 }
 
 export default function PublicSiteLayout({ children }) {
-  const { plan, planLoading, adminEmail } = useAuth();
+  const { user, plan, planLoading, adminEmail, logout } = useAuth();
+  const [signOutBusy, setSignOutBusy] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
   const premiumEntryPath = !planLoading && adminEmail
     ? "/admin/review"
     : (!planLoading && plan === "premium" ? "/dashboard" : "/upgrade");
+
+  async function handleSignOut() {
+    setSignOutError("");
+    setSignOutBusy(true);
+
+    try {
+      await logout();
+    } catch (error) {
+      setSignOutError(error?.message || "Sign-out failed.");
+    } finally {
+      setSignOutBusy(false);
+    }
+  }
 
   return (
     <div className="publicSiteShell">
@@ -90,6 +105,23 @@ export default function PublicSiteLayout({ children }) {
           </nav>
 
           <div className="publicHeaderActions">
+            {user ? (
+              <>
+                {signOutError ? (
+                  <span className="publicHeaderError" role="alert">
+                    {signOutError}
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  className="publicButton publicButtonSecondary publicSignOutButton"
+                  onClick={handleSignOut}
+                  disabled={signOutBusy}
+                >
+                  {signOutBusy ? "Signing out..." : "Sign out"}
+                </button>
+              </>
+            ) : null}
             <ExternalOrInternalCta
               className="publicButton publicButtonPrimary"
               label={CHROME_WEB_STORE_URL ? CHROME_STORE_CTA_LABEL : "Get support"}
