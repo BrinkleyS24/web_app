@@ -762,6 +762,15 @@ export default function Landing() {
             <p className="landingMono mt-6 text-xs uppercase tracking-[0.22em] text-gray-500">
               Beta access focuses on Apply Gate and weekly search health first.
             </p>
+            <div className="mt-8">
+              <Link
+                to="/upgrade"
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-[#111111] px-6 py-3.5 font-bold text-white transition-colors hover:bg-[#10B981]"
+              >
+                Start Premium Beta
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
         </section>
 
@@ -830,8 +839,8 @@ export default function Landing() {
               </span>
             </h2>
             <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-gray-600 md:text-[18px]">
-              Chrome extension is free. Premium drops when the dashboard is ready - you'll
-              hear it here first.
+              Chrome extension is free. Premium Beta is available for Apply Gate
+              and the weekly search-health summary.
             </p>
 
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -845,12 +854,12 @@ export default function Landing() {
                 Add to Chrome
                 <ArrowRight className="h-5 w-5" />
               </a>
-              <a
-                href={premiumUpdatesHref}
+              <Link
+                to="/upgrade"
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-10 py-4 text-lg font-bold text-[#111111] transition-colors hover:border-[#111111]"
               >
-                Get premium updates
-              </a>
+                Start Premium Beta
+              </Link>
             </div>
           </div>
         </section>

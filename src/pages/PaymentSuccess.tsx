@@ -132,9 +132,9 @@ export default function PaymentSuccess() {
               </Link>
               <Link
                 className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-6 py-3.5 font-bold text-[#111111] hover:border-[#111111]"
-                to="/account"
+                to="/settings"
               >
-                Check account
+                Open settings
               </Link>
               <Link
                 className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-6 py-3.5 font-bold text-[#111111] hover:border-[#111111]"

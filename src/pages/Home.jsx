@@ -39,7 +39,7 @@ export default function Home() {
       return;
     }
 
-    navigate("/#premium", { replace: true });
+    navigate("/upgrade", { replace: true });
   }, [user, authLoading, planLoading, adminEmail, plan, planError, navigate]);
 
   const hideInternalWorkspaceDetails = !WEB_WORKSPACE_IS_PUBLIC && !user && !isLocalDevWorkspace;

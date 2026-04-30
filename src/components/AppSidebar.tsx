@@ -99,7 +99,7 @@ export function AppSidebar() {
           </div>
         ) : (
           <NavLink
-            to="/#premium"
+            to="/upgrade"
             className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg bg-sidebar-primary text-sidebar-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
             activeClassName="opacity-90"
           >

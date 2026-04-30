@@ -51,7 +51,7 @@ export default function PaymentCancel() {
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
                 className="inline-flex items-center justify-center rounded-md bg-[#111111] px-6 py-3.5 font-bold text-white hover:bg-[#10B981]"
-                to="/#premium"
+                to="/upgrade"
               >
                 Return to Premium
               </Link>

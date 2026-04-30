@@ -41,8 +41,8 @@ const sections = [
   {
     title: "Premium and billing",
     items: [
-      "The Chrome extension is the public product today. Premium dashboard and billing workflows may remain limited, gated, or unavailable until they are ready.",
-      "If paid plans become available, pricing, renewal, cancellation, and refund details will be shown before purchase.",
+      "The Chrome extension is free. Premium Beta unlocks the web workspace for Apply Gate and weekly search-health summaries.",
+      "Pricing, renewal, cancellation, and refund details are shown before purchase.",
       "Payment details, when applicable, are handled by the payment processor rather than stored directly by Applendium.",
     ],
   },
@@ -108,7 +108,7 @@ export default function Terms() {
             <Link to="/#features" className="landingLinkUnderline text-sm font-medium text-gray-700 hover:text-black">
               Features
             </Link>
-            <Link to="/#premium" className="landingLinkUnderline text-sm font-medium text-gray-700 hover:text-black">
+            <Link to="/upgrade" className="landingLinkUnderline text-sm font-medium text-gray-700 hover:text-black">
               Premium
             </Link>
             <Link to="/#privacy" className="landingLinkUnderline text-sm font-medium text-gray-700 hover:text-black">

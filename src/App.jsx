@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Home from "./pages/Home.jsx";
 import Landing from "./pages/Landing.jsx";
 import Terms from "./pages/Terms.jsx";
-import Account from "./pages/Account.jsx";
+import Upgrade from "./pages/Upgrade.jsx";
 import Dashboard from "./pages/DashboardNew.tsx";
 import PaymentSuccess from "./pages/PaymentSuccess.tsx";
 import PaymentCancel from "./pages/PaymentCancel.tsx";
@@ -35,6 +35,7 @@ const DASHBOARD_ROUTES = [
   "/strategy-alerts",
   "/weekly-summary",
   "/settings",
+  "/account",
   "/admin/debug",
   "/admin/review",
   "/admin/analytics",
@@ -79,7 +80,7 @@ function RequirePremiumUser({ children }) {
   }
 
   if (plan !== "premium") {
-    return <Navigate to="/#premium" replace />;
+    return <Navigate to="/upgrade" replace />;
   }
 
   return children;
@@ -107,8 +108,9 @@ export default function App() {
     location.pathname.startsWith(route)
   );
   const isPayment = location.pathname.startsWith("/payment");
+  const isUpgrade = location.pathname === "/upgrade";
   const isPublicSite = location.pathname === "/" || location.pathname === "/privacy" || location.pathname === "/terms" || location.pathname === "/support";
-  const containerClass = (isDashboard || isPayment)
+  const containerClass = (isDashboard || isPayment || isUpgrade)
     ? "container container--full"
     : (isPublicSite ? "container container--full" : "container");
 
@@ -123,12 +125,13 @@ export default function App() {
               <Route path="/app" element={<Home />} />
               <Route path="/privacy" element={<Navigate to="/#privacy" replace />} />
               <Route path="/terms" element={<Terms />} />
+              <Route path="/upgrade" element={<Upgrade />} />
               <Route path="/support" element={<Navigate to="/#support" replace />} />
               <Route
                 path="/account"
                 element={
                   <RequireNonAdminUser>
-                    <Account />
+                    <Navigate to="/settings" replace />
                   </RequireNonAdminUser>
                 }
               />
