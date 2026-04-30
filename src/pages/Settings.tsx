@@ -194,7 +194,7 @@ export default function Settings() {
               <Button
                 size="sm"
                 className="gap-1.5"
-                onClick={() => navigate("/upgrade")}
+                onClick={() => navigate("/#premium")}
               >
                 <Crown className="w-3.5 h-3.5" />
                 Upgrade to Premium

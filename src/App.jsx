@@ -1,13 +1,10 @@
 import React from "react";
-import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Home from "./pages/Home.jsx";
 import Landing from "./pages/Landing.jsx";
-import Privacy from "./pages/Privacy.jsx";
 import Terms from "./pages/Terms.jsx";
-import Support from "./pages/Support.jsx";
 import Account from "./pages/Account.jsx";
 import Dashboard from "./pages/DashboardNew.tsx";
-import Upgrade from "./pages/Upgrade.tsx";
 import PaymentSuccess from "./pages/PaymentSuccess.tsx";
 import PaymentCancel from "./pages/PaymentCancel.tsx";
 import ApplyGate from "./pages/ApplyGate.tsx";
@@ -82,7 +79,7 @@ function RequirePremiumUser({ children }) {
   }
 
   if (plan !== "premium") {
-    return <Navigate to="/upgrade" replace />;
+    return <Navigate to="/#premium" replace />;
   }
 
   return children;
@@ -109,10 +106,9 @@ export default function App() {
   const isDashboard = DASHBOARD_ROUTES.some((route) =>
     location.pathname.startsWith(route)
   );
-  const isUpgrade = location.pathname.startsWith("/upgrade");
   const isPayment = location.pathname.startsWith("/payment");
   const isPublicSite = location.pathname === "/" || location.pathname === "/privacy" || location.pathname === "/terms" || location.pathname === "/support";
-  const containerClass = (isDashboard || isUpgrade || isPayment)
+  const containerClass = (isDashboard || isPayment)
     ? "container container--full"
     : (isPublicSite ? "container container--full" : "container");
 
@@ -125,10 +121,9 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/app" element={<Home />} />
-              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/privacy" element={<Navigate to="/#privacy" replace />} />
               <Route path="/terms" element={<Terms />} />
-              <Route path="/support" element={<Support />} />
-              <Route path="/pricing" element={<Navigate to="/upgrade" replace />} />
+              <Route path="/support" element={<Navigate to="/#support" replace />} />
               <Route
                 path="/account"
                 element={
@@ -144,10 +139,6 @@ export default function App() {
                     <Dashboard />
                   </RequirePremiumUser>
                 }
-              />
-              <Route
-                path="/upgrade"
-                element={<Upgrade />}
               />
               <Route path="/payment/success" element={<PaymentSuccess />} />
               <Route path="/payment/cancel" element={<PaymentCancel />} />
@@ -253,18 +244,5 @@ export default function App() {
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>
-  );
-}
-
-function TopLink({ to, label }) {
-  return (
-    <NavLink
-      to={to}
-      className={({ isActive }) =>
-        `pill ${isActive ? "pillActive" : ""}`.trim()
-      }
-    >
-      {label}
-    </NavLink>
   );
 }

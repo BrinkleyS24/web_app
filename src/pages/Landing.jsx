@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -23,8 +23,9 @@ import { CHROME_WEB_STORE_URL } from "../lib/publicSiteConfig.js";
 const NAV_LINKS = [
   { href: "#how-it-works", label: "How it works" },
   { href: "#features", label: "Features" },
-  { href: "#privacy", label: "Privacy" },
   { href: "#premium", label: "Premium" },
+  { href: "#privacy", label: "Privacy" },
+  { to: "/terms", label: "Terms" },
 ];
 
 const SIGNAL_ITEMS = [
@@ -190,6 +191,18 @@ function BrandMark({ className = "h-8 w-8" }) {
 }
 
 function HeaderLink({ href, label, onClick }) {
+  if (href?.startsWith("/")) {
+    return (
+      <Link
+        to={href}
+        className="landingLinkUnderline text-sm font-medium text-gray-700 hover:text-black"
+        onClick={onClick}
+      >
+        {label}
+      </Link>
+    );
+  }
+
   return (
     <a
       href={href}
@@ -438,6 +451,15 @@ export default function Landing() {
   const chromeHref = CHROME_WEB_STORE_URL || premiumUpdatesHref;
   const year = new Date().getFullYear();
 
+  useEffect(() => {
+    if (!window.location.hash) return;
+
+    const target = document.querySelector(window.location.hash);
+    if (target) {
+      target.scrollIntoView({ block: "start" });
+    }
+  }, []);
+
   usePageMetadata({
     title: "Applendium | Gmail Job Tracker for Chrome",
     description:
@@ -464,18 +486,18 @@ export default function Landing() {
 
           <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">
             {NAV_LINKS.map((nav) => (
-              <HeaderLink key={nav.label} href={nav.href} label={nav.label} />
+              <HeaderLink key={nav.label} href={nav.href || nav.to} label={nav.label} />
             ))}
           </nav>
 
           <div className="hidden items-center gap-3 md:flex">
-            <Link
-              to="/support"
+            <a
+              href="#support"
               className="text-sm font-medium text-gray-700 hover:text-black"
               data-testid="nav-support"
             >
               Support
-            </Link>
+            </a>
             <a
               href={chromeHref}
               target="_blank"
@@ -502,18 +524,29 @@ export default function Landing() {
           <div className="border-t border-black/8 bg-white/95 backdrop-blur md:hidden">
             <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5">
               {NAV_LINKS.map((nav) => (
-                <a
-                  key={nav.label}
-                  href={nav.href}
-                  className="text-base font-medium text-[#111111]"
-                  onClick={closeMobileMenu}
-                >
-                  {nav.label}
-                </a>
+                nav.to ? (
+                  <Link
+                    key={nav.label}
+                    to={nav.to}
+                    className="text-base font-medium text-[#111111]"
+                    onClick={closeMobileMenu}
+                  >
+                    {nav.label}
+                  </Link>
+                ) : (
+                  <a
+                    key={nav.label}
+                    href={nav.href}
+                    className="text-base font-medium text-[#111111]"
+                    onClick={closeMobileMenu}
+                  >
+                    {nav.label}
+                  </a>
+                )
               ))}
-              <Link to="/support" className="text-base font-medium text-[#111111]" onClick={closeMobileMenu}>
+              <a href="#support" className="text-base font-medium text-[#111111]" onClick={closeMobileMenu}>
                 Support
-              </Link>
+              </a>
               <a
                 href={chromeHref}
                 target="_blank"
@@ -821,6 +854,61 @@ export default function Landing() {
             </div>
           </div>
         </section>
+
+        <section id="support" className="border-t border-gray-200 bg-[#F3F4F6] py-20 md:py-24">
+          <div className="mx-auto grid max-w-7xl gap-8 px-6 md:px-10 lg:grid-cols-12 lg:items-start">
+            <div className="lg:col-span-5">
+              <span className="landingMono text-xs font-bold uppercase tracking-[0.24em] text-[#10B981]">
+                Support
+              </span>
+              <h2 className="landingDisplay mt-5 text-4xl font-black leading-[0.92] tracking-tighter text-[#111111] md:text-5xl">
+                Need help with Applendium?
+              </h2>
+              <p className="mt-5 text-lg leading-8 text-gray-600">
+                Send the account email, what you expected to happen, what happened instead,
+                and any screenshot or error text that makes the issue reproducible.
+              </p>
+            </div>
+
+            <div className="grid gap-5 lg:col-span-7 md:grid-cols-2">
+              <article className="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_16px_40px_-32px_rgba(17,17,17,0.35)]">
+                <p className="landingMono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">
+                  General support
+                </p>
+                <h3 className="landingDisplay mt-4 text-xl font-bold text-[#0B1220]">
+                  support@applendium.com
+                </h3>
+                <p className="mt-3 text-base leading-7 text-gray-600">
+                  Installation, sign-in, sync, billing, and account troubleshooting.
+                </p>
+                <a
+                  href="mailto:support@applendium.com?subject=Applendium%20Support"
+                  className="mt-5 inline-flex items-center justify-center rounded-md bg-[#111111] px-5 py-3 text-sm font-bold text-white hover:bg-[#10B981]"
+                >
+                  Email support
+                </a>
+              </article>
+
+              <article className="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_16px_40px_-32px_rgba(17,17,17,0.35)]">
+                <p className="landingMono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">
+                  Privacy requests
+                </p>
+                <h3 className="landingDisplay mt-4 text-xl font-bold text-[#0B1220]">
+                  privacy@applendium.com
+                </h3>
+                <p className="mt-3 text-base leading-7 text-gray-600">
+                  Data deletion, Gmail access, and privacy-specific account requests.
+                </p>
+                <a
+                  href="mailto:privacy@applendium.com?subject=Applendium%20Privacy%20Request"
+                  className="mt-5 inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-5 py-3 text-sm font-bold text-[#111111] hover:border-[#111111]"
+                >
+                  Contact privacy
+                </a>
+              </article>
+            </div>
+          </div>
+        </section>
       </main>
 
       <footer className="border-t border-gray-200 bg-[#F3F4F6]" data-testid="site-footer">
@@ -859,9 +947,9 @@ export default function Landing() {
                   </a>
                 </li>
                 <li>
-                  <Link to="/upgrade" className="hover:text-[#10B981]" data-testid="footer-premium-link">
+                  <a href="#premium" className="hover:text-[#10B981]" data-testid="footer-premium-link">
                     Premium roadmap
-                  </Link>
+                  </a>
                 </li>
               </ul>
             </div>
@@ -882,9 +970,9 @@ export default function Landing() {
                   </Link>
                 </li>
                 <li>
-                  <Link to="/support" className="hover:text-[#10B981]" data-testid="footer-support-link">
+                  <a href="#support" className="hover:text-[#10B981]" data-testid="footer-support-link">
                     Support
-                  </Link>
+                  </a>
                 </li>
               </ul>
             </div>
@@ -906,7 +994,7 @@ export default function Landing() {
 
           <div className="mt-12 flex flex-col items-start justify-between gap-3 border-t border-gray-200 pt-6 md:flex-row md:items-center">
             <span className="landingMono text-[11px] tracking-wider text-gray-500">
-              © {year} Applendium - made for the inbox.
+              (c) {year} Applendium - made for the inbox.
             </span>
             <span className="landingMono text-[11px] uppercase tracking-[0.2em] text-gray-400">
               v1.0 - extension-first
