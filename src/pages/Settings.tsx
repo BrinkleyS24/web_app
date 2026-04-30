@@ -24,6 +24,8 @@ type SubscriptionStatus = {
   current_period_end?: string | number | null;
   cancel_at_period_end?: boolean;
   subscription_id?: string;
+  billingPortalAvailable?: boolean;
+  billingSource?: string;
 };
 
 type SubscriptionResponse = {
@@ -105,6 +107,7 @@ export default function Settings() {
   const renewalDate = formatDate(subscription?.current_period_end);
   const monthlyLimit = subStatus?.quotaData?.limit;
   const monthlyProcessed = subStatus?.quotaData?.monthlyProcessed ?? 0;
+  const billingPortalAvailable = Boolean(subscription?.billingPortalAvailable);
 
   const accountCards = useMemo(
     () => [
@@ -229,7 +232,7 @@ export default function Settings() {
               <div className="rounded-xl border border-border bg-card/70 p-4">
                 <p className="font-semibold uppercase tracking-widest text-muted-foreground">Renewal</p>
                 <p className="mt-2 font-medium text-foreground">
-                  {renewalDate || "Not available for this local test subscription"}
+                  {renewalDate || "No renewal date available"}
                 </p>
               </div>
               <div className="rounded-xl border border-border bg-card/70 p-4">
@@ -244,7 +247,7 @@ export default function Settings() {
           {subError ? <p className="text-xs text-red-500">{subError}</p> : null}
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            {isPremium ? (
+            {isPremium && billingPortalAvailable ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -259,6 +262,10 @@ export default function Settings() {
                 )}
                 {busyPortal ? "Opening..." : "Manage Billing"}
               </Button>
+            ) : isPremium ? (
+              <p className="text-xs text-muted-foreground">
+                Premium access is active. Billing portal management is not available for this account.
+              </p>
             ) : (
               <Button size="sm" className="gap-1.5" onClick={() => navigate("/upgrade")}>
                 <Crown className="h-3.5 w-3.5" />
