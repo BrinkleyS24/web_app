@@ -109,7 +109,7 @@ export default function Upgrade() {
                 {!authReady ? (
                   <button
                     type="button"
-                    className="inline-flex items-center justify-center gap-2 rounded-md bg-[#111111] px-6 py-3.5 font-bold text-white"
+                    className="landingButtonDark inline-flex items-center justify-center gap-2 rounded-md bg-[#111111] px-6 py-3.5 font-bold text-white"
                     disabled
                   >
                     Checking account...
@@ -117,7 +117,7 @@ export default function Upgrade() {
                 ) : isPremium ? (
                   <Link
                     to="/dashboard"
-                    className="inline-flex items-center justify-center gap-2 rounded-md bg-[#111111] px-6 py-3.5 font-bold text-white hover:bg-[#10B981]"
+                    className="landingButtonDark inline-flex items-center justify-center gap-2 rounded-md bg-[#111111] px-6 py-3.5 font-bold text-white hover:bg-[#10B981]"
                   >
                     Open dashboard
                     <ArrowRight className="h-4 w-4" />
@@ -125,7 +125,7 @@ export default function Upgrade() {
                 ) : user ? (
                   <button
                     type="button"
-                    className="inline-flex items-center justify-center gap-2 rounded-md bg-[#111111] px-6 py-3.5 font-bold text-white hover:bg-[#10B981] disabled:cursor-not-allowed disabled:opacity-70"
+                    className="landingButtonDark inline-flex items-center justify-center gap-2 rounded-md bg-[#111111] px-6 py-3.5 font-bold text-white hover:bg-[#10B981] disabled:cursor-not-allowed disabled:opacity-70"
                     onClick={handleCheckout}
                     disabled={checkoutBusy}
                   >

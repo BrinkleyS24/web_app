@@ -765,7 +765,7 @@ export default function Landing() {
             <div className="mt-8">
               <Link
                 to="/upgrade"
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-[#111111] px-6 py-3.5 font-bold text-white transition-colors hover:bg-[#10B981]"
+                className="landingButtonDark inline-flex items-center justify-center gap-2 rounded-md bg-[#111111] px-6 py-3.5 font-bold text-white transition-colors hover:bg-[#10B981]"
               >
                 Start Premium Beta
                 <ArrowRight className="h-4 w-4" />
@@ -892,7 +892,7 @@ export default function Landing() {
                 </p>
                 <a
                   href="mailto:support@applendium.com?subject=Applendium%20Support"
-                  className="mt-5 inline-flex items-center justify-center rounded-md bg-[#111111] px-5 py-3 text-sm font-bold text-white hover:bg-[#10B981]"
+                  className="landingButtonDark mt-5 inline-flex items-center justify-center rounded-md bg-[#111111] px-5 py-3 text-sm font-bold text-white hover:bg-[#10B981]"
                 >
                   Email support
                 </a>
