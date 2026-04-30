@@ -690,8 +690,8 @@ export default function Landing() {
               The extension is the product today.
             </h2>
             <p className="mt-8 max-w-4xl text-lg leading-8 text-gray-600 md:text-[18px]">
-              Premium workflows and the paid dashboard stay intentionally gated until
-              they're ready for a complete release. No waitlists, no half-built dashboards.
+              Premium Beta starts narrowly: Apply Gate for better apply/skip decisions
+              and a weekly search-health summary for your recent momentum.
             </p>
 
             <div className="mt-12 flex items-center gap-3">
@@ -711,7 +711,7 @@ export default function Landing() {
             <div id="premium" className="mt-14 flex items-center gap-3">
               <span className="landingMono inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-[#10B981]">
                 <Lock className="h-3 w-3" />
-                Premium - coming soon
+                Premium Beta
               </span>
               <div className="h-px flex-1 bg-gray-200" />
             </div>
@@ -727,7 +727,7 @@ export default function Landing() {
             </div>
 
             <p className="landingMono mt-6 text-xs uppercase tracking-[0.22em] text-gray-500">
-              Checkout & billing stay disabled until premium is release-ready.
+              Beta access focuses on Apply Gate and weekly search health first.
             </p>
           </div>
         </section>

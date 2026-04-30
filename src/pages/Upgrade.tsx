@@ -1,27 +1,25 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { Clock3 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock3, FileText, ShieldCheck } from "lucide-react";
 import PublicSiteLayout from "../components/PublicSiteLayout.jsx";
 import { useAuth } from "../lib/AuthContext.jsx";
 import usePageMetadata from "../lib/usePageMetadata.js";
+import { apiFetch } from "../lib/api.js";
+import { premiumUpdatesHref } from "../lib/premiumLaunchContent.js";
 import {
-  premiumFeatureCards,
-  premiumUpdatesHref,
-  upgradeStatusCards,
-} from "../lib/premiumLaunchContent.js";
-import {
-  CHROME_EXTENSION_IS_LIVE,
   CHROME_STORE_CTA_LABEL,
   CHROME_WEB_STORE_URL,
 } from "../lib/publicSiteConfig.js";
 
 const Upgrade = () => {
   const { user, loading: authLoading, plan, planLoading, adminEmail } = useAuth();
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
 
   usePageMetadata({
-    title: "Applendium | Premium Status",
+    title: "Applendium | Premium Beta",
     description:
-      "Premium billing is temporarily closed while the Applendium premium dashboard is still in build. Use this page for current status and support paths.",
+      "Start Applendium Premium Beta for Apply Gate decisions and a weekly search-health summary.",
   });
 
   if (!authLoading && !planLoading && user && adminEmail) {
@@ -35,6 +33,34 @@ const Upgrade = () => {
   const sessionLabel = authLoading
     ? "Checking session..."
     : user?.email || "Not signed in";
+  const checkoutDisabled = checkoutBusy || authLoading || planLoading || !user;
+
+  async function startCheckout() {
+    if (!user) {
+      setCheckoutError("Sign in before starting Premium Beta.");
+      return;
+    }
+
+    setCheckoutBusy(true);
+    setCheckoutError("");
+
+    try {
+      const response = await apiFetch("/api/subscriptions/create-checkout-session", {
+        method: "POST",
+        body: { plan: "premium" },
+        timeoutMs: 30000,
+      });
+
+      if (!response?.url) {
+        throw new Error("Checkout did not return a payment link.");
+      }
+
+      window.location.assign(response.url);
+    } catch (error) {
+      setCheckoutError(error instanceof Error ? error.message : "Unable to start checkout.");
+      setCheckoutBusy(false);
+    }
+  }
 
   return (
     <PublicSiteLayout>
@@ -46,24 +72,30 @@ const Upgrade = () => {
           <div className="heroCopy animate-fade-in">
             <div className="launchBadge">
               <Clock3 aria-hidden="true" />
-              <span>
-                {CHROME_EXTENSION_IS_LIVE
-                  ? "Premium purchase flow: temporarily closed"
-                  : "Premium purchase flow: closed while the Chrome listing is in review"}
-              </span>
+              <span>Premium Beta</span>
             </div>
-            <h1 className="heroTitle">The premium dashboard is still in build.</h1>
+            <h1 className="heroTitle">Apply smarter before you spend another hour applying.</h1>
             <p className="heroLead">
-              Billing is intentionally disabled while the premium workspace is being
-              finished. The public product story should stay honest: the Chrome extension
-              is live first, and nobody should be sent through checkout for an unfinished
-              dashboard or a web workspace that is not publicly open yet.
+              Premium Beta starts with Apply Gate and a weekly search-health summary:
+              paste a job, see whether to apply, tailor first, or skip, then review how
+              your search is moving over the last week.
             </p>
 
             <div className="heroActions">
-              <Link className="publicButton publicButtonSecondary" to="/support">
-                Contact support
-              </Link>
+              {user ? (
+                <button
+                  type="button"
+                  className="publicButton publicButtonPrimary"
+                  onClick={startCheckout}
+                  disabled={checkoutDisabled}
+                >
+                  {checkoutBusy ? "Opening checkout..." : "Start Premium Beta"}
+                </button>
+              ) : (
+                <Link className="publicButton publicButtonPrimary" to="/app">
+                  Sign in to start beta
+                </Link>
+              )}
               <a className="publicButton publicButtonSecondary" href={premiumUpdatesHref}>
                 Premium updates
               </a>
@@ -82,6 +114,11 @@ const Upgrade = () => {
                 </Link>
               )}
             </div>
+            {checkoutError ? (
+              <p className="publicHeaderError" role="alert">
+                {checkoutError}
+              </p>
+            ) : null}
 
             <div className="heroMetaGrid">
               <article className="launchMetricCard">
@@ -89,12 +126,12 @@ const Upgrade = () => {
                 <strong className="launchMetricValue">{sessionLabel}</strong>
               </article>
               <article className="launchMetricCard">
-                <span className="statusLabel">Billing</span>
-                <strong className="launchMetricValue">Closed for now</strong>
+                <span className="statusLabel">Beta focus</span>
+                <strong className="launchMetricValue">Apply Gate</strong>
               </article>
               <article className="launchMetricCard">
-                <span className="statusLabel">Dashboard</span>
-                <strong className="launchMetricValue">Coming soon</strong>
+                <span className="statusLabel">Summary</span>
+                <strong className="launchMetricValue">Weekly health</strong>
               </article>
             </div>
           </div>
@@ -103,9 +140,28 @@ const Upgrade = () => {
             className="heroPanel glass-card launchPanel animate-fade-in"
             style={{ animationDelay: "120ms" }}
           >
-            <p className="heroPanelEyebrow">Current premium status</p>
+            <p className="heroPanelEyebrow">What beta includes now</p>
             <div className="launchPanelList">
-              {upgradeStatusCards.map((item) => {
+              {[
+                {
+                  icon: ShieldCheck,
+                  title: "Apply Gate",
+                  body:
+                    "Paste a role and get a direct apply, tailor-first, or skip decision with the main risks and proof gaps.",
+                },
+                {
+                  icon: FileText,
+                  title: "Weekly Search Summary",
+                  body:
+                    "Review the last 7 days of applications, callbacks, interviews, and response-rate signals in one place.",
+                },
+                {
+                  icon: CheckCircle2,
+                  title: "Beta dashboard access",
+                  body:
+                    "Premium also opens the dashboard workspace while newer action-queue and outcome features continue to mature.",
+                },
+              ].map((item) => {
                 const Icon = item.icon;
 
                 return (
@@ -116,7 +172,7 @@ const Upgrade = () => {
                     <div>
                       <div className="launchPanelHeader">
                         <h2>{item.title}</h2>
-                        <span className="launchStateTag launchStateTagSoon">Status</span>
+                        <span className="launchStateTag launchStateTagSoon">Beta</span>
                       </div>
                       <p>{item.body}</p>
                     </div>
@@ -130,16 +186,36 @@ const Upgrade = () => {
 
       <section className="publicSection publicSectionAlt">
         <div className="sectionHeading">
-          <p className="sectionEyebrow">What premium includes</p>
-          <h2>The feature set stays visible, but access waits for the dashboard launch</h2>
+          <p className="sectionEyebrow">Premium Beta scope</p>
+          <h2>Pay for the decisions that are ready, not a vague future dashboard.</h2>
           <p>
-            This page now explains the premium intent without pretending the paid
-            experience can be used today.
+            The beta promise is intentionally narrow: better apply/skip decisions and a
+            clear weekly view of search health. The broader advisor system will grow from
+            there.
           </p>
         </div>
 
         <div className="featureGrid">
-          {premiumFeatureCards.map((card) => {
+          {[
+            {
+              icon: ShieldCheck,
+              title: "Apply Gate",
+              body:
+                "Use before applying to avoid weak-fit roles, identify fixable gaps, and decide whether the role deserves your time.",
+            },
+            {
+              icon: FileText,
+              title: "Weekly Search Summary",
+              body:
+                "See how many applications, callbacks, and interviews happened this week, plus the basic rates that show momentum.",
+            },
+            {
+              icon: ArrowRight,
+              title: "Growing beta workspace",
+              body:
+                "Daily actions, outcome memory, strategy alerts, and outreach drafts are part of the beta workspace and will keep improving.",
+            },
+          ].map((card) => {
             const Icon = card.icon;
 
             return (
@@ -149,7 +225,7 @@ const Upgrade = () => {
                     <Icon />
                   </span>
                   <div>
-                    <p className="launchCardEyebrow">Coming soon</p>
+                    <p className="launchCardEyebrow">Premium Beta</p>
                     <h3>{card.title}</h3>
                   </div>
                 </div>
@@ -163,26 +239,31 @@ const Upgrade = () => {
       <section className="ctaSection">
         <div className="ctaCard">
           <div>
-            <p className="sectionEyebrow">Until premium opens</p>
-            <h2>Use the extension, keep the messaging honest, and point users here for status.</h2>
+            <p className="sectionEyebrow">Ready to try it</p>
+            <h2>Start with the narrow beta and judge it on Apply Gate quality.</h2>
             <p className="ctaNote">
-              This route now works as a launch-status page instead of a checkout page, so
-              signed-in users do not get sold an unfinished dashboard.
+              Checkout shows the current beta price before purchase. Cancel from account
+              settings if the beta is not useful for your search.
             </p>
           </div>
 
           <div className="ctaActions">
-            <Link className="publicButton publicButtonSecondary" to="/">
-              Back to home
-            </Link>
-            <Link className="publicButton publicButtonSecondary" to="/privacy">
-              Privacy policy
-            </Link>
-            <Link className="publicButton publicButtonSecondary" to="/terms">
-              Terms
-            </Link>
-            <Link className="publicButton publicButtonPrimary" to="/support">
-              Support
+            {user ? (
+              <button
+                type="button"
+                className="publicButton publicButtonPrimary"
+                onClick={startCheckout}
+                disabled={checkoutDisabled}
+              >
+                {checkoutBusy ? "Opening checkout..." : "Start Premium Beta"}
+              </button>
+            ) : (
+              <Link className="publicButton publicButtonPrimary" to="/app">
+                Sign in to start beta
+              </Link>
+            )}
+            <Link className="publicButton publicButtonSecondary" to="/support">
+              Ask a question
             </Link>
           </div>
         </div>

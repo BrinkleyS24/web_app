@@ -2,10 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { FileText, Send, ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { FileText, ArrowRight } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { fetchEmailMetrics } from "@/lib/emails";
 
@@ -102,23 +99,11 @@ const WeeklySummary = () => {
         )}
 
         <div className="glass-card rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Delivery Preferences</h3>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex items-center gap-3">
-              <Switch id="dash-summary" defaultChecked />
-              <Label htmlFor="dash-summary" className="text-sm text-muted-foreground">Show in dashboard</Label>
-            </div>
-            <div className="flex items-center gap-3">
-              <Switch id="email-summary" />
-              <Label htmlFor="email-summary" className="text-sm text-muted-foreground">Email every Monday</Label>
-            </div>
-          </div>
+          <h3 className="text-sm font-semibold text-foreground mb-2">Beta note</h3>
+          <p className="text-sm text-muted-foreground">
+            This is an in-app summary. Scheduled email delivery is not part of the current beta.
+          </p>
         </div>
-
-        <Button variant="outline" className="text-sm gap-2" disabled={!isAuthed}>
-          <Send className="w-4 h-4" />
-          Send to My Email Now
-        </Button>
       </div>
     </DashboardLayout>
   );

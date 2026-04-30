@@ -8,6 +8,8 @@ import Support from "./pages/Support.jsx";
 import Account from "./pages/Account.jsx";
 import Dashboard from "./pages/DashboardNew.tsx";
 import Upgrade from "./pages/Upgrade.tsx";
+import PaymentSuccess from "./pages/PaymentSuccess.tsx";
+import PaymentCancel from "./pages/PaymentCancel.tsx";
 import ApplyGate from "./pages/ApplyGate.tsx";
 import FixSuggestions from "./pages/FixSuggestions.tsx";
 import OutcomeMemory from "./pages/OutcomeMemory.tsx";
@@ -108,8 +110,9 @@ export default function App() {
     location.pathname.startsWith(route)
   );
   const isUpgrade = location.pathname.startsWith("/upgrade");
+  const isPayment = location.pathname.startsWith("/payment");
   const isPublicSite = location.pathname === "/" || location.pathname === "/privacy" || location.pathname === "/terms" || location.pathname === "/support";
-  const containerClass = (isDashboard || isUpgrade)
+  const containerClass = (isDashboard || isUpgrade || isPayment)
     ? "container container--full"
     : (isPublicSite ? "container container--full" : "container");
 
@@ -146,6 +149,8 @@ export default function App() {
                 path="/upgrade"
                 element={<Upgrade />}
               />
+              <Route path="/payment/success" element={<PaymentSuccess />} />
+              <Route path="/payment/cancel" element={<PaymentCancel />} />
               <Route
                 path="/apply-gate"
                 element={

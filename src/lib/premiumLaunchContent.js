@@ -52,10 +52,10 @@ export function getLaunchStatusItems(isExtensionLive) {
     },
     {
       icon: LayoutDashboard,
-      state: isExtensionLive ? "Coming soon" : "Closed for now",
-      title: "Premium dashboard",
+      state: isExtensionLive ? "Beta" : "Closed for now",
+      title: "Premium Beta",
       body:
-        "Advanced review workflows and premium analytics stay intentionally closed until the paid dashboard can support a complete public release.",
+        "Apply Gate and weekly search-health summaries are the first paid beta slice while the broader advisor workspace matures.",
     },
   ];
 }
@@ -169,20 +169,20 @@ export function getRolloutSteps(isExtensionLive) {
 export const upgradeStatusCards = [
   {
     icon: Sparkles,
-    title: "Why checkout is disabled",
+    title: "Why beta is narrow",
     body:
-      "Premium stays closed until the dashboard experience is ready to support real users end to end.",
+      "Premium starts with Apply Gate and weekly search health instead of over-selling the full advisor roadmap.",
   },
   {
     icon: LayoutDashboard,
-    title: "What is still in build",
+    title: "What is still maturing",
     body:
-      "Dashboard review flows, premium analytics, and the paid experience are being finished before launch.",
+      "Daily actions, outcome memory, strategy alerts, and outreach workflows are part of the beta workspace and will keep improving.",
   },
   {
     icon: ShieldCheck,
-    title: "What stays available",
+    title: "What checkout unlocks",
     body:
-      "The extension, support surface, and account access remain available while premium is staged behind the scenes.",
+      "Premium unlocks the gated web workspace after Stripe confirms the subscription.",
   },
 ];

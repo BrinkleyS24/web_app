@@ -14,6 +14,10 @@ vi.mock("../lib/usePageMetadata.js", () => ({
   default: () => undefined,
 }));
 
+vi.mock("../lib/api.js", () => ({
+  apiFetch: vi.fn(),
+}));
+
 vi.mock("../lib/premiumLaunchContent.js", () => ({
   premiumUpdatesHref: "mailto:support@example.test",
   premiumFeatureCards: [],
@@ -49,7 +53,7 @@ describe("Upgrade", () => {
     expect(await screen.findByText("Dashboard Route")).toBeInTheDocument();
   });
 
-  test("renders the premium status page for non-premium sessions", async () => {
+  test("renders the premium beta checkout page for non-premium sessions", async () => {
     useAuth.mockReturnValue({
       user: { email: "free@example.test" },
       loading: false,
@@ -59,7 +63,8 @@ describe("Upgrade", () => {
 
     renderPage();
 
-    expect(await screen.findByText("The premium dashboard is still in build.")).toBeInTheDocument();
+    expect(await screen.findByText("Apply smarter before you spend another hour applying.")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Start Premium Beta" })[0]).toBeInTheDocument();
     expect(screen.getByText("free@example.test")).toBeInTheDocument();
   });
 });
