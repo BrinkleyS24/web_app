@@ -145,6 +145,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
 });
 
 describe("ApplyGate current UI", () => {
@@ -174,6 +175,83 @@ describe("ApplyGate current UI", () => {
     expect(container).toMatchSnapshot();
   });
 
+  test("uses displayDecision as the single visible decision when the contract flag is enabled", async () => {
+    vi.stubEnv("VITE_APPLY_GATE_DISPLAY_DECISION_V1", "true");
+    analyzeJobAlignment.mockResolvedValue({
+      ...baseResult,
+      verdict: "not_recommended",
+      explanation: {
+        decision: "skip",
+        display_decision: {
+          version: 1,
+          action: "FIX_THEN_APPLY",
+          label: "Fix before applying",
+          headline: "Fix first before applying",
+          subtext: "This is an aligned role, but the shown tenure needs clearer proof before applying.",
+          renderMode: "EXPANDED",
+          legacyDecision: "fix_first",
+          status: "risky",
+          source: "STRONG_MATCH_FLOOR",
+          diagnostics: {
+            arbitrationSource: "STRONG_MATCH_FLOOR",
+            aiConstraint: null,
+            subtextSuppressed: false,
+            hardBlocker: false,
+            legacy: {
+              strategicDecision: "SKIP",
+              finalVerdict: "not_recommended",
+              legacyDecision: "skip",
+            },
+          },
+        },
+      },
+      displayDecision: {
+        version: 1,
+        action: "FIX_THEN_APPLY",
+        label: "Fix before applying",
+        headline: "Fix first before applying",
+        subtext: "This is an aligned role, but the shown tenure needs clearer proof before applying.",
+        renderMode: "EXPANDED",
+        legacyDecision: "fix_first",
+        status: "risky",
+        source: "STRONG_MATCH_FLOOR",
+      },
+    });
+    renderPage();
+
+    await runAnalyze({ jobTitle: "Software Engineer in Test (SDET)", companyName: "NAVA" });
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Fix first before applying" })).toBeInTheDocument();
+      expect(screen.getByText("Recommended move: Fix before applying")).toBeInTheDocument();
+      expect(screen.getByText("This is an aligned role, but the shown tenure needs clearer proof before applying.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "I'll fix first" })).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Recommended move: Skip this posting")).not.toBeInTheDocument();
+  });
+
+  test("uses a safe degraded state when displayDecision is missing behind the contract flag", async () => {
+    vi.stubEnv("VITE_APPLY_GATE_DISPLAY_DECISION_V1", "true");
+    analyzeJobAlignment.mockResolvedValue({
+      ...baseResult,
+      verdict: "strong_fit",
+      explanation: {
+        decision: "apply_now",
+      },
+    });
+    renderPage();
+
+    await runAnalyze({ jobTitle: "QA Automation Engineer" });
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Decision unavailable" })).toBeInTheDocument();
+      expect(screen.getByText("Fit label: Decision unavailable")).toBeInTheDocument();
+      expect(screen.getByText("Apply Gate could not produce a consistent decision for this role. Review it manually before acting.")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Recommended move: Apply now")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Apply now" })).not.toBeInTheDocument();
+  });
+
   test("leads with skip when backend marks a risky hard-gate role as skip", async () => {
     analyzeJobAlignment.mockResolvedValue({
       ...baseResult,
@@ -184,6 +262,13 @@ describe("ApplyGate current UI", () => {
           "This posting has hard eligibility requirements not shown in your resume: Nurse's Aide experience, phlebotomy program completion, and BCLS / Basic Cardiac Life Support certification.",
         ],
         assessment_confidence: "high",
+        decision_confidence: "High",
+        decision_confidence_details: {
+          level: "High",
+          sampleSize: 0,
+          conflictCount: 0,
+          factors: ["A true hard blocker gives the recommendation a clearer boundary."],
+        },
         uncertainty_notes: [],
         requirement_ledger: {
           version: 1,
@@ -284,7 +369,252 @@ describe("ApplyGate current UI", () => {
       expect(screen.getByText("Requirement check")).toBeInTheDocument();
       expect(screen.getByText("Nurse's Aide experience")).toBeInTheDocument();
       expect(screen.getByText(/Apply anyway only if you already meet these requirements/i)).toBeInTheDocument();
-      expect(screen.getByText(/Decision confidence:/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/Decision confidence:/i).length).toBeGreaterThan(0);
+    });
+  });
+
+  test("compresses high-confidence clear mismatches to one primary reason", async () => {
+    const primaryReason = "This role requires commercial construction site supervision. Your background is software QA, so this is a different career track.";
+    analyzeJobAlignment.mockResolvedValue({
+      ...baseResult,
+      verdict: "risky",
+      jobTitle: "Construction Site Supervisor",
+      companyName: "Gregor Industries",
+      reasons: [
+        "Missing OSHA 30 certification.",
+        "Missing commercial construction supervisory experience.",
+      ],
+      explanation: {
+        decision: "skip",
+        decision_label: "CLEAR_MISMATCH",
+        decision_confidence: "High",
+        primary_reason: primaryReason,
+        primary_driver_detail: {
+          type: "HARD_DOMAIN_MISMATCH_WITH_REQUIRED_DOMAIN_EXPERIENCE_NOT_SHOWN",
+          label: "Commercial construction in a Supervisory role",
+          reason: primaryReason,
+          priority: 2,
+          requirementType: "DOMAIN_EXPERIENCE",
+        },
+        requirement_ledger: {
+          version: 1,
+          source: "deterministic",
+          summary: {
+            hard_total: 2,
+            hard_missing: 2,
+            hard_unclear: 0,
+            blocking_labels: ["Commercial construction in a Supervisory role", "OSHA 30 certification"],
+          },
+          items: [
+            {
+              id: "domain_experience:construction_supervisor",
+              type: "domain_experience",
+              requirement_type: "DOMAIN_EXPERIENCE",
+              label: "Commercial construction in a Supervisory role",
+              priority: "hard",
+              source_sentence: "Minimum 3+ years experience in Commercial construction in a Supervisory role.",
+              candidate_status: "missing",
+              confidence: "high",
+              blocks_application: true,
+            },
+            {
+              id: "certification:osha_30",
+              type: "certification",
+              requirement_type: "CERTIFICATION",
+              label: "OSHA 30 certification",
+              priority: "hard",
+              source_sentence: "OSHA 30 required.",
+              candidate_status: "missing",
+              confidence: "high",
+              blocks_application: true,
+            },
+          ],
+        },
+        action_plan: {
+          quick_fixes: ["Do not apply unless this proof is missing from the resume."],
+          resume_proof_improvements: ["Add construction supervision evidence only if you already have it."],
+          long_term_gaps: ["Build construction field supervision evidence first."],
+          not_fixable_for_this_posting: ["This is not a quick tailoring issue."],
+        },
+      },
+      scoringBreakdown: {
+        ...baseResult.scoringBreakdown,
+        decisionLabel: "CLEAR_MISMATCH",
+        primaryDriver: {
+          type: "HARD_DOMAIN_MISMATCH_WITH_REQUIRED_DOMAIN_EXPERIENCE_NOT_SHOWN",
+          label: "Commercial construction in a Supervisory role",
+          reason: primaryReason,
+          priority: 2,
+          requirementType: "DOMAIN_EXPERIENCE",
+        },
+      },
+    });
+    renderPage();
+
+    await runAnalyze({ jobTitle: "Construction Site Supervisor" });
+
+    await waitFor(() => {
+      expect(screen.getAllByText(primaryReason)).toHaveLength(1);
+    });
+    expect(screen.queryByText("Why this recommendation")).not.toBeInTheDocument();
+    expect(screen.queryByText("Requirement check")).not.toBeInTheDocument();
+    expect(screen.queryByText("How to improve your odds")).not.toBeInTheDocument();
+  });
+
+  test("compresses aligned stretch decisions to the seniority driver", async () => {
+    const primaryReason = "This is an aligned role, but it is calibrated above your shown tenure: 6+ years requested vs ~1.6 years shown.";
+    analyzeJobAlignment.mockResolvedValue({
+      ...baseResult,
+      verdict: "potential_fit",
+      jobTitle: "Software Development Engineer in Test (SDET)",
+      companyName: "Foodsmart",
+      missingSkills: ["appium"],
+      reasons: [
+        "Missing required skills: appium.",
+        "Experience appears below the stated minimum.",
+      ],
+      explanation: {
+        decision: "apply_now",
+        decision_label: "STRETCH",
+        decision_confidence: "Medium",
+        primary_reason: primaryReason,
+        primary_driver_detail: {
+          type: "SENIORITY_GAP",
+          label: "6+ years experience",
+          reason: primaryReason,
+          priority: 5.5,
+        },
+        requirement_ledger: {
+          version: 1,
+          source: "deterministic",
+          summary: {
+            hard_total: 3,
+            hard_missing: 1,
+            hard_unclear: 0,
+            blocking_labels: ["Appium"],
+          },
+          items: [
+            {
+              id: "tool:appium",
+              type: "tool",
+              requirement_type: "TOOL",
+              label: "Appium",
+              priority: "hard",
+              source_sentence: "Experience with Selenium, Cypress, Appium, TestNG, JUnit, Protractor, and playwright.",
+              candidate_status: "missing",
+              confidence: "medium",
+              blocks_application: false,
+            },
+          ],
+        },
+      },
+      scoringBreakdown: {
+        ...baseResult.scoringBreakdown,
+        hardBlocker: false,
+        decisionLabel: "STRETCH",
+        applicationRiskScore: 42,
+        primaryDriver: {
+          type: "SENIORITY_GAP",
+          label: "6+ years experience",
+          reason: primaryReason,
+          priority: 5.5,
+        },
+      },
+    });
+    renderPage();
+
+    await runAnalyze({ jobTitle: "Software Development Engineer in Test (SDET)", companyName: "Foodsmart" });
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Apply, but tailor first" })).toBeInTheDocument();
+      expect(screen.getByText(primaryReason)).toBeInTheDocument();
+      expect(screen.getByText("Fit label: Stretch aligned")).toBeInTheDocument();
+      expect(screen.getByText("Recommended move: Apply, but tailor first")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Apply, tailored" })).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Requirement check")).not.toBeInTheDocument();
+    expect(screen.queryByText("How to improve your odds")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Missing required skills/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Recommended move: Apply now")).not.toBeInTheDocument();
+  });
+
+  test("does not render empty search memory response time", async () => {
+    analyzeJobAlignment.mockResolvedValue({
+      ...baseResult,
+      explanation: {
+        search_memory: {
+          version: 1,
+          mode: "descriptive",
+          confidence: "low",
+          sampleSize: 0,
+          noResponseWindowDays: 21,
+          similarRoles: [],
+          commonSkills: [],
+          outcomeSummary: {
+            similarRoleCount: 0,
+            interviewed: 0,
+            offered: 0,
+            rejected: 0,
+            noResponse: 0,
+            interviewRate: 0,
+            rejectionRate: 0,
+            noResponseRate: 0,
+            medianDaysToResponse: "",
+            medianDaysToInterview: null,
+            medianDaysToRejection: null,
+          },
+          patternSignals: ["No similar tracked roles were found yet."],
+        },
+      },
+    });
+    renderPage();
+
+    await runAnalyze();
+
+    await waitFor(() => {
+      expect(screen.getByText("Search memory")).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Median response time:/i)).not.toBeInTheDocument();
+  });
+
+  test("leads skip results with a memory-backed behavioral warning", async () => {
+    analyzeJobAlignment.mockResolvedValue({
+      ...baseResult,
+      verdict: "not_recommended",
+      explanation: {
+        decision: "skip",
+        search_memory: {
+          version: 1,
+          mode: "descriptive",
+          confidence: "weak",
+          sampleSize: 8,
+          noResponseWindowDays: 21,
+          similarRoles: [],
+          commonSkills: [],
+          outcomeSummary: {
+            similarRoleCount: 8,
+            interviewed: 0,
+            offered: 0,
+            rejected: 0,
+            noResponse: 8,
+            interviewRate: 0,
+            rejectionRate: 0,
+            noResponseRate: 1,
+            medianDaysToResponse: "",
+            medianDaysToInterview: null,
+            medianDaysToRejection: null,
+          },
+          patternSignals: ["Similar tracked roles have not received responses yet."],
+        },
+      },
+    });
+    renderPage();
+
+    await runAnalyze();
+
+    await waitFor(() => {
+      expect(screen.getByText("Skip this. You've tried 8 similar roles and 8 got no response.")).toBeInTheDocument();
+      expect(screen.getByText("Search memory: 8 similar roles - 8 no responses")).toBeInTheDocument();
     });
   });
 
@@ -320,8 +650,26 @@ describe("ApplyGate current UI", () => {
         jobTitle: "Automation Engineer",
         companyName: "Acme Robotics",
         jobDescription: "Requires PLC and controls experience.",
+        riskTolerance: "balanced",
       });
       expect(screen.getByText("Acme Robotics")).toBeInTheDocument();
+    });
+  });
+
+  test("passes selected apply style as risk tolerance", async () => {
+    analyzeJobAlignment.mockResolvedValue(baseResult);
+    renderPage();
+
+    await userEvent.selectOptions(screen.getByLabelText("Apply style"), "aggressive");
+    await runAnalyze();
+
+    await waitFor(() => {
+      expect(analyzeJobAlignment).toHaveBeenCalledWith({
+        jobTitle: "Automation Engineer",
+        companyName: "",
+        jobDescription: "Requires PLC and controls experience.",
+        riskTolerance: "aggressive",
+      });
     });
   });
 
@@ -465,6 +813,9 @@ describe("ApplyGate current UI", () => {
           feedback: expect.objectContaining({
             surface: "current_result",
             action_label: "fixed",
+            recommended_action: "fixed",
+            recommendation_override: false,
+            override_type: null,
             status: "risky",
             recommendation: "Fix before applying",
             risk_percent: 92,
@@ -474,6 +825,50 @@ describe("ApplyGate current UI", () => {
             score: 44,
             decision: null,
             hard_blocker: true,
+          }),
+        },
+      );
+    });
+  });
+
+  test("marks recommendation overrides when the user applies against a skip decision", async () => {
+    analyzeJobAlignment.mockResolvedValue({
+      ...baseResult,
+      explanation: {
+        decision: "skip",
+        decision_confidence: "Low",
+        calibration_bucket: {
+          version: 1,
+          domainAlignment: "ADJACENT",
+          evidenceStrength: "WEAK",
+          strategicDecision: "SKIP",
+          riskTolerance: "balanced",
+          atsPass: "Low",
+          humanWin: "Medium",
+          decisionConfidence: "Low",
+        },
+      },
+    });
+    renderPage();
+
+    await runAnalyze();
+    await userEvent.click(await screen.findByRole("button", { name: "Apply anyway" }));
+
+    await waitFor(() => {
+      expect(updateApplyGateAction).toHaveBeenCalledWith(
+        "verdict-123",
+        "applied",
+        {
+          feedback: expect.objectContaining({
+            action_label: "applied",
+            recommendation: "Skip this posting",
+            recommended_action: "skipped",
+            recommendation_override: true,
+            override_type: "expected_skipped_user_applied",
+            calibration_bucket: expect.objectContaining({
+              strategicDecision: "SKIP",
+              decisionConfidence: "Low",
+            }),
           }),
         },
       );

@@ -60,6 +60,11 @@ export default function Settings() {
   const [busyPortal, setBusyPortal] = useState(false);
 
   async function fetchSubStatus() {
+    if (!user) {
+      setSubStatus(null);
+      return;
+    }
+
     setSubError("");
     setSubLoading(true);
     try {
@@ -91,21 +96,24 @@ export default function Settings() {
   }
 
   useEffect(() => {
+    if (!user) return;
     fetchSubStatus();
-  }, []);
+  }, [user?.uid]);
 
   async function handleSignOut() {
     await logout();
-    navigate("/app");
+    navigate("/upgrade", { replace: true });
   }
 
   const subscription = subStatus?.subscription || null;
   const effectivePlan = subscription?.plan || plan;
   const isPremium = effectivePlan === "premium";
-  const isActive = subscription?.status === "active" || subscription?.status === "trialing";
-  const statusLabel = subscription?.status || (subLoading ? "loading" : "inactive");
+  const isActive = subscription
+    ? subscription.status === "active" || subscription.status === "trialing"
+    : isPremium;
+  const statusLabel = subscription?.status || (subLoading ? "loading" : isPremium ? "active" : "inactive");
   const renewalDate = formatDate(subscription?.current_period_end);
-  const monthlyLimit = subStatus?.quotaData?.limit;
+  const monthlyLimit = subStatus?.quotaData?.limit ?? (isPremium ? 10000 : 100);
   const monthlyProcessed = subStatus?.quotaData?.monthlyProcessed ?? 0;
   const billingPortalAvailable = Boolean(subscription?.billingPortalAvailable);
 

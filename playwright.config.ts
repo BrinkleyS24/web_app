@@ -35,7 +35,7 @@ export default defineConfig({
     reuseExistingServer: true,
     env: {
       VITE_DEV_AUTH_BYPASS: "true",
-      VITE_DEV_AUTH_EMAIL: "brinkleystacey12@gmail.com",
+      VITE_DEV_AUTH_EMAIL: "candidate@example.test",
       VITE_DEV_AUTH_UID: "playwright-premium-user",
       VITE_API_BASE_URL: "http://127.0.0.1:4010",
       VITE_CACHE_DIR: viteCacheDir,

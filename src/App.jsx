@@ -1,7 +1,7 @@
 import React from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import Home from "./pages/Home.jsx";
 import Landing from "./pages/Landing.jsx";
+import Privacy from "./pages/Privacy.jsx";
 import Terms from "./pages/Terms.jsx";
 import Upgrade from "./pages/Upgrade.jsx";
 import Dashboard from "./pages/DashboardNew.tsx";
@@ -55,7 +55,7 @@ function RequireNonAdminUser({ children }) {
   const { user, loading, planLoading, adminEmail } = useAuth();
 
   if (loading || planLoading) return <LoadingScreen />;
-  if (!user) return <Navigate to="/app" replace />;
+  if (!user) return <Navigate to="/upgrade" replace />;
   if (adminEmail) return <Navigate to="/admin/review" replace />;
 
   return children;
@@ -65,7 +65,7 @@ function RequirePremiumUser({ children }) {
   const { user, loading, plan, planLoading, planError, adminEmail } = useAuth();
 
   if (loading || planLoading) return <LoadingScreen />;
-  if (!user) return <Navigate to="/app" replace />;
+  if (!user) return <Navigate to="/upgrade" replace />;
   if (adminEmail) return <Navigate to="/admin/review" replace />;
 
   if (planError && plan !== "premium") {
@@ -92,7 +92,7 @@ function RequireAdminEmail({ children }) {
   if (loading || planLoading) return <LoadingScreen />;
 
   if (!user) {
-    return <Navigate to="/app" replace />;
+    return <Navigate to="/upgrade" replace />;
   }
 
   if (!adminEmail) {
@@ -122,8 +122,8 @@ export default function App() {
           <div className={containerClass}>
             <Routes>
               <Route path="/" element={<Landing />} />
-              <Route path="/app" element={<Home />} />
-              <Route path="/privacy" element={<Navigate to="/#privacy" replace />} />
+              <Route path="/app" element={<Navigate to="/upgrade" replace />} />
+              <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/upgrade" element={<Upgrade />} />
               <Route path="/support" element={<Navigate to="/#support" replace />} />

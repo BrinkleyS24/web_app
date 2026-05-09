@@ -88,7 +88,7 @@ export const premiumFeatureCards = [
     icon: ShieldCheck,
     title: "Apply Gate",
     body:
-      "Run one pre-apply decision brief that combines fit review, likely rejection risks, and fix-first guidance before you spend time applying.",
+      "Premium-only pre-apply decisions that combine fit review, search memory, and fix-first guidance before you spend time applying.",
   },
   {
     icon: Wrench,
@@ -171,7 +171,7 @@ export const upgradeStatusCards = [
     icon: Sparkles,
     title: "Why beta is narrow",
     body:
-      "Premium starts with Apply Gate and weekly search health instead of over-selling the full advisor roadmap.",
+      "The free Chrome extension tracks applications. Premium starts with Apply Gate and weekly search health instead of over-selling the full advisor roadmap.",
   },
   {
     icon: LayoutDashboard,

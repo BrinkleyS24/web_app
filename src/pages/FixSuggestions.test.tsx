@@ -282,7 +282,7 @@ beforeEach(() => {
   dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(new Date("2026-04-11T12:00:00.000Z").getTime());
 
   useAuth.mockReturnValue({
-    user: { email: "brinkleystacey12@gmail.com" },
+    user: { email: "candidate@example.test" },
     loading: false,
   });
 

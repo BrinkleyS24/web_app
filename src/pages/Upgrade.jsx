@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import AuthButton from "../components/AuthButton.jsx";
 import { useAuth } from "../lib/AuthContext.jsx";
+import { getApiBaseUrl } from "../lib/api.js";
 import { startPremiumCheckout } from "../lib/premiumCheckout.js";
 import usePageMetadata from "../lib/usePageMetadata.js";
 import { CHROME_WEB_STORE_URL } from "../lib/publicSiteConfig.js";
@@ -59,10 +60,27 @@ function BrandHeader() {
 }
 
 export default function Upgrade() {
-  const { user, loading, plan, planLoading } = useAuth();
+  const { user, loading, plan, planLoading, planError, accountStatus } = useAuth();
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
   const isPremium = plan === "premium";
+  const authReady = !loading && !planLoading;
+  const isLocalDevWorkspace =
+    import.meta.env.DEV
+    && typeof window !== "undefined"
+    && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  const showLocalPremiumDiagnostic = isLocalDevWorkspace && authReady && user && !isPremium;
+  const signedInEmail = accountStatus?.authenticatedEmail || user?.email || "unknown";
+  const apiBaseUrl = getApiBaseUrl() || "(not configured)";
+  const signedInEmailNormalized = String(signedInEmail || "").trim().toLowerCase();
+  const shouldBlockLocalCheckout =
+    showLocalPremiumDiagnostic
+    && (
+      Boolean(planError)
+      || accountStatus?.planSource === "verification_failed"
+      || accountStatus?.permanentPremium
+      || signedInEmailNormalized === "brinkleystacey12@gmail.com"
+    );
 
   usePageMetadata({
     title: "Applendium | Premium Beta",
@@ -79,8 +97,6 @@ export default function Upgrade() {
       setCheckoutBusy(false);
     }
   }
-
-  const authReady = !loading && !planLoading;
 
   return (
     <div className="landingPage min-h-screen bg-[#fdfdfc] text-[#111111]">
@@ -122,6 +138,14 @@ export default function Upgrade() {
                     Open dashboard
                     <ArrowRight className="h-4 w-4" />
                   </Link>
+                ) : user && shouldBlockLocalCheckout ? (
+                  <button
+                    type="button"
+                    className="landingButtonDark inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-md bg-[#111111] px-6 py-3.5 font-bold text-white opacity-70"
+                    disabled
+                  >
+                    Resolve local plan check
+                  </button>
                 ) : user ? (
                   <button
                     type="button"
@@ -153,6 +177,37 @@ export default function Upgrade() {
                 <p className="mt-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700" role="alert">
                   {checkoutError}
                 </p>
+              ) : null}
+
+              {showLocalPremiumDiagnostic ? (
+                <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+                  <p className="font-bold">Local premium check did not resolve as premium.</p>
+                  <dl className="mt-2 grid gap-1 text-xs sm:grid-cols-[140px_1fr]">
+                    <dt className="font-semibold">Signed in as</dt>
+                    <dd className="break-all">{signedInEmail}</dd>
+                    <dt className="font-semibold">API base</dt>
+                    <dd className="break-all">{apiBaseUrl}</dd>
+                    <dt className="font-semibold">Backend plan</dt>
+                    <dd>{plan || "unknown"}</dd>
+                    <dt className="font-semibold">Plan source</dt>
+                    <dd>{accountStatus?.planSource || "unknown"}</dd>
+                    <dt className="font-semibold">Permanent premium</dt>
+                    <dd>{accountStatus?.permanentPremium ? "yes" : "no"}</dd>
+                    {accountStatus?.requestId ? (
+                      <>
+                        <dt className="font-semibold">Request ID</dt>
+                        <dd className="break-all">{accountStatus.requestId}</dd>
+                      </>
+                    ) : null}
+                  </dl>
+                  {planError ? (
+                    <p className="mt-2 text-xs font-semibold">Plan verification error: {planError}</p>
+                  ) : null}
+                  <p className="mt-2 text-xs leading-5">
+                    If this should be the permanent premium account, restart the local backend after the latest code changes and refresh.
+                    If the email above is different, sign out and choose brinkleystacey12@gmail.com.
+                  </p>
+                </div>
               ) : null}
             </div>
 

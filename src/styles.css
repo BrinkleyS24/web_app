@@ -55,6 +55,35 @@
   --text: hsl(215 25% 12%);
 }
 
+.page--legal {
+  min-height: 100vh;
+  padding: 56px 20px 72px;
+  background: #f8fafc;
+}
+
+.legal-shell {
+  width: min(880px, 100%);
+  margin: 0 auto;
+  color: #0f172a;
+}
+
+.legal-shell h1 {
+  margin: 0 0 8px;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.05;
+}
+
+.legal-shell h2 {
+  margin: 32px 0 10px;
+  font-size: 1.1rem;
+}
+
+.legal-shell p {
+  max-width: 76ch;
+  line-height: 1.7;
+  color: #334155;
+}
+
 * {
   box-sizing: border-box;
 }

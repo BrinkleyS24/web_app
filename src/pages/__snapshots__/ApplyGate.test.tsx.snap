@@ -86,6 +86,41 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
         >
           <label
             class="text-sm font-medium text-foreground"
+            for="risk-tolerance"
+          >
+            Apply style
+          </label>
+          <select
+            class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            id="risk-tolerance"
+          >
+            <option
+              value="balanced"
+            >
+              Balanced
+            </option>
+            <option
+              value="conservative"
+            >
+              Conservative
+            </option>
+            <option
+              value="aggressive"
+            >
+              Aggressive
+            </option>
+          </select>
+          <p
+            class="text-xs text-muted-foreground"
+          >
+            Default. Separates clear skips from realistic strategy plays.
+          </p>
+        </div>
+        <div
+          class="space-y-2"
+        >
+          <label
+            class="text-sm font-medium text-foreground"
             for="job-description"
           >
             Job Description
@@ -138,7 +173,12 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
             Fix first before applying
           </h2>
           <p
-            class="mt-1 text-sm leading-relaxed"
+            class="mt-1 text-sm font-medium leading-relaxed"
+          >
+            Fix this first. Required education level is missing
+          </p>
+          <p
+            class="mt-1 text-xs leading-relaxed opacity-80"
           >
             A hard blocker or major proof gap is visible. Fix the strongest issue before this becomes another low-probability application.
           </p>
@@ -165,17 +205,6 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
             Recommended move: 
             Fix before applying
           </span>
-          <span
-            class="text-muted-foreground"
-          >
-            Application risk: 
-            <span
-              class="text-red-500"
-            >
-              92
-              %
-            </span>
-          </span>
         </div>
         <div
           class="rounded-lg border border-border/70 bg-background/70 p-3 space-y-2"
@@ -186,7 +215,7 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
             <p
               class="text-xs font-semibold text-foreground"
             >
-              Risk breakdown
+              Why this recommendation
             </p>
             <span
               class="text-xs text-muted-foreground"
@@ -208,12 +237,6 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
                 >
                   Education or training fit
                 </p>
-                <span
-                  class="text-xs font-semibold text-red-500"
-                >
-                  92
-                  %
-                </span>
               </div>
               <p
                 class="mt-1 text-xs text-muted-foreground leading-relaxed"
@@ -232,12 +255,6 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
                 >
                   Required evidence coverage
                 </p>
-                <span
-                  class="text-xs font-semibold text-red-500"
-                >
-                  80
-                  %
-                </span>
               </div>
               <p
                 class="mt-1 text-xs text-muted-foreground leading-relaxed"

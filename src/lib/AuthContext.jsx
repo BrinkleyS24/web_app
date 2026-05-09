@@ -55,6 +55,7 @@ const AuthContext = createContext({
   plan: null,
   planLoading: true,
   planError: "",
+  accountStatus: null,
   adminEmail: false,
   debugRoutesEnabled: false,
   debugAdminAccess: false,
@@ -87,6 +88,15 @@ export function AuthProvider({ children }) {
   const [plan, setPlan] = useState(isLocalDevBypass ? "premium" : null);
   const [planLoading, setPlanLoading] = useState(!isLocalDevBypass);
   const [planError, setPlanError] = useState("");
+  const [accountStatus, setAccountStatus] = useState(
+    isLocalDevBypass
+      ? {
+          authenticatedEmail: DEV_AUTH_BYPASS_EMAIL,
+          permanentPremium: true,
+          planSource: "local_dev_bypass",
+        }
+      : null
+  );
   const [adminEmail, setAdminEmail] = useState(isLocalDevBypass && DEV_AUTH_BYPASS_ADMIN);
   const [debugRoutesEnabled, setDebugRoutesEnabled] = useState(isLocalDevBypass && DEV_AUTH_BYPASS_ADMIN);
   const [debugAdminAccess, setDebugAdminAccess] = useState(isLocalDevBypass && DEV_AUTH_BYPASS_ADMIN);
@@ -133,6 +143,7 @@ export function AuthProvider({ children }) {
     setPlan(null);
     setPlanLoading(false);
     setPlanError("");
+    setAccountStatus(null);
     setAdminEmail(false);
     setDebugRoutesEnabled(false);
     setDebugAdminAccess(false);
@@ -252,6 +263,11 @@ export function AuthProvider({ children }) {
       setPlan("premium");
       setPlanLoading(false);
       setPlanError("");
+      setAccountStatus({
+        authenticatedEmail: DEV_AUTH_BYPASS_EMAIL,
+        permanentPremium: true,
+        planSource: "local_dev_bypass",
+      });
       setAdminEmail(DEV_AUTH_BYPASS_ADMIN);
       setDebugRoutesEnabled(DEV_AUTH_BYPASS_ADMIN);
       setDebugAdminAccess(DEV_AUTH_BYPASS_ADMIN);
@@ -262,6 +278,7 @@ export function AuthProvider({ children }) {
       setPlan(null);
       setPlanLoading(false);
       setPlanError("");
+      setAccountStatus(null);
       setAdminEmail(false);
       setDebugRoutesEnabled(false);
       setDebugAdminAccess(false);
@@ -278,6 +295,12 @@ export function AuthProvider({ children }) {
         if (data?.plan) {
           setPlan(data.plan);
         }
+        setAccountStatus({
+          authenticatedEmail: data?.authenticatedEmail || user.email || null,
+          permanentPremium: Boolean(data?.permanentPremium),
+          planSource: data?.planSource || "unknown",
+          requestId: data?.requestId || null,
+        });
         setAdminEmail(Boolean(data?.adminEmail));
         setDebugRoutesEnabled(Boolean(data?.debugRoutesEnabled));
         setDebugAdminAccess(Boolean(data?.debugAdminAccess));
@@ -289,6 +312,13 @@ export function AuthProvider({ children }) {
         if (cancelled) return;
         setPlanLoading(false);
         setPlanError(error instanceof Error ? error.message : "Failed to load user plan.");
+        setAccountStatus({
+          authenticatedEmail: user.email || null,
+          permanentPremium: false,
+          planSource: "verification_failed",
+          status: error?.status || null,
+          requestId: error?.payload?.requestId || null,
+        });
         setAdminEmail(false);
         setDebugRoutesEnabled(false);
         setDebugAdminAccess(false);
@@ -309,6 +339,7 @@ export function AuthProvider({ children }) {
       plan,
       planLoading,
       planError,
+      accountStatus,
       adminEmail,
       debugRoutesEnabled,
       debugAdminAccess,

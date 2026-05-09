@@ -601,6 +601,8 @@ export type ApplyGateRequirementLedgerItem = {
   id: string;
   source_key?: string | null;
   type: string;
+  requirement_type?: string | null;
+  requirementType?: string | null;
   label: string;
   priority: "hard" | "preferred" | string;
   source_sentence: string;
@@ -663,6 +665,273 @@ export type ApplyGateOccupationGrounding = {
   matchedFamilies?: string[];
 };
 
+export type ApplyGateStrategicDecision = "APPLY" | "APPLY_WITH_STRATEGY" | "FIX_THEN_APPLY" | "SKIP";
+export type ApplyGateDisplayDecision = {
+  version: number;
+  action: ApplyGateStrategicDecision;
+  label: string;
+  headline: string;
+  subtext: string;
+  renderMode: "COMPRESSED" | "EXPANDED";
+  legacyDecision?: "apply_now" | "apply_with_caveats" | "fix_first" | "skip";
+  status?: "strong" | "potential" | "risky" | "not-recommended";
+  source?: string | null;
+  diagnostics?: {
+    arbitrationSource?: string | null;
+    aiConstraint?: null | {
+      type?: string | null;
+      severity?: string | null;
+      reason?: string | null;
+    };
+    subtextSuppressed?: boolean;
+    hardBlocker?: boolean;
+    legacy?: {
+      strategicDecision?: ApplyGateStrategicDecision | null;
+      finalVerdict?: ApplyGateVerdict | string | null;
+      legacyDecision?: "apply_now" | "apply_with_caveats" | "fix_first" | "skip" | null;
+    };
+  } | null;
+};
+export type ApplyGateOutcomeBand = "Low" | "Medium" | "High";
+export type ApplyGateDecisionConfidence = ApplyGateOutcomeBand;
+export type ApplyGateConfidenceType = "CLEAR_SIGNAL" | "WEAK_SIGNAL" | "CONFLICTED_SIGNAL";
+export type ApplyGateCompanyType = "startup" | "enterprise" | "regulated" | "gov_regulated" | "unknown";
+export type ApplyGateRiskTolerance = "conservative" | "balanced" | "aggressive";
+export type ApplyGateCareerTrackType = "OPEN_MARKET" | "STRUCTURED" | "LICENSED";
+export type ApplyGateDomainAlignment = {
+  level: "STRONG_MATCH" | "ADJACENT" | "BRIDGEABLE" | "HARD_MISMATCH";
+  isMismatch?: boolean;
+  type?: string | null;
+  careerTrackType?: ApplyGateCareerTrackType | string | null;
+  bridgeable?: boolean;
+  alignmentScore?: number | null;
+  confidence?: number | null;
+  alignmentLabel?: string | null;
+  jobFamily?: string | null;
+  candidateFamily?: string | null;
+  jobDomain?: string | null;
+  candidateDomain?: string | null;
+  reason?: string | null;
+};
+export type ApplyGateEvidenceStrength = {
+  level: "STRONG" | "MODERATE" | "WEAK";
+  score: number;
+  ownershipScore?: number;
+  roleSpecificProofScore?: number;
+  projectComplexityScore?: number;
+  outcomeEvidenceScore?: number;
+  recencyScore?: number;
+  roleSpecificProofTerms?: string[];
+  basis?: string;
+  reason?: string | null;
+};
+
+export type ApplyGateRequirementClassification = {
+  id: string;
+  type: string;
+  label: string;
+  classification: "hard" | "semi-hard" | "soft";
+  enforcementLikelihood: number;
+  source?: string;
+};
+
+export type ApplyGatePathToWin = {
+  referralRequired: boolean;
+  resumeOptimizationRequired: boolean;
+  estimatedBypassDifficulty: "low" | "medium" | "high";
+  recommendedChannel?: string | null;
+  keyRisks?: string[];
+  companyType?: ApplyGateCompanyType | string | null;
+  riskTolerance?: ApplyGateRiskTolerance;
+  strategy: string[];
+};
+
+export type ApplyGateCalibrationBucket = {
+  version: number;
+  domainAlignment?: ApplyGateDomainAlignment["level"] | null;
+  evidenceStrength?: ApplyGateEvidenceStrength["level"] | null;
+  strategicDecision?: ApplyGateStrategicDecision | null;
+  riskTolerance?: ApplyGateRiskTolerance | null;
+  atsPass?: ApplyGateOutcomeBand | null;
+  humanWin?: ApplyGateOutcomeBand | null;
+  decisionConfidence?: ApplyGateDecisionConfidence | null;
+};
+
+export type ApplyGateDecisionConfidenceDetails = {
+  level: ApplyGateDecisionConfidence;
+  score?: number;
+  sampleSize?: number;
+  conflictCount?: number;
+  confidenceType?: ApplyGateConfidenceType;
+  drivers?: ApplyGateConfidenceDrivers;
+  confidenceFlags?: string[];
+  factors?: string[];
+};
+
+export type ApplyGateConfidenceDrivers = {
+  primaryDriver?: string | null;
+  secondaryDriver?: string | null;
+  conflictDriver?: string | null;
+};
+
+export type ApplyGateCalibrationDiagnostics = {
+  bucket?: {
+    domainAlignment?: ApplyGateDomainAlignment["level"] | null;
+    evidenceStrength?: ApplyGateEvidenceStrength["level"] | null;
+    decisionConfidence?: ApplyGateDecisionConfidence | null;
+    riskTolerance?: ApplyGateRiskTolerance | null;
+  };
+  totalDecisions: number;
+  totalApplied: number;
+  interviews: number;
+  offers: number;
+  rejections: number;
+  ghosted: number;
+  successRate?: number | null;
+  failureRate?: number | null;
+  actualSuccessRate?: number | null;
+  predictedConfidenceLevel?: ApplyGateDecisionConfidence | null;
+  predictedConfidenceRange?: { min: number; max: number } | null;
+  confidenceError?: number | null;
+  confidenceCalibrationStatus?: "CALIBRATED" | "OVERCONFIDENT" | "UNDERCONFIDENT" | "INSUFFICIENT_DATA";
+  decisionReliability?: "STABLE" | "UNSTABLE" | "UNKNOWN";
+  avgDecisionConfidence?: number | null;
+  overconfidenceScore?: number;
+  underconfidenceScore?: number;
+  overrideRate?: number | null;
+  successRate_when_followed?: number | null;
+  successRate_when_overridden?: number | null;
+  overrideApplied?: number;
+  overrideSuccessRate?: number | null;
+  nonOverrideApplied?: number;
+  nonOverrideSuccessRate?: number | null;
+  overrideEffectiveness?: "USERS_RIGHT" | "SYSTEM_RIGHT" | "INCONCLUSIVE";
+  overrideInsight?: string | null;
+  drift?: {
+    driftDetected: boolean;
+    reason?: string | null;
+    successRateDelta?: number | null;
+    overrideRateDelta?: number | null;
+    confidenceStatusChanged?: boolean;
+  };
+  shadowCalibration?: {
+    evaluatedDecisions: number;
+    relaxedWouldImprove: number;
+    strictWouldImprove: number;
+    betterDecisionCounts?: Record<string, number>;
+  };
+  userTrustProfile?: {
+    agreementRate?: number | null;
+    overrideRate?: number | null;
+    overrideSuccessRate?: number | null;
+    highConfidenceFollowRate?: number | null;
+    lowConfidenceOverrideRate?: number | null;
+    confidenceBehaviorAlignment?: {
+      highConfidenceKnown: number;
+      lowConfidenceKnown: number;
+    };
+  } | null;
+  systemHealthReport?: {
+    calibrationHealth?: Record<string, number>;
+    overconfidenceZones?: unknown[];
+    underconfidenceZones?: unknown[];
+    highOverrideZones?: unknown[];
+    unstableDecisionZones?: unknown[];
+    driftFlags?: unknown[];
+  } | null;
+  calibrationPolicy?: {
+    mode: "passive";
+    autoDecisionChangesAllowed: boolean;
+    thresholdChangesRequireExplicitVersion: boolean;
+  };
+};
+
+export type ApplyGateOpportunityCost = {
+  alternativeQualityScore: number;
+  message: string;
+  basis?: string;
+};
+
+export type ApplyGateSignalSeparation = {
+  signalLeakage: boolean;
+  overlapRatio: number;
+  overlappingSignals: string[];
+  threshold: number;
+  matchSignalCount?: number;
+  proofSignalCount?: number;
+};
+
+export type ApplyGateDecisionDiagnostics = {
+  consistencyFlag?: string;
+  confidenceFlags?: string[];
+  confidenceCalibrationStatus?: ApplyGateCalibrationDiagnostics["confidenceCalibrationStatus"];
+  decisionReliability?: ApplyGateCalibrationDiagnostics["decisionReliability"];
+  overrideEffectiveness?: ApplyGateCalibrationDiagnostics["overrideEffectiveness"];
+  driftDetected?: boolean;
+  calibrationDiagnostics?: ApplyGateCalibrationDiagnostics;
+  shadowCalibration?: ApplyGateCalibrationDiagnostics["shadowCalibration"];
+  userTrustProfile?: ApplyGateCalibrationDiagnostics["userTrustProfile"];
+  systemHealthReport?: ApplyGateCalibrationDiagnostics["systemHealthReport"];
+  calibrationPolicy?: ApplyGateCalibrationDiagnostics["calibrationPolicy"];
+  explanationTruthStatus?: "COMPLETE" | "REWRITTEN" | "HIERARCHICAL";
+  primaryNarrativeDriver?: string;
+  suppressedSignals?: string[];
+};
+
+export type ApplyGateDecisionSystem = {
+  decision?: ApplyGateStrategicDecision | null;
+  displayDecision?: ApplyGateDisplayDecision | null;
+  decisionLabel?: string | null;
+  decisionConfidence?: ApplyGateDecisionConfidence | null;
+  confidenceType?: ApplyGateConfidenceType | null;
+  domainAlignment?: ApplyGateDomainAlignment["level"] | null;
+  evidenceStrength?: ApplyGateEvidenceStrength["level"] | null;
+  atsScore?: number | null;
+  humanScore?: number | null;
+  explanation?: ApplyGateConfidenceDrivers | null;
+  opportunityCost?: ApplyGateOpportunityCost | null;
+  overrideInsight?: string | null;
+  calibrationBucket?: ApplyGateCalibrationBucket | null;
+  signalLeakage?: boolean;
+  diagnostics?: ApplyGateDecisionDiagnostics | null;
+};
+
+export type ApplyGateSearchMemory = {
+  version: number;
+  mode: "descriptive";
+  confidence: "low" | "weak" | "meaningful";
+  sampleSize: number;
+  noResponseWindowDays?: number;
+  unavailable?: boolean;
+  commonSkills: string[];
+  similarRoles: Array<{
+    id?: string | number | null;
+    role: string;
+    company?: string | null;
+    outcome?: string | null;
+    responseOutcome?: string | null;
+    noResponse?: boolean;
+    daysToResponse?: number | null;
+    daysToLatest?: number | null;
+    similarity: number;
+    matchedSignals?: string[];
+  }>;
+  outcomeSummary: {
+    similarRoleCount: number;
+    interviewed: number;
+    offered: number;
+    rejected: number;
+    noResponse: number;
+    interviewRate: number;
+    rejectionRate: number;
+    noResponseRate: number;
+    medianDaysToResponse?: number | null;
+    medianDaysToInterview?: number | null;
+    medianDaysToRejection?: number | null;
+  };
+  patternSignals: string[];
+};
+
 export type ApplyGateScoringBreakdown = {
   experienceScore: number;
   skillScore: number;
@@ -681,6 +950,49 @@ export type ApplyGateScoringBreakdown = {
   };
   riskFlags?: string[];
   hardBlocker?: boolean;
+  atsScore?: number;
+  humanScore?: number;
+  atsPass?: ApplyGateOutcomeBand;
+  humanWin?: ApplyGateOutcomeBand;
+  requirementClassification?: ApplyGateRequirementClassification[];
+  trueHardBlockers?: string[];
+  payoffWeight?: number;
+  frictionCost?: number;
+  expectedValueScore?: number;
+  companyType?: ApplyGateCompanyType | string;
+  pathToWin?: ApplyGatePathToWin | null;
+  strategicDecision?: ApplyGateStrategicDecision;
+  decision?: ApplyGateStrategicDecision;
+  decisionLabel?: string | null;
+  primaryDriver?: {
+    type?: string | null;
+    label?: string | null;
+    reason?: string | null;
+    priority?: number | null;
+    requirementType?: string | null;
+  } | null;
+  rawStrategicDecision?: ApplyGateStrategicDecision;
+  decisionConsistency?: {
+    decision?: ApplyGateStrategicDecision | null;
+    decisionLabel?: string | null;
+    originalDecision?: ApplyGateStrategicDecision | string | null;
+    consistencyFlag?: string | null;
+    changed?: boolean;
+    reason?: string | null;
+  };
+  signalSeparation?: ApplyGateSignalSeparation | null;
+  signalLeakage?: boolean;
+  domainAlignment?: ApplyGateDomainAlignment | null;
+  domainMismatch?: ApplyGateDomainAlignment | null;
+  evidenceStrength?: ApplyGateEvidenceStrength | null;
+  careerTrackType?: ApplyGateCareerTrackType | string | null;
+  careerTrackAssessment?: {
+    careerTrackType?: ApplyGateCareerTrackType | string | null;
+    credentialPathMissing?: boolean;
+    blockingLabels?: string[];
+    reason?: string | null;
+  } | null;
+  riskTolerance?: ApplyGateRiskTolerance;
   applicationRiskScore?: number;
   applicationRiskLabel?: string;
   applicationRiskSummary?: string;
@@ -735,8 +1047,54 @@ export type ApplyGateResult = {
   reasons: string[];
   explanation?: {
     hard_blockers: string[];
+    display_decision?: ApplyGateDisplayDecision | null;
     application_risk_score?: number | null;
     risk_breakdown?: ApplyGateRiskBreakdown | null;
+    strategic_decision?: ApplyGateStrategicDecision | null;
+    ats_pass?: ApplyGateOutcomeBand | null;
+    human_win?: ApplyGateOutcomeBand | null;
+    ats_score?: number | null;
+    human_score?: number | null;
+    expected_value_score?: number | null;
+    payoff_weight?: number | null;
+    friction_cost?: number | null;
+    company_type?: ApplyGateCompanyType | string | null;
+    path_to_win?: ApplyGatePathToWin | null;
+    domain_alignment?: ApplyGateDomainAlignment | null;
+    domain_mismatch?: ApplyGateDomainAlignment | null;
+    evidence_strength?: ApplyGateEvidenceStrength | null;
+    career_track_type?: ApplyGateCareerTrackType | string | null;
+    career_track_assessment?: {
+      careerTrackType?: ApplyGateCareerTrackType | string | null;
+      credentialPathMissing?: boolean;
+      blockingLabels?: string[];
+      reason?: string | null;
+    } | null;
+    primary_driver?: string | null;
+    primary_driver_detail?: {
+      type?: string | null;
+      label?: string | null;
+      reason?: string | null;
+      priority?: number | null;
+      requirementType?: string | null;
+    } | null;
+    decision_label?: string | null;
+    primary_reason?: string | null;
+    suppressed_signals?: string[];
+    risk_tolerance?: ApplyGateRiskTolerance | null;
+    calibration_bucket?: ApplyGateCalibrationBucket | null;
+    calibration_diagnostics?: ApplyGateCalibrationDiagnostics | null;
+    confidence_type?: ApplyGateConfidenceType | null;
+    confidence_drivers?: ApplyGateConfidenceDrivers | null;
+    override_insight?: string | null;
+    opportunity_cost?: ApplyGateOpportunityCost | null;
+    signal_leakage?: ApplyGateSignalSeparation | null;
+    diagnostics?: ApplyGateDecisionDiagnostics | null;
+    decision_system?: ApplyGateDecisionSystem | null;
+    decision_confidence?: ApplyGateDecisionConfidence | null;
+    decision_confidence_details?: ApplyGateDecisionConfidenceDetails | null;
+    search_memory?: ApplyGateSearchMemory | null;
+    requirement_classification?: ApplyGateRequirementClassification[];
     role_core_gaps?: string[];
     missing_required: string[];
     missing_preferred: string[];
@@ -755,6 +1113,16 @@ export type ApplyGateResult = {
     };
     fit_notes: string[];
   };
+  displayDecision?: ApplyGateDisplayDecision | null;
+  decisionConfidence?: ApplyGateDecisionConfidence | null;
+  confidenceType?: ApplyGateConfidenceType | null;
+  decisionSystem?: ApplyGateDecisionSystem | null;
+  opportunityCost?: ApplyGateOpportunityCost | null;
+  overrideInsight?: string | null;
+  calibrationBucket?: ApplyGateCalibrationBucket | null;
+  signalLeakage?: boolean;
+  diagnostics?: ApplyGateDecisionDiagnostics | null;
+  searchMemory?: ApplyGateSearchMemory | null;
   matchedSkills: string[];
   missingSkills: string[];
   jobReqs: {
@@ -771,6 +1139,7 @@ export type ApplyGateResult = {
   };
   scoringBreakdown: ApplyGateScoringBreakdown;
   fixSuggestion: string | null;
+  riskTolerance?: ApplyGateRiskTolerance;
   discipline_alignment_score?: number;
   discipline_transition_label?: "Adjacent" | "Stretch" | "Mismatch";
   discipline_dimension_breakdown?: {
@@ -814,6 +1183,7 @@ export async function analyzeJobAlignment(params: {
   jobDescription: string;
   companyName?: string;
   jobUrl?: string;
+  riskTolerance?: ApplyGateRiskTolerance;
 }): Promise<ApplyGateResult> {
   return apiFetch("/api/emails/apply-gate/analyze", {
     method: "POST",

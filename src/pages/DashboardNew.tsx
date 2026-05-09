@@ -318,6 +318,7 @@ const dashboardButtonSecondary =
 
 const Dashboard = () => {
   const [user, setUser] = useState(auth?.currentUser ?? null);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const isAuthed = Boolean(user);
 
   useEffect(() => {
@@ -328,7 +329,10 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (!isAuthed) return;
-    startEmailSync().catch(() => undefined);
+    setSyncError(null);
+    startEmailSync().catch((error) => {
+      setSyncError(error instanceof Error ? error.message : "Unable to start email sync.");
+    });
   }, [isAuthed]);
 
   const metricsQuery = useQuery({
@@ -476,6 +480,15 @@ const Dashboard = () => {
     () => buildQueueItemsFromRankedQueue(rankedQueue).filter((item) => item.bucket === "doToday").slice(0, 3),
     [rankedQueue],
   );
+  const dataLoadErrors = [
+    syncError ? `Email sync: ${syncError}` : null,
+    metricsQuery.isError ? `Metrics: ${metricsQuery.error instanceof Error ? metricsQuery.error.message : "Unable to load metrics"}` : null,
+    applicationStatsQuery.data?.error ? `Applications: ${applicationStatsQuery.data.error}` : null,
+    suggestionAnalyticsQuery.data?.error ? `Outcome analytics: ${suggestionAnalyticsQuery.data.error}` : null,
+    applyGateHistoryQuery.isError ? `Apply Gate history: ${applyGateHistoryQuery.error instanceof Error ? applyGateHistoryQuery.error.message : "Unable to load Apply Gate history"}` : null,
+    strategyAlertsQuery.data?.error ? `Strategy alerts: ${strategyAlertsQuery.data.error}` : null,
+    queueQuery.data?.error ? `Action queue: ${queueQuery.data.error}` : null,
+  ].filter(Boolean) as string[];
 
   return (
     <DashboardLayout>
@@ -487,6 +500,20 @@ const Dashboard = () => {
             Start with the role decision, then clear the few moves that matter across follow-ups, job-fit gaps, resume proof, and stale opportunities.
           </p>
         </div>
+
+        {dataLoadErrors.length > 0 ? (
+          <div className="rounded-2xl border border-destructive/25 bg-destructive/10 p-4 text-sm text-destructive">
+            <p className="font-semibold text-destructive">Your dashboard data did not load.</p>
+            <p className="mt-1 text-destructive/85">
+              Premium access is active, but the backend could not read the job-search data for this session.
+            </p>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-destructive/85">
+              {dataLoadErrors.slice(0, 4).map((error) => (
+                <li key={error}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard icon={Send} label="Applied" value={appliedCount ?? "-"} />

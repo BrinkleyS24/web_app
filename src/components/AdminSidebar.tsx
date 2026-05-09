@@ -26,7 +26,7 @@ export function AdminSidebar() {
     } catch (_) {
       // Keep navigation behavior even if logout cleanup partially fails.
     } finally {
-      navigate("/app", { replace: true });
+      navigate("/", { replace: true });
     }
   }
 
