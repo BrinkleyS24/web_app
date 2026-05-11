@@ -191,6 +191,39 @@ beforeEach(() => {
       now: "2026-04-13T12:00:00.000Z",
       doToday: [
         {
+          id: "queue-applygate-1",
+          logicalKey: "applygate:job-1",
+          dedupeKey: "applygate:job-1:v1",
+          primaryEntityId: "job-1",
+          evidenceVersion: "v1",
+          actionType: "tailor_resume",
+          actionCategory: "optimization",
+          title: "Tailor resume before applying to Datadog",
+          whyNow: "Apply Gate found a proof gap.",
+          targetOutcome: "Raise fit before applying.",
+          effortMinutes: 15,
+          urgencyLevel: "high",
+          confidenceLevel: "moderate",
+          source: "apply_gate",
+          status: "open",
+          effectiveStatus: "open",
+          createdAt: "2026-04-13T10:00:00.000Z",
+          evidence: ["Missing platform proof."],
+          threadId: "job-1",
+          applicationId: "verdict-2",
+          suggestionSource: "apply_gate_action_plan",
+          queueSource: "resume",
+          intent: "TAILOR_RESUME",
+          intentLabel: "Tailor resume",
+          playbook: ["Add missing platform proof."],
+          sourceLabel: "Optimization task",
+          draftEligible: false,
+          routeHref: "/apply-gate",
+          routeLabel: "Review in Apply Gate",
+          stageLabel: "Optimization",
+          company: "Datadog",
+        },
+        {
           id: "queue-followup-1",
           logicalKey: "followup:thread-1",
           dedupeKey: "followup:thread-1:v1",
@@ -306,15 +339,16 @@ describe("DashboardNew", () => {
     renderDashboard();
 
     expect(await screen.findByText("Today's search brief")).toBeInTheDocument();
-    expect(screen.getByText("Know the next decision before you apply again.")).toBeInTheDocument();
+    expect(screen.getByText("Know what your inbox says needs attention today.")).toBeInTheDocument();
 
     expect(await screen.findByText("Next decision")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "QA Analyst" })).toBeInTheDocument();
     expect(screen.getByText("Fix first")).toBeInTheDocument();
     expect(screen.getAllByText("Resume does not show SQL proof").length).toBeGreaterThan(0);
 
-    expect(screen.getByText("Today's top moves")).toBeInTheDocument();
+    expect(screen.getByText("Daily Action Queue")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Send follow-up to Acme Health" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Tailor resume before applying to Datadog" })).not.toBeInTheDocument();
 
     expect(screen.getByText("Search memory")).toBeInTheDocument();
     expect(screen.getByText("Completed follow-ups are showing better outcomes")).toBeInTheDocument();

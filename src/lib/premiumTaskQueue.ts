@@ -93,6 +93,7 @@ export const actionTypeLabels: Record<string, string> = {
   apply: "Apply",
   cleanup: "Cleanup",
   fix_targeting: "Fix targeting",
+  prep_interview: "Prepare interview",
   prepare_interview: "Prepare interview",
   reply: "Reply",
   tailor_resume: "Tailor resume",
@@ -113,6 +114,19 @@ export const actionTypeLabels: Record<string, string> = {
   cleanup_structured_fields: "Extraction cleanup",
   cleanup_application_links: "Link cleanup",
 };
+
+export const daqV1ActionTypes = new Set([
+  "prepare_interview",
+  "prep_interview",
+  "reply",
+  "thank_you",
+  "follow_up",
+  "status_check",
+]);
+
+export function isDaqV1InboxAction(item: QueueItem) {
+  return item.source === "followup" && daqV1ActionTypes.has(String(item.actionType || ""));
+}
 
 const actionPlaybook: Record<string, string[]> = {
   thank_you: [

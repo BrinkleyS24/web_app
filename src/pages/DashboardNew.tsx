@@ -39,6 +39,7 @@ import {
   buildRankedQueueStats,
   buildGmailThreadUrl,
   formatRelativeAge,
+  isDaqV1InboxAction,
   sourceClasses,
   urgencyClasses,
   type QueueItem,
@@ -476,9 +477,24 @@ const Dashboard = () => {
   const rankedQueue = queueQuery.data?.queue || null;
   const activeQueue = useMemo(() => buildQueueItemsFromRankedQueue(rankedQueue), [rankedQueue]);
   const queueStats = useMemo(() => buildRankedQueueStats(rankedQueue), [rankedQueue]);
+  const daqInboxQueue = useMemo(
+    () => activeQueue.filter((item) => isDaqV1InboxAction(item) && item.bucket !== "blocked"),
+    [activeQueue],
+  );
+  const daqStats = useMemo(
+    () => ({
+      active: daqInboxQueue.length,
+      highPriority: daqInboxQueue.filter((item) => item.urgency === "high").length,
+      totalMinutes: daqInboxQueue.reduce((sum, item) => {
+        const match = item.estimatedTime.match(/(\d+)/);
+        return sum + (match ? Number(match[1]) : 0);
+      }, 0),
+    }),
+    [daqInboxQueue],
+  );
   const todaysMoves = useMemo(
-    () => buildQueueItemsFromRankedQueue(rankedQueue).filter((item) => item.bucket === "doToday").slice(0, 3),
-    [rankedQueue],
+    () => daqInboxQueue.slice(0, 3),
+    [daqInboxQueue],
   );
   const dataLoadErrors = [
     syncError ? `Email sync: ${syncError}` : null,
@@ -495,9 +511,9 @@ const Dashboard = () => {
       <div className="space-y-8">
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent">Today's search brief</p>
-          <h1 className="text-3xl font-bold text-foreground">Know the next decision before you apply again.</h1>
+          <h1 className="text-3xl font-bold text-foreground">Know what your inbox says needs attention today.</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            Start with the role decision, then clear the few moves that matter across follow-ups, job-fit gaps, resume proof, and stale opportunities.
+            Applendium uses read-only Gmail signals to surface interview prep, recruiter replies, and follow-up windows before they get buried.
           </p>
         </div>
 
@@ -524,11 +540,13 @@ const Dashboard = () => {
             label="Response Rate"
             value={responseRate}
             change={
-              queueStats.active > 0
-                ? `${queueStats.active} active moves waiting`
-                : "No active move queue right now"
+              daqStats.active > 0
+                ? `${daqStats.active} inbox action${daqStats.active === 1 ? "" : "s"} waiting`
+                : queueStats.active > 0
+                  ? `${queueStats.active} broader queue item${queueStats.active === 1 ? "" : "s"} waiting`
+                  : "No active move queue right now"
             }
-            changeType={queueStats.active > 0 ? "neutral" : "positive"}
+            changeType={daqStats.active > 0 || queueStats.active > 0 ? "neutral" : "positive"}
           />
         </div>
 
@@ -645,11 +663,11 @@ const Dashboard = () => {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 text-sm font-medium text-accent">
-                    <CheckSquare className="w-4 h-4" />
-                    Today's top moves
+                  <CheckSquare className="w-4 h-4" />
+                    Daily Action Queue
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Follow-ups, ghosting signals, job-fit work, and cleanup are ranked so you can act without sifting through separate pages first.
+                    The premium inbox layer starts with the three urgent actions that are easiest to trust: interviews, recruiter replies, and follow-ups.
                   </p>
                 </div>
                 <Link to="/fix-suggestions" className="text-sm text-accent hover:underline">
@@ -660,22 +678,22 @@ const Dashboard = () => {
               <div className="grid grid-cols-3 gap-3">
                 <div className="rounded-xl border border-border/70 bg-background/50 p-3">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Active</p>
-                  <p className="mt-2 text-xl font-semibold text-foreground">{queueStats.active}</p>
+                  <p className="mt-2 text-xl font-semibold text-foreground">{daqStats.active}</p>
                 </div>
                 <div className="rounded-xl border border-border/70 bg-background/50 p-3">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">High priority</p>
-                  <p className="mt-2 text-xl font-semibold text-foreground">{queueStats.highPriority}</p>
+                  <p className="mt-2 text-xl font-semibold text-foreground">{daqStats.highPriority}</p>
                 </div>
                 <div className="rounded-xl border border-border/70 bg-background/50 p-3">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Clear time</p>
-                  <p className="mt-2 text-xl font-semibold text-foreground">{queueStats.totalMinutes}m</p>
+                  <p className="mt-2 text-xl font-semibold text-foreground">{daqStats.totalMinutes}m</p>
                 </div>
               </div>
 
               <div className="space-y-3">
                 {todaysMoves.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-border bg-background/40 p-4 text-sm text-muted-foreground">
-                    No active moves right now. Your queue gets stronger once Apply Gate, follow-up timing, and cleanup work have more history to rank.
+                    No urgent inbox actions right now. The broader queue may still have Apply Gate, cleanup, or strategy work, but DAQ v1 stays focused on time-sensitive Gmail signals.
                   </div>
                 ) : (
                   todaysMoves.map((move) => <TodayMoveCard key={move.id} move={move} />)
