@@ -35,6 +35,8 @@ type AdminUserRow = {
   hasStripeCustomer: boolean;
   hasStripeSubscription: boolean;
   hasGoogleRefreshToken: boolean;
+  pendingFullRefresh: boolean;
+  pendingFullRefreshRequestedAt: string | null;
   isAdmin: boolean;
   isPermanentPremium: boolean;
 };
@@ -138,6 +140,7 @@ export default function AdminUsers() {
   const [detailData, setDetailData] = useState<UserDetailPayload | null>(null);
   const [confirmEmail, setConfirmEmail] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [fullRefreshBusy, setFullRefreshBusy] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
 
   async function loadUsers(nextSearch = search) {
@@ -210,6 +213,30 @@ export default function AdminUsers() {
       setActionMessage(err?.message || "Failed to delete user.");
     } finally {
       setDeleteBusy(false);
+    }
+  }
+
+  async function handleQueueFullRefresh() {
+    if (!detailData?.user?.id) return;
+
+    setFullRefreshBusy(true);
+    setActionMessage("");
+    try {
+      const response = await apiFetch(`/api/admin/users/${encodeURIComponent(detailData.user.id)}/full-refresh`, {
+        method: "POST",
+        body: {},
+      });
+
+      const updatedUser = response?.user as AdminUserRow | undefined;
+      if (updatedUser) {
+        setDetailData((current) => current ? { ...current, user: updatedUser } : current);
+      }
+      setActionMessage(String(response?.message || `Full refresh requested for ${detailData.user.email}.`));
+      await loadUsers(search);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to queue full refresh.");
+    } finally {
+      setFullRefreshBusy(false);
     }
   }
 
@@ -333,6 +360,7 @@ export default function AdminUsers() {
                           <FlagPill tone="warning">Billing linked</FlagPill>
                         ) : null}
                         {user.hasGoogleRefreshToken ? <FlagPill tone="success">Google linked</FlagPill> : null}
+                        {user.pendingFullRefresh ? <FlagPill tone="warning">Refresh pending</FlagPill> : null}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -417,6 +445,14 @@ export default function AdminUsers() {
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">Last sync</p>
                       <p className="mt-1 text-sm text-foreground">{formatDateTime(detailData.user.lastEmailSyncAt)}</p>
                     </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Full refresh</p>
+                      <p className="mt-1 text-sm text-foreground">
+                        {detailData.user.pendingFullRefresh
+                          ? `Pending since ${formatDateTime(detailData.user.pendingFullRefreshRequestedAt)}`
+                          : "Not pending"}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
@@ -438,7 +474,36 @@ export default function AdminUsers() {
                     {detailData.user.hasGoogleRefreshToken ? (
                       <FlagPill tone="success">Google refresh token present</FlagPill>
                     ) : null}
+                    {detailData.user.pendingFullRefresh ? (
+                      <FlagPill tone="warning">Full refresh pending</FlagPill>
+                    ) : null}
                   </div>
+                </section>
+
+                <section className="rounded-xl border border-border bg-background/70 p-4 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4 text-accent" />
+                    <h3 className="text-sm font-semibold text-foreground">Recovery Sync</h3>
+                  </div>
+
+                  <p className="text-sm text-muted-foreground">
+                    Queue a full refresh for this user to reprocess recoverable auto-ignored Gmail messages with the current classifier.
+                  </p>
+
+                  {!detailData.user.hasGoogleRefreshToken ? (
+                    <p className="text-sm text-warning-foreground">
+                      This user has not connected Gmail, so a full refresh cannot run.
+                    </p>
+                  ) : null}
+
+                  <Button
+                    variant="outline"
+                    onClick={handleQueueFullRefresh}
+                    disabled={fullRefreshBusy || !detailData.user.hasGoogleRefreshToken}
+                  >
+                    {fullRefreshBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    {detailData.user.pendingFullRefresh ? "Refresh already pending" : "Queue full refresh"}
+                  </Button>
                 </section>
 
                 <section className="rounded-xl border border-border bg-background/70 p-4 space-y-4">
