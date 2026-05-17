@@ -50,6 +50,7 @@ import {
 } from "@/lib/emails";
 import {
   actionTypeLabels,
+  buildDaqV1InboxQueue,
   buildActionKey,
   buildQueueItemsFromRankedQueue,
   buildRankedQueueStats,
@@ -67,6 +68,7 @@ import {
 
 type UrgencyFilter = "all" | "high" | "medium" | "low";
 type SourceFilter = "all" | QueueSource;
+type QueueView = "inbox" | "all";
 type DraftToneOption = {
   value: SuggestionDraftTone;
   label: string;
@@ -88,7 +90,7 @@ const destructiveActionMenuItemClass =
 
 const sourceFilterLabels: Record<SourceFilter, string> = {
   all: "All",
-  followup: "Outreach",
+  followup: "Outreach tasks",
   stale: "Ghosting",
   apply_gate: "Apply Gate",
   resume: "Resume proof",
@@ -119,6 +121,22 @@ function isCloseIntent(intent?: QueueItem["intent"] | null) {
 
 function isInlineCleanupIntent(intent?: QueueItem["intent"] | null) {
   return intent === "CLEANUP_STRUCTURED_FIELDS" || intent === "LINK_APPLICATIONS";
+}
+
+function normalizeActionType(value?: string | null) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isOutreachQueueItem(item: QueueItem) {
+  return item.source === "followup";
+}
+
+function isGmailHandledCandidate(item: QueueItem) {
+  const actionType = normalizeActionType(item.actionType);
+  return (
+    isOutreachQueueItem(item)
+    && ["reply", "thank_you", "follow_up", "status_check", "prep_interview", "prepare_interview"].includes(actionType)
+  );
 }
 
 function getCleanupPrimaryLabel(intent?: QueueItem["intent"] | null, inlineOpen = false) {
@@ -154,9 +172,9 @@ function getPrimaryActionLabel(
   if (kind === "cleanup") return getCleanupPrimaryLabel(item.intent, inlineOpen);
   if (kind === "close") return "Close application";
   if (kind === "draft") return draftOpen ? "Hide copilot" : draft ? "Show copilot" : "Generate draft";
-  if (kind === "gmail") return "Open Gmail thread";
+  if (kind === "gmail") return "Open Gmail";
   if (kind === "route") return item.routeLabel || "Open workspace";
-  if (kind === "complete") return "Mark done";
+  if (kind === "complete") return isGmailHandledCandidate(item) ? "Already handled" : "Mark done";
   return "Review action";
 }
 
@@ -166,11 +184,11 @@ function getPrimaryActionHelper(kind: PrimaryActionKind, item: QueueItem) {
       ? "Repair application links before trusting pipeline metrics."
       : "Fix extracted company and role fields so recommendations stop drifting.";
   }
-  if (kind === "close") return "Stop letting a stale opportunity consume active search attention.";
-  if (kind === "draft") return "Create a grounded message from the tracked thread before you send anything.";
-  if (kind === "gmail") return "Open the source thread and act from the original context.";
+  if (kind === "close") return "Close this only after checking there is no newer reply.";
+  if (kind === "draft") return "Draft from the conversation, then review it before sending.";
+  if (kind === "gmail") return "Open Gmail first when timing, sender, or conversation details matter.";
   if (kind === "route") return "Jump into the workspace that can resolve this recommendation.";
-  if (kind === "complete") return "Use this when the action is already handled outside Applendium.";
+  if (kind === "complete") return "Use this when you already handled the action in Gmail.";
   return item.sourceDescription;
 }
 
@@ -248,7 +266,7 @@ const draftToneOptions: DraftToneOption[] = [
   {
     value: "concise",
     label: "Concise follow-up",
-    description: "Short version for threads that already carry enough context.",
+    description: "Short version for conversations that already carry enough context.",
   },
   {
     value: "direct",
@@ -367,6 +385,309 @@ function CollapsibleQueueSection({
       </summary>
       <div className="border-t border-border/70 px-4 pb-3 pt-2.5">{children}</div>
     </details>
+  );
+}
+
+function coerceSourceEvidence(entries?: unknown) {
+  if (Array.isArray(entries)) {
+    const fragments = entries
+      .map((entry) => (typeof entry === "string" ? entry : ""))
+      .filter((entry) => entry.length > 0);
+    const looksLikeSplitString =
+      fragments.length >= 3 &&
+      fragments.every((entry) => entry.length <= 1) &&
+      fragments.join("").trim().length > 1;
+
+    if (looksLikeSplitString) {
+      return [fragments.join("").trim()];
+    }
+
+    return entries;
+  }
+  if (typeof entries !== "string") return [];
+
+  const value = entries.trim();
+  if (!value) return [];
+
+  if (value.startsWith("[") && value.endsWith("]")) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      return [value.replace(/^\[\s*/, "").replace(/\s*\]$/, "").trim()].filter(Boolean);
+    }
+  }
+
+  return [value];
+}
+
+function parseSourceEvidence(entries: unknown = []) {
+  const parsed = {
+    subject: "",
+    sender: "",
+    timing: "",
+    other: [] as string[],
+  };
+
+  for (const entry of coerceSourceEvidence(entries)) {
+    const value = String(entry || "").trim();
+    if (!value) continue;
+
+    const subjectMatch = value.match(/^subject:\s*(.+)$/i);
+    if (subjectMatch) {
+      parsed.subject ||= subjectMatch[1].trim();
+      continue;
+    }
+
+    const senderMatch = value.match(/^sender:\s*(.+)$/i);
+    if (senderMatch) {
+      parsed.sender ||= senderMatch[1].trim();
+      continue;
+    }
+
+    if (/^(tracked|received|sent|last|latest|\d+\s+day)/i.test(value)) {
+      parsed.timing ||= value;
+      continue;
+    }
+
+    parsed.other.push(value);
+  }
+
+  return parsed;
+}
+
+function looksLikeBrokenSerializedEvidence(value?: string | null) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return true;
+  if (/^[\[\]{}"',:]+$/.test(normalized)) return true;
+  if (/^\[\s*["']?[^"'\]]{1,20}$/i.test(normalized)) return true;
+  if (/^["']?[^"'\[]+\s*["']?\]$/.test(normalized)) return true;
+  if ((normalized.includes("[") || normalized.includes("]")) && !/^\[[\s\S]*\]$/.test(normalized)) return true;
+  return false;
+}
+
+function getReadableSourceValue(...values: Array<string | null | undefined>) {
+  for (const value of values) {
+    const normalized = String(value || "").trim();
+    if (!normalized || looksLikeBrokenSerializedEvidence(normalized)) continue;
+    return normalized;
+  }
+  return "";
+}
+
+function getDecisionSourceRows(item: QueueItem) {
+  if (item.source === "apply_gate") {
+    const recommendation = getReadableSourceValue(item.blockingReason, item.description, item.whyNow, item.sourceDescription);
+    const nextStep = getReadableSourceValue(item.playbook?.[0], item.sourceDescription, item.routeLabel);
+    return [
+      recommendation ? { label: "Recommendation", value: recommendation } : null,
+      nextStep ? { label: "Best next step", value: nextStep } : null,
+    ].filter((row): row is { label: string; value: string } => Boolean(row));
+  }
+
+  if (item.source === "resume") {
+    const proofGap = getReadableSourceValue(item.description, item.whyNow, item.playbook?.[0], item.sourceDescription);
+    const nextStep = getReadableSourceValue(item.playbook?.[0], item.playbook?.[1], item.routeLabel);
+    return [
+      proofGap ? { label: "Proof gap", value: proofGap } : null,
+      nextStep ? { label: "Best next step", value: nextStep } : null,
+    ].filter((row): row is { label: string; value: string } => Boolean(row));
+  }
+
+  return [];
+}
+
+function buildSourceCheckPreview(item: QueueItem) {
+  const decisionRows = getDecisionSourceRows(item);
+  if (decisionRows[0]?.value) return decisionRows[0].value;
+
+  const parsed = parseSourceEvidence(item.evidence || []);
+  if (parsed.subject && item.company) return `${item.company} conversation: ${parsed.subject}`;
+  if (parsed.subject) return parsed.subject;
+  if (item.company) return `${item.company} conversation`;
+  return "Confirm the source before acting.";
+}
+
+function getSourceCheckTitle(item: QueueItem) {
+  if (item.source === "apply_gate" || item.source === "resume") return "Why this is queued";
+  if (item.source === "cleanup") return "Data to fix";
+  return "Source check";
+}
+
+function getSourceCheckPurpose(item: QueueItem) {
+  const actionType = normalizeActionType(item.actionType);
+
+  if (item.source === "apply_gate") {
+    return "Use this to confirm the Apply Gate recommendation before spending time on this role.";
+  }
+
+  if (item.source === "resume") {
+    return "Use this to see which resume proof gap keeps showing up before you apply again.";
+  }
+
+  if (item.source === "cleanup") {
+    return "Use this to fix missing company or role details so the queue stays accurate.";
+  }
+
+  if (actionType === "thank_you") {
+    return "Use this to refresh the interview context before writing the thank-you note.";
+  }
+
+  if (actionType === "follow_up" || actionType === "status_check") {
+    return "Use this to confirm there has not been a newer reply before you follow up.";
+  }
+
+  if (actionType === "prep_interview" || actionType === "prepare_interview") {
+    return "Use this to confirm interview timing, format, and contact details.";
+  }
+
+  if (isOutreachQueueItem(item)) {
+    return "Use this to confirm the conversation, sender, and company before acting.";
+  }
+
+  return "Use this to confirm the source behind the recommendation.";
+}
+
+function getSourceCheckBadge(item: QueueItem, rowCount: number) {
+  const actionType = normalizeActionType(item.actionType);
+  if (!rowCount) return "Needs verification";
+  if (item.source === "apply_gate") return "Apply Gate source";
+  if (item.source === "resume") return "Resume proof";
+  if (item.source === "cleanup") return "Missing data";
+  if (actionType === "prep_interview" || actionType === "prepare_interview") return "Interview source";
+  if (isOutreachQueueItem(item)) return "Gmail conversation";
+  return "Source context";
+}
+
+function getSourceCheckChecklist(item: QueueItem) {
+  const actionType = normalizeActionType(item.actionType);
+
+  if (item.source === "apply_gate") {
+    return [
+      "Open Apply Gate and confirm the recommendation still matches the role.",
+      "Fix the strongest proof gap before applying.",
+      "If you already applied, mark this handled so it leaves the queue.",
+    ];
+  }
+
+  if (item.source === "resume") {
+    return [
+      "Add proof that directly matches the repeated gap.",
+      "Move the strongest role-relevant bullet higher on the resume.",
+      "Re-run Apply Gate after the resume update.",
+    ];
+  }
+
+  if (item.source === "cleanup") {
+    return [
+      "Confirm the company and role from the original email.",
+      "Fix the missing fields before relying on this recommendation.",
+      "Mark the cleanup done once the source data is corrected.",
+    ];
+  }
+
+  if (actionType === "thank_you") {
+    return [
+      "Confirm this is the actual interview conversation.",
+      "Check the recruiter name and company before drafting.",
+      "If you already sent the note in Gmail, mark this handled.",
+    ];
+  }
+
+  if (actionType === "follow_up" || actionType === "status_check") {
+    return [
+      "Check Gmail for a newer reply before sending anything.",
+      "Confirm this role is still worth active attention.",
+      "If you already followed up elsewhere, mark this handled.",
+    ];
+  }
+
+  if (actionType === "prep_interview" || actionType === "prepare_interview") {
+    return [
+      "Confirm date, format, and contact details in the conversation.",
+      "Pull the role title and company into your prep notes.",
+      "Mark this handled after the prep is complete.",
+    ];
+  }
+
+  return [
+    "Confirm the source matches this action.",
+    "Check whether anything newer changes the recommendation.",
+    "Use the source context before marking this done.",
+  ];
+}
+
+function SourceCheckSection({ item }: { item: QueueItem }) {
+  const parsed = parseSourceEvidence(item.evidence || []);
+  const decisionRows = getDecisionSourceRows(item);
+  const rows = decisionRows.length
+    ? decisionRows
+    : [
+        parsed.subject ? { label: "Thread", value: parsed.subject } : null,
+        parsed.sender ? { label: "Contact", value: parsed.sender } : null,
+        item.company ? { label: "Company", value: item.company } : null,
+        parsed.timing ? { label: "Timing", value: parsed.timing } : null,
+      ].filter((row): row is { label: string; value: string } => Boolean(row));
+  const fallbackRows = decisionRows.length
+    ? []
+    : parsed.other
+        .filter((value) => !looksLikeBrokenSerializedEvidence(value))
+        .slice(0, Math.max(1, 3 - rows.length));
+  const checklist = getSourceCheckChecklist(item);
+  const fallbackLabel =
+    item.source === "apply_gate"
+      ? "Apply Gate note"
+      : item.source === "resume"
+      ? "Resume proof gap"
+      : item.source === "cleanup"
+      ? "Missing field"
+      : "Source detail";
+
+  return (
+    <CollapsibleQueueSection
+      title={getSourceCheckTitle(item)}
+      preview={buildSourceCheckPreview(item)}
+      badge={getSourceCheckBadge(item, rows.length)}
+    >
+      <div className="space-y-3">
+        <p className="text-sm leading-6 text-muted-foreground">
+          {getSourceCheckPurpose(item)}
+        </p>
+
+        {rows.length || fallbackRows.length ? (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {rows.map((row) => (
+              <div key={row.label} className="rounded-xl border border-border/70 bg-background/80 px-3 py-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{row.label}</p>
+                <p className="mt-1 text-sm leading-5 text-foreground">{row.value}</p>
+              </div>
+            ))}
+            {fallbackRows.map((value) => (
+              <div key={value} className="rounded-xl border border-border/70 bg-background/80 px-3 py-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{fallbackLabel}</p>
+                <p className="mt-1 text-sm leading-5 text-foreground">{value}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-border/70 bg-background/80 px-3 py-2">
+            <p className="text-sm text-muted-foreground">No source details were available for this card.</p>
+          </div>
+        )}
+
+        <div className="rounded-xl border border-accent/20 bg-accent/5 px-3 py-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-accent">Before you act</p>
+          <ul className="mt-2 space-y-1.5 text-sm leading-5 text-muted-foreground">
+            {checklist.map((step) => (
+              <li key={step} className="flex gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                <span>{step}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </CollapsibleQueueSection>
   );
 }
 
@@ -490,7 +811,7 @@ function SuggestionDraftPanel({
                   onClick={() => window.open(gmailUrl, "_blank", "noopener,noreferrer")}
                 >
                   <ArrowUpRight className="h-4 w-4" />
-                  Open Gmail thread
+                  Open Gmail
                 </Button>
               ) : null}
             </div>
@@ -547,7 +868,7 @@ function SuggestionDraftPanel({
               ) : null}
               {draft.latestSender && draft.latestSender !== draft.recipient ? (
                 <p className="mt-2 truncate rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground" title={draft.latestSender}>
-                  Latest sender in reply thread: {draft.latestSender}
+                  Latest sender in conversation: {draft.latestSender}
                 </p>
               ) : null}
             </div>
@@ -603,7 +924,7 @@ function invalidateSuggestionQueries(queryClient: ReturnType<typeof useQueryClie
   ]);
 }
 
-function getRankedQueueVisibleActions(queue?: RankedActionQueue | null): RankedAction[] {
+function getRankedQueueActiveActions(queue?: RankedActionQueue | null): RankedAction[] {
   if (!queue) return [];
   return [
     ...(queue.doToday || []),
@@ -613,10 +934,83 @@ function getRankedQueueVisibleActions(queue?: RankedActionQueue | null): RankedA
   ];
 }
 
+function getRankedQueueActionsForQueueItems(queue: RankedActionQueue | null | undefined, items: QueueItem[]) {
+  if (!queue || items.length === 0) return [] as RankedAction[];
+
+  const visibleKeys = new Set(
+    items
+      .map((item) => item.dedupeKey || item.logicalKey)
+      .filter((key): key is string => Boolean(key)),
+  );
+
+  return getRankedQueueActiveActions(queue).filter((action) => (
+    (action.effectiveStatus || action.status) === "open"
+    && (visibleKeys.has(action.dedupeKey) || visibleKeys.has(action.logicalKey))
+  ));
+}
+
+function matchesUrgencyFilter(item: QueueItem, urgencyFilter: UrgencyFilter) {
+  return urgencyFilter === "all" || item.urgency === urgencyFilter;
+}
+
+function buildQueueItemStats(items: QueueItem[], urgencyFilter: UrgencyFilter = "all") {
+  const scopedItems = items.filter((item) => matchesUrgencyFilter(item, urgencyFilter));
+  return {
+    active: scopedItems.length,
+    highPriority: scopedItems.filter((item) => item.urgency === "high").length,
+    totalMinutes: scopedItems.reduce((sum, item) => {
+      const match = item.estimatedTime.match(/(\d+)/);
+      return sum + (match ? Number(match[1]) : 0);
+    }, 0),
+    snoozed: 0,
+    completed: 0,
+  };
+}
+
+function emailBelongsToQueueItem(email: StoredEmail, item: QueueItem) {
+  const emailThreadId = String(email.thread_id || "").trim();
+  const itemThreadId = String(item.threadId || "").trim();
+  if (emailThreadId && itemThreadId && emailThreadId === itemThreadId) return true;
+
+  const emailApplicationId = String(email.applicationId || "").trim();
+  const itemApplicationId = String(item.applicationId || "").trim();
+  return Boolean(emailApplicationId && itemApplicationId && emailApplicationId === itemApplicationId);
+}
+
+function isFromCurrentUser(email: StoredEmail, userEmail?: string | null) {
+  const normalizedUserEmail = String(userEmail || "").trim().toLowerCase();
+  if (!normalizedUserEmail) return false;
+  return String(email.from || "").toLowerCase().includes(normalizedUserEmail);
+}
+
+function getEmailTime(email: StoredEmail) {
+  const time = new Date(email.date || "").getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function latestEmailForQueueItem(item: QueueItem, emails: StoredEmail[]) {
+  return emails
+    .filter((email) => emailBelongsToQueueItem(email, item))
+    .sort((a, b) => getEmailTime(b) - getEmailTime(a))[0] || null;
+}
+
+function shouldSuppressAlreadyHandledGmailAction(item: QueueItem, storedEmails: StoredEmail[], userEmail?: string | null) {
+  if (!isGmailHandledCandidate(item)) return false;
+
+  const latestEmail = latestEmailForQueueItem(item, storedEmails);
+  return Boolean(latestEmail && isFromCurrentUser(latestEmail, userEmail));
+}
+
+function suppressAlreadyHandledGmailActions(items: QueueItem[], storedEmails: StoredEmail[], userEmail?: string | null) {
+  if (!userEmail || storedEmails.length === 0) return items;
+  return items.filter((item) => !shouldSuppressAlreadyHandledGmailAction(item, storedEmails, userEmail));
+}
+
 const FixSuggestions = () => {
   const { user, loading } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [queueView, setQueueView] = useState<QueueView>("inbox");
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [expandedInlineTaskId, setExpandedInlineTaskId] = useState<string>("");
@@ -742,19 +1136,37 @@ const FixSuggestions = () => {
   const storedEmails = (storedEmailsQuery.data?.emails || []) as StoredEmail[];
   const rankedQueue = (queueQuery.data?.queue || null) as RankedActionQueue | null;
   const combinedSuggestions = useMemo(
-    () => buildQueueItemsFromRankedQueue(rankedQueue),
-    [rankedQueue],
+    () => suppressAlreadyHandledGmailActions(
+      buildQueueItemsFromRankedQueue(rankedQueue),
+      storedEmails,
+      user?.email,
+    ),
+    [rankedQueue, storedEmails, user?.email],
+  );
+  const daqInboxSuggestions = useMemo(
+    () => buildDaqV1InboxQueue(combinedSuggestions),
+    [combinedSuggestions],
+  );
+  const visibleSuggestionPool = queueView === "inbox" ? daqInboxSuggestions : combinedSuggestions;
+  const effectiveSourceFilter = queueView === "inbox" && sourceFilter !== "followup" ? "all" : sourceFilter;
+  const sourceFilterOptions: SourceFilter[] =
+    queueView === "inbox" ? ["all"] : ["all", "followup", "stale", "apply_gate", "resume", "cleanup"];
+  const urgencyFilteredSuggestionPool = useMemo(
+    () => visibleSuggestionPool.filter((item) => matchesUrgencyFilter(item, urgencyFilter)),
+    [urgencyFilter, visibleSuggestionPool],
   );
 
   const filteredSuggestions = useMemo(() => {
-    return combinedSuggestions.filter((item) => {
-      const urgencyMatch = urgencyFilter === "all" || item.urgency === urgencyFilter;
-      const sourceMatch = sourceFilter === "all" || item.source === sourceFilter;
-      return urgencyMatch && sourceMatch;
+    return urgencyFilteredSuggestionPool.filter((item) => {
+      const sourceMatch = effectiveSourceFilter === "all" || item.source === effectiveSourceFilter;
+      return sourceMatch;
     });
-  }, [combinedSuggestions, sourceFilter, urgencyFilter]);
+  }, [effectiveSourceFilter, urgencyFilteredSuggestionPool]);
 
-  const stats = useMemo(() => buildRankedQueueStats(rankedQueue), [rankedQueue]);
+  const allStats = useMemo(() => buildRankedQueueStats(rankedQueue), [rankedQueue]);
+  const allVisibleStats = useMemo(() => buildQueueItemStats(combinedSuggestions, urgencyFilter), [combinedSuggestions, urgencyFilter]);
+  const daqStats = useMemo(() => buildQueueItemStats(daqInboxSuggestions, urgencyFilter), [daqInboxSuggestions, urgencyFilter]);
+  const stats = queueView === "inbox" ? daqStats : urgencyFilter === "all" ? allStats : allVisibleStats;
 
   const upcomingFollowupWindows = useMemo(() => {
     return buildUpcomingFollowupWindows({
@@ -777,7 +1189,7 @@ const FixSuggestions = () => {
   const followupSuppressionReason = followupQuery.data?.meta?.suppressionReason || "";
 
   const sourceCounts = useMemo(() => {
-    return combinedSuggestions.reduce<Record<QueueSource, number>>(
+    return urgencyFilteredSuggestionPool.reduce<Record<QueueSource, number>>(
       (counts, item) => ({
         ...counts,
         [item.source]: counts[item.source] + 1,
@@ -790,9 +1202,12 @@ const FixSuggestions = () => {
         cleanup: 0,
       },
     );
-  }, [combinedSuggestions]);
+  }, [urgencyFilteredSuggestionPool]);
 
-  const queueVisibleActions = useMemo(() => getRankedQueueVisibleActions(rankedQueue), [rankedQueue]);
+  const visibleQueueActions = useMemo(
+    () => getRankedQueueActionsForQueueItems(rankedQueue, filteredSuggestions),
+    [filteredSuggestions, rankedQueue],
+  );
   const snoozedItems = useMemo(() => {
     if (!rankedQueue?.dismissed?.length) return [] as QueueItem[];
     return buildQueueItemsFromRankedQueue({
@@ -814,6 +1229,9 @@ const FixSuggestions = () => {
       return "Building your action queue...";
     }
     if (combinedSuggestions.length === 0) return rankedQueue?.emptyState?.title || "No active next-best actions right now.";
+    if (visibleSuggestionPool.length === 0 && queueView === "inbox") {
+      return "No urgent inbox actions are due right now. Switch to all actions for Apply Gate, resume, cleanup, and stale-role work.";
+    }
     return "No suggestions match the current filters.";
   }, [
     combinedSuggestions.length,
@@ -821,12 +1239,14 @@ const FixSuggestions = () => {
     loading,
     queueQuery.data,
     queueQuery.isLoading,
+    queueView,
     rankedQueue,
+    visibleSuggestionPool.length,
   ]);
 
   useCanonicalQueueImpressions({
     enabled: isAuthed,
-    actions: queueVisibleActions,
+    actions: visibleQueueActions,
   });
 
   const withPendingLogicalKey = async <T,>(logicalKey: string | undefined, fn: () => Promise<T>) => {
@@ -901,7 +1321,7 @@ const FixSuggestions = () => {
         await closeApplication({
           applicationId: item.applicationId ?? null,
           emailId: item.emailId ?? null,
-          reason: `Closed from Daily Action Queue ghosting signal: ${item.title}`,
+          reason: `Closed from Daily Action Queue close-out cue: ${item.title}`,
         });
         await completeQueueAction({
           logicalKey: item.logicalKey,
@@ -1057,7 +1477,7 @@ const FixSuggestions = () => {
                 Daily Action Queue
               </h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                One prioritized job-search queue grounded in Gmail timing, application state, Apply Gate signals, and cleanup blockers.
+                Career-coach next actions based on your Gmail context: interview prep, recruiter replies, and follow-up windows.
               </p>
             </div>
 
@@ -1085,28 +1505,45 @@ const FixSuggestions = () => {
                 Focus the queue
               </div>
               <p className="mt-1 text-xs text-muted-foreground sm:hidden">
-                Pick a lane when you need focus. Leave it on all when clearing the day.
+                Inbox actions are time-sensitive Gmail moves. All actions includes resume, Apply Gate, cleanup, and stale-role work.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-1.5">
-              {(["all", "high", "medium", "low"] as UrgencyFilter[]).map((value) => (
-                <Button
-                  key={value}
-                  variant={urgencyFilter === value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setUrgencyFilter(value)}
-                >
-                  {value === "all" ? "All urgency" : value}
-                </Button>
-              ))}
+            <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
+                {(["inbox", "all"] as QueueView[]).map((value) => (
+                  <Button
+                    key={value}
+                    variant={queueView === value ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setQueueView(value);
+                      setSourceFilter("all");
+                    }}
+                  >
+                    {value === "inbox" ? `Inbox actions (${daqInboxSuggestions.length})` : `All actions (${combinedSuggestions.length})`}
+                  </Button>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {(["all", "high", "medium", "low"] as UrgencyFilter[]).map((value) => (
+                  <Button
+                    key={value}
+                    variant={urgencyFilter === value ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setUrgencyFilter(value)}
+                  >
+                    {value === "all" ? "All urgency" : value}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
 
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-            {(["all", "followup", "stale", "apply_gate", "resume", "cleanup"] as SourceFilter[]).map((value) => {
-              const count = value === "all" ? combinedSuggestions.length : sourceCounts[value];
-              const active = sourceFilter === value;
+            {sourceFilterOptions.map((value) => {
+              const count = value === "all" ? urgencyFilteredSuggestionPool.length : sourceCounts[value];
+              const active = effectiveSourceFilter === value;
 
               return (
                 <button
@@ -1119,7 +1556,9 @@ const FixSuggestions = () => {
                   }`}
                   onClick={() => setSourceFilter(value)}
                 >
-                  <span className="text-sm font-semibold text-foreground">{sourceFilterLabels[value]}</span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {queueView === "inbox" && value === "all" ? "Inbox due now" : sourceFilterLabels[value]}
+                  </span>
                   <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                     {count}
                   </span>
@@ -1138,24 +1577,24 @@ const FixSuggestions = () => {
             {displayEntries.length === 0 ? (
               <div className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
                 <p className="text-sm font-semibold text-foreground">
-                  {sourceFilter === "followup" && followupSuppressionReason === "dev_bypass_auth"
+                  {effectiveSourceFilter === "followup" && followupSuppressionReason === "dev_bypass_auth"
                     ? "Outreach is suppressed in local bypass mode"
-                    : sourceFilter === "followup" && upcomingFollowupWindows.length > 0
+                    : effectiveSourceFilter === "followup" && upcomingFollowupWindows.length > 0
                     ? hasDueFollowupWindow
                       ? "Outreach window detected"
                       : "No outreach is due yet"
                     : "No active actions"}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  {sourceFilter === "followup" && followupSuppressionReason === "dev_bypass_auth"
+                  {effectiveSourceFilter === "followup" && followupSuppressionReason === "dev_bypass_auth"
                     ? followupQuery.data?.meta?.message || "The backend returned no outreach cards because this session is using local bypass auth."
-                    : sourceFilter === "followup" && upcomingFollowupWindows.length > 0
+                    : effectiveSourceFilter === "followup" && upcomingFollowupWindows.length > 0
                     ? hasDueFollowupWindow
                       ? "The stored email timing says an outreach window is open, but no active card is visible. It may be hidden, snoozed, completed, or waiting on the latest sync."
-                      : "Your tracked applications are between action windows. Nothing is broken; the queue is waiting until a follow-up would be useful instead of noisy."
+                      : "Your applications are between action windows. Nothing is broken; the queue is waiting until a follow-up would help instead of adding noise."
                     : emptyMessage}
                 </p>
-                {sourceFilter === "followup" && upcomingFollowupWindows.length > 0 ? (
+                {effectiveSourceFilter === "followup" && upcomingFollowupWindows.length > 0 ? (
                   <div className="mt-5">
                     <UpcomingFollowupWindowList windows={upcomingFollowupWindows} />
                   </div>
@@ -1177,7 +1616,7 @@ const FixSuggestions = () => {
                             LOW
                           </span>
                           <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${sourceClasses.stale}`}>
-                            Ghosting signal
+                            Ghosting
                           </span>
                           <span className="inline-flex items-center rounded-full border border-border bg-background/80 px-2.5 py-1 text-xs font-medium text-foreground">
                             Batch close-out
@@ -1192,7 +1631,7 @@ const FixSuggestions = () => {
                             Review {entry.items.length} stale roles in one pass
                           </h3>
                           <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-                            These low-urgency ghosting signals are all in close-out territory. Review them once, send a final note only if a role still matters, and close the rest without letting them consume the whole queue.
+                            These low-urgency roles are all in close-out territory. Review them once, send a final note only if a role still matters, and close the rest without letting them consume the whole queue.
                           </p>
                         </div>
 
@@ -1297,6 +1736,8 @@ const FixSuggestions = () => {
                 });
                 const primaryActionLabel = getPrimaryActionLabel(primaryActionKind, item, draft, inlineOpen, draftOpen);
                 const primaryActionHelper = getPrimaryActionHelper(primaryActionKind, item);
+                const canMarkHandledFromCard =
+                  isGmailHandledCandidate(item) && Boolean(item.logicalKey) && primaryActionKind !== "complete";
                 const primaryActionDisabled =
                   primaryActionKind === "draft"
                     ? draftMutation.isPending
@@ -1309,7 +1750,10 @@ const FixSuggestions = () => {
                   || Boolean(gmailUrl && primaryActionKind !== "gmail")
                   || Boolean(showRouteAction && primaryActionKind !== "route");
                 const runDraftAction = () => toggleDraftForItem(item, draftTone);
-                const runCompleteAction = () => void completeQueueItem(item);
+                const runCompleteAction = (message?: string) => {
+                  void completeQueueItem(item, message);
+                };
+                const runHandledAction = () => runCompleteAction("Removed from today's queue.");
                 const runPrimaryAction = () => {
                   setOpenActionMenuId("");
                   if (primaryActionKind === "cleanup") {
@@ -1323,7 +1767,9 @@ const FixSuggestions = () => {
                   } else if (primaryActionKind === "route") {
                     navigate(item.routeHref || "/");
                   } else if (primaryActionKind === "complete") {
-                    runCompleteAction();
+                    runCompleteAction(
+                      isGmailHandledCandidate(item) ? "Removed from today's queue." : undefined,
+                    );
                   }
                 };
 
@@ -1403,38 +1849,17 @@ const FixSuggestions = () => {
                               <p className="mt-1.5 text-sm leading-6 text-foreground">
                                 {item.whyNow || item.sourceDescription}
                               </p>
+                              {item.source === "followup" ? (
+                                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                                  Already handled this in Gmail? Use <span className="font-medium text-foreground">Already handled</span> so it leaves your active queue.
+                                </p>
+                              ) : null}
                             </div>
 
-                            <CollapsibleQueueSection
-                              title="Evidence"
-                              preview={item.evidence?.[0] || "Grounded by the latest tracked signal."}
-                              badge={
-                                item.evidence?.length
-                                  ? `${Math.min(item.evidence.length, 3)} signal${item.evidence.length === 1 ? "" : "s"}`
-                                  : null
-                              }
-                            >
-                              {item.evidence?.length ? (
-                                <div className="space-y-2">
-                                  {item.evidence.slice(0, 3).map((entry) => (
-                                    <p
-                                      key={entry}
-                                      className="rounded-2xl border border-border/70 bg-background/80 px-3 py-2 text-sm leading-6 text-muted-foreground"
-                                      title={entry}
-                                    >
-                                      {entry}
-                                    </p>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
-                                  <p className="text-sm text-muted-foreground">Grounded by the latest tracked signal.</p>
-                                </div>
-                              )}
-                            </CollapsibleQueueSection>
+                            <SourceCheckSection item={item} />
 
                             <CollapsibleQueueSection
-                              title="Recommended steps"
+                              title="How to handle it"
                               preview={item.playbook[0] || item.sourceDescription}
                               badge={item.sourceDescription}
                             >
@@ -1476,7 +1901,7 @@ const FixSuggestions = () => {
                                       Secondary actions
                                     </p>
                                     <p className="mt-1 text-sm text-muted-foreground">
-                                      Snooze, mark done, or jump to the source context.
+                                      Snooze, clear handled work, or jump to the source context.
                                     </p>
                                   </div>
 
@@ -1520,7 +1945,7 @@ const FixSuggestions = () => {
                                           }}
                                         >
                                           <ArrowUpRight className="h-4 w-4" />
-                                          Open Gmail thread
+                                          Open Gmail
                                         </button>
                                       ) : null}
                                       {showRouteAction && primaryActionKind !== "route" ? (
@@ -1560,11 +1985,13 @@ const FixSuggestions = () => {
                                           disabled={mutationBusy}
                                           onClick={() => {
                                             setOpenActionMenuId("");
-                                            runCompleteAction();
+                                            runCompleteAction(
+                                              isGmailHandledCandidate(item) ? "Removed from today's queue." : undefined,
+                                            );
                                           }}
                                         >
                                           <CheckCircle2 className="h-4 w-4" />
-                                          Mark done
+                                          {isGmailHandledCandidate(item) ? "Already handled" : "Mark done"}
                                         </button>
                                       ) : null}
                                     </div>
@@ -1594,9 +2021,21 @@ const FixSuggestions = () => {
                             {primaryActionLabel}
                           </Button>
 
+                          {canMarkHandledFromCard ? (
+                            <Button
+                              className="mt-2 w-full"
+                              variant="outline"
+                              disabled={mutationBusy}
+                              onClick={runHandledAction}
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                              Already handled
+                            </Button>
+                          ) : null}
+
                           <div className="mt-3 flex items-center gap-2 rounded-full bg-muted/45 px-3 py-2 text-xs text-muted-foreground">
                             <ShieldAlert className="h-3.5 w-3.5" />
-                            Evidence-backed recommendation
+                            Based on your source, never auto-sent
                           </div>
                         </aside>
                       </div>
@@ -1624,11 +2063,17 @@ const FixSuggestions = () => {
                 <h2 className="text-sm font-semibold text-foreground">Today's operating order</h2>
               </div>
               <div className="mt-3 space-y-2">
-                {[
-                  ["1", "Clear blockers", `${sourceCounts.cleanup} cleanup task(s) that affect downstream accuracy.`],
-                  ["2", "Handle ambiguity", `${sourceCounts.stale} ghosting signal(s) to close or follow up.`],
-                  ["3", "Improve conversion", `${sourceCounts.followup + sourceCounts.apply_gate + sourceCounts.resume} fit, resume, or outreach action(s).`],
-                ].map(([step, title, body]) => (
+                {(queueView === "inbox"
+                  ? [
+                      ["1", "Handle urgent inbox moves", `${daqStats.highPriority} high-priority Gmail-grounded action(s).`],
+                      ["2", "Act from the conversation", "Open Gmail before drafting, replying, or preparing."],
+                      ["3", "Check the broader backlog", `${Math.max(combinedSuggestions.length - daqInboxSuggestions.length, 0)} non-inbox action(s) live under all actions.`],
+                    ]
+                  : [
+                      ["1", "Clear blockers", `${sourceCounts.cleanup} cleanup task(s) that affect downstream accuracy.`],
+                      ["2", "Handle ambiguity", `${sourceCounts.stale} role(s) need a check-in or close-out.`],
+                      ["3", "Improve conversion", `${sourceCounts.followup + sourceCounts.apply_gate + sourceCounts.resume} fit, resume, or outreach action(s).`],
+                    ]).map(([step, title, body]) => (
                   <div key={step} className="rounded-xl border border-border/70 bg-background/70 p-3">
                     <div className="flex gap-3">
                       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 text-xs font-bold text-accent">
@@ -1651,7 +2096,7 @@ const FixSuggestions = () => {
               </div>
               {upcomingFollowupWindows.length === 0 ? (
                 <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                  No upcoming outreach windows from the currently tracked applications.
+                  No upcoming outreach windows from your current applications.
                 </p>
               ) : (
                 <div className="mt-4">
@@ -1671,7 +2116,7 @@ const FixSuggestions = () => {
                 <h2 className="text-sm font-semibold text-foreground">Queue details</h2>
               </div>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                Diagnostics, reliability rules, and hidden-state management live here instead of the main queue.
+                Older, hidden, and completed actions live here so the main queue stays focused.
               </p>
             </div>
             <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
@@ -1754,7 +2199,7 @@ const FixSuggestions = () => {
                   <h2 className="text-sm font-semibold text-foreground">Reliability rules</h2>
                 </div>
                 <div className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
-                  <p>Actions need a source signal, a why-now reason, and evidence before they appear.</p>
+                  <p>Actions need clear source context, a why-now reason, and evidence before they appear.</p>
                   <p>Follow-up outcome analytics stay scoped to email suggestions, so cleanup and Apply Gate actions do not pollute response-rate comparisons.</p>
                 </div>
                 <div className="mt-4 rounded-2xl bg-muted/40 p-3">

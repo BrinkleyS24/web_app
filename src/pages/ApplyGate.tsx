@@ -532,6 +532,12 @@ type ApplyGateHistoryDisplayItem = ApplyGateHistoryItem & {
 
 type ApplyGateAction = "applied" | "fixed" | "skipped";
 
+type ApplyGateActionSaveState = {
+  verdictId: string;
+  action: ApplyGateAction;
+  surface: "current_result" | "history";
+} | null;
+
 type DecisionAction = {
   action: ApplyGateAction;
   label: string;
@@ -894,6 +900,8 @@ const ApplyGate = () => {
   const [result, setResult] = useState<ApplyGateResult | null>(null);
   const [isCurrentWarningExpanded, setIsCurrentWarningExpanded] = useState(false);
   const [expandedHistoryWarnings, setExpandedHistoryWarnings] = useState<Record<string, boolean>>({});
+  const [savingAction, setSavingAction] = useState<ApplyGateActionSaveState>(null);
+  const [actionSaveError, setActionSaveError] = useState<{ verdictId: string; message: string } | null>(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -934,6 +942,8 @@ const ApplyGate = () => {
     onSuccess: (data) => {
       setResult(data);
       setIsCurrentWarningExpanded(false);
+      setSavingAction(null);
+      setActionSaveError(null);
       const currentAsHistory = buildHistoryDisplayItemFromResult(data, jobTitle, companyName, null);
       if (currentAsHistory && !currentAsHistory._unsaved) {
         const persistedHistoryItem = currentAsHistory as ApplyGateHistoryItem;
@@ -982,7 +992,7 @@ const ApplyGate = () => {
   );
 
   const handleAction = useCallback(
-    (action: ApplyGateAction) => {
+    async (action: ApplyGateAction) => {
       const targetUrl = (result?.jobUrl || "").trim();
       if (result?.id) {
         const displayDecision = displayDecisionFromResult(result);
@@ -1015,10 +1025,40 @@ const ApplyGate = () => {
           calibrationBucket: result.explanation?.calibration_bucket || null,
         });
 
-        markVerdictActionInCache(result.id, action);
-        updateApplyGateAction(result.id, action, { feedback })
-          .then(() => queryClient.invalidateQueries({ queryKey: ["apply-gate-history"] }))
-          .catch(() => {});
+        let pendingApplyWindow: Window | null = null;
+        if (action === "applied" && targetUrl) {
+          try {
+            pendingApplyWindow = window.open("about:blank", "_blank", "noopener,noreferrer");
+          } catch {
+            pendingApplyWindow = null;
+          }
+        }
+
+        setSavingAction({ verdictId: result.id, action, surface: "current_result" });
+        setActionSaveError((current) => (current?.verdictId === result.id ? null : current));
+
+        try {
+          await updateApplyGateAction(result.id, action, { feedback });
+          markVerdictActionInCache(result.id, action);
+          await queryClient.invalidateQueries({ queryKey: ["apply-gate-history"] });
+          if (action === "applied" && targetUrl) {
+            if (pendingApplyWindow) {
+              pendingApplyWindow.location.href = targetUrl;
+            } else {
+              window.open(targetUrl, "_blank", "noopener,noreferrer");
+            }
+          }
+          setResult(null);
+        } catch {
+          pendingApplyWindow?.close();
+          setActionSaveError({
+            verdictId: result.id,
+            message: "Choice not saved. Try again.",
+          });
+        } finally {
+          setSavingAction((current) => (current?.verdictId === result.id ? null : current));
+        }
+        return;
       }
       if (action === "applied" && targetUrl) {
         window.open(targetUrl, "_blank", "noopener,noreferrer");
@@ -1029,7 +1069,7 @@ const ApplyGate = () => {
   );
 
   const handleHistoryAction = useCallback(
-    (item: ApplyGateHistoryDisplayItem, action: ApplyGateAction) => {
+    async (item: ApplyGateHistoryDisplayItem, action: ApplyGateAction) => {
       const displayDecision = displayDecisionFromHistory(item);
       const useDisplayDecision = applyGateDisplayDecisionV1Enabled() && Boolean(displayDecision);
       const status = useDisplayDecision ? statusFromDisplayDecision(displayDecision) : verdictToStatus(item.verdict);
@@ -1056,10 +1096,21 @@ const ApplyGate = () => {
         calibrationBucket: item.explanation_payload?.calibration_bucket || null,
       });
 
-      markVerdictActionInCache(item.id, action);
-      updateApplyGateAction(item.id, action, { feedback })
-        .then(() => queryClient.invalidateQueries({ queryKey: ["apply-gate-history"] }))
-        .catch(() => {});
+      setSavingAction({ verdictId: item.id, action, surface: "history" });
+      setActionSaveError((current) => (current?.verdictId === item.id ? null : current));
+
+      try {
+        await updateApplyGateAction(item.id, action, { feedback });
+        markVerdictActionInCache(item.id, action);
+        await queryClient.invalidateQueries({ queryKey: ["apply-gate-history"] });
+      } catch {
+        setActionSaveError({
+          verdictId: item.id,
+          message: "Choice not saved. Try again.",
+        });
+      } finally {
+        setSavingAction((current) => (current?.verdictId === item.id ? null : current));
+      }
     },
     [markVerdictActionInCache, queryClient],
   );
@@ -1231,6 +1282,10 @@ const ApplyGate = () => {
       : (currentStatus
         ? decisionActionsForStatus(currentStatus, currentRecommendation, Boolean(result?.scoringBreakdown?.hardBlocker))
         : []));
+  const currentSavePending = Boolean(result?.id && savingAction?.verdictId === result.id);
+  const currentSaveError = result?.id && actionSaveError?.verdictId === result.id
+    ? actionSaveError.message
+    : null;
   const currentFitLabel = currentDisplayDecisionMissing
     ? "Decision unavailable"
     : reviewLabelForDecisionLabel(currentDecisionLabel, currentStatus || "risky");
@@ -1577,19 +1632,29 @@ const ApplyGate = () => {
                     size="sm"
                     variant={item.variant || "default"}
                     className={`${item.className || ""} text-xs h-8`.trim()}
-                    onClick={() => handleAction(item.action)}
+                    onClick={() => void handleAction(item.action)}
+                    disabled={currentSavePending}
+                    aria-busy={currentSavePending && savingAction?.action === item.action ? "true" : undefined}
                   >
-                    {item.label}
+                    {currentSavePending && savingAction?.action === item.action ? "Saving..." : item.label}
                   </Button>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground">
-                {currentDisplayDecisionMissing
-                  ? "No action was saved because the decision contract was unavailable."
-                  : currentHasUniversalHardGate
-                  ? "Apply anyway only if you already meet these requirements and your resume is missing the proof."
-                  : "Your choice is saved to improve future targeting, action queues, and outcome memory."}
-              </p>
+              {currentSaveError ? (
+                <p role="alert" className="text-xs font-medium text-destructive">
+                  {currentSaveError}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground" aria-live="polite">
+                  {currentSavePending
+                    ? "Saving your choice..."
+                    : currentDisplayDecisionMissing
+                    ? "Choose what you did only after the decision reloads cleanly."
+                    : currentHasUniversalHardGate
+                    ? "Apply anyway only if you already meet these requirements and your resume is missing the proof."
+                    : "Choose what you did. This keeps future recommendations grounded."}
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -1650,6 +1715,10 @@ const ApplyGate = () => {
                   const outcomeBands = historyOutcomeBands(item, status);
                   const decisionConfidence = decisionConfidenceLabel(item.explanation_payload?.decision_confidence || null);
                   const historyVisibleReasons = displayDecisionMissing ? [] : visibleReasons;
+                  const historySavePending = savingAction?.verdictId === item.id;
+                  const historySaveError = actionSaveError?.verdictId === item.id
+                    ? actionSaveError.message
+                    : null;
                   return (
                     <>
                 <div className="flex items-start justify-between">
@@ -1700,15 +1769,25 @@ const ApplyGate = () => {
                         size="sm"
                         variant={actionItem.variant || "default"}
                         className={`${actionItem.className || ""} text-xs h-8`.trim()}
-                        onClick={() => handleHistoryAction(item, actionItem.action)}
+                        onClick={() => void handleHistoryAction(item, actionItem.action)}
+                        disabled={historySavePending}
+                        aria-busy={historySavePending && savingAction?.action === actionItem.action ? "true" : undefined}
                       >
-                        {actionItem.label}
+                        {historySavePending && savingAction?.action === actionItem.action ? "Saving..." : actionItem.label}
                       </Button>
                     ))}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Saving this choice keeps Strategy Alerts and Outcome Memory grounded in what you actually did.
-                  </p>
+                  {historySaveError ? (
+                    <p role="alert" className="text-xs font-medium text-destructive">
+                      {historySaveError}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground" aria-live="polite">
+                      {historySavePending
+                        ? "Saving your choice..."
+                        : "Choose what you did. This keeps future recommendations grounded."}
+                    </p>
+                  )}
                 </div>
                     </>
                   );

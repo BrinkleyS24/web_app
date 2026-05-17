@@ -30,7 +30,6 @@ type AdminUserRow = {
   initialSyncComplete: boolean;
   syncProgressPercentage: number | null;
   emailsProcessed: number;
-  monthlyEmailsProcessed: number;
   subscriptionStatus: string | null;
   hasStripeCustomer: boolean;
   hasStripeSubscription: boolean;
@@ -65,6 +64,24 @@ type UserDetailPayload = {
   impact: UserImpact;
 };
 
+type IgnoredEmailRecoveryJob = {
+  id: string;
+  userId: string;
+  status: string;
+  totalEstimate: number;
+  processedCount: number;
+  recoveredCount: number;
+  failedCount: number;
+  skippedCount: number;
+  dbFirstCount: number;
+  gmailFetchCount: number;
+  lastError: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
 function formatDateTime(value?: string | null) {
   if (!value) return "--";
   const date = new Date(value);
@@ -77,8 +94,20 @@ function formatPercent(value?: number | null) {
   return `${Math.round(value)}%`;
 }
 
+function formatApproxMinutes(minutes: number) {
+  if (!Number.isFinite(minutes) || minutes <= 0) return null;
+  if (minutes < 60) return `${Math.ceil(minutes)} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = Math.ceil(minutes % 60);
+  return remainder > 0 ? `${hours} hr ${remainder} min` : `${hours} hr`;
+}
+
 function normalizeEmail(value?: string | null) {
   return String(value || "").trim().toLowerCase();
+}
+
+function looksLikeEmail(value?: string | null) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
 function countLabel(key: string) {
@@ -89,6 +118,8 @@ function countLabel(key: string) {
       return "Applications";
     case "ignoredEmails":
       return "Ignored emails";
+    case "ignoredEmailRecoveryJobs":
+      return "Ignored email recovery jobs";
     case "roleMappings":
       return "Role mappings";
     case "suggestionActions":
@@ -102,6 +133,21 @@ function countLabel(key: string) {
     default:
       return key;
   }
+}
+
+function fullRefreshRuntimeHint(impact?: UserImpact | null) {
+  const recoverableCount = Number(impact?.counts?.ignoredEmails || 0);
+  if (!Number.isFinite(recoverableCount) || recoverableCount <= 0) {
+    return "Pending means the request is queued or running. Refresh this view to check whether it has cleared.";
+  }
+
+  const batches = Math.ceil(recoverableCount / 100);
+  const lowMinutes = Math.max(2, batches * 2);
+  const highMinutes = Math.max(lowMinutes + 2, batches * 3);
+  const lowLabel = formatApproxMinutes(lowMinutes);
+  const highLabel = formatApproxMinutes(highMinutes);
+
+  return `This account has ${recoverableCount.toLocaleString()} recoverable ignored emails. Full refresh runs in safe batches of about 100 emails, so it can take roughly ${lowLabel}-${highLabel}.`;
 }
 
 function FlagPill({
@@ -141,6 +187,9 @@ export default function AdminUsers() {
   const [confirmEmail, setConfirmEmail] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [fullRefreshBusy, setFullRefreshBusy] = useState(false);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryStatusBusy, setRecoveryStatusBusy] = useState(false);
+  const [recoveryJob, setRecoveryJob] = useState<IgnoredEmailRecoveryJob | null>(null);
   const [actionMessage, setActionMessage] = useState("");
 
   async function loadUsers(nextSearch = search) {
@@ -183,8 +232,13 @@ export default function AdminUsers() {
         method: "GET",
       });
       setDetailData(response as UserDetailPayload);
+      const recoveryResponse = await apiFetch(`/api/admin/users/${encodeURIComponent(userId)}/ignored-email-recovery`, {
+        method: "GET",
+      });
+      setRecoveryJob((recoveryResponse?.job as IgnoredEmailRecoveryJob | null) || null);
     } catch (err: any) {
       setDetailData(null);
+      setRecoveryJob(null);
       setDetailError(err?.message || "Failed to load user details.");
     } finally {
       setDetailLoading(false);
@@ -240,16 +294,57 @@ export default function AdminUsers() {
     }
   }
 
+  async function loadRecoveryStatus() {
+    if (!detailData?.user?.id) return;
+
+    setRecoveryStatusBusy(true);
+    setActionMessage("");
+    try {
+      const response = await apiFetch(`/api/admin/users/${encodeURIComponent(detailData.user.id)}/ignored-email-recovery`, {
+        method: "GET",
+      });
+      setRecoveryJob((response?.job as IgnoredEmailRecoveryJob | null) || null);
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to load recovery status.");
+    } finally {
+      setRecoveryStatusBusy(false);
+    }
+  }
+
+  async function handleQueueIgnoredRecovery() {
+    if (!detailData?.user?.id) return;
+
+    setRecoveryBusy(true);
+    setActionMessage("");
+    try {
+      const response = await apiFetch(`/api/admin/users/${encodeURIComponent(detailData.user.id)}/ignored-email-recovery`, {
+        method: "POST",
+        body: {},
+      });
+      setRecoveryJob((response?.job as IgnoredEmailRecoveryJob | null) || null);
+      setActionMessage(String(response?.message || `Targeted recovery requested for ${detailData.user.email}.`));
+    } catch (err: any) {
+      setActionMessage(err?.message || "Failed to queue targeted recovery.");
+    } finally {
+      setRecoveryBusy(false);
+    }
+  }
+
   const totalUsers = listData?.pagination?.totalCount || 0;
   const canDelete =
     detailData?.impact?.canDelete === true
     && normalizeEmail(confirmEmail) === normalizeEmail(detailData?.user?.email)
     && !deleteBusy;
+  const confirmationTarget = detailData?.user?.email || "";
+  const confirmationTargetIsEmail = looksLikeEmail(confirmationTarget);
 
   const impactRows = useMemo(() => {
     const counts = detailData?.impact?.counts || {};
     return Object.entries(counts);
   }, [detailData]);
+  const recoveryPercent = recoveryJob && recoveryJob.totalEstimate > 0
+    ? Math.min(100, Math.round((recoveryJob.processedCount / recoveryJob.totalEstimate) * 100))
+    : null;
 
   return (
     <AdminLayout>
@@ -350,7 +445,6 @@ export default function AdminUsers() {
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       <div>{user.emailsProcessed} processed</div>
-                      <div className="mt-1 text-xs">{user.monthlyEmailsProcessed} this month</div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{formatDateTime(user.lastEmailSyncAt)}</td>
                     <td className="px-4 py-3">
@@ -483,16 +577,70 @@ export default function AdminUsers() {
                 <section className="rounded-xl border border-border bg-background/70 p-4 space-y-4">
                   <div className="flex items-center gap-2">
                     <RefreshCw className="w-4 h-4 text-accent" />
-                    <h3 className="text-sm font-semibold text-foreground">Recovery Sync</h3>
+                    <h3 className="text-sm font-semibold text-foreground">Targeted Recovery</h3>
                   </div>
 
                   <p className="text-sm text-muted-foreground">
-                    Queue a full refresh for this user to reprocess recoverable auto-ignored Gmail messages with the current classifier.
+                    Reclassify recoverable auto-ignored messages by cursor. Stored email bodies are used first; Gmail is queried only when a candidate lacks a stored body.
                   </p>
 
                   {!detailData.user.hasGoogleRefreshToken ? (
                     <p className="text-sm text-warning-foreground">
-                      This user has not connected Gmail, so a full refresh cannot run.
+                      This user has not connected Gmail, so targeted recovery cannot run.
+                    </p>
+                  ) : null}
+
+                  {recoveryJob ? (
+                    <div className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-medium text-foreground">Status: {recoveryJob.status}</span>
+                        <span className="text-muted-foreground">
+                          {recoveryPercent === null ? "--" : `${recoveryPercent}%`}
+                        </span>
+                      </div>
+                      <div className="mt-2 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                        <span>Processed {recoveryJob.processedCount} / {recoveryJob.totalEstimate}</span>
+                        <span>Recovered {recoveryJob.recoveredCount}</span>
+                        <span>DB-first {recoveryJob.dbFirstCount}</span>
+                        <span>Gmail fetch {recoveryJob.gmailFetchCount}</span>
+                        <span>Failed {recoveryJob.failedCount}</span>
+                        <span>Updated {formatDateTime(recoveryJob.updatedAt)}</span>
+                      </div>
+                      {recoveryJob.lastError ? (
+                        <p className="mt-2 text-xs text-destructive">{recoveryJob.lastError}</p>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={handleQueueIgnoredRecovery}
+                      disabled={recoveryBusy || !detailData.user.hasGoogleRefreshToken || recoveryJob?.status === "queued" || recoveryJob?.status === "running"}
+                    >
+                      {recoveryBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                      {recoveryJob?.status === "queued" || recoveryJob?.status === "running" ? "Recovery active" : "Run targeted recovery"}
+                    </Button>
+                    <Button variant="outline" onClick={loadRecoveryStatus} disabled={recoveryStatusBusy}>
+                      {recoveryStatusBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                      Refresh status
+                    </Button>
+                  </div>
+                </section>
+
+                <section className="rounded-xl border border-border bg-background/70 p-4 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4 text-muted-foreground" />
+                    <h3 className="text-sm font-semibold text-foreground">Full Refresh Fallback</h3>
+                  </div>
+
+                  <p className="text-sm text-muted-foreground">
+                    Keep this rollback path for cases where targeted recovery is not enough.
+                  </p>
+
+                  {detailData.user.pendingFullRefresh ? (
+                    <p className="text-sm text-muted-foreground">
+                      {fullRefreshRuntimeHint(detailData.impact)}
                     </p>
                   ) : null}
 
@@ -539,11 +687,17 @@ export default function AdminUsers() {
                   )}
 
                   <div className="space-y-2">
-                    <p className="text-sm font-medium text-foreground">Type the user email to confirm deletion</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {confirmationTargetIsEmail
+                        ? "Type the user email to confirm deletion"
+                        : "Type the account identifier to confirm deletion"}
+                    </p>
                     <Input
                       value={confirmEmail}
                       onChange={(event) => setConfirmEmail(event.target.value)}
-                      placeholder={detailData.user.email}
+                      name="admin-delete-confirmation"
+                      autoComplete="off"
+                      placeholder={confirmationTarget}
                       disabled={deleteBusy || detailData.impact.blockers.length > 0}
                     />
                   </div>

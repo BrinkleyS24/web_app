@@ -20,19 +20,21 @@ const viteCacheDir =
     "vite-cache",
     String(Date.now()),
   );
+const playwrightPort = process.env.PLAYWRIGHT_PORT || "4178";
+const playwrightBaseUrl = `http://127.0.0.1:${playwrightPort}`;
 
 export default defineConfig({
   testDir: "./e2e",
   outputDir: playwrightOutputDir,
   timeout: 30_000,
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL: playwrightBaseUrl,
     headless: true,
   },
   webServer: {
-    command: "npm run dev -- --host 127.0.0.1 --port 4173",
-    url: "http://127.0.0.1:4173",
-    reuseExistingServer: true,
+    command: `npm run dev -- --host 127.0.0.1 --port ${playwrightPort} --strictPort`,
+    url: playwrightBaseUrl,
+    reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === "true",
     env: {
       VITE_DEV_AUTH_BYPASS: "true",
       VITE_DEV_AUTH_EMAIL: "candidate@example.test",

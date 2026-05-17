@@ -35,11 +35,11 @@ import {
   type ApplyGateResult,
 } from "@/lib/emails";
 import {
+  buildDaqV1InboxQueue,
   buildQueueItemsFromRankedQueue,
   buildRankedQueueStats,
   buildGmailThreadUrl,
   formatRelativeAge,
-  isDaqV1InboxAction,
   sourceClasses,
   urgencyClasses,
   type QueueItem,
@@ -478,7 +478,7 @@ const Dashboard = () => {
   const activeQueue = useMemo(() => buildQueueItemsFromRankedQueue(rankedQueue), [rankedQueue]);
   const queueStats = useMemo(() => buildRankedQueueStats(rankedQueue), [rankedQueue]);
   const daqInboxQueue = useMemo(
-    () => activeQueue.filter((item) => isDaqV1InboxAction(item) && item.bucket !== "blocked"),
+    () => buildDaqV1InboxQueue(activeQueue),
     [activeQueue],
   );
   const daqStats = useMemo(
@@ -497,13 +497,15 @@ const Dashboard = () => {
     [daqInboxQueue],
   );
   const dataLoadErrors = [
-    syncError ? `Email sync: ${syncError}` : null,
     metricsQuery.isError ? `Metrics: ${metricsQuery.error instanceof Error ? metricsQuery.error.message : "Unable to load metrics"}` : null,
     applicationStatsQuery.data?.error ? `Applications: ${applicationStatsQuery.data.error}` : null,
     suggestionAnalyticsQuery.data?.error ? `Outcome analytics: ${suggestionAnalyticsQuery.data.error}` : null,
     applyGateHistoryQuery.isError ? `Apply Gate history: ${applyGateHistoryQuery.error instanceof Error ? applyGateHistoryQuery.error.message : "Unable to load Apply Gate history"}` : null,
     strategyAlertsQuery.data?.error ? `Strategy alerts: ${strategyAlertsQuery.data.error}` : null,
     queueQuery.data?.error ? `Action queue: ${queueQuery.data.error}` : null,
+  ].filter(Boolean) as string[];
+  const dataLoadWarnings = [
+    syncError ? `Email sync: ${syncError}` : null,
   ].filter(Boolean) as string[];
 
   return (
@@ -513,7 +515,7 @@ const Dashboard = () => {
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent">Today's search brief</p>
           <h1 className="text-3xl font-bold text-foreground">Know what your inbox says needs attention today.</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            Applendium uses read-only Gmail signals to surface interview prep, recruiter replies, and follow-up windows before they get buried.
+            Applendium uses read-only Gmail context to surface interview prep, recruiter replies, and follow-up windows before they get buried.
           </p>
         </div>
 
@@ -526,6 +528,20 @@ const Dashboard = () => {
             <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-destructive/85">
               {dataLoadErrors.slice(0, 4).map((error) => (
                 <li key={error}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {dataLoadErrors.length === 0 && dataLoadWarnings.length > 0 ? (
+          <div className="rounded-2xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
+            <p className="font-semibold text-warning">Inbox refresh needs attention.</p>
+            <p className="mt-1 text-warning/85">
+              Existing dashboard data loaded, but the latest Gmail sync did not finish for this session.
+            </p>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-warning/85">
+              {dataLoadWarnings.slice(0, 3).map((warning) => (
+                <li key={warning}>{warning}</li>
               ))}
             </ul>
           </div>
@@ -667,7 +683,7 @@ const Dashboard = () => {
                     Daily Action Queue
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    The premium inbox layer starts with the three urgent actions that are easiest to trust: interviews, recruiter replies, and follow-ups.
+                    The premium inbox layer starts with the urgent moves that are easiest to trust: interviews, recruiter replies, and follow-ups.
                   </p>
                 </div>
                 <Link to="/fix-suggestions" className="text-sm text-accent hover:underline">
@@ -693,7 +709,7 @@ const Dashboard = () => {
               <div className="space-y-3">
                 {todaysMoves.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-border bg-background/40 p-4 text-sm text-muted-foreground">
-                    No urgent inbox actions right now. The broader queue may still have Apply Gate, cleanup, or strategy work, but DAQ v1 stays focused on time-sensitive Gmail signals.
+                    No urgent inbox actions right now. The broader queue may still have Apply Gate, cleanup, or strategy work, but DAQ v1 stays focused on time-sensitive Gmail context.
                   </div>
                 ) : (
                   todaysMoves.map((move) => <TodayMoveCard key={move.id} move={move} />)
@@ -863,6 +879,12 @@ function TodayMoveCard({ move }: { move: QueueItem }) {
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">First move</p>
           <p className="mt-1 text-sm text-muted-foreground">{move.playbook[0]}</p>
         </div>
+      ) : null}
+
+      {move.source === "followup" ? (
+        <p className="text-xs leading-5 text-muted-foreground">
+          Check the company and role in Gmail before sending; inbox details can lag behind your latest conversation.
+        </p>
       ) : null}
 
       <div className="flex flex-wrap gap-2">

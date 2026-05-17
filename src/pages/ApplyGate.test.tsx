@@ -138,6 +138,7 @@ async function runAnalyze(options?: { companyName?: string; jobTitle?: string; j
 }
 
 beforeEach(() => {
+  vi.stubEnv("VITE_APPLY_GATE_DISPLAY_DECISION_V1", "false");
   fetchResume.mockResolvedValue({ success: true, resumeText: "resume text with enough length" });
   fetchApplyGateHistory.mockResolvedValue({ success: true, history: [] });
   updateApplyGateAction.mockResolvedValue({ success: true });
@@ -829,6 +830,23 @@ describe("ApplyGate current UI", () => {
         },
       );
     });
+  });
+
+  test("keeps the current decision visible when saving the action fails", async () => {
+    updateApplyGateAction.mockRejectedValueOnce(new Error("Save failed"));
+    analyzeJobAlignment.mockResolvedValue({
+      ...baseResult,
+      jobTitle: "Automation Engineer",
+      companyName: "Acme Robotics",
+    });
+    renderPage();
+
+    await runAnalyze({ companyName: "Acme Robotics" });
+    await userEvent.click(await screen.findByRole("button", { name: "I'll fix first" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Choice not saved. Try again.");
+    expect(screen.getByRole("heading", { name: "Fix first before applying" })).toBeInTheDocument();
+    expect(screen.getByText("Automation Engineer")).toBeInTheDocument();
   });
 
   test("marks recommendation overrides when the user applies against a skip decision", async () => {

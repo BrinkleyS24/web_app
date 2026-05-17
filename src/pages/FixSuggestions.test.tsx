@@ -398,36 +398,195 @@ describe("FixSuggestions", () => {
       await screen.findByRole("heading", { name: "Send thank-you note to Wells Fargo" }),
     ).toBeInTheDocument();
     expect(
-      await screen.findByRole("heading", {
+      screen.queryByRole("heading", {
         name: "Move Associate Quality Engineer - Software (QA) out of active focus",
       }),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
 
-    const outreachLane = screen.getAllByText("Outreach")[0]?.closest("button");
-    const ghostingLane = screen.getAllByText("Ghosting")[0]?.closest("button");
-    const cleanupLane = screen.getByText("Cleanup").closest("button");
+    expect(screen.getByRole("button", { name: /Inbox actions \(1\)/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /All actions \(2\)/ })).toBeInTheDocument();
 
-    expect(outreachLane).toBeTruthy();
-    expect(ghostingLane).toBeTruthy();
-    expect(cleanupLane).toBeTruthy();
+    const inboxLane = screen.getByText("Inbox due now").closest("button");
+    expect(inboxLane).toBeTruthy();
 
-    expect(within(outreachLane as HTMLElement).getByText("1")).toBeInTheDocument();
-    expect(within(outreachLane as HTMLElement).getByText("2 upcoming")).toBeInTheDocument();
-    expect(within(ghostingLane as HTMLElement).getByText("1")).toBeInTheDocument();
-    expect(within(cleanupLane as HTMLElement).getByText("0")).toBeInTheDocument();
+    expect(within(inboxLane as HTMLElement).getByText("1")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Outreach tasks/ })).not.toBeInTheDocument();
 
     expect(screen.getAllByText("First follow-up window for QA Analyst I").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Final check-in window for Software Development Engineer I").length).toBeGreaterThan(0);
     expect(screen.getByText("Queue details")).toBeInTheDocument();
     expect(screen.getAllByText("Why now").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Evidence").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Source check").length).toBeGreaterThan(0);
+    expect(screen.getByText("Before you act")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Already handled" })).toBeInTheDocument();
+    expect(screen.getByText("Based on your source, never auto-sent")).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(recordQueueActionImpression).toHaveBeenCalled();
+      expect(recordQueueActionImpression).toHaveBeenCalledTimes(1);
+    });
+    expect(recordQueueActionImpression).toHaveBeenCalledWith({
+      logicalKey: "followup:wf-thread",
+      dedupeKey: "followup:wf-thread:v1",
+    });
+    expect(recordQueueActionImpression).not.toHaveBeenCalledWith({
+      logicalKey: "stale:ghost-thread",
+      dedupeKey: "stale:ghost-thread:v1",
     });
   });
 
+  test("lets users clear Gmail work they already handled outside the product", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Already handled" }));
+
+    await waitFor(() => {
+      expect(completeQueueAction).toHaveBeenCalledWith({
+        logicalKey: "followup:wf-thread",
+        dedupeKey: "followup:wf-thread:v1",
+      });
+    });
+    expect(toastSuccess).toHaveBeenCalledWith("Removed from today's queue.");
+  });
+
+  test("hides Gmail actions when the latest tracked thread message is from the user", async () => {
+    fetchStoredEmails.mockResolvedValueOnce({
+      success: true,
+      emails: [
+        ...storedEmails,
+        {
+          id: "wf-user-reply",
+          thread_id: "wf-thread",
+          subject: "Re: We would like to invite you to come back",
+          from: "candidate@example.test",
+          date: "2026-04-11T10:00:00.000Z",
+          category: "interviewed",
+          company_name: "Wells Fargo",
+          position: "Software Engineer",
+          applicationId: "wf-app",
+        },
+      ],
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("Daily Action Queue")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("heading", { name: "Send thank-you note to Wells Fargo" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(screen.getByText(/No urgent inbox actions are due right now/)).toBeInTheDocument();
+  });
+
+  test("does not show malformed serialized evidence on Apply Gate cards", async () => {
+    const user = userEvent.setup();
+    fetchRankedActionQueue.mockResolvedValue(
+      buildQueueResponse({
+        doToday: [
+          {
+            id: "queue-apply-1",
+            logicalKey: "apply-gate:qa-engineer",
+            dedupeKey: "apply-gate:qa-engineer:v1",
+            primaryEntityId: "qa-engineer",
+            evidenceVersion: "v1",
+            actionType: "apply_gate_fix",
+            actionCategory: "fit",
+            title: "Apply to QA Engineer",
+            whyNow: "This role is worth applying to after you close the strongest proof gap.",
+            targetOutcome: "Submit a stronger application.",
+            effortMinutes: 12,
+            urgencyLevel: "medium",
+            confidenceLevel: "moderate",
+            source: "apply_gate",
+            status: "open",
+            effectiveStatus: "open",
+            createdAt: "2026-04-10T12:00:00.000Z",
+            evidence: ['["The'],
+            threadId: "apply-gate:qa-engineer",
+            suggestionSource: "apply_gate_action_plan",
+            queueSource: "apply_gate",
+            intent: "FIX_BEFORE_APPLYING",
+            intentLabel: "Apply",
+            playbook: ["Add one stronger automation proof point before applying."],
+            sourceLabel: "Apply Gate",
+            draftEligible: false,
+            routeHref: "/apply-gate",
+            routeLabel: "Review Apply Gate",
+            stageLabel: "Job fit",
+            company: "Acme",
+            blockingReason: "Tailor resume first",
+          },
+        ],
+        thisWeek: [],
+      }),
+    );
+
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: /All actions/ }));
+    await user.click(screen.getByRole("button", { name: /Apply Gate\s+1/ }));
+
+    expect(await screen.findByRole("heading", { name: "Apply to QA Engineer" })).toBeInTheDocument();
+    expect(screen.getByText("Why this is queued")).toBeInTheDocument();
+    expect(screen.getByText("Recommendation")).toBeInTheDocument();
+    expect(screen.getAllByText("Tailor resume first").length).toBeGreaterThan(0);
+    expect(screen.queryByText('["The')).not.toBeInTheDocument();
+  });
+
+  test("records canonical impressions only after hidden queue sections become visible", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "Send thank-you note to Wells Fargo" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(recordQueueActionImpression).toHaveBeenCalledTimes(1);
+    });
+    expect(recordQueueActionImpression).toHaveBeenLastCalledWith({
+      logicalKey: "followup:wf-thread",
+      dedupeKey: "followup:wf-thread:v1",
+    });
+
+    await user.click(screen.getByRole("button", { name: /All actions \(2\)/ }));
+    await user.click(screen.getByRole("button", { name: /Ghosting\s+1/ }));
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Move Associate Quality Engineer - Software (QA) out of active focus",
+      }),
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(recordQueueActionImpression).toHaveBeenCalledWith({
+        logicalKey: "stale:ghost-thread",
+        dedupeKey: "stale:ghost-thread:v1",
+      });
+    });
+    expect(recordQueueActionImpression).toHaveBeenCalledTimes(2);
+  });
+
+  test("updates category counts when urgency filters are active", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: /All actions \(2\)/ }));
+    expect(screen.getByRole("button", { name: /Outreach tasks\s+1/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Ghosting\s+1/ })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "high" }));
+
+    expect(screen.getByRole("button", { name: /Ghosting\s+0/ })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Ghosting\s+0/ }));
+
+    expect(await screen.findByText("No active actions")).toBeInTheDocument();
+    expect(screen.getByText("No suggestions match the current filters.")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", {
+        name: "Move Associate Quality Engineer - Software (QA) out of active focus",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
   test("groups multiple low-urgency stale close-out cards into one batch card", async () => {
+    const user = userEvent.setup();
     fetchRankedActionQueue.mockResolvedValueOnce(
       buildQueueResponse({
         thisWeek: [
@@ -550,6 +709,7 @@ describe("FixSuggestions", () => {
     );
 
     renderPage();
+    await user.click(await screen.findByRole("button", { name: /All actions \(4\)/ }));
 
     expect(await screen.findByText("Review 3 stale roles in one pass")).toBeInTheDocument();
     expect(screen.getByText("Batch close-out lane")).toBeInTheDocument();
@@ -561,6 +721,7 @@ describe("FixSuggestions", () => {
   test("allows closing a stale application directly from the ghosting card", async () => {
     const user = userEvent.setup();
     renderPage();
+    await user.click(await screen.findByRole("button", { name: /All actions \(2\)/ }));
 
     const closeButton = await screen.findByRole("button", { name: "Close application" });
     await user.click(closeButton);
@@ -570,7 +731,7 @@ describe("FixSuggestions", () => {
         applicationId: "ghost-app",
         emailId: "ghost-email",
         reason:
-          "Closed from Daily Action Queue ghosting signal: Move Associate Quality Engineer - Software (QA) out of active focus",
+          "Closed from Daily Action Queue close-out cue: Move Associate Quality Engineer - Software (QA) out of active focus",
       });
     });
 
@@ -611,7 +772,7 @@ describe("FixSuggestions", () => {
     expect(screen.getAllByText("Latest activity: 4/9/2026").length).toBeGreaterThan(0);
     expect(screen.getByText(/Thanks for completing the Early Careers Engineering Assessment\./)).toBeInTheDocument();
     expect(screen.getByText("Suggested reply contact: Jordan Lee <jordan@example.test>")).toBeInTheDocument();
-    expect(screen.getByText("Latest sender in reply thread: Wells Fargo Talent Acquisition <support@example.test>")).toBeInTheDocument();
+    expect(screen.getByText("Latest sender in conversation: Wells Fargo Talent Acquisition <support@example.test>")).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Referral / networking" })).not.toBeInTheDocument();
   });
 

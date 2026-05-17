@@ -1,11 +1,13 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  AlertCircle,
   ArrowRight,
   CheckCircle2,
   Chrome,
   Clock3,
   FileText,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
@@ -60,9 +62,10 @@ function BrandHeader() {
 }
 
 export default function Upgrade() {
-  const { user, loading, plan, planLoading, planError, accountStatus } = useAuth();
+  const { user, loading, plan, planLoading, planError, accountStatus, logout } = useAuth();
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
+  const [signOutBusy, setSignOutBusy] = useState(false);
   const isPremium = plan === "premium";
   const authReady = !loading && !planLoading;
   const isLocalDevWorkspace =
@@ -73,14 +76,24 @@ export default function Upgrade() {
   const signedInEmail = accountStatus?.authenticatedEmail || user?.email || "unknown";
   const apiBaseUrl = getApiBaseUrl() || "(not configured)";
   const signedInEmailNormalized = String(signedInEmail || "").trim().toLowerCase();
+  const permanentPremiumEmail = "brinkleystacey12@gmail.com";
+  const localPremiumAccountMismatch =
+    showLocalPremiumDiagnostic
+    && signedInEmailNormalized !== permanentPremiumEmail;
   const shouldBlockLocalCheckout =
     showLocalPremiumDiagnostic
     && (
       Boolean(planError)
       || accountStatus?.planSource === "verification_failed"
       || accountStatus?.permanentPremium
-      || signedInEmailNormalized === "brinkleystacey12@gmail.com"
+      || signedInEmailNormalized === permanentPremiumEmail
     );
+  const localNoticeTitle = localPremiumAccountMismatch
+    ? "This account does not have Premium access."
+    : "Premium access could not be confirmed.";
+  const localNoticeBody = localPremiumAccountMismatch
+    ? `You are signed in as ${signedInEmail}. Sign out and choose ${permanentPremiumEmail} to use the local Premium workspace.`
+    : "The app could not confirm Premium against the local backend. Retry the check after the backend is running with the latest changes.";
 
   usePageMetadata({
     title: "Applendium | Premium Beta",
@@ -96,6 +109,22 @@ export default function Upgrade() {
       setCheckoutError(error instanceof Error ? error.message : "Unable to start checkout.");
       setCheckoutBusy(false);
     }
+  }
+
+  async function handleLocalSignOut() {
+    setSignOutBusy(true);
+    setCheckoutError("");
+    try {
+      await logout();
+    } catch (error) {
+      setCheckoutError(error instanceof Error ? error.message : "Unable to sign out.");
+    } finally {
+      setSignOutBusy(false);
+    }
+  }
+
+  function handleRetryPlanCheck() {
+    window.location.reload();
   }
 
   return (
@@ -144,7 +173,7 @@ export default function Upgrade() {
                     className="landingButtonDark inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-md bg-[#111111] px-6 py-3.5 font-bold text-white opacity-70"
                     disabled
                   >
-                    Resolve local plan check
+                    Premium access unavailable
                   </button>
                 ) : user ? (
                   <button
@@ -180,33 +209,62 @@ export default function Upgrade() {
               ) : null}
 
               {showLocalPremiumDiagnostic ? (
-                <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
-                  <p className="font-bold">Local premium check did not resolve as premium.</p>
-                  <dl className="mt-2 grid gap-1 text-xs sm:grid-cols-[140px_1fr]">
-                    <dt className="font-semibold">Signed in as</dt>
-                    <dd className="break-all">{signedInEmail}</dd>
-                    <dt className="font-semibold">API base</dt>
-                    <dd className="break-all">{apiBaseUrl}</dd>
-                    <dt className="font-semibold">Backend plan</dt>
-                    <dd>{plan || "unknown"}</dd>
-                    <dt className="font-semibold">Plan source</dt>
-                    <dd>{accountStatus?.planSource || "unknown"}</dd>
-                    <dt className="font-semibold">Permanent premium</dt>
-                    <dd>{accountStatus?.permanentPremium ? "yes" : "no"}</dd>
-                    {accountStatus?.requestId ? (
-                      <>
-                        <dt className="font-semibold">Request ID</dt>
-                        <dd className="break-all">{accountStatus.requestId}</dd>
-                      </>
-                    ) : null}
-                  </dl>
-                  {planError ? (
-                    <p className="mt-2 text-xs font-semibold">Plan verification error: {planError}</p>
-                  ) : null}
-                  <p className="mt-2 text-xs leading-5">
-                    If this should be the permanent premium account, restart the local backend after the latest code changes and refresh.
-                    If the email above is different, sign out and choose brinkleystacey12@gmail.com.
-                  </p>
+                <div className="mt-5 max-w-2xl rounded-lg border border-gray-200 bg-white px-4 py-4 text-sm text-gray-700 shadow-sm" role="status">
+                  <div className="flex gap-3">
+                    <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFF7ED] text-[#C2410C]">
+                      <AlertCircle className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-[#111111]">{localNoticeTitle}</p>
+                      <p className="mt-1 leading-6 text-gray-600">{localNoticeBody}</p>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-bold text-[#111111] transition hover:border-[#111111] disabled:cursor-not-allowed disabled:opacity-60"
+                          onClick={handleRetryPlanCheck}
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                          Retry check
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center rounded-md bg-[#111111] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#10B981] disabled:cursor-not-allowed disabled:opacity-60"
+                          onClick={handleLocalSignOut}
+                          disabled={signOutBusy}
+                        >
+                          {signOutBusy ? "Signing out..." : "Sign out"}
+                        </button>
+                      </div>
+
+                      <details className="mt-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                        <summary className="cursor-pointer font-bold text-gray-700">Developer details</summary>
+                        <dl className="mt-2 grid gap-1 sm:grid-cols-[140px_1fr]">
+                          <dt className="font-semibold">Signed in as</dt>
+                          <dd className="break-all">{signedInEmail}</dd>
+                          <dt className="font-semibold">API base</dt>
+                          <dd className="break-all">{apiBaseUrl}</dd>
+                          <dt className="font-semibold">Backend plan</dt>
+                          <dd>{plan || "unknown"}</dd>
+                          <dt className="font-semibold">Plan source</dt>
+                          <dd>{accountStatus?.planSource || "unknown"}</dd>
+                          <dt className="font-semibold">Permanent premium</dt>
+                          <dd>{accountStatus?.permanentPremium ? "yes" : "no"}</dd>
+                          {accountStatus?.requestId ? (
+                            <>
+                              <dt className="font-semibold">Request ID</dt>
+                              <dd className="break-all">{accountStatus.requestId}</dd>
+                            </>
+                          ) : null}
+                          {planError ? (
+                            <>
+                              <dt className="font-semibold">Verification error</dt>
+                              <dd className="break-all">{planError}</dd>
+                            </>
+                          ) : null}
+                        </dl>
+                      </details>
+                    </div>
+                  </div>
                 </div>
               ) : null}
             </div>

@@ -3,8 +3,20 @@ import { expect, test } from "@playwright/test";
 test("renders copilot grounding and records feedback from the DAQ page", async ({ page }) => {
   let draftRequestBody: Record<string, unknown> | null = null;
   let feedbackRequestBody: Record<string, unknown> | null = null;
+  const impressionBodies: Record<string, unknown>[] = [];
+  const consoleErrors: string[] = [];
+  const pageErrors: string[] = [];
+  const failedRequests: string[] = [];
 
-  await page.route("http://127.0.0.1:4010/api/emails/followup-needed", async (route) => {
+  page.on("console", (msg) => {
+    if (msg.type() === "error") consoleErrors.push(msg.text());
+  });
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("requestfailed", (request) => {
+    failedRequests.push(`${request.method()} ${request.url()} ${request.failure()?.errorText ?? ""}`.trim());
+  });
+
+  await page.route("**/api/emails/followup-needed", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -38,7 +50,88 @@ test("renders copilot grounding and records feedback from the DAQ page", async (
     });
   });
 
-  await page.route("http://127.0.0.1:4010/api/suggestions/states", async (route) => {
+  await page.route("**/api/suggestions/queue", async (route) => {
+    const followupAction = {
+      id: "queue-followup-1",
+      logicalKey: "followup:wf-thread",
+      dedupeKey: "followup:wf-thread:v1",
+      primaryEntityId: "wf-thread",
+      evidenceVersion: "v1",
+      actionType: "thank_you",
+      actionCategory: "communication",
+      title: "Send thank-you note to Wells Fargo",
+      whyNow: "Interview thank-you notes are most useful while the conversation is still fresh.",
+      targetOutcome: "Increase the odds of a recruiter response.",
+      effortMinutes: 5,
+      urgencyLevel: "high",
+      confidenceLevel: "strong",
+      source: "followup_engine",
+      status: "open",
+      effectiveStatus: "open",
+      createdAt: "2026-04-10T12:00:00.000Z",
+      evidence: [
+        "Subject: We would like to invite you to come back",
+        "Sender: WellsFargoHR <wellsfargoworkday@example.test>",
+      ],
+      threadId: "wf-thread",
+      emailId: "wf-email",
+      applicationId: "wf-app",
+      suggestionSource: "email_followup",
+      queueSource: "followup",
+      intent: "SEND_THANK_YOU",
+      intentLabel: "Thank-you",
+      playbook: [
+        "Open the source thread and verify the company, role, and interview context first.",
+        "Reply in-thread within 24 hours and reference one specific conversation point.",
+        "Close with interest, availability, and one sentence on role fit.",
+      ],
+      sourceLabel: "Outreach task",
+      draftEligible: true,
+      routeHref: "/fix-suggestions",
+      routeLabel: "Open queue",
+      stageLabel: "Outreach",
+      company: "Wells Fargo",
+    };
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        queue: {
+          now: "2026-04-11T12:00:00.000Z",
+          doToday: [followupAction],
+          thisWeek: [],
+          later: [],
+          blocked: [],
+          dismissed: [],
+          expired: [],
+          done: [],
+          emptyState: null,
+          resolvedActions: [followupAction],
+        },
+      }),
+    });
+  });
+
+  await page.route("**/api/suggestions/queue/actions/impression", async (route) => {
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    impressionBodies.push(body);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        state: "active",
+        logicalKey: body.logicalKey,
+        dedupeKey: body.dedupeKey,
+        wasStale: false,
+        displayCount: 1,
+      }),
+    });
+  });
+
+  await page.route("**/api/suggestions/states", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -46,7 +139,7 @@ test("renders copilot grounding and records feedback from the DAQ page", async (
     });
   });
 
-  await page.route("http://127.0.0.1:4010/api/emails/apply-gate/history", async (route) => {
+  await page.route("**/api/emails/apply-gate/history", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -54,7 +147,7 @@ test("renders copilot grounding and records feedback from the DAQ page", async (
     });
   });
 
-  await page.route("http://127.0.0.1:4010/api/emails/stored-emails", async (route) => {
+  await page.route("**/api/emails/stored-emails", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -77,7 +170,7 @@ test("renders copilot grounding and records feedback from the DAQ page", async (
     });
   });
 
-  await page.route("http://127.0.0.1:4010/api/suggestions/impressions", async (route) => {
+  await page.route("**/api/suggestions/impressions", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -85,7 +178,7 @@ test("renders copilot grounding and records feedback from the DAQ page", async (
     });
   });
 
-  await page.route("http://127.0.0.1:4010/api/suggestions/draft", async (route) => {
+  await page.route("**/api/suggestions/draft", async (route) => {
     draftRequestBody = route.request().postDataJSON() as Record<string, unknown>;
     await route.fulfill({
       status: 200,
@@ -120,7 +213,7 @@ test("renders copilot grounding and records feedback from the DAQ page", async (
     });
   });
 
-  await page.route("http://127.0.0.1:4010/api/suggestions/feedback", async (route) => {
+  await page.route("**/api/suggestions/feedback", async (route) => {
     feedbackRequestBody = route.request().postDataJSON() as Record<string, unknown>;
     await route.fulfill({
       status: 200,
@@ -129,16 +222,24 @@ test("renders copilot grounding and records feedback from the DAQ page", async (
     });
   });
 
-  await page.goto("/fix-suggestions");
+  await page.goto("/fix-suggestions", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByRole("heading", { name: "Daily Action Queue" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Send thank-you note to Wells Fargo" })).toBeVisible();
+  await expect(page.getByText("Source check")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Already handled" })).toBeVisible();
+  await expect(page.getByText("Based on your source, never auto-sent")).toBeVisible();
+  await expect.poll(() => impressionBodies.length).toBe(1);
+  expect(impressionBodies[0]).toEqual({
+    logicalKey: "followup:wf-thread",
+    dedupeKey: "followup:wf-thread:v1",
+  });
 
   await page.getByRole("button", { name: "Generate draft" }).click();
 
   await expect(page.getByText("Outreach Copilot")).toBeVisible();
   await expect(page.getByText("Suggested reply contact: Jordan Lee <jordan@example.test>")).toBeVisible();
-  await expect(page.getByText("Latest sender in reply thread: Wells Fargo Talent Acquisition <support@example.test>")).toBeVisible();
+  await expect(page.getByText("Latest sender in conversation: Wells Fargo Talent Acquisition <support@example.test>")).toBeVisible();
   await expect(page.getByText("Latest update: The Early Careers Engineering Assessment - Submission Confirmation")).toBeVisible();
   await expect(page.getByText("Latest activity: 4/9/2026")).toBeVisible();
   await expect(page.getByText(/Thanks for completing the Early Careers Engineering Assessment\./)).toBeVisible();
@@ -177,4 +278,7 @@ test("renders copilot grounding and records feedback from the DAQ page", async (
       }),
     }),
   );
+  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
+  expect(failedRequests).toEqual([]);
 });

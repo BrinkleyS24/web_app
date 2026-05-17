@@ -348,9 +348,10 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
             </button>
           </div>
           <p
+            aria-live="polite"
             class="text-xs text-muted-foreground"
           >
-            Your choice is saved to improve future targeting, action queues, and outcome memory.
+            Choose what you did. This keeps future recommendations grounded.
           </p>
         </div>
       </div>

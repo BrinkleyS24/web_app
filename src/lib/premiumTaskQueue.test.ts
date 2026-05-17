@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import {
+  buildDaqV1InboxQueue,
   buildCombinedSuggestionQueue,
+  buildQueueItemsFromRankedQueue,
   buildOutreachDiagnostics,
   buildUpcomingFollowupWindows,
 } from "./premiumTaskQueue";
@@ -318,5 +320,259 @@ describe("premiumTaskQueue outreach timing", () => {
     });
 
     expect(diagnostics.find((item) => item.id === "ghosting")?.count).toBe(0);
+  });
+
+  test("sanitizes raw subject playbooks and deduplicates DAQ inbox actions by source subject", () => {
+    const sharedEvidence = ["Subject: On-site interview at Amazon for the Delivery Associate position."];
+    const baseRankedAction = {
+      logicalKey: "base",
+      dedupeKey: "base:v1",
+      primaryEntityId: "base",
+      evidenceVersion: "v1",
+      actionCategory: "communication",
+      targetOutcome: "Increase chance of recruiter reply",
+      effortMinutes: 5,
+      urgencyLevel: "high",
+      confidenceLevel: "strong",
+      source: "followup_engine",
+      status: "open",
+      effectiveStatus: "open",
+      createdAt: "2026-04-10T12:00:00.000Z",
+      evidence: sharedEvidence,
+      queueSource: "followup",
+      sourceLabel: "Outreach task",
+      routeHref: "/fix-suggestions",
+      routeLabel: "Open queue",
+      stageLabel: "Outreach",
+      company: "Nova Routes",
+      threadId: null,
+      applicationId: null,
+    };
+    const items = buildQueueItemsFromRankedQueue({
+      now: "2026-04-11T12:00:00.000Z",
+      doToday: [
+        {
+          ...baseRankedAction,
+          id: "thank-you",
+          logicalKey: "followup:thank-you",
+          dedupeKey: "followup:thank-you:v1",
+          actionType: "follow_up",
+          legacyActionType: "thank_you",
+          title: "Send thank-you note to Nova Routes",
+          whyNow: "Interview thank-you notes are most useful while the conversation is still fresh.",
+          intent: "SEND_THANK_YOU",
+          intentLabel: "Thank-you",
+          draftEligible: true,
+          playbook: sharedEvidence,
+        },
+        {
+          ...baseRankedAction,
+          id: "interview-prep",
+          logicalKey: "interview:prep",
+          dedupeKey: "interview:prep:v1",
+          actionType: "prep_interview",
+          legacyActionType: "prepare_interview",
+          title: "Prepare for Delivery Associate interview",
+          whyNow: "Nova Routes has an active interview signal.",
+          intent: "PREP_INTERVIEW",
+          intentLabel: "Prepare interview",
+          sourceLabel: "Interview task",
+          draftEligible: false,
+          playbook: ["Re-read the role and write three proof points that match the team needs."],
+        },
+      ],
+      thisWeek: [],
+      later: [],
+      blocked: [],
+      dismissed: [],
+      expired: [],
+      done: [],
+      emptyState: null,
+      resolvedActions: [],
+    } as any);
+
+    expect(items[0].playbook[0]).toMatch(/company, role, and interview context/);
+    expect(items[0].playbook).not.toContain(sharedEvidence[0]);
+
+    const daqItems = buildDaqV1InboxQueue(items);
+    expect(daqItems).toHaveLength(1);
+    expect(daqItems[0].actionType).toBe("thank_you");
+  });
+
+  test("drops JSON punctuation noise from ranked action display fields", () => {
+    const items = buildQueueItemsFromRankedQueue({
+      now: "2026-04-11T12:00:00.000Z",
+      doToday: [
+        {
+          id: "cleanup-noise",
+          logicalKey: "cleanup-noise",
+          dedupeKey: "cleanup-noise:v1",
+          primaryEntityId: "cleanup-noise",
+          evidenceVersion: "v1",
+          actionCategory: "cleanup",
+          actionType: "cleanup",
+          legacyActionType: "cleanup_structured_fields",
+          targetOutcome: "Fix extracted company and role fields so recommendations stop drifting.",
+          effortMinutes: 10,
+          urgencyLevel: "medium",
+          confidenceLevel: "medium",
+          source: "cleanup_engine",
+          status: "open",
+          effectiveStatus: "open",
+          createdAt: "2026-04-10T12:00:00.000Z",
+          evidence: ["[", "Thank you for applying to Assembled"],
+          queueSource: "cleanup",
+          sourceLabel: "Cleanup task",
+          routeHref: "/fix-suggestions",
+          routeLabel: "Resolve missing data",
+          stageLabel: "Cleanup",
+          company: "Assembled",
+          threadId: "thread-cleanup",
+          applicationId: null,
+          title: "Fix 3 tracked emails with missing company or role data",
+          whyNow: "[",
+          intent: "CLEANUP_DATA",
+          intentLabel: "Resolve missing data",
+          draftEligible: false,
+          playbook: ["[", "Subject: Thank you for applying to Assembled", "Open the source thread and correct the missing fields."],
+        },
+      ],
+      thisWeek: [],
+      later: [],
+      blocked: [],
+      dismissed: [],
+      expired: [],
+      done: [],
+      emptyState: null,
+      resolvedActions: [],
+    } as any);
+
+    expect(items[0].description).toBe("Fix extracted company and role fields so recommendations stop drifting.");
+    expect(items[0].whyNow).toBeNull();
+    expect(items[0].evidence).not.toContain("[");
+    expect(items[0].playbook).toEqual(["Open the source thread and correct the missing fields."]);
+  });
+
+  test("coerces ranked queue string and JSON-ish array fields without splitting characters", () => {
+    const items = buildQueueItemsFromRankedQueue({
+      now: "2026-04-11T12:00:00.000Z",
+      doToday: [
+        {
+          id: "resume-proof-ranked",
+          logicalKey: "resume-proof-ranked",
+          dedupeKey: "resume-proof-ranked:v1",
+          primaryEntityId: "resume-proof-ranked",
+          evidenceVersion: "v1",
+          actionCategory: "optimization",
+          actionType: "resume_proof_gap",
+          targetOutcome: "Add stronger resume proof.",
+          effortMinutes: 20,
+          urgencyLevel: "medium",
+          confidenceLevel: "moderate",
+          source: "apply_gate",
+          status: "open",
+          effectiveStatus: "open",
+          createdAt: "2026-04-10T12:00:00.000Z",
+          evidence: "[\"The resume lacks quantified automation evidence.\", \"Add production proof.\"]",
+          queueSource: "resume",
+          sourceLabel: "Resume-proof gap",
+          routeHref: "/apply-gate",
+          routeLabel: "Review Apply Gate",
+          stageLabel: "Resume proof",
+          company: "Resume proof",
+          threadId: "resume-proof:aggregate",
+          applicationId: null,
+          title: "Add stronger proof to your resume",
+          whyNow: "Recent screenings found resume-proof issues.",
+          intent: "TAILOR_RESUME",
+          intentLabel: "Tailor resume",
+          draftEligible: false,
+          playbook: "The resume proof row should stay intact.",
+        },
+      ],
+      thisWeek: [],
+      later: [],
+      blocked: [],
+      dismissed: [],
+      expired: [],
+      done: [],
+      emptyState: null,
+      resolvedActions: [],
+    } as any);
+
+    expect(items[0].playbook).toEqual(["The resume proof row should stay intact."]);
+    expect(items[0].evidence).toEqual([
+      "The resume lacks quantified automation evidence.",
+      "Add production proof.",
+    ]);
+    expect(items[0].evidence).not.toContain("T");
+  });
+
+  test("coerces Apply Gate and resume proof history fields without splitting strings into characters", () => {
+    const queue = buildCombinedSuggestionQueue({
+      followupSuggestions: [],
+      storedEmails: [],
+      actionStates: [],
+      applyGateHistory: [
+        {
+          id: "gate-1",
+          job_title: "QA Engineer",
+          company_name: "Acme",
+          job_url: null,
+          verdict: "risky",
+          score: 45,
+          hard_blocker: false,
+          reasons: "Needs stronger proof",
+          fix_suggestion: null,
+          user_action: null,
+          created_at: "2026-04-10T12:00:00.000Z",
+          explanation_payload: {
+            decision: "fix_first",
+            assessment_confidence: "medium",
+            primary_rejection_drivers: "The posting asks for test automation ownership.",
+            evidence_gaps: "automation ownership",
+            action_plan: {
+              quick_fixes: "The Apply Gate quick fix should stay one row.",
+              resume_proof_improvements: "The resume proof improvement should stay one row.",
+              long_term_gaps: "[\"Build more API testing depth.\"]",
+            },
+          },
+        },
+        {
+          id: "gate-2",
+          job_title: "SDET",
+          company_name: "Beta",
+          job_url: null,
+          verdict: "risky",
+          score: 48,
+          hard_blocker: false,
+          reasons: "Needs stronger proof",
+          fix_suggestion: null,
+          user_action: null,
+          created_at: "2026-04-10T12:00:00.000Z",
+          explanation_payload: {
+            decision: "apply_with_caveats",
+            assessment_confidence: "medium",
+            primary_rejection_drivers: ["The role emphasizes automation ownership."],
+            evidence_gaps: "automation ownership",
+            action_plan: {
+              quick_fixes: ["Add one Selenium result bullet."],
+              resume_proof_improvements: "The resume proof improvement should stay one row.",
+              long_term_gaps: [],
+            },
+          },
+        },
+      ] as any,
+    });
+
+    const applyGateItem = queue.find((item) => item.source === "apply_gate");
+    const resumeItem = queue.find((item) => item.source === "resume");
+
+    expect(applyGateItem?.evidence).toContain("The posting asks for test automation ownership.");
+    expect(applyGateItem?.playbook).toContain("The Apply Gate quick fix should stay one row.");
+    expect(applyGateItem?.evidence).not.toContain("T");
+    expect(resumeItem?.playbook).toContain("The resume proof improvement should stay one row.");
+    expect(resumeItem?.title).toContain("automation ownership");
+    expect(resumeItem?.playbook).not.toContain("T");
   });
 });

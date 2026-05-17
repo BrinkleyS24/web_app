@@ -129,17 +129,32 @@ export function isDaqV1InboxAction(item: QueueItem) {
 }
 
 const actionPlaybook: Record<string, string[]> = {
+  reply: [
+    "Open the conversation and answer the direct question first.",
+    "Keep the reply short and preserve the original recruiter context.",
+  ],
   thank_you: [
+    "Review the conversation so the company, role, and interview context are fresh.",
     "Reply in-thread within 24 hours and reference one specific conversation point.",
     "Close with interest, availability, and one sentence on role fit.",
   ],
   follow_up: [
+    "Check the conversation first so you do not follow up over a newer reply.",
     "Keep the message under five sentences and ask for timing, not a decision.",
     "Re-state interest and attach one concrete reason you fit the role.",
   ],
   status_check: [
+    "Check the conversation first so you do not follow up over a newer reply.",
     "Use a short status check instead of a long update.",
     "Acknowledge their timeline and ask whether there is anything else they need.",
+  ],
+  prep_interview: [
+    "Review the conversation so timing, format, and contact details are correct.",
+    "Re-read the role and write three proof points that match the team needs.",
+  ],
+  prepare_interview: [
+    "Review the conversation so timing, format, and contact details are correct.",
+    "Re-read the role and write three proof points that match the team needs.",
   ],
   research: [
     "Read the job description again and pull two company-specific talking points.",
@@ -175,6 +190,63 @@ const OUTREACH_ACTION_TYPES = new Set([
   "close_stale_interview",
 ]);
 
+function normalizeQueueActionType(value?: string | null) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function looksLikeRawEvidenceStep(value?: string | null) {
+  const normalized = normalizeDisplayString(value)?.toLowerCase() || "";
+  if (!normalized) return false;
+  return (
+    normalized.startsWith("subject:") ||
+    normalized.startsWith("latest update:") ||
+    normalized.startsWith("latest activity:") ||
+    normalized.startsWith("sender:") ||
+    normalized.startsWith("scheduled date:")
+  );
+}
+
+function sanitizeQueuePlaybook(actionType: string | null | undefined, playbook: string[]) {
+  const normalizedType = normalizeQueueActionType(actionType);
+  const defaults = actionPlaybook[normalizedType] || [];
+  const cleaned = (playbook || []).filter((step) => !looksLikeRawEvidenceStep(step));
+  return uniqueStrings([...defaults, ...cleaned], 3);
+}
+
+function getDaqIdentityKey(item: QueueItem) {
+  if (item.applicationId) return `application:${item.applicationId}`;
+  if (item.threadId) return `thread:${item.threadId}`;
+
+  const subjectEvidence = (item.evidence || []).find((entry) => /^subject:\s*/i.test(entry));
+  if (subjectEvidence) {
+    return `subject:${subjectEvidence.replace(/^subject:\s*/i, "").trim().toLowerCase()}`;
+  }
+
+  return `item:${item.id}`;
+}
+
+function getDaqActionPriority(item: QueueItem) {
+  const actionType = normalizeQueueActionType(item.actionType);
+  if (actionType === "reply" || actionType === "thank_you") return 0;
+  if (actionType === "status_check" || actionType === "follow_up") return 1;
+  if (actionType === "prep_interview" || actionType === "prepare_interview") return 2;
+  return 3;
+}
+
+export function buildDaqV1InboxQueue(items: QueueItem[]) {
+  const deduped = new Map<string, QueueItem>();
+
+  for (const item of items.filter((candidate) => isDaqV1InboxAction(candidate) && candidate.bucket !== "blocked")) {
+    const key = getDaqIdentityKey(item);
+    const existing = deduped.get(key);
+    if (!existing || getDaqActionPriority(item) < getDaqActionPriority(existing)) {
+      deduped.set(key, item);
+    }
+  }
+
+  return Array.from(deduped.values());
+}
+
 const APPLIED_ACTIVE_WINDOW_DAYS = 30;
 const INTERVIEW_ACTIVE_WINDOW_DAYS = 21;
 
@@ -183,11 +255,56 @@ type ThreadIdentity = {
   role: string | null;
 };
 
-function uniqueStrings(values: Array<string | null | undefined>, limit = 4) {
+function coerceStringArray(value: unknown): Array<string | null | undefined> {
+  if (Array.isArray(value)) {
+    const fragments = value
+      .map((entry) => (typeof entry === "string" ? entry : ""))
+      .filter((entry) => entry.length > 0);
+    const looksLikeSplitString =
+      fragments.length >= 3 &&
+      fragments.every((entry) => entry.length <= 1) &&
+      normalizeDisplayString(fragments.join(""));
+
+    if (looksLikeSplitString) {
+      return [fragments.join("")];
+    }
+
+    return value;
+  }
+
+  const normalized = normalizeDisplayString(
+    typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+      ? String(value)
+      : null,
+  );
+  if (!normalized) return [];
+
+  if (normalized.startsWith("[") && normalized.endsWith("]")) {
+    try {
+      const parsed = JSON.parse(normalized);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      const singleQuotedJson = normalized.replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_, inner: string) => {
+        return JSON.stringify(inner.replace(/\\'/g, "'"));
+      });
+      try {
+        const parsed = JSON.parse(singleQuotedJson);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        const unwrapped = normalizeDisplayString(normalized.replace(/^\[\s*/, "").replace(/\s*\]$/, ""));
+        return unwrapped ? [unwrapped] : [];
+      }
+    }
+  }
+
+  return [normalized];
+}
+
+function uniqueStrings(values: unknown, limit = 4) {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const value of values) {
-    const normalized = String(value || "").trim();
+  for (const value of coerceStringArray(values)) {
+    const normalized = normalizeDisplayString(value);
     if (!normalized) continue;
     const key = normalized.toLowerCase();
     if (seen.has(key)) continue;
@@ -196,6 +313,16 @@ function uniqueStrings(values: Array<string | null | undefined>, limit = 4) {
     if (out.length >= limit) break;
   }
   return out;
+}
+
+function normalizeDisplayString(value?: string | null) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return null;
+  if (/^[\[\]{}"',:]+$/.test(normalized)) return null;
+  if (/^\[\s*["']?[^"'\]]{1,20}$/i.test(normalized)) return null;
+  if (/^["']?[^"'\[]+\s*["']?\]$/.test(normalized)) return null;
+  if (/^(null|undefined|nan)$/i.test(normalized)) return null;
+  return normalized;
 }
 
 function normalizeKey(value?: string | null) {
@@ -328,21 +455,21 @@ function buildFollowupQueue(suggestions: FollowupSuggestion[]): QueueItem[] {
     source: "followup",
     urgency: (item.urgency || "medium") as QueueUrgency,
     title: item.title || item.subject || "Suggested action",
-    description: item.description || "Suggested next step based on your application timeline.",
+    description: coachDaqCopy(item.description) || "Suggested next step based on your application timeline.",
     company: item.company || null,
     estimatedTime: item.estimatedTime || "10 mins",
     daysAgo: item.daysAgo,
     playbook: actionPlaybook[item.actionType || ""] || [
-      "Review the thread and choose the smallest useful next action.",
+      "Review the conversation and choose the smallest useful next action.",
       "Keep the message specific to this role and this company.",
     ],
-    whyNow: item.whyNow || item.description || null,
+    whyNow: coachDaqCopy(item.whyNow || item.description) || null,
     evidence: uniqueStrings(item.evidence || [], 4),
     actionConfidence: item.actionConfidence || "medium",
     hasDraft: Boolean(item.draftAvailable) && Boolean(item.threadId),
     sourceLabel: "Outreach task",
     sourceDescription:
-      item.category?.toLowerCase() === "interviewed" ? "Interview timing signal" : "Email timing signal",
+      item.category?.toLowerCase() === "interviewed" ? "Interview timing cue" : "Follow-up timing cue",
     threadId: item.threadId,
     emailId: item.emailId ?? null,
     applicationId: item.applicationId ?? null,
@@ -358,8 +485,8 @@ function buildApplyGateQueue(history: ApplyGateHistoryItem[]): QueueItem[] {
   const unresolved = history
     .filter((item) => !item.user_action)
     .filter((item) => {
-      const quickFixes = item.explanation_payload?.action_plan?.quick_fixes || [];
-      const longTerm = item.explanation_payload?.action_plan?.long_term_gaps || [];
+      const quickFixes = coerceStringArray(item.explanation_payload?.action_plan?.quick_fixes);
+      const longTerm = coerceStringArray(item.explanation_payload?.action_plan?.long_term_gaps);
       return quickFixes.length > 0 || longTerm.length > 0;
     })
     .slice(0, 4);
@@ -418,7 +545,7 @@ function buildResumeQueue(history: ApplyGateHistoryItem[]): QueueItem[] {
   const resumeFixes: string[] = [];
 
   for (const item of unresolved) {
-    for (const gap of item.explanation_payload?.evidence_gaps || []) {
+    for (const gap of coerceStringArray(item.explanation_payload?.evidence_gaps)) {
       const label = String(gap || "").trim();
       if (!label) continue;
       const key = label.toLowerCase();
@@ -429,7 +556,7 @@ function buildResumeQueue(history: ApplyGateHistoryItem[]): QueueItem[] {
         evidenceCounts.set(key, { label, count: 1 });
       }
     }
-    resumeFixes.push(...(item.explanation_payload?.action_plan?.resume_proof_improvements || []));
+    resumeFixes.push(...uniqueStrings(item.explanation_payload?.action_plan?.resume_proof_improvements, 10));
   }
 
   const repeatedGaps = Array.from(evidenceCounts.values())
@@ -524,9 +651,9 @@ function buildStaleQueue(emails: StoredEmail[]): QueueItem[] {
     const role = identity.role || getEmailTitle(latest);
     const evidence = uniqueStrings(
       [
-        latest.subject ? `Latest thread: ${latest.subject}` : null,
+        latest.subject ? `Latest conversation: ${latest.subject}` : null,
         latest.from ? `Latest sender: ${latest.from}` : null,
-        `No tracked terminal outcome for ${age} day(s).`,
+        `No final outcome yet after ${age} day(s).`,
       ],
       4,
     );
@@ -537,7 +664,7 @@ function buildStaleQueue(emails: StoredEmail[]): QueueItem[] {
         source: "stale",
         urgency: age >= 21 ? "high" : "medium",
         title: `Send one final status check for ${role}`,
-        description: `${company} has not sent a tracked next-step update in ${age} days.`,
+        description: `${company} has been quiet for ${age} days, so one clear status check is reasonable.`,
         company,
         estimatedTime: "8 mins",
         daysAgo: age,
@@ -545,12 +672,12 @@ function buildStaleQueue(emails: StoredEmail[]): QueueItem[] {
           "Send one short status check that asks for timing, not a decision.",
           "If there is no response after this touch, move the role out of active focus.",
         ],
-        whyNow: `${age} days have passed since the latest tracked application activity, so waiting silently is no longer useful.`,
+        whyNow: `${age} days have passed since the last application touchpoint. A short check-in gives you clarity without over-investing.`,
         evidence,
         actionConfidence: "medium",
         hasDraft: true,
         sourceLabel: "Ghosting signal",
-        sourceDescription: "No tracked next-step update",
+        sourceDescription: "No recent next step",
         threadId,
         emailId: latest.id ?? null,
         applicationId: latest.applicationId ?? null,
@@ -568,7 +695,7 @@ function buildStaleQueue(emails: StoredEmail[]): QueueItem[] {
         source: "stale",
         urgency: "low",
         title: `Move ${role} out of active focus`,
-        description: `${company} has been quiet for ${age} days after the application signal.`,
+        description: `${company} has been quiet for ${age} days after your application touchpoint.`,
         company,
         estimatedTime: "5 mins",
         daysAgo: age,
@@ -599,7 +726,7 @@ function buildStaleQueue(emails: StoredEmail[]): QueueItem[] {
         source: "stale",
         urgency: "high",
         title: `Check interview status for ${role}`,
-        description: `${company} has not sent a tracked post-interview update in ${age} days.`,
+        description: `${company} has been quiet for ${age} days after the interview. Ask once for timing and clarity.`,
         company,
         estimatedTime: "8 mins",
         daysAgo: age,
@@ -630,7 +757,7 @@ function buildStaleQueue(emails: StoredEmail[]): QueueItem[] {
         source: "stale",
         urgency: "medium",
         title: `Close the loop on ${role}`,
-        description: `${company} has been silent for ${age} days after the interview signal.`,
+        description: `${company} has been silent for ${age} days after the interview.`,
         company,
         estimatedTime: "5 mins",
         daysAgo: age,
@@ -638,7 +765,7 @@ function buildStaleQueue(emails: StoredEmail[]): QueueItem[] {
           "Send one final note if this opportunity is still important.",
           "If there is no response, stop letting this role occupy active search bandwidth.",
         ],
-        whyNow: "This interview thread is old enough that the next action is closure, not repeated follow-up.",
+        whyNow: "This interview conversation is old enough that the next action is closure, not repeated follow-up.",
         evidence,
         actionConfidence: "medium",
         hasDraft: true,
@@ -668,18 +795,18 @@ function buildCleanupQueue(emails: StoredEmail[]): QueueItem[] {
   const queue: QueueItem[] = [];
 
   if (missingStructured.length > 0) {
-    const examples = missingStructured.slice(0, 3).map((email) => email.subject || "Unnamed thread");
+    const examples = missingStructured.slice(0, 3).map((email) => email.subject || "Unnamed conversation");
     queue.push({
       id: "cleanup:structured-fields",
       source: "cleanup",
       urgency: "high",
       title: `Clean up ${missingStructured.length} emails with missing company or role data`,
-      description: "These threads are not carrying enough structured data to support tracking and grouping.",
+      description: "These conversations are missing the company or role details needed for useful coaching.",
       company: "Email extraction",
       estimatedTime: missingStructured.length > 3 ? "20 mins" : "10 mins",
       playbook: uniqueStrings(
         [
-          `Review these threads in the extension: ${examples.join("; ")}.`,
+          `Review these conversations in the extension: ${examples.join("; ")}.`,
           "Correct company and role where extraction is blank or obviously wrong.",
           "After corrections, verify the emails attach to the right application journey.",
         ],
@@ -709,18 +836,18 @@ function buildCleanupQueue(emails: StoredEmail[]): QueueItem[] {
       urgency: "medium",
       title: `Link ${unlinkedActive.length} active emails to applications`,
       description:
-        "These threads look relevant, but they are not yet attached to an application record, so they will weaken pipeline metrics.",
+        "These conversations look relevant, but they are not yet attached to an application record, so your pipeline view may be incomplete.",
       company: "Application tracking",
       estimatedTime: unlinkedActive.length > 5 ? "25 mins" : "15 mins",
       playbook: uniqueStrings(
         [
           `Start with: ${examples.join("; ")}.`,
-          "Repair application links for active threads before using outcome metrics to judge progress.",
+          "Link active conversations before using outcome metrics to judge progress.",
           "Once linked, re-check whether the application is still open or should be closed out.",
         ],
         3,
       ),
-      whyNow: "Unlinked active threads weaken pipeline metrics and can hide stale or follow-up opportunities.",
+      whyNow: "Unlinked active conversations can hide follow-up opportunities and make your pipeline look less accurate than it is.",
       evidence: uniqueStrings(examples, 3),
       actionConfidence: "medium",
       sourceLabel: "Cleanup task",
@@ -958,7 +1085,7 @@ export function buildUpcomingFollowupWindows(params: {
           description:
             age >= 6
               ? `${company} is inside the post-interview status-check window.`
-              : `${company} is ${age} day(s) after the interview signal. If no timeline was given, status checks become more appropriate after several business days.`,
+              : `${company} is ${age} day(s) after the interview. If no timeline was given, status checks become more appropriate after several business days.`,
           sourceDescription: age >= 6 ? "Interview status check due now" : "Interview status check opens soon",
         });
       } else if (
@@ -975,7 +1102,7 @@ export function buildUpcomingFollowupWindows(params: {
           windowStartDay: 21,
           windowEndDay: 21,
           title: `Close-loop window for ${role}`,
-          description: `${company} is ${age} day(s) after the interview signal. If silence continues, this should move from follow-up to close-out.`,
+          description: `${company} is ${age} day(s) after the interview. If silence continues, this should move from follow-up to close-out.`,
           sourceDescription: "Interview close-out window approaching",
         });
       }
@@ -1077,7 +1204,7 @@ export function buildOutreachDiagnostics(params: {
       id: "upcoming",
       label: "Upcoming windows",
       count: upcomingWindows.length,
-      description: "Tracked roles that are too early or waiting for a better follow-up window.",
+      description: "Roles that are too early or waiting for a better follow-up window.",
       examples: uniqueStrings(upcomingWindows.map((item) => item.title), 3),
     },
     {
@@ -1089,16 +1216,16 @@ export function buildOutreachDiagnostics(params: {
     },
     {
       id: "ghosting",
-      label: "Moved to ghosting",
+      label: "Ghosting",
       count: ghostingCount,
-      description: "Older open roles managed by the Ghosting lane instead of normal follow-up.",
+      description: "Older open roles that may need one final check-in or a clean close-out.",
       examples: uniqueStrings(ghostingExamples, 3),
     },
     {
       id: "closed",
       label: "Closed outcomes",
       count: closedCount,
-      description: "Threads with rejection, offer, or manually closed signals suppressed from outreach.",
+      description: "Roles with a rejection, offer, or manual close are kept out of outreach.",
       examples: uniqueStrings(closedExamples, 3),
     },
   ];
@@ -1139,7 +1266,8 @@ function requireRankedSource(action: RankedAction): QueueSource {
 }
 
 function requireRankedString(action: RankedAction, fieldName: string, value?: string | null) {
-  if (typeof value === "string" && value.trim().length > 0) return value;
+  const normalized = normalizeDisplayString(value);
+  if (normalized) return normalized;
   throw new Error(`[premiumTaskQueue] Ranked action ${getRankedActionDebugKey(action)} missing ${fieldName}`);
 }
 
@@ -1147,14 +1275,9 @@ function requireRankedIntent(action: RankedAction) {
   return requireRankedString(action, "intent", action.intent) as NonNullable<RankedAction["intent"]>;
 }
 
-function requireRankedStringArray(action: RankedAction, fieldName: string, value?: string[] | null) {
-  if (Array.isArray(value)) {
-    const normalized = value
-      .filter((item): item is string => typeof item === "string")
-      .map((item) => item.trim())
-      .filter(Boolean);
-    if (normalized.length > 0) return normalized;
-  }
+function requireRankedStringArray(action: RankedAction, fieldName: string, value?: unknown) {
+  const normalized = uniqueStrings(value, 20);
+  if (normalized.length > 0) return normalized;
   throw new Error(`[premiumTaskQueue] Ranked action ${getRankedActionDebugKey(action)} missing ${fieldName}`);
 }
 
@@ -1163,11 +1286,36 @@ function requireRankedBoolean(action: RankedAction, fieldName: string, value?: b
   throw new Error(`[premiumTaskQueue] Ranked action ${getRankedActionDebugKey(action)} missing ${fieldName}`);
 }
 
+function coachDaqCopy(value?: string | null) {
+  const normalized = normalizeDisplayString(value);
+  if (!normalized) return null;
+  return normalized
+    .replace(/(\d+\s+days?\s+have\s+passed)\s+without\s+a\s+tracked\s+next-step\s+email\s+from\s+([^.;]+)/gi, "$1 without a response from $2")
+    .replace(/without\s+a\s+tracked\s+next-step\s+email/gi, "without a response")
+    .replace(/tracked\s+next-step\s+email/gi, "response")
+    .replace(/tracked\s+next\s+step/gi, "response")
+    .replace(/The tracked thread has gone cold and is now in close-out territory\./gi, "This role has gone quiet and is ready for a clean close-out.")
+    .replace(/No tracked terminal outcome\./gi, "No final outcome yet.")
+    .replace(/tracked terminal outcome/gi, "final outcome")
+    .replace(/tracked thread/gi, "conversation")
+    .replace(/ghosting signal/gi, "Ghosting signal")
+    .replace(/^ghosting$/i, "Ghosting")
+    .replace(/high-signal/gi, "high-value");
+}
+
+function coachDaqCopyList(values?: Array<string | null | undefined>, limit = 4) {
+  return uniqueStrings(values || [], limit).map((value) => coachDaqCopy(value) || value);
+}
+
 function buildRankedDescription(action: RankedAction) {
   if (action.effectiveStatus === "blocked") {
-    return action.blockingReason || "A prerequisite action is still open.";
+    return coachDaqCopy(action.blockingReason) || "A prerequisite action is still open.";
   }
-  return action.whyNow || action.targetOutcome;
+  return (
+    coachDaqCopy(action.whyNow) ||
+    coachDaqCopy(action.targetOutcome) ||
+    "Open the source context before acting."
+  );
 }
 
 function mapRankedActionToQueueItem(
@@ -1181,9 +1329,12 @@ function mapRankedActionToQueueItem(
   const blockers = (action.unresolvedBlockedBy || [])
     .map((key) => blockerMap.get(key))
     .filter(Boolean) as RankedAction[];
-  const playbook = requireRankedStringArray(action, "playbook", action.playbook);
-  const sourceLabel = requireRankedString(action, "sourceLabel", action.sourceLabel);
-  const stageLabel = requireRankedString(action, "stageLabel", action.stageLabel);
+  const playbook = sanitizeQueuePlaybook(
+    action.legacyActionType || action.actionType,
+    requireRankedStringArray(action, "playbook", action.playbook),
+  );
+  const sourceLabel = coachDaqCopy(requireRankedString(action, "sourceLabel", action.sourceLabel)) || "Recommended action";
+  const stageLabel = coachDaqCopy(requireRankedString(action, "stageLabel", action.stageLabel)) || "Action";
   const routeHref = requireRankedString(action, "routeHref", action.routeHref);
   const routeLabel = requireRankedString(action, "routeLabel", action.routeLabel);
   const draftEligible = requireRankedBoolean(action, "draftEligible", action.draftEligible);
@@ -1196,18 +1347,18 @@ function mapRankedActionToQueueItem(
     bucket,
     source,
     urgency: (action.urgencyLevel || "medium") as QueueUrgency,
-    title: action.title,
+    title: normalizeDisplayString(action.title) || "Review recommended action",
     description: buildRankedDescription(action),
     company: action.company || null,
     estimatedTime: formatEstimatedTime(action.effortMinutes),
     daysAgo: daysSince(action.createdAt),
-    playbook,
-    whyNow: action.whyNow || null,
-    evidence: uniqueStrings(action.evidence || [], 4),
+    playbook: coachDaqCopyList(playbook, 3),
+    whyNow: coachDaqCopy(action.whyNow),
+    evidence: coachDaqCopyList(action.evidence || [], 4),
     actionConfidence: mapConfidence(action.confidenceLevel),
     hasDraft: draftEligible,
     sourceLabel,
-    sourceDescription: action.targetOutcome,
+    sourceDescription: coachDaqCopy(action.targetOutcome) || buildRankedDescription(action),
     threadId: action.threadId || null,
     emailId: action.emailId ?? null,
     applicationId: action.applicationId ?? null,
