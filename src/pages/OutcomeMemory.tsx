@@ -2,9 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { Brain, TrendingUp, Building2, Clock, Briefcase } from "lucide-react";
+import { Brain, TrendingUp, Building2, Clock, Briefcase, AlertCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
-import { fetchApplicationStats, fetchEmailMetrics, fetchSuggestionOutcomeAnalytics } from "@/lib/emails";
+import {
+  fetchApplicationStats,
+  fetchEmailMetrics,
+  fetchRejectionInsights,
+  fetchSuggestionOutcomeAnalytics,
+} from "@/lib/emails";
 
 const OutcomeMemory = () => {
   const [user, setUser] = useState(auth?.currentUser ?? null);
@@ -46,18 +51,40 @@ const OutcomeMemory = () => {
     staleTime: 60_000,
   });
 
+  const rejectionInsightsQuery = useQuery({
+    queryKey: ["outcome-memory", "rejection-insights"],
+    queryFn: async () => {
+      try {
+        return await fetchRejectionInsights(100);
+      } catch {
+        return { success: false, analyzedRejections: 0, patterns: [] };
+      }
+    },
+    enabled: isAuthed,
+    staleTime: 5 * 60_000,
+  });
+
   const metrics = metricsQuery.data?.metrics;
   const appStats = statsQuery.data?.stats;
   const suggestionAnalytics = suggestionAnalyticsQuery.data?.analytics;
+  const rejectionInsights = rejectionInsightsQuery.data;
 
+  // Top cards use application-level counts (one row per tracked application,
+  // closed apps excluded) so they agree with the Chrome extension's pipeline
+  // counts. Email-category counts (used below for rates) are different by
+  // design — one application can produce several rejection/interview emails.
   const stats = useMemo(() => {
+    const apps = appStats?.applications;
     return [
-      { label: "Total Applications", value: metrics?.totalApplications ?? "-" },
-      { label: "Callbacks", value: metrics ? metrics.totalInterviewed + metrics.totalOffers : "-" },
-      { label: "Interviews", value: metrics?.totalInterviewed ?? "-" },
-      { label: "Rejected", value: metrics?.totalRejected ?? "-" },
+      { label: "Applications", value: apps?.applied ?? "-" },
+      {
+        label: "Callbacks",
+        value: apps ? apps.interviewed + apps.offered : "-",
+      },
+      { label: "Interviews", value: apps?.interviewed ?? "-" },
+      { label: "Rejected", value: apps?.rejected ?? "-" },
     ];
-  }, [metrics]);
+  }, [appStats]);
 
   const insights = useMemo(() => {
     if (!metrics) return {};
@@ -100,7 +127,7 @@ const OutcomeMemory = () => {
         { label: "Suggestions shown", value: "-" },
         { label: "Completed", value: "-" },
         { label: "Positive outcomes", value: "-" },
-        { label: "Observed lift", value: "-" },
+        { label: "Outcome gap", value: "-" },
       ];
     }
 
@@ -108,7 +135,7 @@ const OutcomeMemory = () => {
       { label: "Suggestions shown", value: suggestionAnalytics.followup.summary.shownApplications },
       { label: "Completed", value: `${(suggestionAnalytics.followup.summary.completedRate * 100).toFixed(1)}%` },
       { label: "Positive outcomes", value: `${(suggestionAnalytics.followup.summary.positiveOutcomeRate * 100).toFixed(1)}%` },
-      { label: "Observed lift", value: `${(suggestionAnalytics.followup.outcomes.observedLift * 100).toFixed(1)} pts` },
+      { label: "Outcome gap", value: `${(suggestionAnalytics.followup.outcomes.observedLift * 100).toFixed(1)} pts` },
     ];
   }, [suggestionAnalytics]);
 
@@ -117,14 +144,17 @@ const OutcomeMemory = () => {
       return [];
     }
 
+    const completedSample = suggestionAnalytics.followup.outcomes.completed.applications;
+    const ignoredSample = suggestionAnalytics.followup.outcomes.ignored.applications;
     const topActionTypes = suggestionAnalytics.followup.byActionType.slice(0, 3);
+
     return [
-      `Completed suggestions converted to interviews/offers ${(
+      `Completed suggestions: ${(
         suggestionAnalytics.followup.outcomes.completed.positiveRate * 100
-      ).toFixed(1)}% of the time.`,
-      `Ignored suggestions converted to interviews/offers ${(
+      ).toFixed(1)}% positive outcomes (n=${completedSample}).`,
+      `Ignored suggestions: ${(
         suggestionAnalytics.followup.outcomes.ignored.positiveRate * 100
-      ).toFixed(1)}% of the time.`,
+      ).toFixed(1)}% positive outcomes (n=${ignoredSample}).`,
       ...topActionTypes.map(
         (item) =>
           `${item.actionType.replace(/_/g, " ")}: ${item.completed}/${item.shown} completed, ${(
@@ -132,6 +162,16 @@ const OutcomeMemory = () => {
           ).toFixed(1)}% positive outcomes.`,
       ),
     ];
+  }, [suggestionAnalytics]);
+
+  const outcomeGapSampleWarning = useMemo(() => {
+    if (!suggestionAnalytics) return null;
+    const completedSample = suggestionAnalytics.followup.outcomes.completed.applications;
+    const ignoredSample = suggestionAnalytics.followup.outcomes.ignored.applications;
+    if (completedSample < 5 || ignoredSample < 5) {
+      return `Sample is small (${completedSample} completed, ${ignoredSample} ignored). The gap is descriptive, not predictive yet.`;
+    }
+    return null;
   }, [suggestionAnalytics]);
 
   const nonFollowupCompletionStats = useMemo(() => {
@@ -185,9 +225,79 @@ const OutcomeMemory = () => {
                 </div>
               ))}
             </div>
+            <p className="text-xs text-muted-foreground -mt-2">
+              Counts are per tracked application (closed applications excluded) — the same numbers shown in the Chrome extension. Email-level totals in rates and themes below can be higher because one application often produces several emails.
+            </p>
 
             <div className="glass-card rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-foreground mb-4">Suggestion Outcome Loop</h3>
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-destructive" />
+                  Rejection themes from your inbox
+                </h3>
+                {rejectionInsights && rejectionInsights.analyzedRejections > 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    {rejectionInsights.analyzedRejections} rejection email
+                    {rejectionInsights.analyzedRejections === 1 ? "" : "s"} analyzed
+                  </span>
+                ) : null}
+              </div>
+              <p className="text-xs text-muted-foreground mb-4">
+                Patterns mined from the actual text of your rejection emails. Surfaces only when the same gap appears in two or more rejections.
+              </p>
+              {!rejectionInsights || rejectionInsights.patterns.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {rejectionInsights && rejectionInsights.analyzedRejections > 0
+                    ? `Analyzed ${rejectionInsights.analyzedRejections} rejection email${rejectionInsights.analyzedRejections === 1 ? "" : "s"} but no theme appears in 2+ rejections yet. As more rejections accumulate, recurring gaps will show up here.`
+                    : "No rejection emails detected yet. As they come in, recurring themes recruiters cite will appear here."}
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {rejectionInsights.patterns.map((pattern, index) => (
+                    <div
+                      key={`${pattern.category}-${pattern.phrase}-${index}`}
+                      className="rounded-xl border border-border/60 bg-background/40 p-4"
+                    >
+                      <div className="flex items-baseline justify-between gap-3">
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            {pattern.label}
+                          </p>
+                          <p className="text-base font-semibold text-foreground mt-1 break-words">
+                            "{pattern.phrase}"
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
+                          {pattern.occurrences}× in rejections
+                        </span>
+                      </div>
+                      {pattern.examples.length > 0 ? (
+                        <ul className="mt-3 space-y-1.5">
+                          {pattern.examples.map((example, exIdx) => (
+                            <li
+                              key={`${pattern.phrase}-ex-${exIdx}`}
+                              className="text-xs text-muted-foreground"
+                            >
+                              <span className="font-medium text-foreground">
+                                {example.company || "Unknown company"}
+                              </span>
+                              {example.position ? ` — ${example.position}` : ""}
+                              {example.subject ? ` · "${example.subject}"` : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="glass-card rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-foreground mb-1">Suggestion Outcome Loop</h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                The outcome gap is the difference in positive-outcome rate between applications where you completed a suggestion vs. ignored one. It's a correlation, not proof of causation — completers may differ in ways beyond the suggestion itself.
+              </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {suggestionFunnelStats.map((s) => (
                   <div key={s.label} className="rounded-xl border border-border/60 bg-background/40 p-4 text-center">
@@ -196,6 +306,11 @@ const OutcomeMemory = () => {
                   </div>
                 ))}
               </div>
+              {outcomeGapSampleWarning ? (
+                <p className="mt-3 text-xs italic text-yellow-700 dark:text-yellow-300">
+                  {outcomeGapSampleWarning}
+                </p>
+              ) : null}
               <div className="mt-4 space-y-2.5">
                 {suggestionInsights.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
@@ -225,7 +340,7 @@ const OutcomeMemory = () => {
               <div className="mt-4 space-y-2.5">
                 {nonFollowupBreakdown.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    No Apply Gate, resume-proof, or cleanup completion history yet.
+                    No Apply Gate, resume gap, or cleanup completion history yet.
                   </p>
                 ) : (
                   nonFollowupBreakdown.map((item, index) => (

@@ -527,8 +527,9 @@ describe("FixSuggestions", () => {
     await user.click(screen.getByRole("button", { name: /Apply Gate\s+1/ }));
 
     expect(await screen.findByRole("heading", { name: "Apply to QA Engineer" })).toBeInTheDocument();
-    expect(screen.getByText("Why this is queued")).toBeInTheDocument();
-    expect(screen.getByText("Recommendation")).toBeInTheDocument();
+    expect(screen.getByText("Apply Gate context")).toBeInTheDocument();
+    expect(screen.getByText("Specific role")).toBeInTheDocument();
+    expect(screen.getByText("Role-specific issue")).toBeInTheDocument();
     expect(screen.getAllByText("Tailor resume first").length).toBeGreaterThan(0);
     expect(screen.queryByText('["The')).not.toBeInTheDocument();
   });

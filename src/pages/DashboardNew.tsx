@@ -202,7 +202,7 @@ function buildOutcomeMemoryBrief({
     const topSource = nonFollowup?.bySource?.[0]?.source?.replace(/_/g, " ") || "fix work";
     return {
       title: "Fix work is becoming part of the memory",
-      body: `${nonFollowup?.summary.completedSuggestions || 0} of ${nonFollowup?.summary.shownSuggestions || 0} Apply Gate, resume-proof, and cleanup tasks have been completed. ${topSource} is the biggest current source of fix work.`,
+      body: `${nonFollowup?.summary.completedSuggestions || 0} of ${nonFollowup?.summary.shownSuggestions || 0} Apply Gate, resume gap, and cleanup tasks have been completed. ${topSource} is the biggest current source of fix work.`,
       stat: `${formatFractionPercent(nonFollowup?.summary.completionRate)} completion rate`,
       ctaLabel: "Open Outcome Memory",
     };

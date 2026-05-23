@@ -48,6 +48,7 @@ export type MetricsResponse = {
     offerRate: number;
     rejectionRate: number;
     totalEmails: number;
+    windowMisaligned?: boolean;
   };
   dataCompleteness?: {
     syncComplete: boolean;
@@ -346,6 +347,79 @@ export async function fetchStoredEmails(params: {
 export async function fetchEmailMetrics(timeframe = "last_30_days"): Promise<MetricsResponse> {
   const encoded = encodeURIComponent(timeframe);
   return apiFetch(`/api/emails/metrics?timeframe=${encoded}`, { method: "GET" });
+}
+
+export interface RejectionInsightExample {
+  subject: string | null;
+  company: string | null;
+  position: string | null;
+  date: string | null;
+}
+
+export interface RejectionInsightPattern {
+  category: "skill" | "domain" | "years" | "requirement";
+  label: string;
+  phrase: string;
+  occurrences: number;
+  examples: RejectionInsightExample[];
+}
+
+export interface RejectionInsightsResponse {
+  success: boolean;
+  analyzedRejections: number;
+  patterns: RejectionInsightPattern[];
+}
+
+export async function fetchRejectionInsights(limit = 100): Promise<RejectionInsightsResponse> {
+  const encoded = encodeURIComponent(String(limit));
+  return apiFetch(`/api/emails/rejection-insights?limit=${encoded}`, { method: "GET" });
+}
+
+export interface WeeklyHighlightEmail {
+  id: number | null;
+  company: string | null;
+  position: string | null;
+  subject: string | null;
+  date: string | null;
+}
+
+export interface WeeklyHighlightSilent extends WeeklyHighlightEmail {
+  stage: "applied" | "interviewed";
+  daysSilent: number;
+}
+
+export interface WeeklyHighlightsResponse {
+  success: boolean;
+  timeframe: string;
+  windowStart: string | null;
+  windowEnd: string | null;
+  counts: {
+    applications: number;
+    callbacks: number;
+    interviews: number;
+    offers: number;
+    rejections: number;
+  };
+  highlights: {
+    newApplications: WeeklyHighlightEmail[];
+    newCallbacks: WeeklyHighlightEmail[];
+    newOffers: WeeklyHighlightEmail[];
+    newRejections: WeeklyHighlightEmail[];
+    silentThreads: WeeklyHighlightSilent[];
+    topRejectionTheme: {
+      phrase: string;
+      label: string;
+      occurrences: number;
+      category: string;
+    } | null;
+  };
+}
+
+export async function fetchWeeklyHighlights(
+  timeframe: "last_7_days" | "last_14_days" | "last_30_days" = "last_7_days",
+): Promise<WeeklyHighlightsResponse> {
+  const encoded = encodeURIComponent(timeframe);
+  return apiFetch(`/api/emails/weekly-highlights?timeframe=${encoded}`, { method: "GET" });
 }
 
 export async function fetchFollowupSuggestions(): Promise<FollowupSuggestionsResponse> {
@@ -1154,7 +1228,27 @@ export type ApplyGateResult = {
     gaps: string[];
     rationale: string;
   };
+  priorHistory?: ApplyGatePriorHistory | null;
 };
+
+export interface ApplyGatePriorHistoryExample {
+  company: string | null;
+  position: string | null;
+  subject: string | null;
+  date: string | null;
+}
+
+export interface ApplyGatePriorHistory {
+  headline: string;
+  recommendation: "skip" | "fix_first" | "proceed_with_confidence" | null;
+  rejectionCount: number;
+  sameCompanyRejectionCount?: number;
+  similarRolesEvaluated: number;
+  verdictBreakdown: { skip: number; fix: number; apply: number; total: number };
+  recurringTheme: string | null;
+  recurringThemeOccurrences: number;
+  examples: ApplyGatePriorHistoryExample[];
+}
 
 export type ApplyGateHistoryItem = {
   id: string;

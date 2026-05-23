@@ -93,8 +93,17 @@ const sourceFilterLabels: Record<SourceFilter, string> = {
   followup: "Outreach tasks",
   stale: "Ghosting",
   apply_gate: "Apply Gate",
-  resume: "Resume proof",
+  resume: "Resume Gaps",
   cleanup: "Cleanup",
+};
+
+const sourceFilterHelp: Record<SourceFilter, string> = {
+  all: "Everything that can improve today's search: inbox moves, role decisions, resume gaps, cleanup, and stale roles.",
+  followup: "Recruiter replies, thank-you notes, and follow-ups from Gmail conversations.",
+  stale: "Applications or interviews that have gone quiet and may need a final check or close-out.",
+  apply_gate: "One specific role needs an Apply Gate review before you apply, skip, or fix first.",
+  resume: "The same resume gap is showing up across roles you target. Fix it once so future applications are stronger.",
+  cleanup: "Missing or stale data that can make the rest of the queue less reliable.",
 };
 
 const sourceAccentClasses: Record<QueueSource, string> = {
@@ -158,7 +167,7 @@ function getPrimaryActionKind(params: {
   if (params.canDraft) return "draft";
   if (params.gmailUrl) return "gmail";
   if (params.showRouteAction) return "route";
-  if (params.item.threadId && params.item.actionType) return "complete";
+  if (params.item.logicalKey || (params.item.threadId && params.item.actionType)) return "complete";
   return null;
 }
 
@@ -175,7 +184,7 @@ function getPrimaryActionLabel(
   if (kind === "gmail") return "Open Gmail";
   if (kind === "route") return item.routeLabel || "Open workspace";
   if (kind === "complete") return isGmailHandledCandidate(item) ? "Already handled" : "Mark done";
-  return "Review action";
+  return "";
 }
 
 function getPrimaryActionHelper(kind: PrimaryActionKind, item: QueueItem) {
@@ -188,8 +197,12 @@ function getPrimaryActionHelper(kind: PrimaryActionKind, item: QueueItem) {
   if (kind === "draft") return "Draft from the conversation, then review it before sending.";
   if (kind === "gmail") return "Open Gmail first when timing, sender, or conversation details matter.";
   if (kind === "route") return "Jump into the workspace that can resolve this recommendation.";
-  if (kind === "complete") return "Use this when you already handled the action in Gmail.";
-  return item.sourceDescription;
+  if (kind === "complete") {
+    return isGmailHandledCandidate(item)
+      ? "Use this when you already handled the action in Gmail."
+      : "Mark this done after you handle it outside the queue.";
+  }
+  return "Review the details below before deciding what to do next.";
 }
 
 function buildDisplayQueueEntries(queue: QueueItem[]): DisplayQueueEntry[] {
@@ -480,8 +493,8 @@ function getDecisionSourceRows(item: QueueItem) {
     const recommendation = getReadableSourceValue(item.blockingReason, item.description, item.whyNow, item.sourceDescription);
     const nextStep = getReadableSourceValue(item.playbook?.[0], item.sourceDescription, item.routeLabel);
     return [
-      recommendation ? { label: "Recommendation", value: recommendation } : null,
-      nextStep ? { label: "Best next step", value: nextStep } : null,
+      recommendation ? { label: "Role-specific issue", value: recommendation } : null,
+      nextStep ? { label: "Before applying", value: nextStep } : null,
     ].filter((row): row is { label: string; value: string } => Boolean(row));
   }
 
@@ -489,8 +502,8 @@ function getDecisionSourceRows(item: QueueItem) {
     const proofGap = getReadableSourceValue(item.description, item.whyNow, item.playbook?.[0], item.sourceDescription);
     const nextStep = getReadableSourceValue(item.playbook?.[0], item.playbook?.[1], item.routeLabel);
     return [
-      proofGap ? { label: "Proof gap", value: proofGap } : null,
-      nextStep ? { label: "Best next step", value: nextStep } : null,
+      proofGap ? { label: "Repeated gap", value: proofGap } : null,
+      nextStep ? { label: "Best resume fix", value: nextStep } : null,
     ].filter((row): row is { label: string; value: string } => Boolean(row));
   }
 
@@ -509,7 +522,8 @@ function buildSourceCheckPreview(item: QueueItem) {
 }
 
 function getSourceCheckTitle(item: QueueItem) {
-  if (item.source === "apply_gate" || item.source === "resume") return "Why this is queued";
+  if (item.source === "apply_gate") return "Apply Gate context";
+  if (item.source === "resume") return "Why this resume gap matters";
   if (item.source === "cleanup") return "Data to fix";
   return "Source check";
 }
@@ -518,11 +532,11 @@ function getSourceCheckPurpose(item: QueueItem) {
   const actionType = normalizeActionType(item.actionType);
 
   if (item.source === "apply_gate") {
-    return "Use this to confirm the Apply Gate recommendation before spending time on this role.";
+    return "This is tied to one role. Use it to confirm the specific blocker before you spend time applying.";
   }
 
   if (item.source === "resume") {
-    return "Use this to see which resume proof gap keeps showing up before you apply again.";
+    return "This is not about one job. It is a pattern from roles you keep targeting, so one resume update can help across several applications.";
   }
 
   if (item.source === "cleanup") {
@@ -551,8 +565,8 @@ function getSourceCheckPurpose(item: QueueItem) {
 function getSourceCheckBadge(item: QueueItem, rowCount: number) {
   const actionType = normalizeActionType(item.actionType);
   if (!rowCount) return "Needs verification";
-  if (item.source === "apply_gate") return "Apply Gate source";
-  if (item.source === "resume") return "Resume proof";
+  if (item.source === "apply_gate") return "Specific role";
+  if (item.source === "resume") return "Across roles";
   if (item.source === "cleanup") return "Missing data";
   if (actionType === "prep_interview" || actionType === "prepare_interview") return "Interview source";
   if (isOutreachQueueItem(item)) return "Gmail conversation";
@@ -564,15 +578,15 @@ function getSourceCheckChecklist(item: QueueItem) {
 
   if (item.source === "apply_gate") {
     return [
-      "Open Apply Gate and confirm the recommendation still matches the role.",
-      "Fix the strongest proof gap before applying.",
+      "Open Apply Gate and confirm this exact role still looks worth the effort.",
+      "Fix the strongest blocker before applying.",
       "If you already applied, mark this handled so it leaves the queue.",
     ];
   }
 
   if (item.source === "resume") {
     return [
-      "Add proof that directly matches the repeated gap.",
+      "Add proof that directly matches the repeated pattern.",
       "Move the strongest role-relevant bullet higher on the resume.",
       "Re-run Apply Gate after the resume update.",
     ];
@@ -638,7 +652,7 @@ function SourceCheckSection({ item }: { item: QueueItem }) {
     item.source === "apply_gate"
       ? "Apply Gate note"
       : item.source === "resume"
-      ? "Resume proof gap"
+      ? "Resume gap"
       : item.source === "cleanup"
       ? "Missing field"
       : "Source detail";
@@ -1203,6 +1217,7 @@ const FixSuggestions = () => {
       },
     );
   }, [urgencyFilteredSuggestionPool]);
+  const activeSourceHelp = sourceFilterHelp[effectiveSourceFilter];
 
   const visibleQueueActions = useMemo(
     () => getRankedQueueActionsForQueueItems(rankedQueue, filteredSuggestions),
@@ -1230,7 +1245,7 @@ const FixSuggestions = () => {
     }
     if (combinedSuggestions.length === 0) return rankedQueue?.emptyState?.title || "No active next-best actions right now.";
     if (visibleSuggestionPool.length === 0 && queueView === "inbox") {
-      return "No urgent inbox actions are due right now. Switch to all actions for Apply Gate, resume, cleanup, and stale-role work.";
+      return "No urgent inbox actions are due right now. Switch to all actions for Apply Gate, resume gaps, cleanup, and stale-role work.";
     }
     return "No suggestions match the current filters.";
   }, [
@@ -1318,14 +1333,17 @@ const FixSuggestions = () => {
 
     await withPendingLogicalKey(item.logicalKey, async () => {
       try {
+        // Mark the queue action done first. The complete endpoint re-derives the
+        // queue to validate, so it must run before closeApplication removes the
+        // underlying email from the open-tracked set.
+        await completeQueueAction({
+          logicalKey: item.logicalKey,
+          dedupeKey: item.dedupeKey,
+        });
         await closeApplication({
           applicationId: item.applicationId ?? null,
           emailId: item.emailId ?? null,
           reason: `Closed from Daily Action Queue close-out cue: ${item.title}`,
-        });
-        await completeQueueAction({
-          logicalKey: item.logicalKey,
-          dedupeKey: item.dedupeKey,
         });
         await refreshQueueState();
         toast.success("Application closed and removed from active focus.");
@@ -1505,7 +1523,7 @@ const FixSuggestions = () => {
                 Focus the queue
               </div>
               <p className="mt-1 text-xs text-muted-foreground sm:hidden">
-                Inbox actions are time-sensitive Gmail moves. All actions includes resume, Apply Gate, cleanup, and stale-role work.
+                Inbox actions are time-sensitive Gmail moves. All actions includes Apply Gate, resume gaps, cleanup, and stale-role work.
               </p>
             </div>
 
@@ -1570,6 +1588,12 @@ const FixSuggestions = () => {
                 </button>
               );
             })}
+          </div>
+          <div className="mt-2 rounded-xl border border-border/60 bg-background/55 px-3 py-2 text-sm leading-6 text-muted-foreground">
+            <span className="font-medium text-foreground">
+              {effectiveSourceFilter === "all" ? "All actions" : sourceFilterLabels[effectiveSourceFilter]}:
+            </span>{" "}
+            {activeSourceHelp}
           </div>
         </section>
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
@@ -2001,25 +2025,31 @@ const FixSuggestions = () => {
                             </div>
                           </div>
 
-                          <Button
-                            className="mt-3 w-full"
-                            variant={primaryActionKind === "close" ? "destructive" : inlineOpen && primaryActionKind === "cleanup" ? "secondary" : "default"}
-                            disabled={primaryActionDisabled}
-                            onClick={runPrimaryAction}
-                          >
-                            {primaryActionKind === "close" ? (
-                              <XCircle className="h-4 w-4" />
-                            ) : primaryActionKind === "draft" ? (
-                              <MessageSquare className="h-4 w-4" />
-                            ) : primaryActionKind === "gmail" || primaryActionKind === "route" ? (
-                              <ArrowUpRight className="h-4 w-4" />
-                            ) : primaryActionKind === "complete" ? (
-                              <CheckCircle2 className="h-4 w-4" />
-                            ) : (
-                              <CheckSquare className="h-4 w-4" />
-                            )}
-                            {primaryActionLabel}
-                          </Button>
+                          {primaryActionKind ? (
+                            <Button
+                              className="mt-3 w-full"
+                              variant={primaryActionKind === "close" ? "destructive" : inlineOpen && primaryActionKind === "cleanup" ? "secondary" : "default"}
+                              disabled={primaryActionDisabled}
+                              onClick={runPrimaryAction}
+                            >
+                              {primaryActionKind === "close" ? (
+                                <XCircle className="h-4 w-4" />
+                              ) : primaryActionKind === "draft" ? (
+                                <MessageSquare className="h-4 w-4" />
+                              ) : primaryActionKind === "gmail" || primaryActionKind === "route" ? (
+                                <ArrowUpRight className="h-4 w-4" />
+                              ) : primaryActionKind === "complete" ? (
+                                <CheckCircle2 className="h-4 w-4" />
+                              ) : (
+                                <CheckSquare className="h-4 w-4" />
+                              )}
+                              {primaryActionLabel}
+                            </Button>
+                          ) : (
+                            <div className="mt-3 rounded-xl border border-border/70 bg-muted/35 px-3 py-2 text-xs leading-5 text-muted-foreground">
+                              No one-click action is available for this card. Use the details below to decide whether to act or ignore it.
+                            </div>
+                          )}
 
                           {canMarkHandledFromCard ? (
                             <Button
@@ -2072,7 +2102,7 @@ const FixSuggestions = () => {
                   : [
                       ["1", "Clear blockers", `${sourceCounts.cleanup} cleanup task(s) that affect downstream accuracy.`],
                       ["2", "Handle ambiguity", `${sourceCounts.stale} role(s) need a check-in or close-out.`],
-                      ["3", "Improve conversion", `${sourceCounts.followup + sourceCounts.apply_gate + sourceCounts.resume} fit, resume, or outreach action(s).`],
+                      ["3", "Improve conversion", `${sourceCounts.followup + sourceCounts.apply_gate + sourceCounts.resume} fit, resume gap, or outreach action(s).`],
                     ]).map(([step, title, body]) => (
                   <div key={step} className="rounded-xl border border-border/70 bg-background/70 p-3">
                     <div className="flex gap-3">

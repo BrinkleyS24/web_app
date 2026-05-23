@@ -1383,6 +1383,43 @@ const ApplyGate = () => {
               </div>
             )}
 
+            {result.priorHistory ? (
+              <div
+                className={`rounded-xl border px-4 py-3 ${
+                  result.priorHistory.recommendation === "skip"
+                    ? "border-destructive/40 bg-destructive/5 text-destructive"
+                    : result.priorHistory.recommendation === "fix_first"
+                      ? "border-yellow-500/40 bg-yellow-500/5 text-yellow-700 dark:text-yellow-300"
+                      : "border-emerald-500/40 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300"
+                }`}
+              >
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide">
+                      Prior inbox history
+                    </p>
+                    <p className="mt-1 text-sm font-medium leading-relaxed">
+                      {result.priorHistory.headline}
+                    </p>
+                    {result.priorHistory.examples.length > 0 ? (
+                      <ul className="mt-2 space-y-0.5">
+                        {result.priorHistory.examples.map((ex, idx) => (
+                          <li key={`prior-ex-${idx}`} className="text-xs opacity-90">
+                            <span className="font-medium">
+                              {ex.company || "Unknown"}
+                            </span>
+                            {ex.position ? ` — ${ex.position}` : ""}
+                            {ex.subject ? ` · "${ex.subject}"` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             <div>
               <p className="font-semibold text-foreground leading-tight">{currentRoleCompany.role}</p>
               {currentRoleCompany.company ? (

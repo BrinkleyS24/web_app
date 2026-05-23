@@ -110,7 +110,7 @@ export const actionTypeLabels: Record<string, string> = {
   close_stale_application: "Close stale",
   close_stale_interview: "Close interview",
   apply_gate_fix: "Apply Gate fix",
-  resume_proof_gap: "Resume proof",
+  resume_proof_gap: "Resume gap",
   cleanup_structured_fields: "Extraction cleanup",
   cleanup_application_links: "Link cleanup",
 };
@@ -576,26 +576,26 @@ function buildResumeQueue(history: ApplyGateHistoryItem[]): QueueItem[] {
       urgency: repeatedGaps.length > 0 ? "high" : "medium",
       title:
         repeatedGaps.length > 0
-          ? `Resume is repeatedly under-proving ${recurringGapText}`
-          : "Add stronger proof to your resume before the next applications",
+          ? `Fix the recurring resume gap: ${recurringGapText}`
+          : "Strengthen your resume before the next application batch",
       description:
         repeatedGaps.length > 0
-          ? `Recent Apply Gate screenings are repeatedly missing evidence for ${recurringGapText}.`
-          : topResumeFixes[0] || "Apply Gate is finding weak resume proof for work you may already have done.",
-      company: repeatedGaps.length > 0 ? "Across recent screenings" : "Resume proof",
+          ? `This gap keeps showing up in roles you are targeting: ${recurringGapText}.`
+          : topResumeFixes[0] || "Apply Gate keeps finding a resume gap you may be able to fix once.",
+      company: repeatedGaps.length > 0 ? "Across target roles" : "Resume gaps",
       estimatedTime: "20 mins",
       playbook: uniqueStrings(
         [
           ...topResumeFixes,
-          repeatedGaps.length > 0 ? `Add concrete bullets proving ${recurringGapText}.` : null,
-          "Prioritize bullet evidence over adding more skills to a skills list.",
+          repeatedGaps.length > 0 ? `Add concrete resume bullets that cover ${recurringGapText}.` : null,
+          "Put the strongest matching bullet above generic skills or older experience.",
         ],
         3,
       ),
       whyNow:
         repeatedGaps.length > 0
-          ? "The same proof gap is appearing across multiple recent screenings."
-          : "Recent screenings found resume-proof issues that are fixable before the next application batch.",
+          ? "The same resume gap is appearing across multiple recent screenings."
+          : "Recent screenings found resume gaps you can fix before the next application batch.",
       evidence: uniqueStrings(
         [
           repeatedGaps.length > 0 ? `${repeatedGaps.length} repeated gap(s): ${recurringGapText}` : null,
@@ -604,14 +604,14 @@ function buildResumeQueue(history: ApplyGateHistoryItem[]): QueueItem[] {
         4,
       ),
       actionConfidence: repeatedGaps.length > 0 ? "high" : "medium",
-      sourceLabel: "Resume-proof gap",
-      sourceDescription: "Repeated evidence gaps across recent role screenings",
+      sourceLabel: "Resume gap",
+      sourceDescription: "Repeated resume gap across recent role screenings",
       threadId: "resume-proof:aggregate",
       actionType: "resume_proof_gap",
       suggestionSource: "resume_proof_gap",
       routeHref: "/apply-gate",
       routeLabel: "Review Apply Gate",
-      stageLabel: "Resume proof",
+      stageLabel: "Resume gaps",
     },
   ];
 }
@@ -1275,11 +1275,12 @@ function requireRankedIntent(action: RankedAction) {
   return requireRankedString(action, "intent", action.intent) as NonNullable<RankedAction["intent"]>;
 }
 
-function requireRankedStringArray(action: RankedAction, fieldName: string, value?: unknown) {
+function softRankedStringArray(value: unknown, fallback: string[]) {
   const normalized = uniqueStrings(value, 20);
-  if (normalized.length > 0) return normalized;
-  throw new Error(`[premiumTaskQueue] Ranked action ${getRankedActionDebugKey(action)} missing ${fieldName}`);
+  return normalized.length > 0 ? normalized : fallback;
 }
+
+const GENERIC_PLAYBOOK_FALLBACK = ["Open the source context and confirm the recommendation before acting."];
 
 function requireRankedBoolean(action: RankedAction, fieldName: string, value?: boolean) {
   if (typeof value === "boolean") return value;
@@ -1329,10 +1330,12 @@ function mapRankedActionToQueueItem(
   const blockers = (action.unresolvedBlockedBy || [])
     .map((key) => blockerMap.get(key))
     .filter(Boolean) as RankedAction[];
-  const playbook = sanitizeQueuePlaybook(
+  const rawPlaybook = softRankedStringArray(action.playbook, []);
+  const sanitizedPlaybook = sanitizeQueuePlaybook(
     action.legacyActionType || action.actionType,
-    requireRankedStringArray(action, "playbook", action.playbook),
+    rawPlaybook,
   );
+  const playbook = sanitizedPlaybook.length > 0 ? sanitizedPlaybook : GENERIC_PLAYBOOK_FALLBACK;
   const sourceLabel = coachDaqCopy(requireRankedString(action, "sourceLabel", action.sourceLabel)) || "Recommended action";
   const stageLabel = coachDaqCopy(requireRankedString(action, "stageLabel", action.stageLabel)) || "Action";
   const routeHref = requireRankedString(action, "routeHref", action.routeHref);

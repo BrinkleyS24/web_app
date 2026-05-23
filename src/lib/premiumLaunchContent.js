@@ -94,7 +94,7 @@ export const premiumFeatureCards = [
     icon: Wrench,
     title: "Daily Action Queue",
     body:
-      "Prioritize the next few follow-ups, ghosting checks, resume-proof fixes, and cleanup actions with a clear reason behind each move.",
+      "Prioritize the next few follow-ups, ghosting checks, resume gap fixes, and cleanup actions with a clear reason behind each move.",
   },
   {
     icon: Brain,
