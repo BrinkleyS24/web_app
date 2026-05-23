@@ -2,6 +2,7 @@ import { getEmailCompany, getEmailTitle } from "@/lib/emailFormatting";
 import { splitRoleAndCompany } from "@/lib/applyGateDisplay";
 import type {
   ApplyGateHistoryItem,
+  CoachResponse,
   FollowupSuggestion,
   RankedAction,
   RankedActionQueue,
@@ -45,6 +46,13 @@ export type QueueItem = {
   routeLabel?: string | null;
   blockerTitles?: string[];
   blockingReason?: string | null;
+  // DAQ Inbox Intelligence coach response, when the user has the coach
+  // feature enabled and a validated row exists for the underlying thread.
+  // When present, the item's title/description fields have already been
+  // overridden with coach copy in buildFollowupQueue — this is kept here
+  // so consumers (draft panel, debug overlays) can introspect the raw
+  // coach output if needed.
+  coachResponse?: CoachResponse | null;
 };
 
 export type UpcomingFollowupWindow = {
@@ -450,35 +458,53 @@ function daysSince(value?: string | null) {
 }
 
 function buildFollowupQueue(suggestions: FollowupSuggestion[]): QueueItem[] {
-  return suggestions.map((item, index) => ({
-    id: `followup:${item.threadId || index}:${item.actionType || "action"}`,
-    source: "followup",
-    urgency: (item.urgency || "medium") as QueueUrgency,
-    title: item.title || item.subject || "Suggested action",
-    description: coachDaqCopy(item.description) || "Suggested next step based on your application timeline.",
-    company: item.company || null,
-    estimatedTime: item.estimatedTime || "10 mins",
-    daysAgo: item.daysAgo,
-    playbook: actionPlaybook[item.actionType || ""] || [
-      "Review the conversation and choose the smallest useful next action.",
-      "Keep the message specific to this role and this company.",
-    ],
-    whyNow: coachDaqCopy(item.whyNow || item.description) || null,
-    evidence: uniqueStrings(item.evidence || [], 4),
-    actionConfidence: item.actionConfidence || "medium",
-    hasDraft: Boolean(item.draftAvailable) && Boolean(item.threadId),
-    sourceLabel: "Outreach task",
-    sourceDescription:
-      item.category?.toLowerCase() === "interviewed" ? "Interview timing cue" : "Follow-up timing cue",
-    threadId: item.threadId,
-    emailId: item.emailId ?? null,
-    applicationId: item.applicationId ?? null,
-    actionType: item.actionType,
-    suggestionSource: item.suggestionSource || "email_followup",
-    stageLabel: item.category?.toLowerCase() === "interviewed" ? "Interview" : "Application",
-    routeHref: "/fix-suggestions",
-    routeLabel: "Open queue",
-  }));
+  return suggestions.map((item, index) => {
+    // Prefer DAQ Inbox Intelligence coach copy when available. Falls back to
+    // the templated description path so behavior is unchanged for users
+    // without the coach feature (or threads where the coach hasn't generated
+    // a row yet). The coach service guarantees only validated, grounded copy
+    // ever reaches this branch.
+    const coachContent = item.coachResponse?.content ?? null;
+    const coachHeadline = coachContent?.headline?.trim() || null;
+    const coachBody = coachContent?.body?.trim() || null;
+
+    const title = coachHeadline || item.title || item.subject || "Suggested action";
+    const description =
+      coachBody ||
+      coachDaqCopy(item.description) ||
+      "Suggested next step based on your application timeline.";
+
+    return {
+      id: `followup:${item.threadId || index}:${item.actionType || "action"}`,
+      source: "followup",
+      urgency: (item.urgency || "medium") as QueueUrgency,
+      title,
+      description,
+      company: item.company || null,
+      estimatedTime: item.estimatedTime || "10 mins",
+      daysAgo: item.daysAgo,
+      playbook: actionPlaybook[item.actionType || ""] || [
+        "Review the conversation and choose the smallest useful next action.",
+        "Keep the message specific to this role and this company.",
+      ],
+      whyNow: coachDaqCopy(item.whyNow || item.description) || null,
+      evidence: uniqueStrings(item.evidence || [], 4),
+      actionConfidence: item.actionConfidence || "medium",
+      hasDraft: Boolean(item.draftAvailable) && Boolean(item.threadId),
+      sourceLabel: "Outreach task",
+      sourceDescription:
+        item.category?.toLowerCase() === "interviewed" ? "Interview timing cue" : "Follow-up timing cue",
+      threadId: item.threadId,
+      emailId: item.emailId ?? null,
+      applicationId: item.applicationId ?? null,
+      actionType: item.actionType,
+      suggestionSource: item.suggestionSource || "email_followup",
+      stageLabel: item.category?.toLowerCase() === "interviewed" ? "Interview" : "Application",
+      routeHref: "/fix-suggestions",
+      routeLabel: "Open queue",
+      coachResponse: item.coachResponse ?? null,
+    };
+  });
 }
 
 function buildApplyGateQueue(history: ApplyGateHistoryItem[]): QueueItem[] {

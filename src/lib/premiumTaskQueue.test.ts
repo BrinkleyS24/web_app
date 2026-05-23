@@ -576,3 +576,111 @@ describe("premiumTaskQueue outreach timing", () => {
     expect(resumeItem?.playbook).not.toContain("T");
   });
 });
+
+describe("premiumTaskQueue coach response override", () => {
+  test("uses coach headline + body as title + description when coachResponse is present", () => {
+    const queue = buildCombinedSuggestionQueue({
+      storedEmails: [],
+      applyGateHistory: [],
+      followupSuggestions: [
+        {
+          threadId: "thread-acme",
+          subject: "Application received",
+          title: "TEMPLATED TITLE that should be overridden",
+          description: "TEMPLATED DESCRIPTION that should be overridden",
+          actionType: "follow_up",
+          urgency: "high",
+          category: "applied",
+          daysAgo: 11,
+          coachResponse: {
+            signal_type: "evidence_grounded_followup",
+            evidence_hash: "h1",
+            model: "gpt-4o-mini",
+            generated_at: "2026-04-11T11:00:00.000Z",
+            content: {
+              headline: "Follow up with Acme today",
+              body: "Your application has been sitting for 11 days with no rejection signal.",
+              suggested_action: { label: "Send follow-up", intent: "FOLLOW_UP_THREAD" },
+              draft_followup: "Hi! Quick check-in.",
+              cited_evidence_keys: ["company_name"],
+            },
+          },
+        },
+      ],
+    });
+
+    const item = queue.find((q) => q.threadId === "thread-acme");
+    expect(item).toBeDefined();
+    expect(item?.title).toBe("Follow up with Acme today");
+    expect(item?.description).toBe(
+      "Your application has been sitting for 11 days with no rejection signal."
+    );
+    // Coach payload preserved on item so downstream consumers (drafts, debug)
+    // can read structured fields.
+    expect(item?.coachResponse?.content?.draft_followup).toBe("Hi! Quick check-in.");
+  });
+
+  test("falls back to templated title/description when coachResponse is absent", () => {
+    const queue = buildCombinedSuggestionQueue({
+      storedEmails: [],
+      applyGateHistory: [],
+      followupSuggestions: [
+        {
+          threadId: "thread-beta",
+          subject: "Application received",
+          title: "Templated headline",
+          description: "Templated description",
+          actionType: "follow_up",
+          urgency: "medium",
+          category: "applied",
+          daysAgo: 12,
+          // no coachResponse field
+        },
+      ],
+    });
+
+    const item = queue.find((q) => q.threadId === "thread-beta");
+    expect(item).toBeDefined();
+    expect(item?.title).toBe("Templated headline");
+    expect(item?.description).toBe("Templated description");
+    expect(item?.coachResponse ?? null).toBeNull();
+  });
+
+  test("empty coach headline/body falls back to templated fields (defensive)", () => {
+    // Validation should prevent this in the backend, but the renderer must
+    // still degrade gracefully if a malformed row somehow lands.
+    const queue = buildCombinedSuggestionQueue({
+      storedEmails: [],
+      applyGateHistory: [],
+      followupSuggestions: [
+        {
+          threadId: "thread-gamma",
+          subject: "Application received",
+          title: "Templated title",
+          description: "Templated description",
+          actionType: "follow_up",
+          urgency: "medium",
+          category: "applied",
+          daysAgo: 11,
+          coachResponse: {
+            signal_type: "evidence_grounded_followup",
+            evidence_hash: "h1",
+            model: "gpt-4o-mini",
+            generated_at: "2026-04-11T11:00:00.000Z",
+            content: {
+              headline: "   ", // whitespace-only
+              body: "",
+              suggested_action: { label: "Send", intent: "FOLLOW_UP_THREAD" },
+              draft_followup: null,
+              cited_evidence_keys: [],
+            },
+          },
+        },
+      ],
+    });
+
+    const item = queue.find((q) => q.threadId === "thread-gamma");
+    expect(item?.title).toBe("Templated title");
+    expect(item?.description).toBe("Templated description");
+  });
+});

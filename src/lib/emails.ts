@@ -59,6 +59,28 @@ export type MetricsResponse = {
   };
 };
 
+// DAQ Inbox Intelligence coach response surfaced alongside each suggestion when
+// the user has the LLM coach feature enabled. The backend attaches this from
+// daq_coach_response rows that have validation_status='ok'.
+export type CoachResponseContent = {
+  headline: string;
+  body: string;
+  suggested_action: {
+    label: string;
+    intent: string;
+  };
+  draft_followup: string | null;
+  cited_evidence_keys: string[];
+};
+
+export type CoachResponse = {
+  signal_type: string;
+  evidence_hash: string;
+  content: CoachResponseContent;
+  model: string;
+  generated_at: string;
+};
+
 export type FollowupSuggestion = {
   id?: string | number | null;
   emailId?: string | number | null;
@@ -78,6 +100,7 @@ export type FollowupSuggestion = {
   evidence?: string[] | null;
   actionConfidence?: "low" | "medium" | "high" | null;
   draftAvailable?: boolean | null;
+  coachResponse?: CoachResponse | null;
 };
 
 export type FollowupSuggestionsResponse = {
