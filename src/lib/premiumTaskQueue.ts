@@ -218,10 +218,14 @@ function looksLikeRawEvidenceStep(value?: string | null) {
 }
 
 function sanitizeQueuePlaybook(actionType: string | null | undefined, playbook: string[]) {
-  const normalizedType = normalizeQueueActionType(actionType);
-  const defaults = actionPlaybook[normalizedType] || [];
+  // Prefer the backend-provided playbook (coach-generated when available, else
+  // the generator's own template). Only fall back to the frontend static
+  // defaults when the backend gave nothing usable — otherwise we would bury the
+  // coach steps under generic boilerplate and the 3-item cap.
   const cleaned = (playbook || []).filter((step) => !looksLikeRawEvidenceStep(step));
-  return uniqueStrings([...defaults, ...cleaned], 3);
+  if (cleaned.length > 0) return uniqueStrings(cleaned, 3);
+  const normalizedType = normalizeQueueActionType(actionType);
+  return uniqueStrings(actionPlaybook[normalizedType] || [], 3);
 }
 
 function getDaqIdentityKey(item: QueueItem) {

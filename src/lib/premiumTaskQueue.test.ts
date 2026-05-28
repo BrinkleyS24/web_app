@@ -453,6 +453,61 @@ describe("premiumTaskQueue outreach timing", () => {
     );
   });
 
+  test("uses the backend (coach) playbook instead of burying it under static defaults", () => {
+    const coachSteps = [
+      "Find a Cutsforth engineer through your network.",
+      "Ask for a 10-minute intro chat about the QA team.",
+    ];
+    const items = buildQueueItemsFromRankedQueue({
+      now: "2026-04-11T12:00:00.000Z",
+      doToday: [
+        {
+          id: "playbook-action",
+          logicalKey: "pb:1",
+          dedupeKey: "pb:1:v1",
+          primaryEntityId: "pb:1",
+          evidenceVersion: "v1",
+          actionType: "follow_up",
+          actionCategory: "communication",
+          title: "Connect with someone at Cutsforth",
+          whyNow: "Recruiters rarely reach back from cold applications.",
+          targetOutcome: "Improve the quality of the next human touchpoint",
+          effortMinutes: 12,
+          urgencyLevel: "medium",
+          confidenceLevel: "moderate",
+          source: "followup_engine",
+          status: "open",
+          effectiveStatus: "open",
+          createdAt: "2026-04-10T12:00:00.000Z",
+          evidence: [],
+          queueSource: "followup",
+          intent: "NETWORKING_OUTREACH",
+          intentLabel: "Network",
+          sourceLabel: "Outreach task",
+          routeHref: "/fix-suggestions",
+          routeLabel: "Open queue",
+          stageLabel: "Application",
+          draftEligible: true,
+          playbook: coachSteps,
+          company: "Cutsforth",
+          threadId: "t-pb",
+          applicationId: null,
+        },
+      ],
+      thisWeek: [],
+      later: [],
+      blocked: [],
+      dismissed: [],
+      expired: [],
+      done: [],
+      emptyState: null,
+      resolvedActions: [],
+    } as any);
+
+    expect(items).toHaveLength(1);
+    expect(items[0].playbook).toEqual(coachSteps);
+  });
+
   test("drops JSON punctuation noise from ranked action display fields", () => {
     const items = buildQueueItemsFromRankedQueue({
       now: "2026-04-11T12:00:00.000Z",
