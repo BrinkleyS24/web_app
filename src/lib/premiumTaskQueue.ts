@@ -46,6 +46,9 @@ export type QueueItem = {
   routeLabel?: string | null;
   blockerTitles?: string[];
   blockingReason?: string | null;
+  // Display-only cleaned snippet of the latest inbound message, shown in the
+  // Source check panel so the user can recognize the thread before acting.
+  lastMessageSnippet?: string | null;
   // DAQ Inbox Intelligence coach response, when the user has the coach
   // feature enabled and a validated row exists for the underlying thread.
   // When present, the item's title/description fields have already been
@@ -1400,6 +1403,7 @@ function mapRankedActionToQueueItem(
     routeLabel,
     blockerTitles: blockers.map((item) => item.title),
     blockingReason: action.blockingReason || null,
+    lastMessageSnippet: normalizeDisplayString(action.lastMessageSnippet) || null,
   };
 }
 

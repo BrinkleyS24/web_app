@@ -265,6 +265,7 @@ export type RankedAction = {
   routeLabel?: string | null;
   stageLabel?: string | null;
   company?: string | null;
+  lastMessageSnippet?: string | null;
 };
 
 export type RankedActionQueue = {

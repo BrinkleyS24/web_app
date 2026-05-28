@@ -689,6 +689,13 @@ function SourceCheckSection({ item }: { item: QueueItem }) {
           </div>
         )}
 
+        {item.lastMessageSnippet ? (
+          <div className="rounded-xl border border-border/70 bg-background/80 px-3 py-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Latest message</p>
+            <p className="mt-1 text-sm leading-5 text-foreground">“{item.lastMessageSnippet}”</p>
+          </div>
+        ) : null}
+
         <div className="rounded-xl border border-accent/20 bg-accent/5 px-3 py-2.5">
           <p className="text-xs font-semibold uppercase tracking-wide text-accent">Before you act</p>
           <ul className="mt-2 space-y-1.5 text-sm leading-5 text-muted-foreground">
@@ -1828,9 +1835,13 @@ const FixSuggestions = () => {
 
                           <div>
                             <h3 className="text-lg font-semibold tracking-tight text-foreground">{item.title}</h3>
-                            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-                              {item.description}
-                            </p>
+                            {item.description
+                              && item.description.trim().toLowerCase()
+                                !== (item.whyNow || "").trim().toLowerCase() ? (
+                              <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+                                {item.description}
+                              </p>
+                            ) : null}
                             {item.status === "blocked" && (item.blockingReason || item.blockerTitles?.length) ? (
                               <div className="mt-3 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-warning">Blocked by</p>

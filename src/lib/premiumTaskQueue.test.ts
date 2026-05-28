@@ -399,6 +399,60 @@ describe("premiumTaskQueue outreach timing", () => {
     expect(daqItems[0].actionType).toBe("thank_you");
   });
 
+  test("carries lastMessageSnippet through to the queue item for Source check", () => {
+    const items = buildQueueItemsFromRankedQueue({
+      now: "2026-04-11T12:00:00.000Z",
+      doToday: [
+        {
+          id: "snippet-action",
+          logicalKey: "snippet:1",
+          dedupeKey: "snippet:1:v1",
+          primaryEntityId: "snippet:1",
+          evidenceVersion: "v1",
+          actionType: "follow_up",
+          actionCategory: "communication",
+          title: "Reply to recruiter at Cutsforth",
+          whyNow: "They asked for your availability.",
+          targetOutcome: "Keep the recruiter conversation moving",
+          effortMinutes: 5,
+          urgencyLevel: "high",
+          confidenceLevel: "strong",
+          source: "followup_engine",
+          status: "open",
+          effectiveStatus: "open",
+          createdAt: "2026-04-10T12:00:00.000Z",
+          evidence: [],
+          queueSource: "followup",
+          intent: "FOLLOW_UP_THREAD",
+          intentLabel: "Reply",
+          sourceLabel: "Recruiter reply",
+          routeHref: "/fix-suggestions",
+          routeLabel: "Open queue",
+          stageLabel: "Needs response",
+          draftEligible: true,
+          playbook: ["Answer the direct question first."],
+          company: "Cutsforth",
+          threadId: "t-snippet",
+          applicationId: null,
+          lastMessageSnippet: "Could you please send your availability for Tuesday or Wednesday?",
+        },
+      ],
+      thisWeek: [],
+      later: [],
+      blocked: [],
+      dismissed: [],
+      expired: [],
+      done: [],
+      emptyState: null,
+      resolvedActions: [],
+    } as any);
+
+    expect(items).toHaveLength(1);
+    expect(items[0].lastMessageSnippet).toBe(
+      "Could you please send your availability for Tuesday or Wednesday?",
+    );
+  });
+
   test("drops JSON punctuation noise from ranked action display fields", () => {
     const items = buildQueueItemsFromRankedQueue({
       now: "2026-04-11T12:00:00.000Z",
