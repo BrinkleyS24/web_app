@@ -634,19 +634,34 @@ function getSourceCheckChecklist(item: QueueItem) {
 function SourceCheckSection({ item }: { item: QueueItem }) {
   const parsed = parseSourceEvidence(item.evidence || []);
   const decisionRows = getDecisionSourceRows(item);
+  // Promote a "Role: …" evidence entry to its own structured row instead of
+  // letting it land in the generic fallback list.
+  const roleFromEvidence = parsed.other
+    .map((value) => value.match(/^role:\s*(.+)$/i)?.[1]?.trim())
+    .find((value): value is string => Boolean(value));
   const rows = decisionRows.length
     ? decisionRows
     : [
         parsed.subject ? { label: "Thread", value: parsed.subject } : null,
         parsed.sender ? { label: "Contact", value: parsed.sender } : null,
         item.company ? { label: "Company", value: item.company } : null,
+        roleFromEvidence ? { label: "Role", value: roleFromEvidence } : null,
         parsed.timing ? { label: "Timing", value: parsed.timing } : null,
       ].filter((row): row is { label: string; value: string } => Boolean(row));
+  // Fallback "Source detail" rows only fill genuinely empty space (e.g. strategy
+  // cards whose evidence is the alert detail). Drop entries that merely echo a
+  // structured row already shown ("Company: Hopper" when COMPANY is shown), and
+  // strip the redundant "Label:" prefix from whatever remains.
+  const shownValues = new Set(rows.map((row) => row.value.trim().toLowerCase()));
+  const stripEvidenceLabel = (value: string) =>
+    value.replace(/^(company|role|subject|sender|thread|contact)\s*:\s*/i, "").trim();
   const fallbackRows = decisionRows.length
     ? []
     : parsed.other
         .filter((value) => !looksLikeBrokenSerializedEvidence(value))
-        .slice(0, Math.max(1, 3 - rows.length));
+        .map((value) => stripEvidenceLabel(value))
+        .filter((value) => Boolean(value) && !shownValues.has(value.toLowerCase()))
+        .slice(0, Math.max(0, 3 - rows.length));
   const checklist = getSourceCheckChecklist(item);
   const fallbackLabel =
     item.source === "apply_gate"
