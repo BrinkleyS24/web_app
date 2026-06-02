@@ -120,15 +120,14 @@ function formatPointDelta(value: number | null | undefined) {
 }
 
 function buildOutcomeMemoryBrief({
-  metrics,
+  cohortMetrics,
   appStats,
   suggestionAnalytics,
 }: {
-  metrics?: {
-    totalApplications: number;
-    totalInterviewed: number;
-    totalOffers: number;
-    responseRate: number;
+  cohortMetrics?: {
+    applicationsSent: number;
+    reachedInterview: number;
+    reachedOffer: number;
     interviewRate: number;
   };
   appStats?: {
@@ -208,15 +207,15 @@ function buildOutcomeMemoryBrief({
     };
   }
 
-  if (metrics && metrics.totalApplications > 0) {
-    const callbacks = metrics.totalInterviewed + metrics.totalOffers;
+  if (cohortMetrics && cohortMetrics.applicationsSent > 0) {
+    const reached = cohortMetrics.reachedInterview;
     return {
-      title: callbacks > 0 ? "Your search has early conversion signal" : "Your search memory is still warming up",
+      title: reached > 0 ? "Your search has early conversion signal" : "Your search memory is still warming up",
       body:
-        callbacks > 0
-          ? `${callbacks} callbacks are tracked from ${metrics.totalApplications} applications in this window. Use Apply Gate before the next batch so the system can learn which roles are worth repeating.`
-          : `${metrics.totalApplications} applications are tracked in this window, but no callbacks are visible yet. Run Apply Gate and keep follow-up actions marked so the memory has better signal.`,
-      stat: `Interview rate ${metrics.interviewRate.toFixed(1)}%`,
+        reached > 0
+          ? `${reached} of ${cohortMetrics.applicationsSent} applications have reached an interview. Use Apply Gate before the next batch so the system can learn which roles are worth repeating.`
+          : `${cohortMetrics.applicationsSent} applications are tracked, but none have reached an interview yet. Run Apply Gate and keep follow-up actions marked so the memory has better signal.`,
+      stat: `Interview rate ${cohortMetrics.interviewRate.toFixed(1)}%`,
       ctaLabel: "Open Outcome Memory",
     };
   }
@@ -429,20 +428,23 @@ const Dashboard = () => {
     staleTime: 30_000,
   });
 
-  const metrics = metricsQuery.data?.metrics;
   const outcomeMemoryBrief = useMemo(
     () =>
       buildOutcomeMemoryBrief({
-        metrics,
+        cohortMetrics: metricsQuery.data?.cohortMetrics,
         appStats: applicationStatsQuery.data?.stats,
         suggestionAnalytics: suggestionAnalyticsQuery.data?.analytics,
       }),
-    [applicationStatsQuery.data?.stats, metrics, suggestionAnalyticsQuery.data?.analytics],
+    [applicationStatsQuery.data?.stats, metricsQuery.data?.cohortMetrics, suggestionAnalyticsQuery.data?.analytics],
   );
-  const appliedCount = metrics?.totalApplications;
-  const callbacksCount = metrics ? metrics.totalInterviewed + metrics.totalOffers : undefined;
-  const interviewsCount = metrics?.totalInterviewed;
-  const responseRate = metrics ? `${metrics.responseRate.toFixed(1)}%` : "-";
+  // Headline tiles use the canonical all-time cohort metrics (one entry per distinct
+  // application), so the numbers stay consistent across every premium page and the
+  // interview rate is an honest cohort rate rather than a window-misaligned ratio.
+  const cohortMetrics = metricsQuery.data?.cohortMetrics;
+  const appliedCount = cohortMetrics?.applicationsSent;
+  const interviewsCount = cohortMetrics?.reachedInterview;
+  const offersCount = cohortMetrics?.reachedOffer;
+  const interviewRate = cohortMetrics ? `${cohortMetrics.interviewRate.toFixed(1)}%` : "-";
 
   const applyGateHistory = useMemo(
     () => applyGateHistoryQuery.data?.history || [],
@@ -548,13 +550,13 @@ const Dashboard = () => {
         ) : null}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard icon={Send} label="Applied" value={appliedCount ?? "-"} />
-          <MetricCard icon={MessageSquare} label="Callbacks" value={callbacksCount ?? "-"} />
-          <MetricCard icon={UserCheck} label="Interviews" value={interviewsCount ?? "-"} />
+          <MetricCard icon={Send} label="Applications" value={appliedCount ?? "-"} />
+          <MetricCard icon={UserCheck} label="Reached interview" value={interviewsCount ?? "-"} />
+          <MetricCard icon={MessageSquare} label="Offers" value={offersCount ?? "-"} />
           <MetricCard
             icon={TrendingUp}
-            label="Response Rate"
-            value={responseRate}
+            label="Interview rate"
+            value={interviewRate}
             change={
               daqStats.active > 0
                 ? `${daqStats.active} inbox action${daqStats.active === 1 ? "" : "s"} waiting`

@@ -89,6 +89,17 @@ beforeEach(() => {
       rejectionRate: 40,
       totalEmails: 17,
     },
+    cohortMetrics: {
+      applicationsSent: 8,
+      reachedInterview: 2,
+      reachedOffer: 1,
+      rejectedCohorts: 3,
+      interviewRate: 25,
+      offerRate: 12.5,
+      rejectionRate: 37.5,
+      basis: "email_cohorts_all_time",
+      ungroupableEmails: 2,
+    },
   });
 
   fetchApplicationStats.mockResolvedValue({

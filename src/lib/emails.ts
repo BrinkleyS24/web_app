@@ -50,6 +50,20 @@ export type MetricsResponse = {
     totalEmails: number;
     windowMisaligned?: boolean;
   };
+  // Canonical, honest, all-time job-search metrics computed from the emails table
+  // (one entry per distinct application cohort). These are the cross-page-consistent
+  // numbers the UI should headline; the windowed `metrics` block above is secondary.
+  cohortMetrics?: {
+    applicationsSent: number;
+    reachedInterview: number;
+    reachedOffer: number;
+    rejectedCohorts: number;
+    interviewRate: number;
+    offerRate: number;
+    rejectionRate: number;
+    basis: string;
+    ungroupableEmails: number;
+  };
   dataCompleteness?: {
     syncComplete: boolean;
     oldestEmailDate: string | null;
@@ -1306,6 +1320,12 @@ export async function analyzeJobAlignment(params: {
   return apiFetch("/api/emails/apply-gate/analyze", {
     method: "POST",
     body: JSON.stringify(params),
+    // The premium verdict runs a full LLM pass over the resume + JD, which takes
+    // ~30s end-to-end. The default 15s client timeout aborts mid-flight while the
+    // backend keeps running and still persists a verdict — surfacing a false
+    // "timed out" error to the user (and stacking duplicate verdicts on retry).
+    // Give the request enough headroom for the real AI latency plus scoring.
+    timeoutMs: 45_000,
   });
 }
 

@@ -65,61 +65,59 @@ const OutcomeMemory = () => {
   });
 
   const metrics = metricsQuery.data?.metrics;
+  const cohortMetrics = metricsQuery.data?.cohortMetrics;
   const appStats = statsQuery.data?.stats;
   const suggestionAnalytics = suggestionAnalyticsQuery.data?.analytics;
   const rejectionInsights = rejectionInsightsQuery.data;
 
-  // Top cards use application-level counts (one row per tracked application,
-  // closed apps excluded) so they agree with the Chrome extension's pipeline
-  // counts. Email-category counts (used below for rates) are different by
-  // design — one application can produce several rejection/interview emails.
+  // Top cards use the canonical all-time cohort metrics (one entry per distinct
+  // application, computed from the emails table) so they stay consistent with the
+  // Dashboard AND with the rates shown below — no more "Rejected 0" next to a
+  // non-zero rejection rate.
   const stats = useMemo(() => {
-    const apps = appStats?.applications;
     return [
-      { label: "Applications", value: apps?.applied ?? "-" },
-      {
-        label: "Callbacks",
-        value: apps ? apps.interviewed + apps.offered : "-",
-      },
-      { label: "Interviews", value: apps?.interviewed ?? "-" },
-      { label: "Rejected", value: apps?.rejected ?? "-" },
+      { label: "Applications", value: cohortMetrics?.applicationsSent ?? "-" },
+      { label: "Reached interview", value: cohortMetrics?.reachedInterview ?? "-" },
+      { label: "Offers", value: cohortMetrics?.reachedOffer ?? "-" },
+      { label: "Rejected", value: cohortMetrics?.rejectedCohorts ?? "-" },
     ];
-  }, [appStats]);
+  }, [cohortMetrics]);
 
   const insights = useMemo(() => {
-    if (!metrics) return {};
+    if (!cohortMetrics) return {};
 
-    const responseRate = metrics.responseRate.toFixed(1);
-    const interviewRate = metrics.interviewRate.toFixed(1);
-    const offerRate = metrics.offerRate.toFixed(1);
-    const rejectionRate = metrics.rejectionRate.toFixed(1);
+    // All rates are canonical all-time cohort rates, so they agree with the top
+    // tiles and across pages (one application = one cohort).
+    const interviewRate = cohortMetrics.interviewRate.toFixed(1);
+    const offerRate = cohortMetrics.offerRate.toFixed(1);
+    const rejectionRate = cohortMetrics.rejectionRate.toFixed(1);
 
     const linked = appStats?.emails.linked ?? 0;
-    const totalEmails = appStats?.emails.total ?? metrics.totalEmails ?? 0;
+    const totalEmails = appStats?.emails.total ?? metrics?.totalEmails ?? 0;
     const ungrouped = appStats?.emails.ungrouped ?? Math.max(0, totalEmails - linked);
     const linkedRatio = totalEmails > 0 ? ((linked / totalEmails) * 100).toFixed(1) : "0.0";
 
     return {
       "Response Signals": [
-        { text: `Response rate is ${responseRate}%.`, icon: TrendingUp },
+        { text: `${cohortMetrics.reachedInterview} of ${cohortMetrics.applicationsSent} applications reached an interview.`, icon: TrendingUp },
         { text: `Interview rate is ${interviewRate}% of applications.`, icon: TrendingUp },
         { text: `Offer rate is ${offerRate}% of applications.`, icon: TrendingUp },
       ],
       "Pipeline Health": [
         { text: `${ungrouped} emails are not linked to applications.`, icon: Building2 },
         { text: `${linkedRatio}% of emails are linked to applications.`, icon: Building2 },
-        { text: `Rejection rate is ${rejectionRate}%.`, icon: Building2 },
+        { text: `Rejection rate is ${rejectionRate}% of applications.`, icon: Building2 },
       ],
       "Timing and Volume": [
-        { text: `Total tracked emails: ${metrics.totalEmails}.`, icon: Clock },
-        { text: `Applied: ${metrics.totalApplications} - Interviews: ${metrics.totalInterviewed} - Offers: ${metrics.totalOffers}.`, icon: Clock },
+        { text: `Total tracked emails: ${metrics?.totalEmails ?? totalEmails}.`, icon: Clock },
+        { text: `Applications: ${cohortMetrics.applicationsSent} - Reached interview: ${cohortMetrics.reachedInterview} - Offers: ${cohortMetrics.reachedOffer}.`, icon: Clock },
       ],
       "Key Signals": [
         { text: "Use interview rate to refine which roles convert best.", icon: Briefcase },
         { text: "Track unlinked emails to improve application grouping.", icon: Briefcase },
       ],
     };
-  }, [appStats, metrics]);
+  }, [appStats, cohortMetrics, metrics]);
 
   const suggestionFunnelStats = useMemo(() => {
     if (!suggestionAnalytics) {
