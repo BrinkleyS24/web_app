@@ -173,8 +173,12 @@ function buildOutcomeMemoryBrief({
     const completedRate = followup?.outcomes.completed.positiveRate || 0;
     const ignoredRate = followup?.outcomes.ignored.positiveRate || 0;
     const observedLift = followup?.outcomes.observedLift || 0;
-    const improved = observedLift >= 0.05;
-    const lagging = observedLift <= -0.05;
+    // Match the backend Strategy Alerts followupLiftThreshold (0.15): below this,
+    // the lift is too weak to claim a correlation, so we stay neutral instead of
+    // declaring "better outcomes" where the alert would stay silent.
+    const FOLLOWUP_LIFT_THRESHOLD = 0.15;
+    const improved = observedLift >= FOLLOWUP_LIFT_THRESHOLD;
+    const lagging = observedLift <= -FOLLOWUP_LIFT_THRESHOLD;
 
     if (improved || lagging) {
       return {
