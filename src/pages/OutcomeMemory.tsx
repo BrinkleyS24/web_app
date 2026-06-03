@@ -241,13 +241,13 @@ const OutcomeMemory = () => {
                 ) : null}
               </div>
               <p className="text-xs text-muted-foreground mb-4">
-                Patterns mined from the actual text of your rejection emails. Surfaces only when the same gap appears in two or more rejections.
+                When a rejection email actually states what was missing, this surfaces the gaps that recur across several of them. Most rejections don't give a reason, so this stays quiet unless they do.
               </p>
               {!rejectionInsights || rejectionInsights.patterns.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   {rejectionInsights && rejectionInsights.analyzedRejections > 0
-                    ? `Analyzed ${rejectionInsights.analyzedRejections} rejection email${rejectionInsights.analyzedRejections === 1 ? "" : "s"} but no theme appears in 2+ rejections yet. As more rejections accumulate, recurring gaps will show up here.`
-                    : "No rejection emails detected yet. As they come in, recurring themes recruiters cite will appear here."}
+                    ? `Analyzed ${rejectionInsights.analyzedRejections} rejection email${rejectionInsights.analyzedRejections === 1 ? "" : "s"}, but they didn't spell out specific gaps — most rejections just say the role moved on without saying why. For a concrete read on what's missing for a given role, run it through Apply Gate before applying.`
+                    : "No rejection emails detected yet. If a future rejection names a specific gap, recurring themes will appear here."}
                 </p>
               ) : (
                 <div className="space-y-3">
