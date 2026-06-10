@@ -413,6 +413,32 @@ export async function fetchRejectionInsights(limit = 100): Promise<RejectionInsi
   return apiFetch(`/api/emails/rejection-insights?limit=${encoded}`, { method: "GET" });
 }
 
+export interface ResumeGapExample {
+  company: string | null;
+  position: string | null;
+  date: string | null;
+}
+
+export interface ResumeGap {
+  skill: string;
+  category: "required" | "evidence" | "preferred";
+  label: string;
+  occurrences: number;
+  examples: ResumeGapExample[];
+}
+
+export interface ResumeGapInsightsResponse {
+  success: boolean;
+  analyzedVerdicts: number;
+  distinctRolesEvaluated: number;
+  verdictsWithGapData: number;
+  gaps: ResumeGap[];
+}
+
+export async function fetchResumeGaps(): Promise<ResumeGapInsightsResponse> {
+  return apiFetch(`/api/emails/resume-gaps`, { method: "GET" });
+}
+
 export interface WeeklyHighlightEmail {
   id: number | null;
   company: string | null;

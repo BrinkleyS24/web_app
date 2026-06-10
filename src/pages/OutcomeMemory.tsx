@@ -7,7 +7,7 @@ import { auth } from "@/lib/firebase";
 import {
   fetchApplicationStats,
   fetchEmailMetrics,
-  fetchRejectionInsights,
+  fetchResumeGaps,
   fetchSuggestionOutcomeAnalytics,
 } from "@/lib/emails";
 
@@ -51,13 +51,19 @@ const OutcomeMemory = () => {
     staleTime: 60_000,
   });
 
-  const rejectionInsightsQuery = useQuery({
-    queryKey: ["outcome-memory", "rejection-insights"],
+  const resumeGapsQuery = useQuery({
+    queryKey: ["outcome-memory", "resume-gaps"],
     queryFn: async () => {
       try {
-        return await fetchRejectionInsights(100);
+        return await fetchResumeGaps();
       } catch {
-        return { success: false, analyzedRejections: 0, patterns: [] };
+        return {
+          success: false,
+          analyzedVerdicts: 0,
+          distinctRolesEvaluated: 0,
+          verdictsWithGapData: 0,
+          gaps: [],
+        };
       }
     },
     enabled: isAuthed,
@@ -68,7 +74,7 @@ const OutcomeMemory = () => {
   const cohortMetrics = metricsQuery.data?.cohortMetrics;
   const appStats = statsQuery.data?.stats;
   const suggestionAnalytics = suggestionAnalyticsQuery.data?.analytics;
-  const rejectionInsights = rejectionInsightsQuery.data;
+  const resumeGaps = resumeGapsQuery.data;
 
   // Top cards use the canonical all-time cohort metrics (one entry per distinct
   // application, computed from the emails table) so they stay consistent with the
@@ -231,56 +237,55 @@ const OutcomeMemory = () => {
               <div className="flex items-center justify-between mb-1">
                 <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-destructive" />
-                  Rejection themes from your inbox
+                  Recurring resume gaps
                 </h3>
-                {rejectionInsights && rejectionInsights.analyzedRejections > 0 ? (
+                {resumeGaps && resumeGaps.distinctRolesEvaluated > 0 ? (
                   <span className="text-xs text-muted-foreground">
-                    {rejectionInsights.analyzedRejections} rejection email
-                    {rejectionInsights.analyzedRejections === 1 ? "" : "s"} analyzed
+                    {resumeGaps.distinctRolesEvaluated} role
+                    {resumeGaps.distinctRolesEvaluated === 1 ? "" : "s"} run through Apply Gate
                   </span>
                 ) : null}
               </div>
               <p className="text-xs text-muted-foreground mb-4">
-                When a rejection email actually states what was missing, this surfaces the gaps that recur across several of them. Most rejections don't give a reason, so this stays quiet unless they do.
+                Pulled from your Apply Gate runs — the requirements that came up in two or more different roles you evaluated, where your resume didn't show the proof. These are the gaps worth closing first.
               </p>
-              {!rejectionInsights || rejectionInsights.patterns.length === 0 ? (
+              {!resumeGaps || resumeGaps.gaps.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  {rejectionInsights && rejectionInsights.analyzedRejections > 0
-                    ? `Analyzed ${rejectionInsights.analyzedRejections} rejection email${rejectionInsights.analyzedRejections === 1 ? "" : "s"}, but they didn't spell out specific gaps — most rejections just say the role moved on without saying why. For a concrete read on what's missing for a given role, run it through Apply Gate before applying.`
-                    : "No rejection emails detected yet. If a future rejection names a specific gap, recurring themes will appear here."}
+                  {resumeGaps && resumeGaps.distinctRolesEvaluated >= 2
+                    ? `No single requirement has recurred across two or more of your ${resumeGaps.distinctRolesEvaluated} evaluated roles yet — nothing systemic to flag. Apply Gate still shows the per-role gaps when you run a specific posting.`
+                    : "Run a few different roles through Apply Gate to start. Once a requirement you're missing shows up across two or more roles, it'll surface here as a recurring gap."}
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {rejectionInsights.patterns.map((pattern, index) => (
+                  {resumeGaps.gaps.map((gap, index) => (
                     <div
-                      key={`${pattern.category}-${pattern.phrase}-${index}`}
+                      key={`${gap.category}-${gap.skill}-${index}`}
                       className="rounded-xl border border-border/60 bg-background/40 p-4"
                     >
                       <div className="flex items-baseline justify-between gap-3">
                         <div>
                           <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                            {pattern.label}
+                            {gap.label}
                           </p>
                           <p className="text-base font-semibold text-foreground mt-1 break-words">
-                            "{pattern.phrase}"
+                            "{gap.skill}"
                           </p>
                         </div>
                         <span className="shrink-0 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
-                          {pattern.occurrences}× in rejections
+                          in {gap.occurrences} role{gap.occurrences === 1 ? "" : "s"}
                         </span>
                       </div>
-                      {pattern.examples.length > 0 ? (
+                      {gap.examples.length > 0 ? (
                         <ul className="mt-3 space-y-1.5">
-                          {pattern.examples.map((example, exIdx) => (
+                          {gap.examples.map((example, exIdx) => (
                             <li
-                              key={`${pattern.phrase}-ex-${exIdx}`}
+                              key={`${gap.skill}-ex-${exIdx}`}
                               className="text-xs text-muted-foreground"
                             >
                               <span className="font-medium text-foreground">
                                 {example.company || "Unknown company"}
                               </span>
                               {example.position ? ` — ${example.position}` : ""}
-                              {example.subject ? ` · "${example.subject}"` : ""}
                             </li>
                           ))}
                         </ul>
