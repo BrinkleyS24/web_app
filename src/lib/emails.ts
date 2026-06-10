@@ -426,6 +426,24 @@ export interface WeeklyHighlightSilent extends WeeklyHighlightEmail {
   daysSilent: number;
 }
 
+export interface WeeklyReadoutItem {
+  text: string;
+  direction?: "up" | "down" | "flat";
+  priority?: "high" | "normal";
+}
+
+export interface WeeklyReadout {
+  confidence: "quiet" | "thin" | "normal";
+  headline: string;
+  sections: {
+    whatChanged: WeeklyReadoutItem[];
+    whatWorked: WeeklyReadoutItem[];
+    whatDidnt: WeeklyReadoutItem[];
+    emergingPattern: WeeklyReadoutItem | null;
+    nextWeek: WeeklyReadoutItem[];
+  };
+}
+
 export interface WeeklyHighlightsResponse {
   success: boolean;
   timeframe: string;
@@ -438,6 +456,7 @@ export interface WeeklyHighlightsResponse {
     offers: number;
     rejections: number;
   };
+  readout?: WeeklyReadout;
   highlights: {
     newApplications: WeeklyHighlightEmail[];
     newCallbacks: WeeklyHighlightEmail[];
