@@ -23,7 +23,7 @@ const mainNav = [
 
 function NavCode({ code }: { code: string }) {
   return (
-    <span className="nav-code w-[22px] h-[22px] rounded-md grid place-items-center font-mono text-[9px] font-bold tracking-[0.05em] shrink-0 bg-secondary text-muted-foreground">
+    <span className="nav-code w-[22px] h-[22px] rounded-md grid place-items-center font-mono text-[9px] font-bold tracking-[0.05em] shrink-0 bg-white/[0.06] text-[#7C8AA3] transition-colors">
       {code}
     </span>
   );
@@ -51,14 +51,14 @@ export function AppSidebar() {
     <Sidebar className="border-r border-sidebar-border">
       <SidebarHeader className="px-4 py-[18px] border-b border-sidebar-border">
         <div className="flex items-center gap-2.5">
-          <div className="w-[26px] h-[26px] rounded-[7px] bg-[#0B1220] grid place-items-center shrink-0">
+          <div className="w-[26px] h-[26px] rounded-[7px] bg-white/[0.06] ring-1 ring-white/10 grid place-items-center shrink-0">
             <img src="/logo-transparent.png" alt="Applendium" className="w-5 h-5 block" />
           </div>
           <div>
             <h2 className="text-sm font-bold tracking-[-0.01em] leading-tight text-sidebar-accent-foreground">
               applendium
             </h2>
-            <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[#0E8C63]">
+            <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[#2FBE8F]">
               {planLoading ? "…" : isPremium ? "Premium" : "Free"}
             </p>
           </div>
@@ -75,7 +75,7 @@ export function AppSidebar() {
                     <NavLink
                       to={item.url}
                       end={item.url === "/"}
-                      className="group flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13.5px] font-medium text-sidebar-foreground hover:bg-secondary hover:text-sidebar-accent-foreground transition-colors"
+                      className="group flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13.5px] font-medium text-sidebar-foreground hover:bg-white/[0.05] hover:text-white transition-colors"
                       activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-semibold [&_.nav-code]:bg-[#0E8C63] [&_.nav-code]:text-white"
                     >
                       <NavCode code={item.code} />
@@ -92,7 +92,7 @@ export function AppSidebar() {
       <div className="mt-auto px-2.5 py-3.5 border-t border-sidebar-border space-y-2">
         <NavLink
           to="/settings"
-          className="group flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13.5px] font-medium text-sidebar-foreground hover:bg-secondary hover:text-sidebar-accent-foreground transition-colors"
+          className="group flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13.5px] font-medium text-sidebar-foreground hover:bg-white/[0.05] hover:text-white transition-colors"
           activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-semibold [&_.nav-code]:bg-[#0E8C63] [&_.nav-code]:text-white"
         >
           <NavCode code="st" />
@@ -111,8 +111,8 @@ export function AppSidebar() {
         ) : null}
 
         {user ? (
-          <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] bg-card border border-sidebar-border">
-            <div className="w-7 h-7 rounded-full bg-[#EAF5F0] text-[#0E8C63] grid place-items-center text-[11px] font-bold shrink-0">
+          <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] bg-white/[0.04] border border-white/10">
+            <div className="w-7 h-7 rounded-full bg-[#2FBE8F]/15 text-[#5FD9AE] grid place-items-center text-[11px] font-bold shrink-0">
               {initials}
             </div>
             <div className="min-w-0">

@@ -39,16 +39,16 @@
   --chart-4: #B45309;
   --chart-5: #9AA0A6;
 
-  /* Light paper sidebar */
-  --sidebar: #FAFAF8;
-  --sidebar-foreground: #5C6470;
-  --sidebar-primary: #0E8C63;
+  /* Dark ink sidebar (premium rail, bridges the dark landing -> light app) */
+  --sidebar: #0B1220;
+  --sidebar-foreground: #98A1B3;
+  --sidebar-primary: #2FBE8F;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #EAF5F0;
-  --sidebar-accent-foreground: #0B1220;
-  --sidebar-border: #E9EAE5;
-  --sidebar-ring: #0E8C63;
-  --sidebar-muted: #9AA0A6;
+  --sidebar-accent: rgba(47, 190, 143, 0.14);
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #2FBE8F;
+  --sidebar-muted: #6B7894;
 
   /* Legacy vars for original pages */
   --bg: #FAFAF8;
