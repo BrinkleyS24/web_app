@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { Brain, TrendingUp, Building2, Clock, Briefcase, AlertCircle } from "lucide-react";
-import { auth } from "@/lib/firebase";
+import { TrendingUp, Building2, Clock, Briefcase } from "lucide-react";
+import { useAuth } from "@/lib/AuthContext.jsx";
 import {
   fetchApplicationStats,
   fetchEmailMetrics,
@@ -12,14 +11,8 @@ import {
 } from "@/lib/emails";
 
 const OutcomeMemory = () => {
-  const [user, setUser] = useState(auth?.currentUser ?? null);
+  const { user } = useAuth();
   const isAuthed = Boolean(user);
-
-  useEffect(() => {
-    if (!auth) return undefined;
-    const unsub = onAuthStateChanged(auth, (nextUser) => setUser(nextUser));
-    return () => unsub();
-  }, []);
 
   const metricsQuery = useQuery({
     queryKey: ["outcome-memory", "metrics"],
@@ -208,95 +201,108 @@ const OutcomeMemory = () => {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Brain className="w-6 h-6 text-accent" />
-            Outcome Memory
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">Patterns and signals from all your applications.</p>
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+            What keeps happening
+          </p>
+          <h1 className="mt-2 text-[28px] font-bold tracking-[-0.025em] text-foreground">Outcome Memory</h1>
+          <p className="mt-2.5 max-w-[60ch] text-sm leading-relaxed text-muted-foreground">
+            Patterns across your rejections and stalls — so the same gap stops costing you interviews.
+          </p>
         </div>
 
         {!isAuthed ? (
-          <div className="glass-card rounded-xl p-6 text-sm text-muted-foreground">
+          <div className="glass-card rounded-2xl p-6 text-sm text-muted-foreground">
             Sign in to see outcome insights.
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {stats.map((s) => (
-                <div key={s.label} className="glass-card rounded-xl p-4 text-center">
-                  <p className="text-2xl font-bold text-foreground">{s.value}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground -mt-2">
-              Counts are per tracked application (closed applications excluded) — the same numbers shown in the Chrome extension. Email-level totals in rates and themes below can be higher because one application often produces several emails.
-            </p>
-
-            <div className="glass-card rounded-xl p-5">
-              <div className="flex items-center justify-between mb-1">
-                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-destructive" />
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
                   Recurring resume gaps
-                </h3>
+                </p>
                 {resumeGaps && resumeGaps.distinctRolesEvaluated > 0 ? (
-                  <span className="text-xs text-muted-foreground">
+                  <span className="font-mono text-[10px] text-muted-foreground">
                     {resumeGaps.distinctRolesEvaluated} role
                     {resumeGaps.distinctRolesEvaluated === 1 ? "" : "s"} run through Apply Gate
                   </span>
                 ) : null}
               </div>
-              <p className="text-xs text-muted-foreground mb-4">
+              <p className="mt-2 max-w-[62ch] text-sm leading-relaxed text-muted-foreground">
                 Pulled from your Apply Gate runs — the requirements that came up in two or more different roles you evaluated, where your resume didn't show the proof. These are the gaps worth closing first.
               </p>
+
               {!resumeGaps || resumeGaps.gaps.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
+                <div className="glass-card mt-4 rounded-2xl p-6 text-sm text-muted-foreground">
                   {resumeGaps && resumeGaps.distinctRolesEvaluated >= 2
                     ? `No single requirement has recurred across two or more of your ${resumeGaps.distinctRolesEvaluated} evaluated roles yet — nothing systemic to flag. Apply Gate still shows the per-role gaps when you run a specific posting.`
                     : "Run a few different roles through Apply Gate to start. Once a requirement you're missing shows up across two or more roles, it'll surface here as a recurring gap."}
-                </p>
+                </div>
               ) : (
-                <div className="space-y-3">
-                  {resumeGaps.gaps.map((gap, index) => (
-                    <div
-                      key={`${gap.category}-${gap.skill}-${index}`}
-                      className="rounded-xl border border-border/60 bg-background/40 p-4"
-                    >
-                      <div className="flex items-baseline justify-between gap-3">
-                        <div>
-                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                            {gap.label}
-                          </p>
-                          <p className="text-base font-semibold text-foreground mt-1 break-words">
+                <div className="mt-4 grid gap-3.5">
+                  {resumeGaps.gaps.map((gap, index) => {
+                    const severe = gap.occurrences >= 3;
+                    return (
+                      <div
+                        key={`${gap.category}-${gap.skill}-${index}`}
+                        className="glass-card rounded-2xl p-5 sm:p-6"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <h2 className="text-base font-bold tracking-[-0.01em] text-foreground break-words">
                             "{gap.skill}"
-                          </p>
+                          </h2>
+                          <span
+                            className={`shrink-0 rounded-md px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.08em] ${
+                              severe ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning"
+                            }`}
+                          >
+                            Seen {gap.occurrences}&times;
+                          </span>
                         </div>
-                        <span className="shrink-0 rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
-                          in {gap.occurrences} role{gap.occurrences === 1 ? "" : "s"}
-                        </span>
-                      </div>
-                      {gap.examples.length > 0 ? (
-                        <ul className="mt-3 space-y-1.5">
-                          {gap.examples.map((example, exIdx) => (
-                            <li
-                              key={`${gap.skill}-ex-${exIdx}`}
-                              className="text-xs text-muted-foreground"
-                            >
-                              <span className="font-medium text-foreground">
+                        <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                          {gap.label}
+                        </p>
+                        {gap.examples.length > 0 ? (
+                          <div className="mt-3.5 flex flex-wrap gap-1.5">
+                            {gap.examples.map((example, exIdx) => (
+                              <span
+                                key={`${gap.skill}-ex-${exIdx}`}
+                                className="rounded-md bg-muted px-2 py-1 font-mono text-[10px] text-muted-foreground"
+                              >
                                 {example.company || "Unknown company"}
+                                {example.position ? ` · ${example.position}` : ""}
                               </span>
-                              {example.position ? ` — ${example.position}` : ""}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </div>
-                  ))}
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
 
-            <div className="glass-card rounded-xl p-5">
+            <details className="group">
+              <summary className="flex cursor-pointer select-none items-center justify-between gap-2 rounded-2xl border border-border bg-card px-5 py-3.5 text-sm font-semibold text-foreground hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
+                <span className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-accent" />
+                  Detailed analytics &amp; loops
+                </span>
+                <span className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">expand</span>
+              </summary>
+              <div className="mt-3.5 space-y-3.5">
+            <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
+              {stats.map((s) => (
+                <div key={s.label} className="glass-card rounded-2xl p-5">
+                  <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{s.label}</p>
+                  <p className="mt-2 text-[30px] font-bold leading-tight tracking-[-0.03em] text-foreground">{s.value}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Counts are per tracked application (closed applications excluded) — the same numbers shown in the Chrome extension. Email-level totals in rates and themes below can be higher because one application often produces several emails.
+            </p>
+            <div className="glass-card rounded-2xl p-5">
               <h3 className="text-sm font-semibold text-foreground mb-1">Suggestion Outcome Loop</h3>
               <p className="text-xs text-muted-foreground mb-4">
                 The outcome gap is the difference in positive-outcome rate between applications where you completed a suggestion vs. ignored one. It's a correlation, not proof of causation — completers may differ in ways beyond the suggestion itself.
@@ -330,7 +336,7 @@ const OutcomeMemory = () => {
               </div>
             </div>
 
-            <div className="glass-card rounded-xl p-5">
+            <div className="glass-card rounded-2xl p-5">
               <h3 className="text-sm font-semibold text-foreground mb-4">Non-follow-up Fix Completion</h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {nonFollowupCompletionStats.map((s) => (
@@ -358,12 +364,12 @@ const OutcomeMemory = () => {
 
             <div className="space-y-5">
               {Object.keys(insights).length === 0 ? (
-                <div className="glass-card rounded-xl p-6 text-sm text-muted-foreground">
+                <div className="glass-card rounded-2xl p-6 text-sm text-muted-foreground">
                   Loading insights...
                 </div>
               ) : (
                 Object.entries(insights).map(([group, items], gi) => (
-                  <div key={group} className="glass-card rounded-xl p-5 animate-fade-in" style={{ animationDelay: gi * 80 + "ms" }}>
+                  <div key={group} className="glass-card rounded-2xl p-5 animate-fade-in" style={{ animationDelay: gi * 80 + "ms" }}>
                     <h3 className="text-sm font-semibold text-foreground mb-3">{group}</h3>
                     <div className="space-y-2.5">
                       {items.map((item, j) => (
@@ -377,6 +383,8 @@ const OutcomeMemory = () => {
                 ))
               )}
             </div>
+              </div>
+            </details>
           </>
         )}
       </div>

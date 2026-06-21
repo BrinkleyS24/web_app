@@ -51,6 +51,7 @@ function writeDevBypassSignedOutState(nextValue) {
 const AuthContext = createContext({
   user: null,
   loading: true,
+  bridgeDone: false,
   extensionDetected: false,
   plan: null,
   planLoading: true,
@@ -335,6 +336,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       user,
       loading,
+      bridgeDone,
       extensionDetected,
       plan,
       planLoading,

@@ -7,26 +7,14 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
       class="space-y-6"
     >
       <div>
-        <h1
-          class="text-2xl font-bold text-foreground flex items-center gap-2"
+        <p
+          class="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
         >
-          <svg
-            aria-hidden="true"
-            class="lucide lucide-shield w-6 h-6 text-accent"
-            fill="none"
-            height="24"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-            width="24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
-            />
-          </svg>
+          Pre-apply decision brief
+        </p>
+        <h1
+          class="mt-2 text-[28px] font-bold tracking-[-0.025em] text-foreground"
+        >
           Apply Gate
         </h1>
         <p
@@ -36,323 +24,373 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
         </p>
       </div>
       <div
-        class="glass-card rounded-xl p-5 space-y-3"
-      >
-        <p
-          class="text-xs text-muted-foreground"
-        >
-          Resume signal: 
-          Saved
-        </p>
-        <div
-          class="space-y-2"
-        >
-          <label
-            class="text-sm font-medium text-foreground"
-            for="job-title"
-          >
-            Job Title
-          </label>
-          <input
-            class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-            id="job-title"
-            placeholder="e.g., QA Analyst"
-            value="Automation Engineer"
-          />
-        </div>
-        <div
-          class="space-y-2"
-        >
-          <label
-            class="text-sm font-medium text-foreground"
-            for="company-name"
-          >
-            Company Name (optional)
-          </label>
-          <input
-            class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-            id="company-name"
-            placeholder="e.g., Acme Corp"
-            value=""
-          />
-          <p
-            class="text-xs text-muted-foreground"
-          >
-            Useful when the pasted job description does not clearly name the employer.
-          </p>
-        </div>
-        <div
-          class="space-y-2"
-        >
-          <label
-            class="text-sm font-medium text-foreground"
-            for="risk-tolerance"
-          >
-            Apply style
-          </label>
-          <select
-            class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-            id="risk-tolerance"
-          >
-            <option
-              value="balanced"
-            >
-              Balanced
-            </option>
-            <option
-              value="conservative"
-            >
-              Conservative
-            </option>
-            <option
-              value="aggressive"
-            >
-              Aggressive
-            </option>
-          </select>
-          <p
-            class="text-xs text-muted-foreground"
-          >
-            Default. Separates clear skips from realistic strategy plays.
-          </p>
-        </div>
-        <div
-          class="space-y-2"
-        >
-          <label
-            class="text-sm font-medium text-foreground"
-            for="job-description"
-          >
-            Job Description
-          </label>
-          <textarea
-            class="w-full min-h-[120px] rounded-md border border-border bg-background px-3 py-2 text-sm"
-            id="job-description"
-            placeholder="Paste the job description"
-          >
-            Requires PLC and controls experience.
-          </textarea>
-          <p
-            class="text-xs text-muted-foreground"
-          >
-            Paste the full job description. URL import is temporarily disabled while we harden extraction.
-          </p>
-        </div>
-        <button
-          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
-          data-size="default"
-          data-slot="button"
-          data-variant="default"
-        >
-          Get decision
-        </button>
-      </div>
-      <div
-        class="glass-card rounded-xl p-6 space-y-3"
+        class="grid items-start gap-3.5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]"
       >
         <div
-          class="rounded-xl border px-4 py-3 border-red-500/30 bg-red-500/10 text-red-700"
+          class="glass-card space-y-3 rounded-2xl p-5"
         >
           <div
-            class="flex flex-wrap items-center justify-between gap-3"
+            class="flex items-center justify-between gap-2"
           >
-            <p
-              class="text-xs font-semibold uppercase tracking-wide"
+            <h2
+              class="text-[15px] font-bold tracking-[-0.01em] text-foreground"
             >
-              Decision
-            </p>
+              Job to review
+            </h2>
             <span
-              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border status-risky"
+              class="font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
             >
-              Risky
+              Resume: 
+              saved
             </span>
           </div>
-          <h2
-            class="mt-2 text-xl font-semibold"
-          >
-            Fix first before applying
-          </h2>
-          <p
-            class="mt-1 text-sm font-medium leading-relaxed"
-          >
-            Fix this first. Required education level is missing
-          </p>
-          <p
-            class="mt-1 text-xs leading-relaxed opacity-80"
-          >
-            A hard blocker or major proof gap is visible. Fix the strongest issue before this becomes another low-probability application.
-          </p>
-        </div>
-        <div>
-          <p
-            class="font-semibold text-foreground leading-tight"
-          >
-            Automation Engineer
-          </p>
-        </div>
-        <div
-          class="flex flex-wrap items-center gap-3 text-xs pt-0.5"
-        >
-          <span
-            class="px-2 py-0.5 rounded bg-muted text-muted-foreground"
-          >
-            Fit label: 
-            High-risk application
-          </span>
-          <span
-            class="px-2 py-0.5 rounded border border-accent/20 bg-accent/10 text-accent"
-          >
-            Recommended move: 
-            Fix before applying
-          </span>
-        </div>
-        <div
-          class="rounded-lg border border-border/70 bg-background/70 p-3 space-y-2"
-        >
           <div
-            class="flex flex-wrap items-center justify-between gap-2"
+            class="space-y-2"
           >
-            <p
-              class="text-xs font-semibold text-foreground"
+            <label
+              class="text-sm font-medium text-foreground"
+              for="job-title"
             >
-              Why this recommendation
-            </p>
-            <span
+              Job Title
+            </label>
+            <input
+              class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              id="job-title"
+              placeholder="e.g., QA Analyst"
+              value="Automation Engineer"
+            />
+          </div>
+          <div
+            class="space-y-2"
+          >
+            <label
+              class="text-sm font-medium text-foreground"
+              for="company-name"
+            >
+              Company Name (optional)
+            </label>
+            <input
+              class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              id="company-name"
+              placeholder="e.g., Acme Corp"
+              value=""
+            />
+            <p
               class="text-xs text-muted-foreground"
             >
-              Education or training fit: severe risk.
-            </span>
+              Useful when the pasted job description does not clearly name the employer.
+            </p>
           </div>
           <div
-            class="grid gap-2 sm:grid-cols-2"
+            class="space-y-2"
+          >
+            <label
+              class="text-sm font-medium text-foreground"
+              for="risk-tolerance"
+            >
+              Apply style
+            </label>
+            <select
+              class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              id="risk-tolerance"
+            >
+              <option
+                value="balanced"
+              >
+                Balanced
+              </option>
+              <option
+                value="conservative"
+              >
+                Conservative
+              </option>
+              <option
+                value="aggressive"
+              >
+                Aggressive
+              </option>
+            </select>
+            <p
+              class="text-xs text-muted-foreground"
+            >
+              Default. Separates clear skips from realistic strategy plays.
+            </p>
+          </div>
+          <div
+            class="space-y-2"
+          >
+            <label
+              class="text-sm font-medium text-foreground"
+              for="job-description"
+            >
+              Job Description
+            </label>
+            <textarea
+              class="w-full min-h-[120px] rounded-md border border-border bg-background px-3 py-2 text-sm"
+              id="job-description"
+              placeholder="Paste the job description"
+            >
+              Requires PLC and controls experience.
+            </textarea>
+            <p
+              class="text-xs text-muted-foreground"
+            >
+              Paste the full job description. URL import is temporarily disabled while we harden extraction.
+            </p>
+          </div>
+          <button
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
+            data-size="default"
+            data-slot="button"
+            data-variant="default"
+          >
+            Get decision
+          </button>
+        </div>
+        <div
+          class="min-w-0"
+        >
+          <div
+            class="glass-card space-y-3 rounded-2xl p-6"
           >
             <div
-              class="rounded-md border border-border/60 bg-muted/20 px-3 py-2"
+              class="-mx-6 -mt-6 mb-1 rounded-t-2xl border-b border-border px-6 py-5"
+              style="background: linear-gradient(180deg, #F2FAF6 0%, var(--card) 100%);"
             >
               <div
-                class="flex items-center justify-between gap-2"
+                class="flex items-start justify-between gap-4"
               >
-                <p
-                  class="text-xs font-medium text-foreground"
+                <div
+                  class="min-w-0"
                 >
-                  Education or training fit
-                </p>
+                  <div
+                    class="flex flex-wrap items-center gap-2"
+                  >
+                    <p
+                      class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+                    >
+                      Decision
+                    </p>
+                    <span
+                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border status-risky"
+                    >
+                      Risky
+                    </span>
+                  </div>
+                  <h2
+                    class="mt-2 text-xl font-bold tracking-[-0.01em] text-foreground"
+                  >
+                    Fix first before applying
+                  </h2>
+                  <p
+                    class="mt-1 text-sm font-medium leading-relaxed text-muted-foreground"
+                  >
+                    Fix this first. Required education level is missing
+                  </p>
+                  <p
+                    class="mt-1 text-xs leading-relaxed text-muted-foreground/80"
+                  >
+                    A hard blocker or major proof gap is visible. Fix the strongest issue before this becomes another low-probability application.
+                  </p>
+                </div>
+                <div
+                  class="shrink-0 text-center"
+                >
+                  <div
+                    class="grid h-[78px] w-[78px] place-items-center rounded-full"
+                    style="background: conic-gradient(#B3261E 0% 92%, var(--border) 92% 100%);"
+                  >
+                    <div
+                      class="grid h-[62px] w-[62px] place-items-center rounded-full bg-card"
+                    >
+                      <span
+                        class="text-[19px] font-bold tracking-[-0.02em] text-foreground"
+                      >
+                        92
+                        %
+                      </span>
+                    </div>
+                  </div>
+                  <p
+                    class="mt-2 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
+                  >
+                    Rejection risk
+                  </p>
+                </div>
               </div>
+            </div>
+            <div>
               <p
-                class="mt-1 text-xs text-muted-foreground leading-relaxed"
+                class="font-semibold text-foreground leading-tight"
               >
-                Education score is 30/100.
+                Automation Engineer
               </p>
             </div>
             <div
-              class="rounded-md border border-border/60 bg-muted/20 px-3 py-2"
+              class="flex flex-wrap items-center gap-3 text-xs pt-0.5"
+            >
+              <span
+                class="px-2 py-0.5 rounded bg-muted text-muted-foreground"
+              >
+                Fit label: 
+                High-risk application
+              </span>
+              <span
+                class="px-2 py-0.5 rounded border border-accent/20 bg-accent/10 text-accent"
+              >
+                Recommended move: 
+                Fix before applying
+              </span>
+            </div>
+            <div
+              class="rounded-lg border border-border/70 bg-background/70 p-3 space-y-2"
             >
               <div
-                class="flex items-center justify-between gap-2"
+                class="flex flex-wrap items-center justify-between gap-2"
               >
                 <p
-                  class="text-xs font-medium text-foreground"
+                  class="text-xs font-semibold text-foreground"
                 >
-                  Required evidence coverage
+                  Why this recommendation
                 </p>
+                <span
+                  class="text-xs text-muted-foreground"
+                >
+                  Education or training fit: severe risk.
+                </span>
+              </div>
+              <div
+                class="grid gap-2 sm:grid-cols-2"
+              >
+                <div
+                  class="rounded-md border border-border/60 bg-muted/20 px-3 py-2"
+                >
+                  <div
+                    class="flex items-center justify-between gap-2"
+                  >
+                    <p
+                      class="text-xs font-medium text-foreground"
+                    >
+                      Education or training fit
+                    </p>
+                  </div>
+                  <p
+                    class="mt-1 text-xs text-muted-foreground leading-relaxed"
+                  >
+                    Education score is 30/100.
+                  </p>
+                </div>
+                <div
+                  class="rounded-md border border-border/60 bg-muted/20 px-3 py-2"
+                >
+                  <div
+                    class="flex items-center justify-between gap-2"
+                  >
+                    <p
+                      class="text-xs font-medium text-foreground"
+                    >
+                      Required evidence coverage
+                    </p>
+                  </div>
+                  <p
+                    class="mt-1 text-xs text-muted-foreground leading-relaxed"
+                  >
+                    Required-skill evidence score is 20/100.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div
+              class="space-y-1.5"
+            >
+              <p
+                class="text-sm text-muted-foreground leading-relaxed"
+              >
+                • 
+                Missing required: plc programming.
+              </p>
+              <p
+                class="text-sm text-muted-foreground leading-relaxed"
+              >
+                • 
+                Education gap.
+              </p>
+            </div>
+            <div
+              class="flex items-start gap-2 p-3 rounded-lg bg-destructive/5 border border-destructive/10"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-triangle-alert w-4 h-4 text-destructive shrink-0 mt-0.5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"
+                />
+                <path
+                  d="M12 9v4"
+                />
+                <path
+                  d="M12 17h.01"
+                />
+              </svg>
+              <div
+                class="text-sm text-destructive leading-snug"
+              >
+                <span>
+                  Likely rejection driver
+                  : 
+                  Required education level is missing
+                </span>
+              </div>
+            </div>
+            <div
+              class="space-y-2 pt-1"
+            >
+              <div
+                class="flex flex-wrap items-center gap-2"
+              >
+                <button
+                  class="inline-flex items-center justify-center whitespace-nowrap font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive rounded-md gap-1.5 px-3 has-[>svg]:px-2.5 bg-accent text-accent-foreground hover:bg-accent/90 text-xs h-8"
+                  data-size="sm"
+                  data-slot="button"
+                  data-variant="default"
+                >
+                  I'll fix first
+                </button>
+                <button
+                  class="inline-flex items-center justify-center whitespace-nowrap font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5 text-xs h-8"
+                  data-size="sm"
+                  data-slot="button"
+                  data-variant="outline"
+                >
+                  Apply anyway
+                </button>
+                <button
+                  class="inline-flex items-center justify-center whitespace-nowrap font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5 text-muted-foreground text-xs h-8"
+                  data-size="sm"
+                  data-slot="button"
+                  data-variant="ghost"
+                >
+                  Skip role
+                </button>
               </div>
               <p
-                class="mt-1 text-xs text-muted-foreground leading-relaxed"
+                aria-live="polite"
+                class="text-xs text-muted-foreground"
               >
-                Required-skill evidence score is 20/100.
+                Choose what you did. This keeps future recommendations grounded.
               </p>
             </div>
           </div>
-        </div>
-        <div
-          class="space-y-1.5"
-        >
-          <p
-            class="text-sm text-muted-foreground leading-relaxed"
-          >
-            • 
-            Missing required: plc programming.
-          </p>
-          <p
-            class="text-sm text-muted-foreground leading-relaxed"
-          >
-            • 
-            Education gap.
-          </p>
-        </div>
-        <div
-          class="flex items-start gap-2 p-3 rounded-lg bg-destructive/5 border border-destructive/10"
-        >
-          <svg
-            aria-hidden="true"
-            class="lucide lucide-triangle-alert w-4 h-4 text-destructive shrink-0 mt-0.5"
-            fill="none"
-            height="24"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-            width="24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"
-            />
-            <path
-              d="M12 9v4"
-            />
-            <path
-              d="M12 17h.01"
-            />
-          </svg>
-          <div
-            class="text-sm text-destructive leading-snug"
-          >
-            <span>
-              Likely rejection driver
-              : 
-              Required education level is missing
-            </span>
-          </div>
-        </div>
-        <div
-          class="space-y-2 pt-1"
-        >
-          <div
-            class="flex flex-wrap items-center gap-2"
-          >
-            <button
-              class="inline-flex items-center justify-center whitespace-nowrap font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive rounded-md gap-1.5 px-3 has-[>svg]:px-2.5 bg-accent text-accent-foreground hover:bg-accent/90 text-xs h-8"
-              data-size="sm"
-              data-slot="button"
-              data-variant="default"
-            >
-              I'll fix first
-            </button>
-            <button
-              class="inline-flex items-center justify-center whitespace-nowrap font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5 text-xs h-8"
-              data-size="sm"
-              data-slot="button"
-              data-variant="outline"
-            >
-              Apply anyway
-            </button>
-            <button
-              class="inline-flex items-center justify-center whitespace-nowrap font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5 text-muted-foreground text-xs h-8"
-              data-size="sm"
-              data-slot="button"
-              data-variant="ghost"
-            >
-              Skip role
-            </button>
-          </div>
-          <p
-            aria-live="polite"
-            class="text-xs text-muted-foreground"
-          >
-            Choose what you did. This keeps future recommendations grounded.
-          </p>
         </div>
       </div>
     </div>

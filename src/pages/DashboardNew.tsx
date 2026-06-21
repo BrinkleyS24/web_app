@@ -1,19 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
-  Bell,
   Brain,
-  CheckSquare,
+  ChevronsUpDown,
   Clock3,
   Mail,
-  MessageSquare,
-  Send,
+  RefreshCw,
   Shield,
-  Sparkles,
-  TrendingUp,
-  UserCheck,
   Wrench,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -22,7 +16,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { splitRoleAndCompany } from "@/lib/applyGateDisplay";
-import { auth } from "@/lib/firebase";
+import { useAuth } from "@/lib/AuthContext.jsx";
 import {
   fetchApplicationStats,
   fetchApplyGateHistory,
@@ -40,7 +34,6 @@ import {
   buildRankedQueueStats,
   buildGmailThreadUrl,
   formatRelativeAge,
-  sourceClasses,
   urgencyClasses,
   type QueueItem,
 } from "@/lib/premiumTaskQueue";
@@ -316,20 +309,16 @@ function formatDecisionBrief(item: ApplyGateHistoryItem | null) {
 }
 
 const dashboardButtonPrimary =
-  "inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-accent-foreground hover:bg-accent/90 transition-colors";
+  "inline-flex items-center justify-center gap-2 rounded-[10px] bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-accent";
 const dashboardButtonSecondary =
-  "inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/40 transition-colors";
+  "inline-flex items-center justify-center gap-2 rounded-[10px] border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:border-primary";
+const dashboardEyebrow =
+  "font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground";
 
 const Dashboard = () => {
-  const [user, setUser] = useState(auth?.currentUser ?? null);
+  const { user } = useAuth();
   const [syncError, setSyncError] = useState<string | null>(null);
   const isAuthed = Boolean(user);
-
-  useEffect(() => {
-    if (!auth) return undefined;
-    const unsub = onAuthStateChanged(auth, (nextUser) => setUser(nextUser));
-    return () => unsub();
-  }, []);
 
   useEffect(() => {
     if (!isAuthed) return;
@@ -514,15 +503,59 @@ const Dashboard = () => {
     syncError ? `Email sync: ${syncError}` : null,
   ].filter(Boolean) as string[];
 
+  const queryClient = useQueryClient();
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  async function handleSync() {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    setSyncError(null);
+    try {
+      await startEmailSync();
+      await queryClient.invalidateQueries();
+    } catch (error) {
+      setSyncError(error instanceof Error ? error.message : "Unable to sync Gmail.");
+    } finally {
+      setIsSyncing(false);
+    }
+  }
+
+  const now = new Date();
+  const greetingWord =
+    now.getHours() < 12 ? "Good morning" : now.getHours() < 18 ? "Good afternoon" : "Good evening";
+  const dateLabel = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const rawName = String(user?.displayName || user?.email || "").split(/[@\s]/)[0];
+  const firstName = rawName ? rawName.charAt(0).toUpperCase() + rawName.slice(1) : "";
+  const topAlert = strategyHighlights[0] || null;
+  const strategyEmptyMessage = !isAuthed
+    ? "Sign in to see strategy alerts."
+    : strategyAlertsQuery.data?.error?.includes("Premium feature required")
+      ? "Upgrade to Premium to see strategy alerts."
+      : "No strategy alerts yet — keep applying and they'll surface here.";
+
   return (
     <DashboardLayout>
-      <div className="space-y-8">
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent">Today's search brief</p>
-          <h1 className="text-3xl font-bold text-foreground">Know what your inbox says needs attention today.</h1>
-          <p className="max-w-3xl text-sm text-muted-foreground">
-            Applendium uses read-only Gmail context to surface interview prep, recruiter replies, and follow-up windows before they get buried.
-          </p>
+      <div className="space-y-3.5">
+        {/* Greeting header */}
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              {dateLabel}
+            </p>
+            <h1 className="mt-2 text-[28px] font-bold tracking-[-0.025em] text-foreground">
+              {greetingWord}
+              {firstName ? `, ${firstName}` : ""}.
+            </h1>
+          </div>
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-[13px] font-semibold text-foreground transition-colors hover:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+            {isSyncing ? "Syncing…" : "Sync Gmail"}
+          </button>
         </div>
 
         {dataLoadErrors.length > 0 ? (
@@ -553,12 +586,12 @@ const Dashboard = () => {
           </div>
         ) : null}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard icon={Send} label="Applications" value={appliedCount ?? "-"} />
-          <MetricCard icon={UserCheck} label="Reached interview" value={interviewsCount ?? "-"} />
-          <MetricCard icon={MessageSquare} label="Offers" value={offersCount ?? "-"} />
+        {/* Metric row */}
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+          <MetricCard label="Applications" value={appliedCount ?? "-"} />
+          <MetricCard label="Reached interview" value={interviewsCount ?? "-"} />
+          <MetricCard label="Offers" value={offersCount ?? "-"} />
           <MetricCard
-            icon={TrendingUp}
             label="Interview rate"
             value={interviewRate}
             change={
@@ -572,255 +605,259 @@ const Dashboard = () => {
           />
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
-          <section className="glass-card rounded-2xl p-6 space-y-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 text-sm font-medium text-accent">
-                  <Shield className="w-4 h-4" />
-                  Next decision
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Decide whether to apply now, fix first, or skip before another application eats time.
-                </p>
-              </div>
-              {decisionBrief?.status ? <StatusBadge status={decisionBrief.status} /> : null}
+        {/* Daily Action Queue | Strategy alert + Recent Apply Gate */}
+        <div className="grid items-start gap-3.5 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,1fr)]">
+          <section className="glass-card overflow-hidden rounded-2xl">
+            <div className="flex items-center justify-between gap-3 px-5 py-4">
+              <h2 className="text-[15px] font-bold tracking-[-0.01em] text-foreground">Daily Action Queue</h2>
+              <span className="rounded-full bg-accent/10 px-2.5 py-1 font-mono text-[10px] font-bold text-accent">
+                {daqStats.active} open
+              </span>
             </div>
-
-            {!decisionBrief ? (
-              <div className="rounded-xl border border-dashed border-border bg-background/40 p-5 space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Check one target role and get a clear apply, fix, or skip recommendation before you spend time on the application.
-                </p>
-                <Link to="/apply-gate" className={dashboardButtonPrimary}>
-                  <Shield className="w-4 h-4" />
-                  Open Apply Gate
-                </Link>
+            {todaysMoves.length === 0 ? (
+              <div className="border-t border-border px-5 py-6 text-sm leading-6 text-muted-foreground">
+                No urgent inbox actions right now. The broader queue may still have Apply Gate, cleanup, or strategy work, but the Daily Action Queue stays focused on time-sensitive Gmail context.
               </div>
             ) : (
-              <>
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h2 className="text-2xl font-semibold text-foreground">{decisionBrief.role}</h2>
-                    <span className="inline-flex items-center rounded-full border border-accent/20 bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
-                      {decisionBrief.recommendation}
-                    </span>
-                    {decisionBrief.confidence ? (
-                      <span className="inline-flex items-center rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                        {decisionBrief.confidence}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                    {decisionBrief.company ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <Mail className="w-4 h-4" />
-                        {decisionBrief.company}
-                      </span>
-                    ) : null}
-                    <span className="inline-flex items-center gap-1.5">
-                      <Clock3 className="w-4 h-4" />
-                      {decisionBrief.isUnresolved ? "Unresolved" : "Latest verdict"} - {decisionBrief.ageLabel}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid gap-5 md:grid-cols-2">
-                  <div className="space-y-3">
-                    <p className="text-sm font-semibold text-foreground">{decisionBrief.reasonHeadline}</p>
-                    <div className="space-y-2">
-                      {decisionBrief.reasons.map((reason) => (
-                        <div key={reason} className="flex items-start gap-2 rounded-lg border border-border/70 bg-background/60 px-3 py-2">
-                          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
-                          <p className="text-sm text-muted-foreground">{reason}</p>
-                        </div>
-                      ))}
-                    </div>
-                    {decisionBrief.supportingSignals?.length ? (
-                      <div className="rounded-lg border border-emerald-200/70 bg-emerald-50/60 px-3 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                          What still supports it
-                        </p>
-                        <div className="mt-2 space-y-2">
-                          {decisionBrief.supportingSignals.map((signal: string) => (
-                            <p key={signal} className="text-sm text-emerald-800">
-                              • {signal}
-                            </p>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="space-y-3">
-                    <p className="text-sm font-semibold text-foreground">Do this next</p>
-                    <div className="space-y-2">
-                      {decisionBrief.nextActions.map((action, index) => (
-                        <div key={`${index}-${action}`} className="flex items-start gap-3 rounded-lg border border-border/70 bg-background/60 px-3 py-2">
-                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent/10 text-xs font-semibold text-accent">
-                            {index + 1}
-                          </span>
-                          <p className="text-sm text-muted-foreground">{action}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <Link to="/apply-gate" className={dashboardButtonPrimary}>
-                    Review in Apply Gate
-                    <ArrowRight className="w-4 h-4" />
-                  </Link>
-                  <Link to="/fix-suggestions" className={dashboardButtonSecondary}>
-                    Open action queue
-                  </Link>
-                </div>
-              </>
+              todaysMoves.map((move) => <QueueRow key={move.id} move={move} />)
             )}
+            <Link
+              to="/fix-suggestions"
+              className="block border-t border-border px-5 py-3 text-[13px] font-semibold text-accent transition-colors hover:bg-muted/40"
+            >
+              View full queue &rarr;
+            </Link>
           </section>
 
-          <section className="space-y-4">
-            <div className="glass-card rounded-2xl p-6 space-y-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2 text-sm font-medium text-accent">
-                  <CheckSquare className="w-4 h-4" />
-                    Daily Action Queue
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    The premium inbox layer starts with the urgent moves that are easiest to trust: interviews, recruiter replies, and follow-ups.
-                  </p>
-                </div>
-                <Link to="/fix-suggestions" className="text-sm text-accent hover:underline">
-                  Full queue
-                </Link>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-xl border border-border/70 bg-background/50 p-3">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Active</p>
-                  <p className="mt-2 text-xl font-semibold text-foreground">{daqStats.active}</p>
-                </div>
-                <div className="rounded-xl border border-border/70 bg-background/50 p-3">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">High priority</p>
-                  <p className="mt-2 text-xl font-semibold text-foreground">{daqStats.highPriority}</p>
-                </div>
-                <div className="rounded-xl border border-border/70 bg-background/50 p-3">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Clear time</p>
-                  <p className="mt-2 text-xl font-semibold text-foreground">{daqStats.totalMinutes}m</p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {todaysMoves.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-border bg-background/40 p-4 text-sm text-muted-foreground">
-                    No urgent inbox actions right now. The broader queue may still have Apply Gate, cleanup, or strategy work, but DAQ v1 stays focused on time-sensitive Gmail context.
-                  </div>
-                ) : (
-                  todaysMoves.map((move) => <TodayMoveCard key={move.id} move={move} />)
-                )}
-              </div>
-            </div>
-
-            <div className="glass-card rounded-2xl p-5 space-y-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-accent">
-                <Brain className="w-4 h-4" />
-                Search memory
-              </div>
-              <div className="rounded-xl border border-border/70 bg-background/50 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h3 className="text-sm font-semibold text-foreground">{outcomeMemoryBrief.title}</h3>
-                  <span className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                    {outcomeMemoryBrief.stat}
+          <div className="grid gap-3.5">
+            {/* Strategy alert (dark) */}
+            <div className="rounded-2xl bg-primary p-5">
+              {!topAlert ? (
+                <>
+                  <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-[#2FBE8F]">
+                    Strategy alert
                   </span>
-                </div>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">{outcomeMemoryBrief.body}</p>
-              </div>
-              <Link to="/outcome-memory" className="inline-flex items-center gap-2 text-sm text-accent hover:underline">
-                {outcomeMemoryBrief.ctaLabel}
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-
-            <div className="glass-card rounded-2xl p-5 space-y-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-accent">
-                <Bell className="w-4 h-4" />
-                Strategy signal check
-              </div>
-              {strategyHighlights.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  {!isAuthed
-                    ? "Sign in to see strategy alerts."
-                    : strategyAlertsQuery.data?.error?.includes("Premium feature required")
-                      ? "Upgrade to Premium to see strategy alerts."
-                      : "No strategy alerts yet."}
-                </p>
+                  <p className="mt-3 text-[13px] leading-relaxed text-white/60">{strategyEmptyMessage}</p>
+                </>
               ) : (
-                <div className="space-y-3">
-                  {strategyHighlights.map((alert) => (
-                    <div key={alert.id} className="rounded-xl border border-border/70 bg-background/50 p-3">
-                      <p className="text-sm font-medium text-foreground">{alert.title}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">{alert.description}</p>
-                      {alert.supporting_stat ? (
-                        <p className="mt-2 text-xs font-medium text-foreground/80">{alert.supporting_stat}</p>
-                      ) : null}
-                    </div>
-                  ))}
-                  <Link to="/strategy-alerts" className="inline-flex items-center gap-2 text-sm text-accent hover:underline">
-                    Review all strategy alerts
-                    <ArrowRight className="w-4 h-4" />
+                <>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-[#2FBE8F]">
+                      Strategy alert
+                    </span>
+                    {topAlert.supporting_stat ? (
+                      <span className="rounded-full border border-white/15 px-2 py-0.5 font-mono text-[9px] font-bold text-white/60">
+                        {topAlert.supporting_stat}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-3 text-[14.5px] font-semibold leading-snug text-white">{topAlert.title}</p>
+                  <p className="mt-2 text-[12.5px] leading-relaxed text-white/60">{topAlert.description}</p>
+                  <Link
+                    to="/strategy-alerts"
+                    className="mt-3.5 inline-block text-[12.5px] font-semibold text-[#2FBE8F] hover:underline"
+                  >
+                    Review alerts &rarr;
                   </Link>
-                </div>
+                </>
               )}
             </div>
-          </section>
-        </div>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
-          <section className="glass-card rounded-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 text-sm font-medium text-accent">
-                  <Sparkles className="w-4 h-4" />
-                  Recent screening history
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Keep the latest role checks nearby while the main brief stays focused on today's decision and next actions.
-                </p>
+            {/* Recent Apply Gate */}
+            <div className="glass-card overflow-hidden rounded-2xl">
+              <div className="px-5 py-3.5">
+                <h2 className="text-sm font-bold text-foreground">Recent Apply Gate</h2>
               </div>
-              <Link to="/apply-gate" className="text-sm text-accent hover:underline">
-                View all
-              </Link>
-            </div>
-
-            <div className="space-y-3">
               {recentItems.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border bg-background/40 p-4 text-sm text-muted-foreground">
-                  {isAuthed ? "No recent Apply Gate results yet." : "Sign in to see recent Apply Gate results."}
+                <div className="border-t border-border px-5 py-3.5 text-sm text-muted-foreground">
+                  {isAuthed ? "No recent Apply Gate results yet." : "Sign in to see recent results."}
                 </div>
               ) : (
                 recentItems.map((job) => (
-                  <div key={job.id} className="rounded-xl border border-border/70 bg-background/50 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{job.title}</p>
-                        {job.company ? (
-                          <p className="text-xs text-muted-foreground mt-1">{job.company}</p>
-                        ) : null}
+                  <div
+                    key={job.id}
+                    className="flex items-center justify-between gap-3 border-t border-border px-5 py-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-[13px] font-semibold text-foreground">
+                        {job.title}
+                        {job.company ? <span className="text-muted-foreground"> &middot; {job.company}</span> : null}
                       </div>
-                      <StatusBadge status={job.status} />
                     </div>
+                    <StatusBadge status={job.status} />
                   </div>
                 ))
               )}
+              <Link
+                to="/apply-gate"
+                className="block border-t border-border px-5 py-3 text-[12.5px] font-semibold text-accent transition-colors hover:bg-muted/40"
+              >
+                Open Apply Gate &rarr;
+              </Link>
             </div>
+          </div>
+        </div>
+
+        {/* Next decision brief — collapsed by default to match the mockup's lean dashboard (nothing removed) */}
+        <details className="group glass-card overflow-hidden rounded-2xl">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 [&::-webkit-details-marker]:hidden">
+            <span className="flex items-center gap-2">
+              <span className={dashboardEyebrow}>Latest Apply Gate decision</span>
+              {decisionBrief?.status ? <StatusBadge status={decisionBrief.status} /> : null}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+              <ChevronsUpDown className="h-3.5 w-3.5" />
+              <span className="group-open:hidden">Show</span>
+              <span className="hidden group-open:inline">Hide</span>
+            </span>
+          </summary>
+          <section className="space-y-5 px-6 pb-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className={dashboardEyebrow}>Next decision</p>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                Decide whether to apply now, fix first, or skip before another application eats time.
+              </p>
+            </div>
+            {decisionBrief?.status ? <StatusBadge status={decisionBrief.status} /> : null}
+          </div>
+
+          {!decisionBrief ? (
+            <div className="space-y-3 rounded-xl border border-dashed border-border bg-muted/40 p-5">
+              <p className="text-sm text-muted-foreground">
+                Check one target role and get a clear apply, fix, or skip recommendation before you spend time on the application.
+              </p>
+              <Link to="/apply-gate" className={dashboardButtonPrimary}>
+                <Shield className="h-4 w-4" />
+                Open Apply Gate
+              </Link>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h2 className="text-2xl font-bold tracking-[-0.02em] text-foreground">{decisionBrief.role}</h2>
+                  <span className="inline-flex items-center rounded-full border border-accent/20 bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent">
+                    {decisionBrief.recommendation}
+                  </span>
+                  {decisionBrief.confidence ? (
+                    <span className="inline-flex items-center rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                      {decisionBrief.confidence}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                  {decisionBrief.company ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Mail className="h-4 w-4" />
+                      {decisionBrief.company}
+                    </span>
+                  ) : null}
+                  <span className="inline-flex items-center gap-1.5">
+                    <Clock3 className="h-4 w-4" />
+                    {decisionBrief.isUnresolved ? "Unresolved" : "Latest verdict"} - {decisionBrief.ageLabel}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-2">
+                <div className="space-y-3">
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                    {decisionBrief.reasonHeadline}
+                  </p>
+                  <div className="space-y-2">
+                    {decisionBrief.reasons.map((reason) => (
+                      <div key={reason} className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                        <p className="text-sm text-muted-foreground">{reason}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {decisionBrief.supportingSignals?.length ? (
+                    <div className="rounded-lg border border-accent/20 bg-accent/5 px-3 py-3">
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-accent">
+                        What still supports it
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        {decisionBrief.supportingSignals.map((signal: string) => (
+                          <p key={signal} className="text-sm text-foreground/80">
+                            &bull; {signal}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="space-y-3">
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                    Do this next
+                  </p>
+                  <div className="space-y-2">
+                    {decisionBrief.nextActions.map((action, index) => (
+                      <div key={`${index}-${action}`} className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2">
+                        <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent/10 text-xs font-semibold text-accent">
+                          {index + 1}
+                        </span>
+                        <p className="text-sm text-muted-foreground">{action}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Link to="/apply-gate" className={dashboardButtonPrimary}>
+                  Review in Apply Gate
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link to="/fix-suggestions" className={dashboardButtonSecondary}>
+                  Open action queue
+                </Link>
+              </div>
+            </>
+          )}
+          </section>
+        </details>
+
+        {/* Search memory + Quick links — collapsed by default to match the mockup's lean dashboard (nothing removed) */}
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl border border-border bg-card px-5 py-3.5 [&::-webkit-details-marker]:hidden">
+            <span className="flex items-center gap-2">
+              <Brain className="h-4 w-4 text-accent" />
+              <span className="text-sm font-semibold text-foreground">Search memory &amp; quick links</span>
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+              <ChevronsUpDown className="h-3.5 w-3.5" />
+              <span className="group-open:hidden">Show</span>
+              <span className="hidden group-open:inline">Hide</span>
+            </span>
+          </summary>
+          <div className="mt-3.5 grid items-start gap-3.5 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <section className="glass-card space-y-3 rounded-2xl p-6">
+            <div className="flex items-center gap-2">
+              <Brain className="h-4 w-4 text-accent" />
+              <span className={dashboardEyebrow}>Search memory</span>
+            </div>
+            <div className="rounded-xl border border-border bg-muted/40 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-sm font-bold text-foreground">{outcomeMemoryBrief.title}</h3>
+                <span className="rounded-full border border-border bg-card px-2.5 py-1 font-mono text-[10px] font-semibold text-muted-foreground">
+                  {outcomeMemoryBrief.stat}
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{outcomeMemoryBrief.body}</p>
+            </div>
+            <Link to="/outcome-memory" className="inline-flex items-center gap-2 text-sm font-semibold text-accent hover:underline">
+              {outcomeMemoryBrief.ctaLabel}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </section>
 
-          <section className="glass-card rounded-2xl p-5 space-y-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-accent">
-              <Wrench className="w-4 h-4" />
-              Quick links
+          <section className="glass-card space-y-3 rounded-2xl p-5">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-accent" />
+              <span className={dashboardEyebrow}>Quick links</span>
             </div>
             <div className="space-y-2">
               {[
@@ -832,84 +869,56 @@ const Dashboard = () => {
                 <Link
                   key={item.label}
                   to={item.to}
-                  className="flex items-center justify-between rounded-xl border border-border/70 bg-background/50 px-3 py-3 text-sm font-medium text-foreground hover:border-accent/30 hover:bg-background transition-colors"
+                  className="flex items-center justify-between rounded-xl border border-border bg-muted/40 px-3 py-3 text-sm font-semibold text-foreground transition-colors hover:border-accent/40 hover:bg-card"
                 >
                   <span>{item.label}</span>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
                 </Link>
               ))}
             </div>
           </section>
-        </div>
+          </div>
+        </details>
       </div>
     </DashboardLayout>
   );
 };
 
-function TodayMoveCard({ move }: { move: QueueItem }) {
-  const gmailUrl = move.source === "followup" || move.source === "stale" ? buildGmailThreadUrl(move.threadId) : null;
-  const primaryHref = gmailUrl || move.routeHref || "/fix-suggestions";
-  const primaryLabel = gmailUrl ? "Open in Gmail" : move.routeLabel || "Open queue";
+function QueueRow({ move }: { move: QueueItem }) {
+  const gmailUrl =
+    move.source === "followup" || move.source === "stale" ? buildGmailThreadUrl(move.threadId) : null;
+  const href = gmailUrl || move.routeHref || "/fix-suggestions";
+  const isExternal = href.startsWith("http");
+  const actionLabel = gmailUrl ? "Open in Gmail ↗" : "Open";
 
-  return (
-    <article className="rounded-xl border border-border/70 bg-background/50 p-4 space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${urgencyClasses[move.urgency]}`}>
-          {move.urgency.toUpperCase()}
-        </span>
-        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${sourceClasses[move.source]}`}>
-          {move.sourceLabel}
-        </span>
-      </div>
-
-      <div>
-        <h3 className="text-sm font-semibold text-foreground">{move.title}</h3>
-        <p className="mt-1 text-sm text-muted-foreground">{move.description}</p>
-      </div>
-
-      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-        {move.company ? (
-          <span className="inline-flex items-center gap-1.5">
-            <Mail className="w-3.5 h-3.5" />
-            {move.company}
-          </span>
-        ) : null}
-        <span className="inline-flex items-center gap-1.5">
-          <Clock3 className="w-3.5 h-3.5" />
-          {move.estimatedTime} - {formatRelativeAge(move.daysAgo)}
-        </span>
-      </div>
-
-      {move.playbook[0] ? (
-        <div className="rounded-lg border border-border/70 bg-background px-3 py-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">First move</p>
-          <p className="mt-1 text-sm text-muted-foreground">{move.playbook[0]}</p>
-        </div>
-      ) : null}
-
-      {move.source === "followup" ? (
-        <p className="text-xs leading-5 text-muted-foreground">
-          Check the company and role in Gmail before sending; inbox details can lag behind your latest conversation.
+  const inner = (
+    <>
+      <span
+        className={`mt-0.5 inline-flex shrink-0 items-center rounded-md px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.08em] ${urgencyClasses[move.urgency]}`}
+      >
+        {move.urgency}
+      </span>
+      <div className="min-w-0 flex-1">
+        <h3 className="text-[14px] font-semibold text-foreground">{move.title}</h3>
+        <p className="mt-1 text-[13px] leading-snug text-muted-foreground">{move.description}</p>
+        <p className="mt-1.5 font-mono text-[10px] text-muted-foreground/70">
+          {move.sourceLabel} &middot; {formatRelativeAge(move.daysAgo)}
         </p>
-      ) : null}
-
-      <div className="flex flex-wrap gap-2">
-        {primaryHref.startsWith("http") ? (
-          <a className={dashboardButtonPrimary} href={primaryHref} target="_blank" rel="noreferrer">
-            {primaryLabel}
-            <ArrowRight className="w-4 h-4" />
-          </a>
-        ) : (
-          <Link className={dashboardButtonPrimary} to={primaryHref}>
-            {primaryLabel}
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        )}
-        <Link className={dashboardButtonSecondary} to="/fix-suggestions">
-          Full queue
-        </Link>
       </div>
-    </article>
+      <span className="mt-0.5 shrink-0 whitespace-nowrap text-[12px] font-semibold text-accent">{actionLabel}</span>
+    </>
+  );
+
+  const cls = "flex items-start gap-3 border-t border-border px-5 py-3.5 transition-colors hover:bg-muted/40";
+
+  return isExternal ? (
+    <a href={href} target="_blank" rel="noreferrer" className={cls}>
+      {inner}
+    </a>
+  ) : (
+    <Link to={href} className={cls}>
+      {inner}
+    </Link>
   );
 }
 

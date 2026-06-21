@@ -26,6 +26,10 @@ vi.mock("@/lib/firebase", () => ({
   auth: authState,
 }));
 
+vi.mock("@/lib/AuthContext.jsx", () => ({
+  useAuth: () => ({ user: authState.currentUser, loading: false }),
+}));
+
 vi.mock("@/lib/emails", async () => {
   const actual = await vi.importActual("@/lib/emails");
   return {
@@ -98,7 +102,7 @@ describe("StrategyAlerts", () => {
     renderPage();
 
     expect(await screen.findByRole("heading", { name: "Strategy Alerts" })).toBeInTheDocument();
-    expect(screen.getByText("Strategy radar")).toBeInTheDocument();
+    expect(screen.getByText("High-confidence only")).toBeInTheDocument();
     expect(await screen.findByText("Next strategic move")).toBeInTheDocument();
     expect(screen.getAllByText("You are applying mostly to low-match roles").length).toBeGreaterThan(0);
 

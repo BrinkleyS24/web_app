@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
+import { useCallback, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import {
@@ -16,7 +15,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { auth } from "@/lib/firebase";
+import { useAuth } from "@/lib/AuthContext.jsx";
 import {
   analyzePrejection,
   fetchPrejectionHistory,
@@ -194,15 +193,9 @@ function ResumeIndicator() {
 // ── Main page ───────────────────────────────────────────────────────
 
 const Prejection = () => {
-  const [user, setUser] = useState(auth?.currentUser ?? null);
+  const { user } = useAuth();
   const isAuthed = Boolean(user);
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    if (!auth) return undefined;
-    const unsub = onAuthStateChanged(auth, (nextUser) => setUser(nextUser));
-    return () => unsub();
-  }, []);
 
   // ── Form state ──────────────────────────────────────────────────
   const [jobTitle, setJobTitle] = useState("");

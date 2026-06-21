@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowRight,
-  Bell,
   CheckCircle2,
   Compass,
   Gauge,
@@ -16,7 +14,7 @@ import {
 
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { auth } from "@/lib/firebase";
+import { useAuth } from "@/lib/AuthContext.jsx";
 import { fetchStrategyAlerts, type StrategyAlert } from "@/lib/emails";
 
 const severityStyles: Record<StrategyAlert["severity"], string> = {
@@ -119,14 +117,8 @@ function EmptyState({ message }: { message: string }) {
 }
 
 const StrategyAlerts = () => {
-  const [user, setUser] = useState(auth?.currentUser ?? null);
+  const { user } = useAuth();
   const isAuthed = Boolean(user);
-
-  useEffect(() => {
-    if (!auth) return undefined;
-    const unsub = onAuthStateChanged(auth, (nextUser) => setUser(nextUser));
-    return () => unsub();
-  }, []);
 
   const alertsQuery = useQuery({
     queryKey: ["strategy-alerts", "aggregates"],
@@ -191,35 +183,31 @@ const StrategyAlerts = () => {
   return (
     <DashboardLayout>
       <div className="space-y-5">
-        <section className="relative overflow-hidden rounded-2xl border border-border/70 bg-[radial-gradient(circle_at_top_left,hsl(var(--accent)/0.14),transparent_34%),linear-gradient(135deg,hsl(var(--card)),hsl(var(--background)))] p-5 shadow-sm">
-          <div className="absolute -right-20 -top-20 h-44 w-44 rounded-full bg-accent/10 blur-3xl" />
-          <div className="relative grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-end">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-accent">
-                <Bell className="h-3.5 w-3.5" />
-                Strategy radar
-              </div>
-              <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground">Strategy Alerts</h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                Pattern checks for targeting, response trends, focus lanes, and whether completed premium actions are tied to better outcomes.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                ["Active", summary.active],
-                ["Actionable", summary.actionable],
-                ["Working", summary.positive],
-                ["Calibrating", summary.calibration],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-xl border border-border/70 bg-background/75 px-3 py-2.5 shadow-sm">
-                  <p className="text-xl font-bold leading-none text-foreground">{value}</p>
-                  <p className="mt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-                </div>
-              ))}
-            </div>
+        <div className="flex flex-wrap items-end justify-between gap-5">
+          <div>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              High-confidence only
+            </p>
+            <h1 className="mt-2 text-[28px] font-bold tracking-[-0.025em] text-foreground">Strategy Alerts</h1>
+            <p className="mt-2 max-w-[60ch] text-sm leading-6 text-muted-foreground">
+              We only raise an alert when the pattern is strong enough to act on. No noise, no daily nagging.
+            </p>
           </div>
-        </section>
+
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            {[
+              ["Active", summary.active],
+              ["Actionable", summary.actionable],
+              ["Working", summary.positive],
+              ["Calibrating", summary.calibration],
+            ].map(([label, value]) => (
+              <div key={label} className="glass-card rounded-2xl px-4 py-3">
+                <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+                <p className="mt-1.5 text-2xl font-bold leading-none text-foreground">{value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {!isAuthed || alerts.length === 0 ? (
           <EmptyState message={emptyMessage} />
@@ -227,21 +215,29 @@ const StrategyAlerts = () => {
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
             <main className="space-y-5">
               {grouped.primary ? (
-                <section className="rounded-2xl border border-primary/20 bg-[linear-gradient(135deg,hsl(var(--primary)/0.08),hsl(var(--background)))] p-5 shadow-sm">
+                <section className="rounded-2xl bg-primary p-5 sm:p-6">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-primary">Next strategic move</p>
-                      <h2 className="mt-2 text-xl font-semibold text-foreground">{grouped.primary.title}</h2>
-                      <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-[#2FBE8F]">
+                          Next strategic move
+                        </span>
+                        <span className="rounded-full border border-white/15 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.1em] text-white/60">
+                          High conf
+                        </span>
+                      </div>
+                      <h2 className="mt-3 text-xl font-bold tracking-[-0.01em] text-white">{grouped.primary.title}</h2>
+                      <p className="mt-2 max-w-3xl text-sm leading-6 text-white/60">
                         {grouped.primary.recommendation || grouped.primary.description}
                       </p>
                     </div>
-                    <Button asChild>
-                      <Link to={primaryCta.to}>
-                        {primaryCta.label}
-                        <ArrowRight className="h-4 w-4" />
-                      </Link>
-                    </Button>
+                    <Link
+                      to={primaryCta.to}
+                      className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-[#0E8C63] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#10B981]"
+                    >
+                      {primaryCta.label}
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
                   </div>
                 </section>
               ) : null}

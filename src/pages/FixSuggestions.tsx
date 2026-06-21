@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import {
   AlarmClock,
   ArrowUpRight,
+  Check,
   CheckCircle2,
   CheckSquare,
   ChevronsUpDown,
@@ -18,7 +19,6 @@ import {
   MoreHorizontal,
   PauseCircle,
   ShieldAlert,
-  Sparkles,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -120,6 +120,13 @@ const sourceRailClasses: Record<QueueSource, string> = {
   apply_gate: "bg-accent",
   resume: "bg-success",
   cleanup: "bg-foreground/30",
+};
+
+// Compact, squared mono urgency pill matching the redesign queue rows.
+const urgencyMonoClasses: Record<"low" | "medium" | "high", string> = {
+  high: "bg-destructive/10 text-destructive",
+  medium: "bg-warning/10 text-warning",
+  low: "bg-muted text-muted-foreground",
 };
 
 type PrimaryActionKind = "cleanup" | "close" | "draft" | "gmail" | "route" | "complete" | null;
@@ -761,7 +768,7 @@ function SuggestionDraftPanel({
     : "";
 
   return (
-    <div className="rounded-2xl border border-primary/20 bg-[linear-gradient(135deg,hsl(var(--primary)/0.08),hsl(var(--background)))] p-4 shadow-sm">
+    <div className="rounded-2xl border border-primary/20 bg-accent/5 p-4 shadow-sm">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -1505,38 +1512,34 @@ const FixSuggestions = () => {
   return (
     <DashboardLayout>
       <div className="space-y-4">
-        <section className="relative overflow-hidden rounded-2xl border border-border/70 bg-[radial-gradient(circle_at_top_left,hsl(var(--accent)/0.16),transparent_32%),linear-gradient(135deg,hsl(var(--card)),hsl(var(--background)))] p-4 shadow-sm sm:p-5">
-          <div className="absolute -right-16 -top-24 h-40 w-40 rounded-full bg-accent/10 blur-3xl" />
-          <div className="relative grid gap-4 xl:grid-cols-[minmax(0,1fr)_520px] xl:items-end">
-            <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-accent">
-                <Sparkles className="h-3 w-3" />
-                Premium action command center
-              </div>
-              <h1 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                Daily Action Queue
-              </h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                Career-coach next actions based on your Gmail context: interview prep, recruiter replies, and follow-up windows.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {[
-                ["Active", stats.active],
-                ["High priority", stats.highPriority],
-                ["To clear", `${stats.totalMinutes || 0}m`],
-                ["Hidden", stats.snoozed],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-xl border border-border/70 bg-background/75 px-3 py-2.5 shadow-sm backdrop-blur">
-                  <p className="text-xl font-bold leading-none text-foreground">{value}</p>
-                  <p className="mt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-                </div>
-              ))}
-            </div>
+        <div className="flex flex-wrap items-end justify-between gap-5">
+          <div className="max-w-3xl">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              Ranked by impact
+            </p>
+            <h1 className="mt-2 text-[28px] font-bold tracking-[-0.025em] text-foreground">
+              Daily Action Queue
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+              Career-coach next actions based on your Gmail context: interview prep, recruiter replies, and follow-up windows.
+            </p>
           </div>
-        </section>
 
+        </div>
+
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-3 shadow-sm [&::-webkit-details-marker]:hidden">
+            <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Filter className="h-4 w-4 text-accent" />
+              Filter &amp; focus the queue
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+              <ChevronsUpDown className="h-3.5 w-3.5" />
+              <span className="group-open:hidden">Show</span>
+              <span className="hidden group-open:inline">Hide</span>
+            </span>
+          </summary>
+          <div className="mt-3">
         <section className="rounded-2xl border border-border/70 bg-card/80 p-3 shadow-sm">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
@@ -1618,10 +1621,18 @@ const FixSuggestions = () => {
             {activeSourceHelp}
           </div>
         </section>
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="space-y-4">
+          </div>
+        </details>
+        <div className="space-y-4">
+          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            <div className="flex items-center justify-between gap-3 px-5 py-4">
+              <h2 className="text-[15px] font-bold tracking-[-0.01em] text-foreground">Today's queue</h2>
+              <span className="rounded-full bg-accent/10 px-2.5 py-1 font-mono text-[10px] font-bold text-accent">
+                {stats.active} open
+              </span>
+            </div>
             {displayEntries.length === 0 ? (
-              <div className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
+              <div className="border-t border-border/70 px-5 py-6">
                 <p className="text-sm font-semibold text-foreground">
                   {effectiveSourceFilter === "followup" && followupSuppressionReason === "dev_bypass_auth"
                     ? "Outreach is suppressed in local bypass mode"
@@ -1640,6 +1651,19 @@ const FixSuggestions = () => {
                       : "Your applications are between action windows. Nothing is broken; the queue is waiting until a follow-up would help instead of adding noise."
                     : emptyMessage}
                 </p>
+                {queueView === "inbox" && combinedSuggestions.length > daqInboxSuggestions.length ? (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="mt-4"
+                    onClick={() => {
+                      setQueueView("all");
+                      setSourceFilter("all");
+                    }}
+                  >
+                    Show all actions ({combinedSuggestions.length})
+                  </Button>
+                ) : null}
                 {effectiveSourceFilter === "followup" && upcomingFollowupWindows.length > 0 ? (
                   <div className="mt-5">
                     <UpcomingFollowupWindowList windows={upcomingFollowupWindows} />
@@ -1650,13 +1674,12 @@ const FixSuggestions = () => {
               displayEntries.map((entry, index) => {
                 if (entry.type === "stale_group") {
                   return (
-                    <article
+                    <div
                       key={entry.key}
-                      className={`relative overflow-visible rounded-2xl border bg-gradient-to-br p-0 shadow-sm animate-fade-in ${sourceAccentClasses.stale}`}
+                      className="border-t border-border/70 animate-fade-in"
                       style={{ animationDelay: `${index * 60}ms` }}
                     >
-                      <div className={`absolute inset-y-4 left-0 w-1 rounded-r-full ${sourceRailClasses.stale}`} />
-                      <div className="space-y-3 p-4 sm:p-5">
+                      <div className="space-y-3 px-5 py-4">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${urgencyClasses.low}`}>
                             LOW
@@ -1750,7 +1773,7 @@ const FixSuggestions = () => {
                           })}
                         </div>
                       </div>
-                    </article>
+                    </div>
                   );
                 }
 
@@ -1819,15 +1842,64 @@ const FixSuggestions = () => {
                   }
                 };
 
+                const reason = item.whyNow || item.sourceDescription || item.description || "";
+
                 return (
-                  <article
+                  <div
                     key={item.id}
-                    className={`relative overflow-visible rounded-2xl border bg-gradient-to-br p-0 shadow-sm animate-fade-in ${sourceAccentClasses[item.source]}`}
+                    className="animate-fade-in border-t border-border/70"
                     style={{ animationDelay: `${index * 60}ms` }}
                   >
-                    <div className={`absolute inset-y-4 left-0 w-1 rounded-r-full ${sourceRailClasses[item.source]}`} />
-                    <div className="p-4 sm:p-5">
-                      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_240px]">
+                    <div className="flex items-start gap-3 px-5 py-4">
+                      <button
+                        type="button"
+                        aria-label="Mark done"
+                        disabled={mutationBusy}
+                        onClick={() =>
+                          runCompleteAction(
+                            isGmailHandledCandidate(item) ? "Removed from today's queue." : undefined,
+                          )
+                        }
+                        className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border border-border text-transparent transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Check className="h-3 w-3" />
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-sm font-semibold tracking-[-0.01em] text-foreground">{item.title}</h3>
+                          <span
+                            className={`shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.08em] ${urgencyMonoClasses[item.urgency]}`}
+                          >
+                            {item.urgency}
+                          </span>
+                        </div>
+                        {reason ? (
+                          <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{reason}</p>
+                        ) : null}
+                        <p className="mt-1.5 font-mono text-[10px] text-muted-foreground/80">
+                          {item.sourceLabel} · {formatRelativeAge(item.daysAgo)}
+                        </p>
+                      </div>
+                      {primaryActionKind ? (
+                        <Button
+                          size="sm"
+                          variant={primaryActionKind === "close" ? "destructive" : "outline"}
+                          disabled={primaryActionDisabled}
+                          onClick={runPrimaryAction}
+                          className="shrink-0"
+                        >
+                          {primaryActionLabel}
+                        </Button>
+                      ) : null}
+                    </div>
+
+                    <details className="group/row px-5 pb-4">
+                      <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-medium text-muted-foreground [&::-webkit-details-marker]:hidden">
+                        <ChevronsUpDown className="h-3.5 w-3.5" />
+                        <span className="group-open/row:hidden">Details</span>
+                        <span className="hidden group-open/row:inline">Hide details</span>
+                      </summary>
+                      <div className="mt-3 grid gap-4 xl:grid-cols-[minmax(0,1fr)_240px]">
                         <div className="min-w-0 space-y-4">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${urgencyClasses[item.urgency]}`}>
@@ -1849,7 +1921,6 @@ const FixSuggestions = () => {
                           </div>
 
                           <div>
-                            <h3 className="text-lg font-semibold tracking-tight text-foreground">{item.title}</h3>
                             {item.description
                               && item.description.trim().toLowerCase()
                                 !== (item.whyNow || "").trim().toLowerCase() ? (
@@ -2051,32 +2122,6 @@ const FixSuggestions = () => {
                             </div>
                           </div>
 
-                          {primaryActionKind ? (
-                            <Button
-                              className="mt-3 w-full"
-                              variant={primaryActionKind === "close" ? "destructive" : inlineOpen && primaryActionKind === "cleanup" ? "secondary" : "default"}
-                              disabled={primaryActionDisabled}
-                              onClick={runPrimaryAction}
-                            >
-                              {primaryActionKind === "close" ? (
-                                <XCircle className="h-4 w-4" />
-                              ) : primaryActionKind === "draft" ? (
-                                <MessageSquare className="h-4 w-4" />
-                              ) : primaryActionKind === "gmail" || primaryActionKind === "route" ? (
-                                <ArrowUpRight className="h-4 w-4" />
-                              ) : primaryActionKind === "complete" ? (
-                                <CheckCircle2 className="h-4 w-4" />
-                              ) : (
-                                <CheckSquare className="h-4 w-4" />
-                              )}
-                              {primaryActionLabel}
-                            </Button>
-                          ) : (
-                            <div className="mt-3 rounded-xl border border-border/70 bg-muted/35 px-3 py-2 text-xs leading-5 text-muted-foreground">
-                              No one-click action is available for this card. Use the details below to decide whether to act or ignore it.
-                            </div>
-                          )}
-
                           {canMarkHandledFromCard ? (
                             <Button
                               className="mt-2 w-full"
@@ -2105,14 +2150,26 @@ const FixSuggestions = () => {
                         onRefresh={() => invalidateSuggestionQueries(queryClient)}
                       />
                     ) : null}
-                    </div>
-                  </article>
+                    </details>
+                  </div>
                 );
               })
             )}
           </div>
 
-          <aside className="space-y-3 xl:sticky xl:top-4 xl:self-start">
+          <details className="group">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl border border-border/70 bg-card px-4 py-3 shadow-sm [&::-webkit-details-marker]:hidden">
+              <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <CheckSquare className="h-4 w-4 text-accent" />
+                Operating order &amp; upcoming outreach
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                <ChevronsUpDown className="h-3.5 w-3.5" />
+                <span className="group-open:hidden">Show</span>
+                <span className="hidden group-open:inline">Hide</span>
+              </span>
+            </summary>
+            <div className="mt-3 space-y-3">
             <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
               <div className="flex items-center gap-2">
                 <CheckSquare className="h-4 w-4 text-accent" />
@@ -2160,8 +2217,8 @@ const FixSuggestions = () => {
                 </div>
               )}
             </div>
-
-          </aside>
+            </div>
+          </details>
         </div>
 
         <details className="group rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
@@ -2182,7 +2239,21 @@ const FixSuggestions = () => {
             </span>
           </summary>
 
-          <div className="mt-4 grid gap-4 border-t border-border/70 pt-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="mt-4 grid grid-cols-2 gap-2.5 border-t border-border/70 pt-4 sm:grid-cols-4">
+            {[
+              ["Active", stats.active],
+              ["High priority", stats.highPriority],
+              ["To clear", `${stats.totalMinutes || 0}m`],
+              ["Hidden", stats.snoozed],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-xl border border-border/70 bg-background/70 px-4 py-3">
+                <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+                <p className="mt-1.5 text-2xl font-bold leading-none text-foreground">{value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
             <div className="space-y-4">
               <div className="rounded-3xl border border-border/70 bg-background/70 p-5 shadow-sm">
                 <div className="flex items-center gap-2">

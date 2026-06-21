@@ -6,6 +6,8 @@ import type { ReactNode } from "react";
 
 import Dashboard from "./DashboardNew";
 
+const useAuth = vi.fn();
+
 const {
   fetchApplicationStats,
   fetchApplyGateHistory,
@@ -35,6 +37,10 @@ vi.mock("@/lib/firebase", () => ({
   auth: {
     currentUser: { uid: "user-1", email: "stacey@example.test" },
   },
+}));
+
+vi.mock("@/lib/AuthContext.jsx", () => ({
+  useAuth: () => useAuth(),
 }));
 
 vi.mock("@/components/DashboardLayout", () => ({
@@ -74,6 +80,11 @@ function renderDashboard() {
 
 beforeEach(() => {
   vi.spyOn(Date, "now").mockReturnValue(new Date("2026-04-13T12:00:00.000Z").getTime());
+
+  useAuth.mockReturnValue({
+    user: { uid: "user-1", email: "stacey@example.test" },
+    loading: false,
+  });
 
   fetchEmailMetrics.mockResolvedValue({
     success: true,
@@ -349,8 +360,7 @@ describe("DashboardNew", () => {
   test("renders the MVP command center with decision, actions, and memory", async () => {
     renderDashboard();
 
-    expect(await screen.findByText("Today's search brief")).toBeInTheDocument();
-    expect(screen.getByText("Know what your inbox says needs attention today.")).toBeInTheDocument();
+    expect(await screen.findByText(/Good (morning|afternoon|evening), Stacey\./)).toBeInTheDocument();
 
     expect(await screen.findByText("Next decision")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "QA Analyst" })).toBeInTheDocument();
@@ -365,7 +375,7 @@ describe("DashboardNew", () => {
     expect(screen.getByText("Completed follow-ups are showing better outcomes")).toBeInTheDocument();
     expect(screen.getByText("Observed lift +40.0 pts")).toBeInTheDocument();
 
-    expect(screen.getByText("Strategy signal check")).toBeInTheDocument();
+    expect(screen.getByText("Strategy alert")).toBeInTheDocument();
     expect(screen.getByText("You are applying mostly to low-match roles")).toBeInTheDocument();
   });
 });

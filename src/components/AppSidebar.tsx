@@ -1,21 +1,10 @@
-import {
-  LayoutDashboard,
-  Shield,
-  Wrench,
-  Brain,
-  Bell,
-  FileText,
-  Crown,
-  Settings,
-  CheckCircle2,
-} from "lucide-react";
+import { Crown } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -24,51 +13,72 @@ import {
 import { useAuth } from "@/lib/AuthContext.jsx";
 
 const mainNav = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Apply Gate", url: "/apply-gate", icon: Shield },
-  { title: "Next Actions", url: "/fix-suggestions", icon: Wrench },
-  { title: "Outcome Memory", url: "/outcome-memory", icon: Brain },
-  { title: "Strategy Alerts", url: "/strategy-alerts", icon: Bell },
-  { title: "Weekly Summary", url: "/weekly-summary", icon: FileText },
+  { title: "Dashboard", url: "/dashboard", code: "db" },
+  { title: "Apply Gate", url: "/apply-gate", code: "ag" },
+  { title: "Next Actions", url: "/fix-suggestions", code: "na" },
+  { title: "Outcome Memory", url: "/outcome-memory", code: "om" },
+  { title: "Strategy Alerts", url: "/strategy-alerts", code: "sa" },
+  { title: "Weekly Summary", url: "/weekly-summary", code: "ws" },
 ];
 
+function NavCode({ code }: { code: string }) {
+  return (
+    <span className="nav-code w-[22px] h-[22px] rounded-md grid place-items-center font-mono text-[9px] font-bold tracking-[0.05em] shrink-0 bg-secondary text-muted-foreground">
+      {code}
+    </span>
+  );
+}
+
+function initialsFromUser(name?: string | null, email?: string | null) {
+  const source = String(name || "").trim();
+  if (source) {
+    const parts = source.split(/\s+/).filter(Boolean);
+    const first = parts[0]?.[0] || "";
+    const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+    return (first + last).toUpperCase() || "?";
+  }
+  const emailChar = String(email || "").trim()[0];
+  return emailChar ? emailChar.toUpperCase() : "?";
+}
+
 export function AppSidebar() {
-  const { plan, planLoading } = useAuth();
+  const { user, plan, planLoading } = useAuth();
   const isPremium = plan === "premium";
+  const displayName = user?.displayName || user?.email || "Signed in";
+  const initials = initialsFromUser(user?.displayName, user?.email);
 
   return (
-    <Sidebar className="border-r-0">
-      <SidebarHeader className="p-5 border-b border-sidebar-border">
+    <Sidebar className="border-r border-sidebar-border">
+      <SidebarHeader className="px-4 py-[18px] border-b border-sidebar-border">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
-            <Crown className="w-4 h-4 text-sidebar-primary-foreground" />
+          <div className="w-[26px] h-[26px] rounded-[7px] bg-[#0B1220] grid place-items-center shrink-0">
+            <img src="/logo-transparent.png" alt="Applendium" className="w-5 h-5 block" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-sidebar-accent-foreground">Applendium</h2>
-            <p className="text-xs text-sidebar-muted">
+            <h2 className="text-sm font-bold tracking-[-0.01em] leading-tight text-sidebar-accent-foreground">
+              applendium
+            </h2>
+            <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[#0E8C63]">
               {planLoading ? "…" : isPremium ? "Premium" : "Free"}
             </p>
           </div>
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="px-3 py-4">
+      <SidebarContent className="px-2.5 py-3.5">
         <SidebarGroup>
-          <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-sidebar-muted mb-2 px-3">
-            Features
-          </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-0.5">
               {mainNav.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
                       end={item.url === "/"}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      className="group flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13.5px] font-medium text-sidebar-foreground hover:bg-secondary hover:text-sidebar-accent-foreground transition-colors"
+                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-semibold [&_.nav-code]:bg-[#0E8C63] [&_.nav-code]:text-white"
                     >
-                      <item.icon className="w-4 h-4 shrink-0" />
+                      <NavCode code={item.code} />
                       <span>{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
@@ -77,38 +87,45 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
       </SidebarContent>
 
-      <div className="mt-auto p-4 border-t border-sidebar-border space-y-2">
-        {/* Settings link */}
+      <div className="mt-auto px-2.5 py-3.5 border-t border-sidebar-border space-y-2">
         <NavLink
           to="/settings"
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-          activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+          className="group flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13.5px] font-medium text-sidebar-foreground hover:bg-secondary hover:text-sidebar-accent-foreground transition-colors"
+          activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-semibold [&_.nav-code]:bg-[#0E8C63] [&_.nav-code]:text-white"
         >
-          <Settings className="w-4 h-4 shrink-0" />
+          <NavCode code="st" />
           <span>Settings</span>
         </NavLink>
 
-        {/* Plan button — changes based on subscription status */}
-        {isPremium ? (
-          <div className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-medium">
-            <CheckCircle2 className="w-4 h-4" />
-            Premium Active
-          </div>
-        ) : (
+        {!isPremium && !planLoading ? (
           <NavLink
             to="/upgrade"
-            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg bg-sidebar-primary text-sidebar-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-[10px] bg-[#0E8C63] text-white text-sm font-semibold hover:bg-[#10B981] transition-colors"
             activeClassName="opacity-90"
           >
             <Crown className="w-4 h-4" />
             Upgrade Plan
           </NavLink>
-        )}
+        ) : null}
+
+        {user ? (
+          <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] bg-card border border-sidebar-border">
+            <div className="w-7 h-7 rounded-full bg-[#EAF5F0] text-[#0E8C63] grid place-items-center text-[11px] font-bold shrink-0">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <div className="text-[12.5px] font-semibold text-sidebar-accent-foreground truncate">
+                {displayName}
+              </div>
+              {user?.email && user.email !== displayName ? (
+                <div className="text-[11px] text-sidebar-muted truncate">{user.email}</div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </div>
     </Sidebar>
   );
 }
-

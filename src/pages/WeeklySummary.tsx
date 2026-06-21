@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { onAuthStateChanged } from "firebase/auth";
+import { useMemo, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import {
-  FileText,
   CheckCircle2,
   Calendar,
   Sparkles,
@@ -16,7 +14,7 @@ import {
   Lightbulb,
   ArrowRight,
 } from "lucide-react";
-import { auth } from "@/lib/firebase";
+import { useAuth } from "@/lib/AuthContext.jsx";
 import { fetchEmailMetrics, fetchWeeklyHighlights } from "@/lib/emails";
 import type {
   WeeklyHighlightEmail,
@@ -105,7 +103,7 @@ function DirectionGlyph({ direction }: { direction?: "up" | "down" | "flat" }) {
 function StrategicReadout({ readout }: { readout: WeeklyReadout }) {
   const { headline, confidence, sections } = readout;
   return (
-    <div className="glass-card rounded-xl p-6 space-y-5 border border-accent/20">
+    <div className="glass-card rounded-2xl p-6 space-y-5 border border-accent/20">
       <div className="flex items-start gap-3">
         <Sparkles className="w-5 h-5 text-accent mt-0.5 shrink-0" />
         <div>
@@ -207,13 +205,20 @@ function StrategicReadout({ readout }: { readout: WeeklyReadout }) {
 }
 
 const WeeklySummary = () => {
-  const [user, setUser] = useState(auth?.currentUser ?? null);
+  const { user } = useAuth();
   const isAuthed = Boolean(user);
 
-  useEffect(() => {
-    if (!auth) return undefined;
-    const unsub = onAuthStateChanged(auth, (nextUser) => setUser(nextUser));
-    return () => unsub();
+  // Honest week-range label for the eyebrow: the same trailing 7-day window the
+  // highlights/metrics queries use (end = today, start = today - 6 days).
+  const weekRangeLabel = useMemo(() => {
+    const end = new Date();
+    const start = new Date(end);
+    start.setDate(end.getDate() - 6);
+    const fmtDay = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const fmtEnd = start.getMonth() === end.getMonth()
+      ? end.toLocaleDateString("en-US", { day: "numeric" })
+      : fmtDay(end);
+    return `Week of ${fmtDay(start)} – ${fmtEnd}`;
   }, []);
 
   const highlightsQuery = useQuery({
@@ -275,38 +280,38 @@ const WeeklySummary = () => {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <FileText className="w-6 h-6 text-accent" />
-            Weekly Summary
-          </h1>
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+            {weekRangeLabel}
+          </p>
+          <h1 className="mt-2 text-[28px] font-bold tracking-[-0.025em] text-foreground">Weekly Summary</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Built from your inbox in the last 7 days, not just totals.
           </p>
         </div>
 
         {!isAuthed ? (
-          <div className="glass-card rounded-xl p-6 text-sm text-muted-foreground">
+          <div className="glass-card rounded-2xl p-6 text-sm text-muted-foreground">
             Sign in to see your weekly summary.
           </div>
         ) : (
           <>
             {readout ? <StrategicReadout readout={readout} /> : null}
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
               {cards.map((card) => (
-                <div key={card.label} className="glass-card rounded-xl p-4 text-center">
-                  <p className={`text-3xl font-bold ${card.tone}`}>{card.value}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{card.label}</p>
+                <div key={card.label} className="glass-card rounded-2xl p-5">
+                  <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{card.label}</p>
+                  <p className={`mt-2 text-[30px] font-bold leading-tight tracking-[-0.03em] ${card.tone}`}>{card.value}</p>
                 </div>
               ))}
             </div>
 
             {isLoading ? (
-              <div className="glass-card rounded-xl p-6 text-sm text-muted-foreground">
+              <div className="glass-card rounded-2xl p-6 text-sm text-muted-foreground">
                 Building your weekly summary from this week's inbox activity...
               </div>
             ) : !hasAnyHighlight ? (
-              <div className="glass-card rounded-xl p-6 space-y-2">
+              <div className="glass-card rounded-2xl p-6 space-y-2">
                 <p className="text-sm text-foreground font-medium">
                   No tracked job-search activity this week.
                 </p>
@@ -317,7 +322,7 @@ const WeeklySummary = () => {
             ) : (
               <div className="space-y-4">
                 {highlights?.highlights.newOffers.length ? (
-                  <div className="glass-card rounded-xl p-5">
+                  <div className="glass-card rounded-2xl p-5">
                     <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-success" />
                       Offers this week
@@ -331,7 +336,7 @@ const WeeklySummary = () => {
                 ) : null}
 
                 {highlights?.highlights.newCallbacks.length ? (
-                  <div className="glass-card rounded-xl p-5">
+                  <div className="glass-card rounded-2xl p-5">
                     <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-accent" />
                       Callbacks and interview moves
@@ -345,7 +350,7 @@ const WeeklySummary = () => {
                 ) : null}
 
                 {highlights?.highlights.newRejections.length ? (
-                  <div className="glass-card rounded-xl p-5">
+                  <div className="glass-card rounded-2xl p-5">
                     <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                       <XCircle className="w-4 h-4 text-destructive" />
                       Rejections this week
@@ -372,7 +377,7 @@ const WeeklySummary = () => {
                 ) : null}
 
                 {highlights?.highlights.silentThreads.length ? (
-                  <div className="glass-card rounded-xl p-5">
+                  <div className="glass-card rounded-2xl p-5">
                     <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                       <Clock className="w-4 h-4 text-yellow-600" />
                       Threads going silent
@@ -386,7 +391,7 @@ const WeeklySummary = () => {
                 ) : null}
 
                 {highlights?.highlights.newApplications.length ? (
-                  <div className="glass-card rounded-xl p-5">
+                  <div className="glass-card rounded-2xl p-5">
                     <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-muted-foreground" />
                       New applications detected
@@ -402,7 +407,7 @@ const WeeklySummary = () => {
             )}
 
             {weekMetrics ? (
-              <div className="glass-card rounded-xl p-5 space-y-2">
+              <div className="glass-card rounded-2xl p-5 space-y-2">
                 <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-muted-foreground" />
                   Weekly rates
@@ -423,7 +428,7 @@ const WeeklySummary = () => {
           </>
         )}
 
-        <div className="glass-card rounded-xl p-5">
+        <div className="glass-card rounded-2xl p-5">
           <h3 className="text-sm font-semibold text-foreground mb-2">Beta note</h3>
           <p className="text-sm text-muted-foreground">
             This is an in-app summary. Scheduled email delivery is not part of the current beta.

@@ -14,7 +14,6 @@ import {
   Loader2,
   LogOut,
   RefreshCw,
-  Settings as SettingsIcon,
   User,
 } from "lucide-react";
 
@@ -116,6 +115,19 @@ export default function Settings() {
   const monthlyLimit = subStatus?.quotaData?.limit ?? (isPremium ? 10000 : 100);
   const monthlyProcessed = subStatus?.quotaData?.monthlyProcessed ?? 0;
   const billingPortalAvailable = Boolean(subscription?.billingPortalAvailable);
+  const accountInitials = (() => {
+    const name = String(user?.displayName || "").trim();
+    if (name) {
+      const parts = name.split(/\s+/).filter(Boolean);
+      return ((parts[0]?.[0] || "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase() || "?";
+    }
+    const email = String(user?.email || "").trim();
+    return email ? email[0].toUpperCase() : "?";
+  })();
+  const accountName = String(user?.displayName || "").trim() || String(user?.email || "").trim() || "Your account";
+  const accountPlanLabel = planLoading ? "…" : isPremium ? "Premium" : "Free";
+  const accountSecondary =
+    user?.displayName && user?.email ? `${user.email} · ${accountPlanLabel}` : accountPlanLabel;
 
   const accountCards = useMemo(
     () => [
@@ -147,29 +159,29 @@ export default function Settings() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-4xl space-y-8">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
-            <SettingsIcon className="h-6 w-6" />
-            Settings
-          </h1>
+      <div className="max-w-2xl space-y-3.5">
+        <div className="mb-2">
+          <h1 className="text-[28px] font-bold tracking-[-0.025em] text-foreground">Settings</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Manage your account, resume, and subscription in one place.
           </p>
         </div>
 
-        <section className="glass-card space-y-4 rounded-xl p-6">
+        <section className="glass-card space-y-4 rounded-2xl p-6">
           <div className="flex items-center gap-2">
             <User className="h-5 w-5 text-accent" />
             <h2 className="text-base font-semibold text-foreground">Account</h2>
           </div>
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-0.5">
-              <p className="text-sm text-foreground">{user?.email || "-"}</p>
-              <p className="text-xs text-muted-foreground">
-                Firebase UID: {user?.uid ? `${user.uid.slice(0, 12)}...` : "-"}
-              </p>
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent/10 text-sm font-bold text-accent">
+                {accountInitials}
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium text-foreground">{accountName}</p>
+                <p className="text-xs text-muted-foreground">{accountSecondary}</p>
+              </div>
             </div>
             <Button variant="outline" size="sm" className="gap-1.5" onClick={handleSignOut}>
               <LogOut className="h-3.5 w-3.5" />
@@ -190,7 +202,7 @@ export default function Settings() {
           <ResumePrompt />
         </section>
 
-        <section className="glass-card space-y-5 rounded-xl p-6">
+        <section className="glass-card space-y-5 rounded-2xl p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="flex items-center gap-2">

@@ -6,53 +6,53 @@
 
 :root {
   color-scheme: light;
-  --radius: 0.625rem;
-  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --radius: 0.875rem;
+  --font-display: "Space Grotesk", system-ui, sans-serif;
 
-  /* Lovable theme — light */
-  --background: hsl(210 20% 98%);
-  --foreground: hsl(215 25% 12%);
-  --card: hsl(0 0% 100%);
-  --card-foreground: hsl(215 25% 12%);
-  --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(215 25% 12%);
-  --primary: hsl(215 50% 23%);
-  --primary-foreground: hsl(210 40% 98%);
-  --secondary: hsl(210 25% 93%);
-  --secondary-foreground: hsl(215 25% 20%);
-  --muted: hsl(210 20% 95%);
-  --muted-foreground: hsl(215 15% 50%);
-  --accent: hsl(170 55% 40%);
-  --accent-foreground: hsl(0 0% 100%);
-  --destructive: hsl(0 72% 55%);
-  --destructive-foreground: hsl(0 0% 100%);
-  --warning: hsl(38 92% 50%);
-  --warning-foreground: hsl(38 92% 14%);
-  --success: hsl(160 60% 42%);
-  --success-foreground: hsl(0 0% 100%);
-  --border: hsl(214 20% 90%);
-  --input: hsl(214 20% 90%);
-  --ring: hsl(215 50% 23%);
-  --chart-1: hsl(170 55% 40%);
-  --chart-2: hsl(200 60% 50%);
-  --chart-3: hsl(215 50% 23%);
-  --chart-4: hsl(38 92% 50%);
-  --chart-5: hsl(160 60% 42%);
+  /* Applendium redesign — warm paper + ink + green */
+  --background: #FAFAF8;
+  --foreground: #0B1220;
+  --card: #FFFFFF;
+  --card-foreground: #0B1220;
+  --popover: #FFFFFF;
+  --popover-foreground: #0B1220;
+  --primary: #0B1220;
+  --primary-foreground: #FFFFFF;
+  --secondary: #EEF0EC;
+  --secondary-foreground: #3D4450;
+  --muted: #F4F5F1;
+  --muted-foreground: #5C6470; /* darkened from #79808B for WCAG AA on paper/card */
+  --accent: #0E8C63;
+  --accent-foreground: #FFFFFF;
+  --destructive: #B3261E;
+  --destructive-foreground: #FFFFFF;
+  --warning: #B45309;
+  --warning-foreground: #7C3A06;
+  --success: #0E8C63;
+  --success-foreground: #FFFFFF;
+  --border: #E9EAE5;
+  --input: #E9EAE5;
+  --ring: #0E8C63;
+  --chart-1: #0E8C63;
+  --chart-2: #2FBE8F;
+  --chart-3: #0B1220;
+  --chart-4: #B45309;
+  --chart-5: #9AA0A6;
 
-  /* Dark navy sidebar */
-  --sidebar: hsl(215 50% 23%);
-  --sidebar-foreground: hsl(210 30% 85%);
-  --sidebar-primary: hsl(170 55% 50%);
-  --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(215 45% 30%);
-  --sidebar-accent-foreground: hsl(210 30% 95%);
-  --sidebar-border: hsl(215 40% 30%);
-  --sidebar-ring: hsl(170 55% 50%);
-  --sidebar-muted: hsl(215 30% 40%);
+  /* Light paper sidebar */
+  --sidebar: #FAFAF8;
+  --sidebar-foreground: #5C6470;
+  --sidebar-primary: #0E8C63;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #EAF5F0;
+  --sidebar-accent-foreground: #0B1220;
+  --sidebar-border: #E9EAE5;
+  --sidebar-ring: #0E8C63;
+  --sidebar-muted: #9AA0A6;
 
   /* Legacy vars for original pages */
-  --bg: hsl(210 20% 98%);
-  --text: hsl(215 25% 12%);
+  --bg: #FAFAF8;
+  --text: #0B1220;
 }
 
 .page--legal {
@@ -182,7 +182,12 @@ a:not([class]) {
 }
 
 .muted {
-  color: var(--muted);
+  color: var(--muted-foreground);
+}
+
+::selection {
+  background: #0E8C63;
+  color: #fff;
 }
 
 .error {
@@ -238,7 +243,7 @@ a:not([class]) {
   --color-success-foreground: var(--success-foreground);
   --color-warning-foreground: var(--warning-foreground);
   --color-destructive-foreground: var(--destructive-foreground);
-  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-sans: 'Space Grotesk', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
 
@@ -296,15 +301,13 @@ a:not([class]) {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  background-image: linear-gradient(135deg, hsl(170 55% 40%), hsl(200 60% 50%));
+  background-image: linear-gradient(135deg, #0E8C63, #2FBE8F);
 }
 
 .glass-card {
-  background: color-mix(in srgb, var(--card) 80%, transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(11, 18, 32, 0.03);
 }
 
 .status-strong {
@@ -442,11 +445,19 @@ html {
 }
 
 .landingPage {
-  font-family: "Satoshi", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Visible keyboard focus for the landing's custom links/buttons (WCAG 2.4.7). */
+.landingPage a:focus-visible,
+.landingPage button:focus-visible {
+  outline: 2px solid #0E8C63;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .landingDisplay {
-  font-family: "Cabinet Grotesk", "Satoshi", sans-serif;
+  font-family: "Space Grotesk", system-ui, sans-serif;
 }
 
 .landingMono {

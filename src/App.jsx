@@ -52,9 +52,13 @@ function LoadingScreen() {
 }
 
 function RequireNonAdminUser({ children }) {
-  const { user, loading, planLoading, adminEmail } = useAuth();
+  const { user, loading, bridgeDone, planLoading, adminEmail } = useAuth();
 
-  if (loading || planLoading) return <LoadingScreen />;
+  // On a cold load of a gated route, Firebase emits null once before the session
+  // restores and the extension bridge re-authenticates. Wait for that to settle
+  // before deciding the user is signed out — otherwise a real signed-in user gets
+  // bounced to /upgrade on hard refresh / deep link.
+  if (loading || planLoading || (!user && !bridgeDone)) return <LoadingScreen />;
   if (!user) return <Navigate to="/upgrade" replace />;
   if (adminEmail) return <Navigate to="/admin/review" replace />;
 
@@ -62,9 +66,11 @@ function RequireNonAdminUser({ children }) {
 }
 
 function RequirePremiumUser({ children }) {
-  const { user, loading, plan, planLoading, planError, adminEmail } = useAuth();
+  const { user, loading, bridgeDone, plan, planLoading, planError, adminEmail } = useAuth();
 
-  if (loading || planLoading) return <LoadingScreen />;
+  // See RequireNonAdminUser: hold the loading state until auth has settled so a
+  // premium user isn't redirected to /upgrade during the auth-restore window.
+  if (loading || planLoading || (!user && !bridgeDone)) return <LoadingScreen />;
   if (!user) return <Navigate to="/upgrade" replace />;
   if (adminEmail) return <Navigate to="/admin/review" replace />;
 
@@ -87,9 +93,9 @@ function RequirePremiumUser({ children }) {
 }
 
 function RequireAdminEmail({ children }) {
-  const { user, loading, planLoading, adminEmail } = useAuth();
+  const { user, loading, bridgeDone, planLoading, adminEmail } = useAuth();
 
-  if (loading || planLoading) return <LoadingScreen />;
+  if (loading || planLoading || (!user && !bridgeDone)) return <LoadingScreen />;
 
   if (!user) {
     return <Navigate to="/upgrade" replace />;

@@ -7,6 +7,8 @@ import type { ReactNode } from "react";
 
 import ApplyGate from "./ApplyGate";
 
+const useAuth = vi.fn();
+
 const {
   analyzeJobAlignment,
   fetchApplyGateHistory,
@@ -32,6 +34,10 @@ vi.mock("firebase/auth", () => ({
 
 vi.mock("@/lib/firebase", () => ({
   auth: { currentUser: { uid: "test-user" } },
+}));
+
+vi.mock("@/lib/AuthContext.jsx", () => ({
+  useAuth: () => useAuth(),
 }));
 
 vi.mock("@/lib/emails", async () => {
@@ -139,6 +145,7 @@ async function runAnalyze(options?: { companyName?: string; jobTitle?: string; j
 
 beforeEach(() => {
   vi.stubEnv("VITE_APPLY_GATE_DISPLAY_DECISION_V1", "false");
+  useAuth.mockReturnValue({ user: { uid: "test-user" }, loading: false });
   fetchResume.mockResolvedValue({ success: true, resumeText: "resume text with enough length" });
   fetchApplyGateHistory.mockResolvedValue({ success: true, history: [] });
   updateApplyGateAction.mockResolvedValue({ success: true });

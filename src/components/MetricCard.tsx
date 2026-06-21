@@ -1,7 +1,7 @@
 import { LucideIcon } from "lucide-react";
 
 interface MetricCardProps {
-  icon: LucideIcon;
+  icon?: LucideIcon;
   label: string;
   value: string | number;
   change?: string;
@@ -11,13 +11,11 @@ interface MetricCardProps {
 export function MetricCard({ icon: Icon, label, value, change, changeType = "neutral" }: MetricCardProps) {
   return (
     <div className="glass-card rounded-xl p-5">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
-          <Icon className="w-4 h-4 text-accent" />
-        </div>
-        <span className="text-sm text-muted-foreground">{label}</span>
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</span>
+        {Icon ? <Icon className="w-4 h-4 text-accent" /> : null}
       </div>
-      <p className="text-2xl font-bold text-foreground">{value}</p>
+      <p className="text-[30px] leading-tight font-bold tracking-[-0.03em] text-foreground">{value}</p>
       {change && (
         <p className={"text-xs mt-1 " + (
           changeType === "positive" ? "text-success" :

@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { Shield, AlertTriangle } from "lucide-react";
+import { AlertTriangle, Check, Loader2 } from "lucide-react";
 import {
   normalizeCompanyName,
   splitRoleAndCompany as splitApplyGateRoleAndCompany,
 } from "@/lib/applyGateDisplay";
-import { auth } from "@/lib/firebase";
+import { useAuth } from "@/lib/AuthContext.jsx";
 import {
   analyzeJobAlignment,
   fetchApplyGateHistory,
@@ -21,6 +20,74 @@ import {
   type ApplyGateRiskTolerance,
   type ApplyGateCalibrationBucket,
 } from "@/lib/emails";
+
+const APPLY_GATE_STAGES = [
+  "Reading the job description",
+  "Matching against your résumé",
+  "Scoring fit & rejection risk",
+  "Writing your decision brief",
+];
+
+// The premium verdict is a single ~30s backend call (no streaming), so this
+// shows staged, time-estimated progress instead of a 30s blank spinner — the
+// difference between "is this broken?" and "it's working through my résumé".
+function ApplyGateProgress() {
+  const reduceMotion =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const [pct, setPct] = useState(reduceMotion ? 50 : 8);
+
+  useEffect(() => {
+    if (reduceMotion) return undefined;
+    const id = window.setInterval(() => {
+      // Ease asymptotically toward 92% so the bar never claims "done" early.
+      setPct((p) => (p >= 92 ? 92 : p + Math.max(0.7, (92 - p) * 0.05)));
+    }, 600);
+    return () => window.clearInterval(id);
+  }, [reduceMotion]);
+
+  const stageIndex = Math.min(
+    APPLY_GATE_STAGES.length - 1,
+    Math.floor((pct / 92) * APPLY_GATE_STAGES.length),
+  );
+
+  return (
+    <div className="glass-card rounded-2xl p-8" role="status" aria-live="polite" aria-busy="true">
+      <p className="text-sm font-semibold">Checking this role…</p>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+        The full premium read takes about half a minute — your résumé, the posting, and your past
+        outcomes are all in play.
+      </p>
+      <div className="mt-5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <ul className="mt-5 space-y-2.5">
+        {APPLY_GATE_STAGES.map((label, i) => {
+          const state = i < stageIndex ? "done" : i === stageIndex ? "active" : "pending";
+          return (
+            <li key={label} className="flex items-center gap-2.5 text-sm">
+              {state === "done" ? (
+                <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              ) : state === "active" ? (
+                <Loader2
+                  className={`h-4 w-4 shrink-0 text-primary ${reduceMotion ? "" : "animate-spin"}`}
+                  aria-hidden="true"
+                />
+              ) : (
+                <span className="h-4 w-4 shrink-0 rounded-full border border-muted-foreground/30" aria-hidden="true" />
+              )}
+              <span className={state === "pending" ? "text-muted-foreground" : "font-medium"}>{label}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
 
 const HARD_BLOCKER_LABELS: Record<string, string> = {
   experience_gap: "Years of experience are below the stated minimum",
@@ -892,7 +959,7 @@ function buildHistoryDisplayItemFromResult(
 }
 
 const ApplyGate = () => {
-  const [user, setUser] = useState(auth?.currentUser ?? null);
+  const { user } = useAuth();
   const [jobTitle, setJobTitle] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -903,12 +970,6 @@ const ApplyGate = () => {
   const [savingAction, setSavingAction] = useState<ApplyGateActionSaveState>(null);
   const [actionSaveError, setActionSaveError] = useState<{ verdictId: string; message: string } | null>(null);
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    if (!auth) return undefined;
-    const unsub = onAuthStateChanged(auth, (nextUser) => setUser(nextUser));
-    return () => unsub();
-  }, []);
 
   const resumeQuery = useQuery({
     queryKey: ["user-resume"],
@@ -1294,17 +1355,23 @@ const ApplyGate = () => {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Shield className="w-6 h-6 text-accent" />
-            Apply Gate
-          </h1>
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+            Pre-apply decision brief
+          </p>
+          <h1 className="mt-2 text-[28px] font-bold tracking-[-0.025em] text-foreground">Apply Gate</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Decide whether to apply, fix first, or skip before you spend time on a posting.
           </p>
         </div>
 
-        <div className="glass-card rounded-xl p-5 space-y-3">
-          <p className="text-xs text-muted-foreground">Resume signal: {hasResume ? "Saved" : "Not found"}</p>
+        <div className="grid items-start gap-3.5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]">
+          <div className="glass-card space-y-3 rounded-2xl p-5">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-[15px] font-bold tracking-[-0.01em] text-foreground">Job to review</h2>
+            <span className="font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+              Resume: {hasResume ? "saved" : "not found"}
+            </span>
+          </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground" htmlFor="job-title">Job Title</label>
             <input
@@ -1363,23 +1430,52 @@ const ApplyGate = () => {
                 : "Apply Gate could not analyze this role. Paste the full job description and try again."}
             </p>
           )}
-        </div>
+          </div>
 
-        {result && (
-          <div className="glass-card rounded-xl p-6 space-y-3">
+          <div className="min-w-0">
+            {analyzeMutation.isPending ? (
+              <ApplyGateProgress />
+            ) : result ? (
+              <div className="glass-card space-y-3 rounded-2xl p-6">
             {currentDecisionCopy && (
-              <div className={`rounded-xl border px-4 py-3 ${currentDecisionCopy.toneClass}`}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide">Decision</p>
-                  <StatusBadge status={currentStatus || "risky"} />
+              <div
+                className="-mx-6 -mt-6 mb-1 rounded-t-2xl border-b border-border px-6 py-5"
+                style={{ background: "linear-gradient(180deg, #F2FAF6 0%, var(--card) 100%)" }}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Decision</p>
+                      <StatusBadge status={currentStatus || "risky"} />
+                    </div>
+                    <h2 className="mt-2 text-xl font-bold tracking-[-0.01em] text-foreground">{currentDecisionCopy.title}</h2>
+                    {currentDecisionNudge ? (
+                      <p className="mt-1 text-sm font-medium leading-relaxed text-muted-foreground">{currentDecisionNudge}</p>
+                    ) : null}
+                    {(!currentIsCompressedDecision && (!currentDecisionNudge || currentDecisionNudge !== currentDecisionCopy.body)) ? (
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground/80">{currentDecisionCopy.body}</p>
+                    ) : null}
+                  </div>
+                  {typeof currentRisk === "number" ? (
+                    <div className="shrink-0 text-center">
+                      <div
+                        className="grid h-[78px] w-[78px] place-items-center rounded-full"
+                        style={{
+                          background: `conic-gradient(${
+                            currentRisk < 34 ? "#0E8C63" : currentRisk < 67 ? "#B45309" : "#B3261E"
+                          } 0% ${currentRisk}%, var(--border) ${currentRisk}% 100%)`,
+                        }}
+                      >
+                        <div className="grid h-[62px] w-[62px] place-items-center rounded-full bg-card">
+                          <span className="text-[19px] font-bold tracking-[-0.02em] text-foreground">{currentRisk}%</span>
+                        </div>
+                      </div>
+                      <p className="mt-2 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                        Rejection risk
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
-                <h2 className="mt-2 text-xl font-semibold">{currentDecisionCopy.title}</h2>
-                {currentDecisionNudge ? (
-                  <p className="mt-1 text-sm font-medium leading-relaxed">{currentDecisionNudge}</p>
-                ) : null}
-                {(!currentIsCompressedDecision && (!currentDecisionNudge || currentDecisionNudge !== currentDecisionCopy.body)) ? (
-                  <p className="mt-1 text-xs leading-relaxed opacity-80">{currentDecisionCopy.body}</p>
-                ) : null}
               </div>
             )}
 
@@ -1693,12 +1789,18 @@ const ApplyGate = () => {
                 </p>
               )}
             </div>
+              </div>
+            ) : (
+              <div className="glass-card rounded-2xl p-8 text-center text-sm leading-6 text-muted-foreground">
+                Paste a job on the left and run the gate to see the verdict, rejection risk, and fix-first guidance here.
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         {history.length > 0 && (
           <div className="space-y-3">
-            <p className="text-sm font-medium text-foreground">Recent verdicts</p>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Recent verdicts</p>
             {history.slice(0, 5).map((item) => (
               <div key={item.id} className="glass-card rounded-xl p-5 space-y-3">
                 {(() => {
