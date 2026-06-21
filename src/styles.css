@@ -248,29 +248,32 @@ a:not([class]) {
 }
 
 .dark {
-  --background: hsl(215 30% 8%);
-  --foreground: hsl(210 30% 92%);
-  --card: hsl(215 30% 11%);
-  --card-foreground: hsl(210 30% 92%);
-  --popover: hsl(215 30% 11%);
-  --popover-foreground: hsl(210 30% 92%);
-  --primary: hsl(170 55% 50%);
-  --primary-foreground: hsl(215 30% 8%);
-  --secondary: hsl(215 25% 18%);
-  --secondary-foreground: hsl(210 30% 85%);
-  --muted: hsl(215 25% 15%);
-  --muted-foreground: hsl(215 15% 55%);
-  --accent: hsl(170 55% 45%);
+  /* Applendium dark — mirrors the landing-page hero popup (deep navy + bright
+     green/gold/pink). Kept in lockstep with the extension popup's .dark block
+     (frontend/job_sort/popup/src/index.css) per scripts/check_token_parity.mjs. */
+  --background: hsl(220 49% 8%);
+  --foreground: hsl(213 27% 90%);
+  --card: hsl(221 47% 10%);
+  --card-foreground: hsl(213 27% 90%);
+  --popover: hsl(221 45% 12%);
+  --popover-foreground: hsl(213 27% 90%);
+  --primary: hsl(221 44% 13%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(219 28% 16%);
+  --secondary-foreground: hsl(215 18% 76%);
+  --muted: hsl(220 30% 13%);
+  --muted-foreground: hsl(215 15% 63%);
+  --accent: hsl(162 84% 29%);
   --accent-foreground: hsl(0 0% 100%);
-  --destructive: hsl(0 72% 50%);
-  --destructive-foreground: hsl(0 0% 100%);
-  --warning: hsl(38 92% 50%);
-  --warning-foreground: hsl(38 92% 14%);
-  --success: hsl(160 60% 42%);
-  --success-foreground: hsl(0 0% 100%);
-  --border: hsl(215 25% 18%);
-  --input: hsl(215 25% 18%);
-  --ring: hsl(170 55% 50%);
+  --destructive: hsl(348 83% 70%);
+  --destructive-foreground: hsl(220 49% 9%);
+  --warning: hsl(41 84% 70%);
+  --warning-foreground: hsl(40 55% 12%);
+  --success: hsl(159 62% 46%);
+  --success-foreground: hsl(220 49% 9%);
+  --border: hsl(216 22% 20%);
+  --input: hsl(216 22% 20%);
+  --ring: hsl(160 70% 42%);
   --chart-1: hsl(170 55% 45%);
   --chart-2: hsl(200 60% 55%);
   --chart-3: hsl(215 50% 35%);

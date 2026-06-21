@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Chrome, Search } from "lucide-react";
-import { motion, useMotionValue, useSpring, useReducedMotion, useInView, animate } from "framer-motion";
+import { ArrowLeft, ArrowRight, Chrome, Search } from "lucide-react";
+import { motion, AnimatePresence, useMotionValue, useSpring, useReducedMotion, useInView, animate } from "framer-motion";
 
 const EASE_OUT = [0.16, 1, 0.3, 1];
 
 // Mirrors the real extension popup (see LandingExtensionDemo): metric tiles,
-// search, filter chips, and email rows with a lifecycle stepper.
+// search, filter chips, and email rows with a lifecycle stepper. Interactive:
+// chips filter, search filters, a row opens an inline preview.
 const TILES = [
   { key: "applied", label: "Applied", value: 24, text: "text-white", bg: "bg-white/[0.05]", ring: "ring-white/10" },
   { key: "interviews", label: "Interviews", value: 6, text: "text-[#F4C770]", bg: "bg-[#F4B740]/[0.10]", ring: "ring-[#F4B740]/20" },
@@ -22,13 +23,63 @@ const STATUS = {
 };
 
 const ROWS = [
-  { company: "Stripe", role: "Senior Frontend Engineer", subject: "We received your application", from: "Stripe Careers", status: "applied", date: "Today", unread: true },
-  { company: "Linear", role: "Product Engineer", subject: "Tech screen confirmed", from: "Linear Recruiting", status: "interview", date: "Today", unread: true },
-  { company: "Supabase", role: "Senior Engineer", subject: "Verbal offer and next steps", from: "Supabase Recruiting", status: "offer", date: "Yesterday", unread: true },
-  { company: "Airbnb", role: "Frontend Engineer", subject: "Update on your application", from: "Airbnb Recruiting", status: "rejected", date: "5d ago", unread: false },
+  {
+    id: "stripe",
+    company: "Stripe",
+    role: "Senior Frontend Engineer",
+    subject: "We received your application",
+    from: "Stripe Careers",
+    status: "applied",
+    date: "Today",
+    unread: true,
+    body: "Thanks for applying to the Senior Frontend Engineer role. Our team is reviewing your application and will be in touch about next steps.",
+    detected: ["Application confirmed", "Role + company parsed"],
+  },
+  {
+    id: "linear",
+    company: "Linear",
+    role: "Product Engineer",
+    subject: "Tech screen confirmed",
+    from: "Linear Recruiting",
+    status: "interview",
+    date: "Today",
+    unread: true,
+    body: "Your technical screen is confirmed for Thursday at 2:00pm. You'll meet with two engineers for a 60-minute pairing session.",
+    detected: ["Moved to Interview", "Interview scheduled"],
+  },
+  {
+    id: "supabase",
+    company: "Supabase",
+    role: "Senior Engineer",
+    subject: "Verbal offer and next steps",
+    from: "Supabase Recruiting",
+    status: "offer",
+    date: "Yesterday",
+    unread: true,
+    body: "We're thrilled to extend a verbal offer for the Senior Engineer position. The written offer with full compensation details is on its way.",
+    detected: ["Moved to Offer", "Outcome detected"],
+  },
+  {
+    id: "airbnb",
+    company: "Airbnb",
+    role: "Frontend Engineer",
+    subject: "Update on your application",
+    from: "Airbnb Recruiting",
+    status: "rejected",
+    date: "5d ago",
+    unread: false,
+    body: "After careful consideration we've decided to move forward with other candidates for this role. We'd encourage you to apply again in the future.",
+    detected: ["Marked Rejected", "Pipeline updated"],
+  },
 ];
 
-const CHIPS = ["All", "Applied", "Interviews", "Offers", "Rejected"];
+const CHIPS = [
+  { label: "All", match: null },
+  { label: "Applied", match: "applied" },
+  { label: "Interviews", match: "interview" },
+  { label: "Offers", match: "offer" },
+  { label: "Rejected", match: "rejected" },
+];
 const STAGE_COLORS = ["#9AA7BD", "#F4C770", "#34E3A8"];
 
 function CountUp({ to }) {
@@ -82,39 +133,43 @@ function Magnetic({ children, className, strength = 0.35 }) {
   );
 }
 
-function Stepper({ status }) {
+function Stepper({ status, large = false }) {
   const s = STATUS[status];
+  const dot = large ? "h-2 w-2" : "h-1.5 w-1.5";
+  const seg = large ? "w-5" : "w-3";
   return (
-    <div className="mt-2 flex items-center gap-1">
+    <div className={`flex items-center gap-1 ${large ? "" : "mt-2"}`}>
       {[0, 1, 2].map((i) => (
         <div key={i} className="flex items-center gap-1">
-          {i > 0 ? <span className={`h-px w-3 ${s.reached > i ? "bg-white/30" : "bg-white/10"}`} /> : null}
+          {i > 0 ? <span className={`h-px ${seg} ${s.reached > i ? "bg-white/30" : "bg-white/10"}`} /> : null}
           <span
-            className="h-1.5 w-1.5 rounded-full"
+            className={`${dot} rounded-full`}
             style={{ background: s.reached > i ? STAGE_COLORS[i] : "rgba(255,255,255,0.18)" }}
           />
         </div>
       ))}
       {s.terminal ? (
         <div className="flex items-center gap-1">
-          <span className="h-px w-3 bg-[#F2718C]/40" />
-          <span className="h-1.5 w-1.5 rounded-full bg-[#F2718C]" />
+          <span className={`h-px ${seg} bg-[#F2718C]/40`} />
+          <span className={`${dot} rounded-full bg-[#F2718C]`} />
         </div>
       ) : null}
     </div>
   );
 }
 
-function EmailRow({ row, index }) {
-  const reduce = useReducedMotion();
+function EmailRow({ row, onOpen }) {
   const s = STATUS[row.status];
   return (
-    <motion.div
-      initial={reduce ? { opacity: 1 } : { opacity: 0, y: 14 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-10% 0px" }}
-      transition={{ duration: 0.6, ease: EASE_OUT, delay: reduce ? 0 : 0.25 + index * 0.1 }}
-      className="rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2.5 transition-colors hover:border-white/15 hover:bg-white/[0.04]"
+    <motion.button
+      type="button"
+      onClick={() => onOpen(row.id)}
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -6, transition: { duration: 0.18 } }}
+      transition={{ duration: 0.4, ease: EASE_OUT }}
+      className="w-full rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2.5 text-left transition-colors hover:border-white/20 hover:bg-white/[0.05] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#34E3A8]/50"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -135,12 +190,98 @@ function EmailRow({ row, index }) {
         </span>
       </div>
       <Stepper status={row.status} />
+    </motion.button>
+  );
+}
+
+function PreviewPane({ row, onBack }) {
+  const s = STATUS[row.status];
+  return (
+    <motion.div
+      key="preview"
+      initial={{ opacity: 0, x: 16 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 16, transition: { duration: 0.18 } }}
+      transition={{ duration: 0.4, ease: EASE_OUT }}
+      className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-3"
+    >
+      <button
+        type="button"
+        onClick={onBack}
+        className="landingMono inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7C8AA3] transition-colors hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#34E3A8]/50"
+      >
+        <ArrowLeft className="h-3 w-3" />
+        All applications
+      </button>
+
+      <div className="mt-3 flex items-center gap-2">
+        <span className={`landingMono rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em] ring-1 ${s.pill}`}>
+          {s.label}
+        </span>
+        <span className="text-[11px] font-medium text-[#98A1B3]">
+          {row.company} · {row.role}
+        </span>
+      </div>
+
+      <p className="mt-3 text-[14px] font-semibold leading-snug text-white">{row.subject}</p>
+      <div className="mt-1 flex items-center justify-between">
+        <p className="text-[11px] text-[#7C8AA3]">{row.from}</p>
+        <p className="text-[10px] text-[#5C6B85]">{row.date}</p>
+      </div>
+
+      <div className="mt-3 rounded-lg border border-white/[0.06] bg-[#0B1220]/60 px-3 py-2.5">
+        <p className="text-[12px] leading-[1.55] text-[#B7C0CF]">{row.body}</p>
+      </div>
+
+      <div className="mt-3">
+        <p className="landingMono text-[9px] font-bold uppercase tracking-[0.14em] text-[#5C6B85]">Applendium detected</p>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {row.detected.map((d) => (
+            <span
+              key={d}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#2FBE8F]/25 bg-[#2FBE8F]/10 px-2 py-0.5 text-[10px] font-medium text-[#7CF0C6]"
+            >
+              <span className="h-1 w-1 rounded-full bg-[#34E3A8]" />
+              {d}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between border-t border-white/[0.07] pt-3">
+        <span className="landingMono text-[9px] font-bold uppercase tracking-[0.14em] text-[#5C6B85]">Lifecycle</span>
+        <Stepper status={row.status} large />
+      </div>
     </motion.div>
   );
 }
 
 export default function LandingHero({ chromeHref }) {
   const reduce = useReducedMotion();
+  const [activeChip, setActiveChip] = useState("All");
+  const [query, setQuery] = useState("");
+  const [openId, setOpenId] = useState(null);
+
+  const filtered = useMemo(() => {
+    const chip = CHIPS.find((c) => c.label === activeChip);
+    const q = query.trim().toLowerCase();
+    return ROWS.filter((row) => {
+      if (chip?.match && row.status !== chip.match) return false;
+      if (!q) return true;
+      return (
+        row.company.toLowerCase().includes(q) ||
+        row.role.toLowerCase().includes(q) ||
+        row.subject.toLowerCase().includes(q)
+      );
+    });
+  }, [activeChip, query]);
+
+  const openRow = openId ? ROWS.find((r) => r.id === openId) : null;
+
+  function selectChip(label) {
+    setActiveChip(label);
+    setOpenId(null);
+  }
 
   return (
     <section
@@ -247,7 +388,7 @@ export default function LandingHero({ chromeHref }) {
           </div>
         </motion.div>
 
-        {/* RIGHT — the actual extension popup */}
+        {/* RIGHT — the actual extension popup (interactive) */}
         <div className="[perspective:1500px]">
           <motion.div
             initial={reduce ? false : { opacity: 0, rotateX: 8, y: 26 }}
@@ -275,46 +416,100 @@ export default function LandingHero({ chromeHref }) {
             {/* body */}
             <div className="space-y-3 p-3">
               <div className="grid grid-cols-4 gap-2">
-                {TILES.map((t) => (
-                  <div key={t.key} className={`rounded-xl px-2 py-2 text-center ring-1 ${t.bg} ${t.ring}`}>
-                    <div className={`landingDisplay text-[18px] font-bold leading-none ${t.text}`}>
-                      <CountUp to={t.value} />
-                    </div>
-                    <div className="landingMono mt-1 text-[8px] font-bold uppercase tracking-[0.12em] text-[#7C8AA3]">
-                      {t.label}
-                    </div>
-                  </div>
-                ))}
+                {TILES.map((t) => {
+                  const chip = CHIPS.find((c) => c.match === t.key);
+                  const active = chip && activeChip === chip.label;
+                  return (
+                    <button
+                      key={t.key}
+                      type="button"
+                      onClick={() => chip && selectChip(active ? "All" : chip.label)}
+                      className={`rounded-xl px-2 py-2 text-center ring-1 transition-all ${t.bg} ${t.ring} ${
+                        active ? "ring-2 ring-offset-2 ring-offset-[#0C1424]" : "hover:brightness-125"
+                      } focus:outline-none focus-visible:ring-2 focus-visible:ring-[#34E3A8]/50`}
+                    >
+                      <div className={`landingDisplay text-[18px] font-bold leading-none ${t.text}`}>
+                        <CountUp to={t.value} />
+                      </div>
+                      <div className="landingMono mt-1 text-[8px] font-bold uppercase tracking-[0.12em] text-[#7C8AA3]">
+                        {t.label}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
 
-              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 focus-within:border-[#2FBE8F]/40">
                 <Search className="h-3.5 w-3.5 text-[#7C8AA3]" />
-                <span className="text-[11px] text-[#5C6B85]">Search companies, roles…</span>
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setOpenId(null);
+                  }}
+                  placeholder="Search companies, roles…"
+                  aria-label="Search applications"
+                  className="w-full bg-transparent text-[11px] text-white placeholder:text-[#5C6B85] focus:outline-none"
+                />
               </div>
 
               <div className="flex gap-1.5 overflow-hidden">
-                {CHIPS.map((c, i) => (
-                  <span
-                    key={c}
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-medium ${
-                      i === 0 ? "bg-[#0E8C63] text-white" : "border border-white/10 text-[#9AA7BD]"
-                    }`}
-                  >
-                    {c}
-                  </span>
-                ))}
+                {CHIPS.map((c) => {
+                  const active = activeChip === c.label;
+                  return (
+                    <button
+                      key={c.label}
+                      type="button"
+                      onClick={() => selectChip(c.label)}
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#34E3A8]/50 ${
+                        active
+                          ? "bg-[#0E8C63] text-white"
+                          : "border border-white/10 text-[#9AA7BD] hover:border-white/25 hover:text-white"
+                      }`}
+                    >
+                      {c.label}
+                    </button>
+                  );
+                })}
               </div>
 
-              <div className="space-y-2">
-                {ROWS.map((row, i) => (
-                  <EmailRow key={row.company} row={row} index={i} />
-                ))}
+              <div className="min-h-[228px]">
+                <AnimatePresence mode="wait" initial={false}>
+                  {openRow ? (
+                    <PreviewPane key={`preview-${openRow.id}`} row={openRow} onBack={() => setOpenId(null)} />
+                  ) : (
+                    <motion.div
+                      key="list"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                      className="space-y-2"
+                    >
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        {filtered.length > 0 ? (
+                          filtered.map((row) => <EmailRow key={row.id} row={row} onOpen={setOpenId} />)
+                        ) : (
+                          <motion.p
+                            key="empty"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="rounded-xl border border-dashed border-white/10 px-3 py-8 text-center text-[11px] text-[#7C8AA3]"
+                          >
+                            No applications match “{query || activeChip}”.
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           </motion.div>
 
           <p className="landingMono mt-4 text-center text-[10.5px] text-[#5C6B85]">
-            ↑ the real popup — every status pulled from the thread that created it
+            ↑ the real popup — tap a tile, search, or open a thread
           </p>
         </div>
       </div>
