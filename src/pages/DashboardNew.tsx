@@ -13,6 +13,7 @@ import {
 import { Link } from "react-router-dom";
 
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { FirstMoveCard } from "@/components/FirstMoveCard";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { splitRoleAndCompany } from "@/lib/applyGateDisplay";
@@ -557,6 +558,8 @@ const Dashboard = () => {
             {isSyncing ? "Syncing…" : "Sync Gmail"}
           </button>
         </div>
+
+        <FirstMoveCard />
 
         {dataLoadErrors.length > 0 ? (
           <div className="rounded-2xl border border-destructive/25 bg-destructive/10 p-4 text-sm text-destructive">

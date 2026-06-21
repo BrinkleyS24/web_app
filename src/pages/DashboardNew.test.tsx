@@ -13,6 +13,7 @@ const {
   fetchApplyGateHistory,
   fetchEmailMetrics,
   fetchRankedActionQueue,
+  fetchResume,
   fetchStrategyAlerts,
   fetchSuggestionOutcomeAnalytics,
   startEmailSync,
@@ -21,6 +22,7 @@ const {
   fetchApplyGateHistory: vi.fn(),
   fetchEmailMetrics: vi.fn(),
   fetchRankedActionQueue: vi.fn(),
+  fetchResume: vi.fn(),
   fetchStrategyAlerts: vi.fn(),
   fetchSuggestionOutcomeAnalytics: vi.fn(),
   startEmailSync: vi.fn(),
@@ -55,6 +57,7 @@ vi.mock("@/lib/emails", async () => {
     fetchApplyGateHistory,
     fetchEmailMetrics,
     fetchRankedActionQueue,
+    fetchResume,
     fetchStrategyAlerts,
     fetchSuggestionOutcomeAnalytics,
     startEmailSync,
@@ -350,6 +353,11 @@ beforeEach(() => {
     ],
   });
   startEmailSync.mockResolvedValue({ success: true });
+
+  fetchResume.mockResolvedValue({
+    success: true,
+    resumeText: "A saved resume that is comfortably longer than twenty characters.",
+  });
 });
 
 afterEach(() => {
@@ -377,5 +385,17 @@ describe("DashboardNew", () => {
 
     expect(screen.getByText("Strategy alert")).toBeInTheDocument();
     expect(screen.getByText("You are applying mostly to low-match roles")).toBeInTheDocument();
+
+    expect(screen.queryByTestId("first-move-card")).not.toBeInTheDocument();
+  });
+
+  test("shows the First Move card for a cold-start account", async () => {
+    fetchResume.mockResolvedValue({ success: true, resumeText: null });
+    fetchApplyGateHistory.mockResolvedValue({ success: true, history: [] });
+
+    renderDashboard();
+
+    expect(await screen.findByTestId("first-move-card")).toBeInTheDocument();
+    expect(screen.getByText(/Get a verdict on the next role/)).toBeInTheDocument();
   });
 });
