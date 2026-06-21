@@ -10,7 +10,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { saveResume, fetchResume, deleteResume } from "@/lib/emails";
+import { fetchResume, deleteResume } from "@/lib/emails";
+import { useSaveResume } from "@/hooks/useSaveResume";
 
 /**
  * Shared resume prompt that sits above the analysis form on
@@ -43,14 +44,8 @@ export function ResumePrompt() {
     if (editing && savedResume) setDraft(savedResume);
   }, [editing, savedResume]);
 
-  // ── Save mutation ──────────────────────────────────────────────
-  const saveMutation = useMutation({
-    mutationFn: () => saveResume(draft.trim()),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["user-resume"] });
-      setEditing(false);
-    },
-  });
+  // ── Save mutation (shared hook) ───────────────────────────────
+  const saveMutation = useSaveResume();
 
   // ── Delete mutation ────────────────────────────────────────────
   const deleteMutation = useMutation({
@@ -64,7 +59,9 @@ export function ResumePrompt() {
   });
 
   const handleSave = useCallback(() => {
-    if (draft.trim().length >= 20) saveMutation.mutate();
+    if (draft.trim().length >= 20) {
+      saveMutation.mutate(draft, { onSuccess: () => setEditing(false) });
+    }
   }, [draft, saveMutation]);
 
   // ── Loading state ──────────────────────────────────────────────
