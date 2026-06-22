@@ -91,6 +91,23 @@ describe("FirstMoveCard", () => {
     expect(screen.queryByText(/already knows your/)).not.toBeInTheDocument();
   });
 
+  test("boundary — established at exactly 5", async () => {
+    fetchResume.mockResolvedValue({ success: true, resumeText: RESUME });
+    fetchEmailMetrics.mockResolvedValue(metricsWith(5));
+    renderCard();
+    expect(
+      await screen.findByText(/Apply Gate already knows your 5 tracked applications/),
+    ).toBeInTheDocument();
+  });
+
+  test("boundary — thin at 4", async () => {
+    fetchResume.mockResolvedValue({ success: true, resumeText: RESUME });
+    fetchEmailMetrics.mockResolvedValue(metricsWith(4));
+    renderCard();
+    expect(await screen.findByText("Run Apply Gate on a role you're weighing.")).toBeInTheDocument();
+    expect(screen.queryByText(/already knows your/)).toBeNull();
+  });
+
   test(">= 1 gate run -> card hidden", async () => {
     fetchResume.mockResolvedValue({ success: true, resumeText: RESUME });
     fetchApplyGateHistory.mockResolvedValue({ success: true, history: [{ id: "v1" }] });
