@@ -900,6 +900,32 @@ describe("ApplyGate current UI", () => {
     });
   });
 
+  test("renders an honest 'add your résumé' state instead of a verdict when the profile is empty", async () => {
+    analyzeJobAlignment.mockResolvedValue({
+      success: true,
+      insufficientProfile: true,
+      insufficientProfileMessage:
+        "We couldn't read your résumé or application history, so there's nothing to evaluate this role against. Add your résumé above and run it again.",
+      jobTitle: "QA Engineer",
+      companyName: "Pennant Services",
+      verdict: null,
+      reasons: [],
+    });
+    renderPage();
+
+    await runAnalyze({ jobTitle: "QA Engineer" });
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Add your résumé to get a verdict" })).toBeInTheDocument();
+      expect(screen.getByText(/nothing to evaluate this role against/i)).toBeInTheDocument();
+    });
+
+    // Critically: NO confident verdict is rendered off an empty profile.
+    expect(screen.queryByText("Skip this role")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Rejection risk/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Requirement check")).not.toBeInTheDocument();
+  });
+
   test("shows persisted company names in history and hides unresolved placeholders", async () => {
     fetchApplyGateHistory.mockResolvedValue({
       success: true,

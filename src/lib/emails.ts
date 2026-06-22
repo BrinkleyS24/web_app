@@ -1176,6 +1176,13 @@ export type ApplyGateScoringBreakdown = {
 
 export type ApplyGateResult = {
   success: boolean;
+  /**
+   * Set when the backend had no usable profile (no résumé text + no history) and
+   * refused to render a verdict. The UI shows an honest "add your résumé" state
+   * instead of a (meaningless) decision. See applyGateService.hasEvaluableProfile.
+   */
+  insufficientProfile?: boolean;
+  insufficientProfileMessage?: string;
   id?: string | null;
   jobTitle?: string | null;
   companyName?: string | null;

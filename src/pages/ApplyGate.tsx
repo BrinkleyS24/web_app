@@ -1005,6 +1005,10 @@ const ApplyGate = () => {
       setIsCurrentWarningExpanded(false);
       setSavingAction(null);
       setActionSaveError(null);
+      // An insufficient-profile result is not a verdict — don't fold it into history.
+      if (data.insufficientProfile) {
+        return;
+      }
       const currentAsHistory = buildHistoryDisplayItemFromResult(data, jobTitle, companyName, null);
       if (currentAsHistory && !currentAsHistory._unsaved) {
         const persistedHistoryItem = currentAsHistory as ApplyGateHistoryItem;
@@ -1435,6 +1439,24 @@ const ApplyGate = () => {
           <div className="min-w-0">
             {analyzeMutation.isPending ? (
               <ApplyGateProgress />
+            ) : result?.insufficientProfile ? (
+              <div className="glass-card space-y-3 rounded-2xl p-6">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" aria-hidden="true" />
+                  <div>
+                    <h2 className="text-[15px] font-bold tracking-[-0.01em] text-foreground">
+                      Add your résumé to get a verdict
+                    </h2>
+                    <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                      {result.insufficientProfileMessage
+                        || "We couldn't read your résumé or application history, so there's nothing to evaluate this role against. Add your résumé and run it again."}
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Paste your résumé in the panel above, then re-run the analysis.
+                    </p>
+                  </div>
+                </div>
+              </div>
             ) : result ? (
               <div className="glass-card space-y-3 rounded-2xl p-6">
             {currentDecisionCopy && (
