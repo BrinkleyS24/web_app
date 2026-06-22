@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { PremiumEmptyState } from "@/components/PremiumEmptyState";
 import { TrendingUp, Building2, Clock, Briefcase } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext.jsx";
 import {
@@ -233,10 +234,22 @@ const OutcomeMemory = () => {
               </p>
 
               {!resumeGaps || resumeGaps.gaps.length === 0 ? (
-                <div className="glass-card mt-4 rounded-2xl p-6 text-sm text-muted-foreground">
-                  {resumeGaps && resumeGaps.distinctRolesEvaluated >= 2
-                    ? `No single requirement has recurred across two or more of your ${resumeGaps.distinctRolesEvaluated} evaluated roles yet — nothing systemic to flag. Apply Gate still shows the per-role gaps when you run a specific posting.`
-                    : "Run a few different roles through Apply Gate to start. Once a requirement you're missing shows up across two or more roles, it'll surface here as a recurring gap."}
+                <div className="mt-4">
+                  {resumeGaps && resumeGaps.distinctRolesEvaluated >= 2 ? (
+                    // Caught-up: they've evaluated roles, nothing recurring — reassure, don't push.
+                    <PremiumEmptyState
+                      title="Nothing systemic to flag yet"
+                      body={`No single requirement has recurred across two or more of your ${resumeGaps.distinctRolesEvaluated} evaluated roles. Apply Gate still shows the per-role gaps when you run a specific posting.`}
+                    />
+                  ) : (
+                    // Cold-start: too few evaluated roles to detect a pattern → give the next move.
+                    <PremiumEmptyState
+                      icon={TrendingUp}
+                      title="Run a few roles through Apply Gate"
+                      body="Once a requirement you're missing shows up across two or more roles, it'll surface here as a recurring resume gap worth closing first."
+                      cta={{ label: "Run Apply Gate", to: "/apply-gate" }}
+                    />
+                  )}
                 </div>
               ) : (
                 <div className="mt-4 grid gap-3.5">

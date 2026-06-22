@@ -14,6 +14,7 @@ import {
 
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
+import { PremiumEmptyState } from "@/components/PremiumEmptyState";
 import { useAuth } from "@/lib/AuthContext.jsx";
 import { fetchStrategyAlerts, type StrategyAlert } from "@/lib/emails";
 
@@ -108,14 +109,6 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
   );
 }
 
-function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-border bg-card p-5 text-sm leading-6 text-muted-foreground">
-      {message}
-    </div>
-  );
-}
-
 const StrategyAlerts = () => {
   const { user } = useAuth();
   const isAuthed = Boolean(user);
@@ -180,6 +173,14 @@ const StrategyAlerts = () => {
 
   const primaryCta = getAlertCta(grouped.primary);
 
+  // Cold-start: authed, loaded, not premium-gated, but no alerts yet → give a
+  // concrete next move. (The sign-in / upgrade / loading cases are not cold-start.)
+  const isAlertsColdStart =
+    isAuthed &&
+    !alertsQuery.isLoading &&
+    !alertsQuery.data?.error?.includes("Premium feature required") &&
+    alerts.length === 0;
+
   return (
     <DashboardLayout>
       <div className="space-y-5">
@@ -210,7 +211,15 @@ const StrategyAlerts = () => {
         </div>
 
         {!isAuthed || alerts.length === 0 ? (
-          <EmptyState message={emptyMessage} />
+          isAlertsColdStart ? (
+            <PremiumEmptyState
+              title="No strategy alerts yet"
+              body="Strategy Alerts surface once Applendium has enough tracked history to spot a pattern. Running Apply Gate on the roles you're weighing seeds those signals."
+              cta={{ label: "Run Apply Gate", to: "/apply-gate" }}
+            />
+          ) : (
+            <PremiumEmptyState title={emptyMessage} />
+          )
         ) : (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
             <main className="space-y-5">
@@ -250,7 +259,7 @@ const StrategyAlerts = () => {
                   </p>
                 </div>
                 {grouped.actionable.length === 0 ? (
-                  <EmptyState message="No high or medium strategy alerts right now." />
+                  <PremiumEmptyState title="No high or medium strategy alerts right now." />
                 ) : (
                   grouped.actionable.map((alert) => <AlertCard key={alert.id} alert={alert} />)
                 )}
