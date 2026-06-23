@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/AuthContext.jsx";
 const mainNav = [
   { title: "Dashboard", url: "/dashboard", code: "db" },
   { title: "Apply Gate", url: "/apply-gate", code: "ag" },
+  { title: "Résumés", url: "/resumes", code: "rv" },
   { title: "Next Actions", url: "/fix-suggestions", code: "na" },
   { title: "Outcome Memory", url: "/outcome-memory", code: "om" },
   { title: "Strategy Alerts", url: "/strategy-alerts", code: "sa" },

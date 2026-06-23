@@ -8,6 +8,7 @@ import Dashboard from "./pages/DashboardNew.tsx";
 import PaymentSuccess from "./pages/PaymentSuccess.tsx";
 import PaymentCancel from "./pages/PaymentCancel.tsx";
 import ApplyGate from "./pages/ApplyGate.tsx";
+import Resumes from "./pages/Resumes.tsx";
 import FixSuggestions from "./pages/FixSuggestions.tsx";
 import OutcomeMemory from "./pages/OutcomeMemory.tsx";
 import StrategyAlerts from "./pages/StrategyAlerts.tsx";
@@ -30,6 +31,7 @@ const DASHBOARD_ROUTES = [
   "/admin",
   "/dashboard",
   "/apply-gate",
+  "/resumes",
   "/fix-suggestions",
   "/outcome-memory",
   "/strategy-alerts",
@@ -156,6 +158,14 @@ export default function App() {
                 element={
                   <RequirePremiumUser>
                     <ApplyGate />
+                  </RequirePremiumUser>
+                }
+              />
+              <Route
+                path="/resumes"
+                element={
+                  <RequirePremiumUser>
+                    <Resumes />
                   </RequirePremiumUser>
                 }
               />
