@@ -681,7 +681,7 @@ describe("ApplyGate current UI", () => {
     });
   });
 
-  test("renders occupation grounding when backend provides it", async () => {
+  test("renders a humanized career-field match (no O*NET codes or raw confidence) when backend grounds occupation", async () => {
     analyzeJobAlignment.mockResolvedValue({
       ...baseResult,
       scoringBreakdown: {
@@ -716,12 +716,19 @@ describe("ApplyGate current UI", () => {
 
     await runAnalyze({ jobTitle: "Ultrasound Tech", jobDescription: "ARDMS and ultrasound technology program required." });
 
+    // The analytical breakdown is collapsed by default — expand it to see career-field match.
+    await userEvent.click(await screen.findByRole("button", { name: /Show the full breakdown/i }));
+
     await waitFor(() => {
-      expect(screen.getByText("Occupation grounding")).toBeInTheDocument();
+      expect(screen.getByText("Career-field match")).toBeInTheDocument();
       expect(screen.getByText("Diagnostic Medical Sonographers")).toBeInTheDocument();
       expect(screen.getByText("Software Quality Assurance Analysts and Testers")).toBeInTheDocument();
       expect(screen.getByText(/Different occupation family/i)).toBeInTheDocument();
     });
+    // The jargon is gone: no O*NET-SOC codes, no raw confidence %, no "Occupation grounding".
+    expect(screen.queryByText(/O\*NET-SOC/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Confidence \d+%/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Occupation grounding")).not.toBeInTheDocument();
   });
 
   test("does not show preferred-only gaps in the requirement check", async () => {
@@ -924,6 +931,28 @@ describe("ApplyGate current UI", () => {
     expect(screen.queryByText("Skip this role")).not.toBeInTheDocument();
     expect(screen.queryByText(/Rejection risk/i)).not.toBeInTheDocument();
     expect(screen.queryByText("Requirement check")).not.toBeInTheDocument();
+  });
+
+  test("acting on a verdict shows a confirmation + next step instead of silently clearing", async () => {
+    analyzeJobAlignment.mockResolvedValue(baseResult);
+    renderPage();
+
+    await runAnalyze();
+    await userEvent.click(await screen.findByRole("button", { name: "I'll fix first" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Saved — tailor before you send.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Review another role" })).toBeInTheDocument();
+    });
+    // The decision is still on screen (not silently dismissed), and the action buttons are gone.
+    expect(screen.getByText("Fix first before applying")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "I'll fix first" })).not.toBeInTheDocument();
+
+    // "Review another role" clears the card.
+    await userEvent.click(screen.getByRole("button", { name: "Review another role" }));
+    await waitFor(() => {
+      expect(screen.queryByText("Fix first before applying")).not.toBeInTheDocument();
+    });
   });
 
   test("shows persisted company names in history and hides unresolved placeholders", async () => {

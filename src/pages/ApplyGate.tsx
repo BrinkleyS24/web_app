@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Check, Loader2 } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import {
   normalizeCompanyName,
   splitRoleAndCompany as splitApplyGateRoleAndCompany,
@@ -195,12 +195,6 @@ function occupationAlignmentLabel(value: string | null | undefined) {
 
 function riskBreakdownFromHistory(item: ApplyGateHistoryDisplayItem) {
   return item.explanation_payload?.risk_breakdown || null;
-}
-
-function riskTone(risk: number) {
-  if (risk <= 30) return "text-emerald-500";
-  if (risk <= 65) return "text-amber-500";
-  return "text-red-500";
 }
 
 function normalizeOutcomeBand(value: unknown, fallback: "Low" | "Medium" | "High" = "Medium") {
@@ -958,14 +952,40 @@ function buildHistoryDisplayItemFromResult(
   };
 }
 
+function actionConfirmationCopy(action: ApplyGateAction): { title: string; body: string } {
+  if (action === "applied") {
+    return {
+      title: "Marked as applied — good luck.",
+      body: "Logged against your outcome history, so your next verdicts get sharper as results come in.",
+    };
+  }
+  if (action === "fixed") {
+    return {
+      title: "Saved — tailor before you send.",
+      body: "Logged that you're fixing first. Start with the concrete fixes in this verdict.",
+    };
+  }
+  return {
+    title: "Skipped — on to the next one.",
+    body: "Logged so similar low-fit roles get flagged faster next time.",
+  };
+}
+
 const ApplyGate = () => {
   const { user } = useAuth();
   const [jobTitle, setJobTitle] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [jobDescription, setJobDescription] = useState("");
+  const [jobUrl, setJobUrl] = useState("");
   const [riskTolerance, setRiskTolerance] = useState<ApplyGateRiskTolerance>("balanced");
   const [result, setResult] = useState<ApplyGateResult | null>(null);
   const [isCurrentWarningExpanded, setIsCurrentWarningExpanded] = useState(false);
+  // Collapsed-by-default analytical breakdown (keeps the default verdict skimmable).
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  // After the user records what they did, show a confirmation + next step instead of
+  // silently clearing the card (which read as "the button did nothing").
+  const [actionConfirmation, setActionConfirmation] = useState<{ action: ApplyGateAction } | null>(null);
+  const actionPlanRef = useRef<HTMLDivElement | null>(null);
   const [expandedHistoryWarnings, setExpandedHistoryWarnings] = useState<Record<string, boolean>>({});
   const [savingAction, setSavingAction] = useState<ApplyGateActionSaveState>(null);
   const [actionSaveError, setActionSaveError] = useState<{ verdictId: string; message: string } | null>(null);
@@ -999,10 +1019,19 @@ const ApplyGate = () => {
   }, [currentHistoryProjection, rawHistory]);
 
   const analyzeMutation = useMutation({
-    mutationFn: () => analyzeJobAlignment({ jobTitle, jobDescription, companyName, riskTolerance }),
+    mutationFn: () =>
+      analyzeJobAlignment({
+        jobTitle,
+        jobDescription,
+        companyName,
+        riskTolerance,
+        ...(jobUrl.trim() ? { jobUrl: jobUrl.trim() } : {}),
+      }),
     onSuccess: (data) => {
       setResult(data);
       setIsCurrentWarningExpanded(false);
+      setShowBreakdown(false);
+      setActionConfirmation(null);
       setSavingAction(null);
       setActionSaveError(null);
       // An insufficient-profile result is not a verdict — don't fold it into history.
@@ -1113,7 +1142,7 @@ const ApplyGate = () => {
               window.open(targetUrl, "_blank", "noopener,noreferrer");
             }
           }
-          setResult(null);
+          setActionConfirmation({ action });
         } catch {
           pendingApplyWindow?.close();
           setActionSaveError({
@@ -1128,7 +1157,7 @@ const ApplyGate = () => {
       if (action === "applied" && targetUrl) {
         window.open(targetUrl, "_blank", "noopener,noreferrer");
       }
-      setResult(null);
+      setActionConfirmation({ action });
     },
     [companyName, jobTitle, markVerdictActionInCache, queryClient, result],
   );
@@ -1398,6 +1427,18 @@ const ApplyGate = () => {
             <p className="text-xs text-muted-foreground">Useful when the pasted job description does not clearly name the employer.</p>
           </div>
           <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground" htmlFor="job-url">Job posting link (optional)</label>
+            <input
+              id="job-url"
+              type="url"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              value={jobUrl}
+              onChange={(e) => setJobUrl(e.target.value)}
+              placeholder="https://…"
+            />
+            <p className="text-xs text-muted-foreground">We won't read the page — this just lets "Apply" open the posting in a new tab.</p>
+          </div>
+          <div className="space-y-2">
             <label className="text-sm font-medium text-foreground" htmlFor="risk-tolerance">Apply style</label>
             <select
               id="risk-tolerance"
@@ -1561,7 +1602,19 @@ const ApplyGate = () => {
               ) : null}
             </div>
 
-            {!currentIsCompressedDecision && currentRiskBreakdown?.components?.length ? (
+            {!currentIsCompressedDecision && (currentRiskBreakdown?.components?.length || currentOccupationGrounding?.job || currentOccupationGrounding?.candidate) ? (
+              <button
+                type="button"
+                onClick={() => setShowBreakdown((v) => !v)}
+                className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                aria-expanded={showBreakdown}
+              >
+                {showBreakdown ? "Hide the full breakdown" : "Show the full breakdown"}
+                {showBreakdown ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </button>
+            ) : null}
+
+            {!currentIsCompressedDecision && showBreakdown && currentRiskBreakdown?.components?.length ? (
               <div className="rounded-lg border border-border/70 bg-background/70 p-3 space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-foreground">Why this recommendation</p>
@@ -1582,35 +1635,21 @@ const ApplyGate = () => {
               </div>
             ) : null}
 
-            {!currentIsCompressedDecision && (currentOccupationGrounding?.job || currentOccupationGrounding?.candidate) ? (
+            {!currentIsCompressedDecision && showBreakdown && (currentOccupationGrounding?.job || currentOccupationGrounding?.candidate) ? (
               <div className="rounded-lg border border-border/70 bg-background/70 p-3 space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs font-semibold text-foreground">Occupation grounding</p>
-                  <span className={`text-xs font-semibold ${riskTone(100 - Math.round(currentOccupationGrounding.alignmentScore ?? 50))}`}>
-                    {Math.round(currentOccupationGrounding.alignmentScore ?? 50)}/100
-                  </span>
-                </div>
+                <p className="text-xs font-semibold text-foreground">Career-field match</p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Posting</p>
-                    <p className="text-xs font-medium text-foreground">{currentOccupationGrounding.job?.title || "Unknown occupation"}</p>
-                    {currentOccupationGrounding.job?.onetSoc ? (
-                      <p className="text-xs text-muted-foreground">O*NET-SOC {currentOccupationGrounding.job.onetSoc}</p>
-                    ) : null}
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">This role</p>
+                    <p className="text-xs font-medium text-foreground">{currentOccupationGrounding.job?.title || "Unclear"}</p>
                   </div>
                   <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Profile</p>
-                    <p className="text-xs font-medium text-foreground">{currentOccupationGrounding.candidate?.title || "Unknown occupation"}</p>
-                    {currentOccupationGrounding.candidate?.onetSoc ? (
-                      <p className="text-xs text-muted-foreground">O*NET-SOC {currentOccupationGrounding.candidate.onetSoc}</p>
-                    ) : null}
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Your background</p>
+                    <p className="text-xs font-medium text-foreground">{currentOccupationGrounding.candidate?.title || "Unclear"}</p>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {occupationAlignmentLabel(currentOccupationGrounding.alignmentLabel)}
-                  {Number.isFinite(Number(currentOccupationGrounding.confidence))
-                    ? ` - Confidence ${Math.round(Number(currentOccupationGrounding.confidence) * 100)}%`
-                    : ""}
                 </p>
               </div>
             ) : null}
@@ -1764,7 +1803,7 @@ const ApplyGate = () => {
             )}
 
             {!currentIsCompressedDecision && currentActionSections.length > 0 && (
-              <div className="rounded-lg border border-border/70 bg-background/70 p-3 space-y-2">
+              <div ref={actionPlanRef} className="rounded-lg border border-border/70 bg-background/70 p-3 space-y-2 scroll-mt-4">
                 <p className="text-xs font-semibold text-foreground">{currentHasUniversalHardGate ? "What this means" : "How to improve your odds"}</p>
                 <div className="space-y-2">
                   {currentActionSections.map((section) => (
@@ -1779,38 +1818,83 @@ const ApplyGate = () => {
               </div>
             )}
 
-            <div className="space-y-2 pt-1">
-              <div className="flex flex-wrap items-center gap-2">
-                {currentDecisionActions.map((item) => (
+            {actionConfirmation ? (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-2">
+                <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                  <Check className="h-4 w-4 shrink-0" />
+                  {actionConfirmationCopy(actionConfirmation.action).title}
+                </p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {actionConfirmationCopy(actionConfirmation.action).body}
+                </p>
+                <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                  {actionConfirmation.action === "applied" && (result?.jobUrl || jobUrl).trim() ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs h-8"
+                      onClick={() => window.open((result?.jobUrl || jobUrl).trim(), "_blank", "noopener,noreferrer")}
+                    >
+                      Open the posting
+                    </Button>
+                  ) : null}
+                  {actionConfirmation.action === "fixed" && currentActionSections.length > 0 ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs h-8"
+                      onClick={() => actionPlanRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    >
+                      See the fixes
+                    </Button>
+                  ) : null}
                   <Button
-                    key={`${item.action}-${item.label}`}
                     size="sm"
-                    variant={item.variant || "default"}
-                    className={`${item.className || ""} text-xs h-8`.trim()}
-                    onClick={() => void handleAction(item.action)}
-                    disabled={currentSavePending}
-                    aria-busy={currentSavePending && savingAction?.action === item.action ? "true" : undefined}
+                    variant="ghost"
+                    className="text-xs h-8 text-muted-foreground"
+                    onClick={() => {
+                      setActionConfirmation(null);
+                      setResult(null);
+                    }}
                   >
-                    {currentSavePending && savingAction?.action === item.action ? "Saving..." : item.label}
+                    Review another role
                   </Button>
-                ))}
+                </div>
               </div>
-              {currentSaveError ? (
-                <p role="alert" className="text-xs font-medium text-destructive">
-                  {currentSaveError}
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground" aria-live="polite">
-                  {currentSavePending
-                    ? "Saving your choice..."
-                    : currentDisplayDecisionMissing
-                    ? "Choose what you did only after the decision reloads cleanly."
-                    : currentHasUniversalHardGate
-                    ? "Apply anyway only if you already meet these requirements and your resume is missing the proof."
-                    : "Choose what you did. This keeps future recommendations grounded."}
-                </p>
-              )}
-            </div>
+            ) : (
+              <div className="space-y-2 pt-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  {currentDecisionActions.map((item) => (
+                    <Button
+                      key={`${item.action}-${item.label}`}
+                      size="sm"
+                      variant={item.variant || "default"}
+                      className={`${item.className || ""} text-xs h-8`.trim()}
+                      onClick={() => void handleAction(item.action)}
+                      disabled={currentSavePending}
+                      aria-busy={currentSavePending && savingAction?.action === item.action ? "true" : undefined}
+                    >
+                      {currentSavePending && savingAction?.action === item.action ? "Saving..." : item.label}
+                    </Button>
+                  ))}
+                </div>
+                {currentSaveError ? (
+                  <p role="alert" className="text-xs font-medium text-destructive">
+                    {currentSaveError}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground" aria-live="polite">
+                    {currentSavePending
+                      ? "Saving your choice..."
+                      : currentDisplayDecisionMissing
+                      ? "Choose what you did only after the decision reloads cleanly."
+                      : currentHasUniversalHardGate
+                      ? "Apply anyway only if you already meet these requirements and your resume is missing the proof."
+                      : "Choose what you did. This keeps future recommendations grounded."}
+                  </p>
+                )}
+              </div>
+            )}
               </div>
             ) : (
               <div className="glass-card rounded-2xl p-8 text-center text-sm leading-6 text-muted-foreground">
