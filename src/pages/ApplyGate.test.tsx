@@ -14,11 +14,15 @@ const {
   fetchApplyGateHistory,
   updateApplyGateAction,
   fetchResume,
+  fetchResumeVariants,
+  fetchVariantScoreboard,
 } = vi.hoisted(() => ({
   analyzeJobAlignment: vi.fn(),
   fetchApplyGateHistory: vi.fn(),
   updateApplyGateAction: vi.fn(),
   fetchResume: vi.fn(),
+  fetchResumeVariants: vi.fn(),
+  fetchVariantScoreboard: vi.fn(),
 }));
 
 vi.mock("@/components/DashboardLayout", () => ({
@@ -48,6 +52,8 @@ vi.mock("@/lib/emails", async () => {
     fetchApplyGateHistory,
     updateApplyGateAction,
     fetchResume,
+    fetchResumeVariants,
+    fetchVariantScoreboard,
   };
 });
 
@@ -149,6 +155,8 @@ beforeEach(() => {
   fetchResume.mockResolvedValue({ success: true, resumeText: "resume text with enough length" });
   fetchApplyGateHistory.mockResolvedValue({ success: true, history: [] });
   updateApplyGateAction.mockResolvedValue({ success: true });
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [] });
+  fetchVariantScoreboard.mockResolvedValue({ success: true, scoreboard: { minSample: 5, perVariant: [] }, recommendation: null });
 });
 
 afterEach(() => {
@@ -996,6 +1004,49 @@ describe("ApplyGate current UI", () => {
       expect(screen.getByText("Beta Systems")).toBeInTheDocument();
       expect(screen.getByText("SDET")).toBeInTheDocument();
       expect(screen.queryByText("Company unavailable")).not.toBeInTheDocument();
+    });
+  });
+
+  test("passes the chosen résumé variantId to analyze", async () => {
+    fetchResumeVariants.mockResolvedValue({
+      success: true,
+      variants: [
+        { id: "A", name: "QA-focused", isDefault: true, createdAt: "", charCount: 1200 },
+        { id: "B", name: "Generic", isDefault: false, createdAt: "", charCount: 1100 },
+      ],
+    });
+    analyzeJobAlignment.mockResolvedValue(baseResult);
+    renderPage();
+
+    await userEvent.selectOptions(await screen.findByLabelText(/Résumé/i), "B");
+    await runAnalyze();
+
+    await waitFor(() =>
+      expect(analyzeJobAlignment).toHaveBeenCalledWith(expect.objectContaining({ variantId: "B" })),
+    );
+  });
+
+  test("surfaces apply-time variant guidance when one out-performs", async () => {
+    fetchResumeVariants.mockResolvedValue({
+      success: true,
+      variants: [
+        { id: "A", name: "QA-focused", isDefault: true, createdAt: "", charCount: 1200 },
+        { id: "B", name: "Generic", isDefault: false, createdAt: "", charCount: 1100 },
+      ],
+    });
+    fetchVariantScoreboard.mockResolvedValue({
+      success: true,
+      scoreboard: { minSample: 5, perVariant: [] },
+      recommendation: { variantId: "A", name: "QA-focused", interviewRate: 43 },
+    });
+    analyzeJobAlignment.mockResolvedValue(baseResult);
+    renderPage();
+
+    await runAnalyze({ jobTitle: "QA Engineer" });
+
+    await waitFor(() => {
+      expect(screen.getByText(/best\s+track record on roles like this/i)).toBeInTheDocument();
+      expect(screen.getByText(/43% reach an interview/i)).toBeInTheDocument();
     });
   });
 });

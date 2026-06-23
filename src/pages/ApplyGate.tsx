@@ -14,6 +14,8 @@ import {
   fetchApplyGateHistory,
   updateApplyGateAction,
   fetchResume,
+  fetchResumeVariants,
+  fetchVariantScoreboard,
   type ApplyGateResult,
   type ApplyGateHistoryItem,
   type ApplyGateDisplayDecision,
@@ -977,6 +979,7 @@ const ApplyGate = () => {
   const [companyName, setCompanyName] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [jobUrl, setJobUrl] = useState("");
+  const [variantId, setVariantId] = useState("");
   const [riskTolerance, setRiskTolerance] = useState<ApplyGateRiskTolerance>("balanced");
   const [result, setResult] = useState<ApplyGateResult | null>(null);
   const [isCurrentWarningExpanded, setIsCurrentWarningExpanded] = useState(false);
@@ -999,6 +1002,32 @@ const ApplyGate = () => {
   });
 
   const hasResume = Boolean(resumeQuery.data?.resumeText && resumeQuery.data.resumeText.trim().length > 20);
+
+  // Résumé variants: pick which one to run the gate against; the choice rides
+  // analyze → verdict → apply so the outcome attributes back to that variant.
+  const variantsQuery = useQuery({
+    queryKey: ["resume-variants"],
+    queryFn: fetchResumeVariants,
+    enabled: Boolean(user),
+    staleTime: 60_000,
+  });
+  const variants = variantsQuery.data?.variants ?? [];
+  useEffect(() => {
+    if (!variantId && variants.length > 0) {
+      setVariantId((variants.find((v) => v.isDefault) ?? variants[0]).id);
+    }
+  }, [variants, variantId]);
+
+  // Apply-time guidance: once a verdict exists, surface which saved variant has the
+  // best track record for roles like this one. Honest — null below the sample floor.
+  const guidanceTitle = result?.jobTitle || jobTitle;
+  const guidanceQuery = useQuery({
+    queryKey: ["variant-scoreboard", guidanceTitle],
+    queryFn: () => fetchVariantScoreboard(guidanceTitle),
+    enabled: Boolean(result) && !result?.insufficientProfile && variants.length > 1,
+    staleTime: 30_000,
+  });
+  const variantRecommendation = guidanceQuery.data?.recommendation ?? null;
 
   const historyQuery = useQuery<ApplyGateHistoryQueryData>({
     queryKey: ["apply-gate-history"],
@@ -1026,6 +1055,7 @@ const ApplyGate = () => {
         companyName,
         riskTolerance,
         ...(jobUrl.trim() ? { jobUrl: jobUrl.trim() } : {}),
+        ...(variantId ? { variantId } : {}),
       }),
     onSuccess: (data) => {
       setResult(data);
@@ -1438,6 +1468,24 @@ const ApplyGate = () => {
             />
             <p className="text-xs text-muted-foreground">We won't read the page — this just lets "Apply" open the posting in a new tab.</p>
           </div>
+          {variants.length > 0 ? (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground" htmlFor="resume-variant">Résumé</label>
+              <select
+                id="resume-variant"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                value={variantId}
+                onChange={(e) => setVariantId(e.target.value)}
+              >
+                {variants.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}{v.isDefault ? " (default)" : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">Which saved résumé to evaluate — and record as sent if you apply.</p>
+            </div>
+          ) : null}
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground" htmlFor="risk-tolerance">Apply style</label>
             <select
@@ -1576,6 +1624,14 @@ const ApplyGate = () => {
                     ) : null}
                   </div>
                 </div>
+              </div>
+            ) : null}
+
+            {variantRecommendation ? (
+              <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 text-xs leading-relaxed text-muted-foreground">
+                <span className="font-semibold text-foreground">{variantRecommendation.name}</span> has your best
+                track record on roles like this — {variantRecommendation.interviewRate}% reach an interview. Consider
+                sending that one.
               </div>
             ) : null}
 
