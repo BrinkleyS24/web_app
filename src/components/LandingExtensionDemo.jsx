@@ -1242,10 +1242,10 @@ export default function LandingExtensionDemo() {
               <span className="text-muted-foreground">{footerSummary}</span>
               <button
                 type="button"
-                onClick={() => setDemoNotice("Premium Beta opens from the real extension or web upgrade page.")}
+                onClick={() => setDemoNotice("Premium opens from the real extension or web upgrade page.")}
                 className="font-medium text-accent transition hover:text-accent/80"
               >
-                Premium Beta -&gt;
+                Premium -&gt;
               </button>
             </div>
           ) : null}

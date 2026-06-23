@@ -429,9 +429,9 @@ const WeeklySummary = () => {
         )}
 
         <div className="glass-card rounded-2xl p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-2">Beta note</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-2">Note</h3>
           <p className="text-sm text-muted-foreground">
-            This is an in-app summary. Scheduled email delivery is not part of the current beta.
+            This is an in-app summary. Scheduled email delivery is not available yet.
           </p>
         </div>
       </div>

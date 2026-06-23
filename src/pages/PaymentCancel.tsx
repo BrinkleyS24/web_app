@@ -10,7 +10,7 @@ export default function PaymentCancel() {
 
   usePageMetadata({
     title: "Applendium | Checkout Canceled",
-    description: "Applendium Premium Beta checkout was canceled.",
+    description: "Applendium Premium checkout was canceled.",
   });
 
   return (
@@ -45,7 +45,7 @@ export default function PaymentCancel() {
               No payment was completed.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-gray-600 md:text-xl">
-              You can review Premium Beta whenever you are ready. The beta starts with
+              You can review Premium whenever you are ready. It starts with
               Apply Gate and a weekly search-health summary.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">

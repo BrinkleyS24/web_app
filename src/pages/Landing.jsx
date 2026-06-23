@@ -517,9 +517,9 @@ export default function Landing() {
                   <div className="flex h-full flex-col justify-center gap-4 rounded-2xl border border-white/10 bg-[#0E1726]/70 p-7 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="landingDisplay text-[34px] font-bold leading-none tracking-[-0.02em] text-white">
-                        {priceLabel ? priceLabel.amount : "Beta"}
+                        {priceLabel ? priceLabel.amount : "Premium"}
                         <span className="text-[15px] font-semibold text-[#98A1B3]">
-                          {priceLabel ? priceLabel.suffix : " price"}
+                          {priceLabel ? priceLabel.suffix : ""}
                         </span>
                       </p>
                       <p className="landingMono mt-2 text-[11px] leading-[1.7] text-[#5C6B85]">
@@ -681,7 +681,7 @@ export default function Landing() {
                 to="/upgrade"
                 className="inline-flex items-center justify-center rounded-[12px] border border-white/15 bg-white/[0.03] px-6 py-[14px] text-base font-semibold text-white/90 transition-colors hover:border-white/30 hover:bg-white/[0.06]"
               >
-                Start Premium Beta
+                Start Premium
               </Link>
             </div>
           </Reveal>

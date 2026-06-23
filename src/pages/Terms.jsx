@@ -41,7 +41,7 @@ const sections = [
   {
     title: "Premium and billing",
     items: [
-      "The Chrome extension is free. Premium Beta unlocks the web workspace for Apply Gate and weekly search-health summaries.",
+      "The Chrome extension is free. Premium unlocks the web workspace for Apply Gate and weekly search-health summaries.",
       "Pricing, renewal, cancellation, and refund details are shown before purchase.",
       "Payment details, when applicable, are handled by the payment processor rather than stored directly by Applendium.",
     ],

@@ -94,8 +94,8 @@ export default function Upgrade() {
     : "The app could not confirm Premium against the local backend. Retry the check after the backend is running with the latest changes.";
 
   usePageMetadata({
-    title: "Applendium | Premium Beta",
-    description: "Applendium Premium Beta unlocks Apply Gate and the weekly search-health summary.",
+    title: "Applendium | Premium",
+    description: "Applendium Premium unlocks Apply Gate and the weekly search-health summary.",
   });
 
   async function handleCheckout() {
@@ -136,14 +136,13 @@ export default function Upgrade() {
         <section className="mx-auto max-w-[980px] px-6 pb-24 pt-20 md:px-8">
           <div className="text-center">
             <p className="landingMono text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0E8C63]">
-              Premium beta
+              Premium
             </p>
             <h1 className="landingDisplay mx-auto mt-5 max-w-[20ch] text-[38px] font-bold leading-[1.04] tracking-[-0.035em] md:text-[52px]">
               One plan. Every judgment feature.
             </h1>
             <p className="mx-auto mt-5 max-w-[50ch] text-[17px] leading-[1.65] text-[#5C6470]">
-              The tracker stays free forever. Premium adds the decision layer on top of your inbox
-              &mdash; in beta now, at a beta price.
+              The tracker stays free forever. Premium adds the decision layer on top of your inbox.
             </p>
           </div>
 
@@ -171,9 +170,6 @@ export default function Upgrade() {
             </div>
 
             <div className="relative overflow-hidden rounded-[18px] bg-[#0B1220] p-8">
-              <div className="landingMono absolute right-0 top-0 rounded-bl-[10px] bg-[#0E8C63] px-3.5 py-1.5 text-[9px] font-bold tracking-[0.14em] text-white">
-                BETA
-              </div>
               <h2 className="text-lg font-bold text-white">Premium</h2>
               {formattedPrice ? (
                 <p className="mt-3.5 text-[38px] font-bold tracking-[-0.03em] text-white">
@@ -184,12 +180,12 @@ export default function Upgrade() {
                 </p>
               ) : (
                 <p className="mt-3.5 text-[28px] font-bold tracking-[-0.03em] text-white">
-                  Beta price
+                  Pricing
                   <span className="ml-2 text-base font-semibold text-[#98A1B3]">at checkout</span>
                 </p>
               )}
               <p className="mt-1 text-[13px] text-[#98A1B3]">
-                cancel anytime &middot; price locked for beta users
+                cancel anytime
               </p>
               <div className="mt-6 grid gap-3 border-t border-[#1C2A42] pt-[22px]">
                 {PREMIUM_FEATURES.map((feature) => (
@@ -221,7 +217,7 @@ export default function Upgrade() {
                     onClick={handleCheckout}
                     disabled={checkoutBusy}
                   >
-                    {checkoutBusy ? "Opening checkout..." : "Start Premium beta"}
+                    {checkoutBusy ? "Opening checkout..." : "Start Premium"}
                     <ArrowRight className="h-4 w-4" />
                   </button>
                 ) : (

@@ -19,14 +19,14 @@ export default function PaymentSuccess() {
 
   usePageMetadata({
     title: "Applendium | Payment Complete",
-    description: "Applendium Premium Beta payment confirmation.",
+    description: "Applendium Premium payment confirmation.",
   });
 
   useEffect(() => {
     if (loading || planLoading) return undefined;
 
     if (!user) {
-      setStatusMessage("Sign in again to finish activating Premium Beta.");
+      setStatusMessage("Sign in again to finish activating Premium.");
       return undefined;
     }
 
@@ -55,7 +55,7 @@ export default function PaymentSuccess() {
         if (cancelled) return;
 
         if (activePremium) {
-          setStatusMessage("Premium Beta is active. Opening your dashboard...");
+          setStatusMessage("Premium is active. Opening your dashboard...");
           window.setTimeout(() => window.location.replace("/dashboard"), 600);
           return;
         }
@@ -115,7 +115,7 @@ export default function PaymentSuccess() {
               Payment complete
             </div>
             <h1 className="landingDisplay mt-6 text-5xl font-black leading-[0.9] tracking-tighter text-[#111111] md:text-7xl">
-              Activating Premium Beta.
+              Activating Premium.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-gray-600 md:text-xl">{statusMessage}</p>
             {statusError ? (

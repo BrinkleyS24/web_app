@@ -133,10 +133,10 @@ export default function Settings() {
     () => [
       {
         label: "Plan",
-        value: planLoading ? "Loading..." : isPremium ? "Premium Beta" : "Free",
+        value: planLoading ? "Loading..." : isPremium ? "Premium" : "Free",
         body: isPremium
-          ? "Apply Gate, weekly search health, and beta workspace access are unlocked."
-          : "The Chrome extension remains free. Premium Beta unlocks the web workspace.",
+          ? "Apply Gate, weekly search health, and the premium workspace are unlocked."
+          : "The Chrome extension remains free. Premium unlocks the web workspace.",
         icon: Crown,
       },
       {

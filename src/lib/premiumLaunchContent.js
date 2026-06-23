@@ -52,10 +52,10 @@ export function getLaunchStatusItems(isExtensionLive) {
     },
     {
       icon: LayoutDashboard,
-      state: isExtensionLive ? "Beta" : "Closed for now",
-      title: "Premium Beta",
+      state: isExtensionLive ? "Live now" : "Ready at launch",
+      title: "Premium",
       body:
-        "Apply Gate and weekly search-health summaries are the first paid beta slice while the broader advisor workspace matures.",
+        "Apply Gate and weekly search-health summaries are the core of the premium workspace, which keeps expanding.",
     },
   ];
 }
@@ -169,7 +169,7 @@ export function getRolloutSteps(isExtensionLive) {
 export const upgradeStatusCards = [
   {
     icon: Sparkles,
-    title: "Why beta is narrow",
+    title: "Why premium is focused",
     body:
       "The free Chrome extension tracks applications. Premium starts with Apply Gate and weekly search health instead of over-selling the full advisor roadmap.",
   },
@@ -177,7 +177,7 @@ export const upgradeStatusCards = [
     icon: LayoutDashboard,
     title: "What is still maturing",
     body:
-      "Daily actions, outcome memory, strategy alerts, and outreach workflows are part of the beta workspace and will keep improving.",
+      "Daily actions, outcome memory, strategy alerts, and outreach workflows are part of the premium workspace and will keep improving.",
   },
   {
     icon: ShieldCheck,
