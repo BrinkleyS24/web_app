@@ -1368,6 +1368,7 @@ export async function analyzeJobAlignment(params: {
   companyName?: string;
   jobUrl?: string;
   riskTolerance?: ApplyGateRiskTolerance;
+  variantId?: string;
 }): Promise<ApplyGateResult> {
   return apiFetch("/api/emails/apply-gate/analyze", {
     method: "POST",
@@ -1519,4 +1520,54 @@ export async function fetchResume(): Promise<{
 
 export async function deleteResume(): Promise<{ success: boolean }> {
   return apiFetch("/api/emails/profile/resume", { method: "DELETE" });
+}
+
+// ── Résumé variants + outcome scoreboard ─────────────────────────────
+export type ResumeVariant = {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  createdAt: string;
+  charCount: number;
+};
+
+export type VariantScoreRow = {
+  variantId: string;
+  name: string;
+  sent: number;
+  matchedToOutcome: number;
+  interviewed: number;
+  offered: number;
+  rejected: number;
+  noResponse: number;
+  interviewRate: number | null;
+  sufficientSample: boolean;
+};
+
+export type VariantScoreboard = { perVariant: VariantScoreRow[]; minSample: number };
+export type VariantRecommendation = { variantId: string; name: string; interviewRate: number } | null;
+
+export async function fetchResumeVariants(): Promise<{ success: boolean; variants: ResumeVariant[] }> {
+  return apiFetch("/api/resumes", { method: "GET" });
+}
+
+export async function createResumeVariant(body: { name: string; text: string }): Promise<{ success: boolean; id?: string; error?: string }> {
+  return apiFetch("/api/resumes", { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function renameResumeVariant(id: string, name: string): Promise<{ success: boolean }> {
+  return apiFetch(`/api/resumes/${id}`, { method: "PATCH", body: JSON.stringify({ name }) });
+}
+
+export async function setDefaultResumeVariant(id: string): Promise<{ success: boolean }> {
+  return apiFetch(`/api/resumes/${id}`, { method: "PATCH", body: JSON.stringify({ makeDefault: true }) });
+}
+
+export async function archiveResumeVariant(id: string): Promise<{ success: boolean }> {
+  return apiFetch(`/api/resumes/${id}`, { method: "DELETE" });
+}
+
+export async function fetchVariantScoreboard(title?: string): Promise<{ success: boolean; scoreboard: VariantScoreboard; recommendation: VariantRecommendation }> {
+  const qs = title ? `?title=${encodeURIComponent(title)}` : "";
+  return apiFetch(`/api/resumes/scoreboard${qs}`, { method: "GET" });
 }
