@@ -1186,7 +1186,7 @@ export type VariantStrategyGap = {
   skipSignal: boolean;                      // true only for missing gaps
 };
 export type VariantStrategy = {
-  recommended: { variantId: string; name: string; basis: "requirements" | "your_outcomes"; sampleSize: number; reason: string };
+  recommended: { variantId: string; name: string; basis: "requirements" | "your_outcomes"; sampleSize: number; reason: string; outcomeBand?: { kind: "stronger" | "tracked"; sampleSize: number; comparison: string } | null };
   alternatives: { variantId: string; name: string; contentMatch: { coverage: number | null; matchedCount: number; requiredCount: number; missing: string[] } }[];
   gaps: VariantStrategyGap[];
   basisLabel: string;   // e.g. "Based on this role's requirements"

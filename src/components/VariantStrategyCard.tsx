@@ -69,6 +69,11 @@ export function VariantStrategyCard({ strategy, onDraftDecisionsChange }: Varian
         <h3 className="mt-1 text-[15px] font-bold tracking-[-0.01em] text-foreground">
           {strategy.recommended.name}
         </h3>
+        {strategy.recommended.basis === "your_outcomes" && (
+          <span className="mt-1 inline-flex items-center rounded border border-accent/30 bg-accent/5 px-2 py-0.5 text-[11px] font-medium text-accent">
+            Learning from your {strategy.recommended.outcomeBand?.sampleSize ?? strategy.recommended.sampleSize} outcomes
+          </span>
+        )}
         <p className="mt-0.5 text-xs text-muted-foreground">{strategy.basisLabel}</p>
       </div>
 

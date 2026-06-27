@@ -38,6 +38,20 @@ const strategy: VariantStrategy = {
   ],
 };
 
+const outcomeStrategy: VariantStrategy = {
+  recommended: {
+    variantId: "variant-b",
+    name: "Backend-Focused",
+    basis: "your_outcomes",
+    sampleSize: 5,
+    reason: "Higher interview rate for similar roles.",
+    outcomeBand: { kind: "stronger", sampleSize: 5, comparison: "roles like this" },
+  },
+  alternatives: [],
+  basisLabel: "Based on your 5 applications with this résumé to roles like this",
+  gaps: [],
+};
+
 describe("VariantStrategyCard", () => {
   test("renders the recommended variant name and basis label", () => {
     render(<VariantStrategyCard strategy={strategy} />);
@@ -100,5 +114,19 @@ describe("VariantStrategyCard", () => {
     expect(screen.getByText("Draft accepted")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Dismiss" })).not.toBeInTheDocument();
+  });
+
+  test("your_outcomes: renders learning badge and basisLabel without any percentage", () => {
+    const { container } = render(<VariantStrategyCard strategy={outcomeStrategy} />);
+    expect(screen.getByText(/Learning from your 5 outcomes/i)).toBeInTheDocument();
+    expect(
+      screen.getByText("Based on your 5 applications with this résumé to roles like this"),
+    ).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/%/);
+  });
+
+  test("requirements (regression): learning badge is not rendered", () => {
+    render(<VariantStrategyCard strategy={strategy} />);
+    expect(screen.queryByText(/Learning from your/i)).not.toBeInTheDocument();
   });
 });
