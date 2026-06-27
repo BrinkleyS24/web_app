@@ -104,6 +104,44 @@ describe("Résumés page", () => {
     expect(screen.queryByText(/not enough to call it yet/i)).not.toBeInTheDocument();
   });
 
+  test("drill-down renders both rows and labels pending correctly", async () => {
+    fetchResumeVariants.mockResolvedValue({
+      success: true,
+      variants: [{ id: "V1", name: "SWE-generic", isDefault: true, createdAt: "", charCount: 2000 }],
+    });
+    fetchVariantScoreboard.mockResolvedValue({
+      success: true,
+      scoreboard: {
+        minSample: 5,
+        perVariant: [{ variantId: "V1", name: "SWE-generic", sent: 2, matchedToOutcome: 1, interviewed: 1, offered: 0, rejected: 0, noResponse: 0, interviewRate: null, sufficientSample: false }],
+      },
+      recommendation: null,
+      breakdown: {
+        V1: [
+          { role: "QA Engineer", company: "Acme Corp", outcome: "interviewed" },
+          { role: "Software Tester", company: "Beta Inc", outcome: "pending" },
+        ],
+      },
+    });
+    renderPage();
+
+    // Expand the drill-down
+    const toggle = await screen.findByRole("button", { name: /Show 2 applications/i });
+    await userEvent.click(toggle);
+
+    // Both rows should now be visible
+    expect(screen.getByText("QA Engineer")).toBeInTheDocument();
+    expect(screen.getByText("Acme Corp")).toBeInTheDocument();
+    expect(screen.getByText("Interviewed")).toBeInTheDocument();
+
+    expect(screen.getByText("Software Tester")).toBeInTheDocument();
+    expect(screen.getByText("Beta Inc")).toBeInTheDocument();
+    expect(screen.getByText("Pending")).toBeInTheDocument();
+
+    // Pending caption present
+    expect(screen.getByText(/Pending applications aren't counted in the rate/i)).toBeInTheDocument();
+  });
+
   test("creates a new variant from pasted text", async () => {
     fetchResumeVariants.mockResolvedValue({ success: true, variants: [] });
     renderPage();

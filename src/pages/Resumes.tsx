@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { Check, FileText, Loader2, Plus, Star, Trash2 } from "lucide-react";
+import { Check, ChevronDown, FileText, Loader2, Plus, Star, Trash2 } from "lucide-react";
 import {
   fetchResumeVariants,
   fetchVariantScoreboard,
@@ -10,10 +10,27 @@ import {
   setDefaultResumeVariant,
   archiveResumeVariant,
   type VariantScoreRow,
+  type VariantBreakdownRow,
 } from "@/lib/emails";
 
 function roundedChars(n: number) {
   return `${Math.round(n / 100) * 100}+ chars`;
+}
+
+function outcomeBadge(outcome: VariantBreakdownRow["outcome"]) {
+  const cfg: Record<VariantBreakdownRow["outcome"], { label: string; cls: string }> = {
+    interviewed: { label: "Interviewed", cls: "text-accent border-accent/20 bg-accent/10" },
+    offered:     { label: "Offered",     cls: "text-accent border-accent/20 bg-accent/10" },
+    rejected:    { label: "Rejected",    cls: "text-destructive border-destructive/20 bg-destructive/10" },
+    no_response: { label: "No response", cls: "text-muted-foreground border-border bg-muted" },
+    pending:     { label: "Pending",     cls: "text-muted-foreground border-border bg-muted" },
+  };
+  const { label, cls } = cfg[outcome] ?? cfg.pending;
+  return (
+    <span className={`rounded border px-2 py-0.5 text-[11px] font-medium ${cls}`}>
+      {label}
+    </span>
+  );
 }
 
 function recordLine(score: VariantScoreRow | undefined) {
@@ -45,11 +62,22 @@ const Resumes = () => {
   const [adding, setAdding] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draft, setDraft] = useState("");
+  const [openDrilldowns, setOpenDrilldowns] = useState<Set<string>>(new Set());
+
+  const toggleDrilldown = (id: string) => {
+    setOpenDrilldowns((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const variants = variantsQuery.data?.variants ?? [];
   const scoreByVariant = new Map(
     (scoreboardQuery.data?.scoreboard?.perVariant ?? []).map((r) => [r.variantId, r]),
   );
+  const breakdown = scoreboardQuery.data?.breakdown ?? {};
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["resume-variants"] });
@@ -111,6 +139,35 @@ const Resumes = () => {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">{recordLine(scoreByVariant.get(v.id))}</p>
+                {(() => {
+                  const rows = breakdown[v.id] ?? [];
+                  if (rows.length === 0) return null;
+                  const isOpen = openDrilldowns.has(v.id);
+                  return (
+                    <div className="space-y-1.5">
+                      <button
+                        onClick={() => toggleDrilldown(v.id)}
+                        className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                        aria-expanded={isOpen}
+                      >
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                        {isOpen ? "Hide applications" : `Show ${rows.length} application${rows.length === 1 ? "" : "s"}`}
+                      </button>
+                      {isOpen && (
+                        <div className="space-y-1.5 pt-1">
+                          {rows.map((row, i) => (
+                            <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg bg-muted/50 px-3 py-1.5 text-xs">
+                              <span className="font-medium text-foreground">{row.role ?? "Unknown role"}</span>
+                              {row.company ? <span className="text-muted-foreground">{row.company}</span> : null}
+                              {outcomeBadge(row.outcome)}
+                            </div>
+                          ))}
+                          <p className="text-[11px] text-muted-foreground">Pending applications aren't counted in the rate.</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             ))}
             {variants.length === 0 ? (

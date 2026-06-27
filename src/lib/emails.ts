@@ -1564,6 +1564,12 @@ export type VariantScoreRow = {
   sufficientSample: boolean;
 };
 
+export type VariantBreakdownRow = {
+  role: string | null;
+  company: string | null;
+  outcome: "interviewed" | "offered" | "rejected" | "no_response" | "pending";
+};
+
 export type VariantScoreboard = { perVariant: VariantScoreRow[]; minSample: number };
 export type VariantRecommendation = { variantId: string; name: string; interviewRate: number } | null;
 
@@ -1587,7 +1593,7 @@ export async function archiveResumeVariant(id: string): Promise<{ success: boole
   return apiFetch(`/api/resumes/${id}`, { method: "DELETE" });
 }
 
-export async function fetchVariantScoreboard(title?: string): Promise<{ success: boolean; scoreboard: VariantScoreboard; recommendation: VariantRecommendation }> {
+export async function fetchVariantScoreboard(title?: string): Promise<{ success: boolean; scoreboard: VariantScoreboard; recommendation: VariantRecommendation; breakdown?: { [variantId: string]: VariantBreakdownRow[] } }> {
   const qs = title ? `?title=${encodeURIComponent(title)}` : "";
   return apiFetch(`/api/resumes/scoreboard${qs}`, { method: "GET" });
 }
