@@ -731,8 +731,10 @@ describe("FixSuggestions", () => {
       expect(closeApplication).toHaveBeenCalledWith({
         applicationId: "ghost-app",
         emailId: "ghost-email",
+        // Leads with "No response" so the close classifies as a neutral ghosting
+        // close-out, not a rejection (premium issue #2).
         reason:
-          "Closed from Daily Action Queue close-out cue: Move Associate Quality Engineer - Software (QA) out of active focus",
+          "No response - ghosted, closed from Daily Action Queue: Move Associate Quality Engineer - Software (QA) out of active focus",
       });
     });
 

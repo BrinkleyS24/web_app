@@ -1154,6 +1154,7 @@ export type ApplyGateScoringBreakdown = {
   applicationRiskLabel?: string;
   applicationRiskSummary?: string;
   applicationRiskBasis?: string;
+  applicationRiskCalibration?: string;
   riskBreakdown?: ApplyGateRiskBreakdown | null;
   occupationGrounding?: ApplyGateOccupationGrounding | null;
   educationBlock?: boolean;
@@ -1213,6 +1214,7 @@ export type ApplyGateResult = {
     hard_blockers: string[];
     display_decision?: ApplyGateDisplayDecision | null;
     application_risk_score?: number | null;
+    application_risk_calibration?: string | null;
     risk_breakdown?: ApplyGateRiskBreakdown | null;
     strategic_decision?: ApplyGateStrategicDecision | null;
     ats_pass?: ApplyGateOutcomeBand | null;

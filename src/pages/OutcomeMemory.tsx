@@ -123,17 +123,24 @@ const OutcomeMemory = () => {
     if (!suggestionAnalytics) {
       return [
         { label: "Suggestions shown", value: "-" },
-        { label: "Completed", value: "-" },
-        { label: "Positive outcomes", value: "-" },
-        { label: "Outcome gap", value: "-" },
+        { label: "You acted on", value: "-" },
+        { label: "Reached interview/offer", value: "-" },
+        { label: "Enough to judge", value: "-" },
       ];
     }
 
+    // "Enough to judge" replaces the old "Outcome gap — X pts" tile: a tiny
+    // sample (e.g. 2 completed) made a bold percentage-point number read as
+    // false precision. State plainly whether there's enough data instead.
+    const completedSample = suggestionAnalytics.followup.outcomes.completed.applications;
+    const ignoredSample = suggestionAnalytics.followup.outcomes.ignored.applications;
+    const enoughToJudge = completedSample >= 5 && ignoredSample >= 5;
+
     return [
       { label: "Suggestions shown", value: suggestionAnalytics.followup.summary.shownApplications },
-      { label: "Completed", value: `${(suggestionAnalytics.followup.summary.completedRate * 100).toFixed(1)}%` },
-      { label: "Positive outcomes", value: `${(suggestionAnalytics.followup.summary.positiveOutcomeRate * 100).toFixed(1)}%` },
-      { label: "Outcome gap", value: `${(suggestionAnalytics.followup.outcomes.observedLift * 100).toFixed(1)} pts` },
+      { label: "You acted on", value: `${(suggestionAnalytics.followup.summary.completedRate * 100).toFixed(1)}%` },
+      { label: "Reached interview/offer", value: `${(suggestionAnalytics.followup.summary.positiveOutcomeRate * 100).toFixed(1)}%` },
+      { label: "Enough to judge", value: enoughToJudge ? "Yes" : "Not yet" },
     ];
   }, [suggestionAnalytics]);
 
@@ -142,22 +149,20 @@ const OutcomeMemory = () => {
       return [];
     }
 
-    const completedSample = suggestionAnalytics.followup.outcomes.completed.applications;
-    const ignoredSample = suggestionAnalytics.followup.outcomes.ignored.applications;
+    const completed = suggestionAnalytics.followup.outcomes.completed;
+    const ignored = suggestionAnalytics.followup.outcomes.ignored;
     const topActionTypes = suggestionAnalytics.followup.byActionType.slice(0, 3);
+    const pct = (v: number) => `${(v * 100).toFixed(0)}%`;
+    const apps = (n: number) => `${n} application${n === 1 ? "" : "s"}`;
 
+    // Plain language instead of "n=2"/"positive outcomes": say what happened and
+    // how many applications it's based on, in words the user can act on.
     return [
-      `Completed suggestions: ${(
-        suggestionAnalytics.followup.outcomes.completed.positiveRate * 100
-      ).toFixed(1)}% positive outcomes (n=${completedSample}).`,
-      `Ignored suggestions: ${(
-        suggestionAnalytics.followup.outcomes.ignored.positiveRate * 100
-      ).toFixed(1)}% positive outcomes (n=${ignoredSample}).`,
+      `When you followed a suggestion, ${pct(completed.positiveRate)} of those reached an interview or offer (${apps(completed.applications)}).`,
+      `When you skipped it, ${pct(ignored.positiveRate)} reached an interview or offer (${apps(ignored.applications)}).`,
       ...topActionTypes.map(
         (item) =>
-          `${item.actionType.replace(/_/g, " ")}: ${item.completed}/${item.shown} completed, ${(
-            item.positiveOutcomeRate * 100
-          ).toFixed(1)}% positive outcomes.`,
+          `${item.actionType.replace(/_/g, " ")}: done on ${item.completed} of ${item.shown}, ${pct(item.positiveOutcomeRate)} reached an interview or offer.`,
       ),
     ];
   }, [suggestionAnalytics]);
@@ -167,7 +172,7 @@ const OutcomeMemory = () => {
     const completedSample = suggestionAnalytics.followup.outcomes.completed.applications;
     const ignoredSample = suggestionAnalytics.followup.outcomes.ignored.applications;
     if (completedSample < 5 || ignoredSample < 5) {
-      return `Sample is small (${completedSample} completed, ${ignoredSample} ignored). The gap is descriptive, not predictive yet.`;
+      return `Still early — only ${completedSample} followed and ${ignoredSample} skipped so far. Treat this as a hint, not a verdict.`;
     }
     return null;
   }, [suggestionAnalytics]);
@@ -316,9 +321,9 @@ const OutcomeMemory = () => {
               Counts are per tracked application (closed applications excluded) — the same numbers shown in the Chrome extension. Email-level totals in rates and themes below can be higher because one application often produces several emails.
             </p>
             <div className="glass-card rounded-2xl p-5">
-              <h3 className="text-sm font-semibold text-foreground mb-1">Suggestion Outcome Loop</h3>
+              <h3 className="text-sm font-semibold text-foreground mb-1">Does following suggestions help?</h3>
               <p className="text-xs text-muted-foreground mb-4">
-                The outcome gap is the difference in positive-outcome rate between applications where you completed a suggestion vs. ignored one. It's a correlation, not proof of causation — completers may differ in ways beyond the suggestion itself.
+                Do the applications where you act on a suggestion end better than the ones where you skip it? This compares the two. It's a correlation, not proof — people who follow suggestions may differ in other ways too, and it only means much once enough applications have resolved.
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {suggestionFunnelStats.map((s) => (

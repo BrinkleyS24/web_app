@@ -191,6 +191,25 @@ describe("ApplyGate current UI", () => {
     expect(container).toMatchSnapshot();
   });
 
+  test("uncalibrated risk renders an honest fit-based band, not a false-precise %", async () => {
+    // baseResult.scoringBreakdown.riskBreakdown.calibration === "not_outcome_calibrated".
+    // An uncalibrated score must never be shown to the user as a probability.
+    analyzeJobAlignment.mockResolvedValue(baseResult);
+    renderPage();
+
+    await runAnalyze();
+
+    await waitFor(() => {
+      expect(screen.getByText("Automation Engineer")).toBeInTheDocument();
+    });
+
+    // No false-precise percentage.
+    expect(screen.queryByText("92%")).not.toBeInTheDocument();
+    // Honest qualitative band + explicit "fit-based estimate" framing instead.
+    expect(screen.getByTestId("risk-band")).toHaveTextContent(/severe/i);
+    expect(screen.getByText(/fit-based estimate/i)).toBeInTheDocument();
+  });
+
   test("uses displayDecision as the single visible decision when the contract flag is enabled", async () => {
     vi.stubEnv("VITE_APPLY_GATE_DISPLAY_DECISION_V1", "true");
     analyzeJobAlignment.mockResolvedValue({

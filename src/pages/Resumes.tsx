@@ -17,12 +17,24 @@ function roundedChars(n: number) {
 }
 
 function recordLine(score: VariantScoreRow | undefined) {
+  const sent = score?.sent ?? 0;
+  if (sent === 0) {
+    return "No applications through this résumé yet — pick it in Apply Gate when you apply.";
+  }
+  // The headline count is the real number of applications sent through this
+  // résumé (sent), NOT matchedToOutcome. matchedToOutcome only counts the
+  // applications we've since been able to attribute an inbox outcome to, so
+  // showing it as "applications" undercounts (5 applies could read as "1").
+  const sentLabel = `${sent} application${sent === 1 ? "" : "s"} through this résumé`;
   if (!score || !score.sufficientSample) {
     const matched = score?.matchedToOutcome ?? 0;
-    return `Only ${matched} application${matched === 1 ? "" : "s"} through this résumé — not enough to call it yet.`;
+    if (matched === 0) {
+      return `${sentLabel} — waiting on inbox replies before we can call it.`;
+    }
+    return `${sentLabel} · ${matched} with a tracked outcome so far — not enough to call it yet.`;
   }
   const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
-  return `${plural(score.sent, "sent")} · ${plural(score.interviewed, "interview")} · ${plural(score.offered, "offer")} · ${plural(score.rejected, "rejected")} · ${score.noResponse} no response`;
+  return `${sentLabel} · ${plural(score.interviewed, "interview")} · ${plural(score.offered, "offer")} · ${plural(score.rejected, "rejected")} · ${score.noResponse} no response`;
 }
 
 const Resumes = () => {

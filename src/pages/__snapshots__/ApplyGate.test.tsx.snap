@@ -217,26 +217,21 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
                 </div>
                 <div
                   class="shrink-0 text-center"
+                  data-testid="risk-band"
                 >
                   <div
-                    class="grid h-[78px] w-[78px] place-items-center rounded-full"
-                    style="background: conic-gradient(#B3261E 0% 92%, var(--border) 92% 100%);"
+                    class="grid h-[78px] min-w-[78px] place-items-center rounded-full border px-3 border-red-500/30 bg-red-500/10 text-red-700"
                   >
-                    <div
-                      class="grid h-[62px] w-[62px] place-items-center rounded-full bg-card"
+                    <span
+                      class="text-base font-bold tracking-[-0.01em]"
                     >
-                      <span
-                        class="text-[19px] font-bold tracking-[-0.02em] text-foreground"
-                      >
-                        92
-                        %
-                      </span>
-                    </div>
+                      Severe
+                    </span>
                   </div>
                   <p
                     class="mt-2 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
                   >
-                    Rejection risk
+                    Rejection risk · fit-based estimate
                   </p>
                 </div>
               </div>

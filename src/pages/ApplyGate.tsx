@@ -185,6 +185,38 @@ function historyApplicationRiskPercent(item: ApplyGateHistoryDisplayItem, status
     ?? fallbackRiskPercent(item.score, status, Boolean(item.hard_blocker));
 }
 
+// The risk percentage is only a probability if the backend calibrated it against real
+// outcomes. Until then it is a deterministic fit transform — show it as a qualitative
+// band, never as a precise %. Honest default: treat unknown as not-calibrated.
+const APPLY_GATE_RISK_CALIBRATED = "outcome_calibrated";
+
+function riskCalibrationFromResult(result: ApplyGateResult | null | undefined) {
+  return String(
+    result?.scoringBreakdown?.applicationRiskCalibration
+    ?? result?.scoringBreakdown?.riskBreakdown?.calibration
+    ?? result?.explanation?.application_risk_calibration
+    ?? result?.explanation?.risk_breakdown?.calibration
+    ?? "not_outcome_calibrated",
+  );
+}
+
+function riskBandLabelFromResult(result: ApplyGateResult | null | undefined) {
+  const label = String(
+    result?.scoringBreakdown?.applicationRiskLabel
+    ?? result?.scoringBreakdown?.riskBreakdown?.label
+    ?? result?.explanation?.risk_breakdown?.label
+    ?? "",
+  ).trim();
+  return label ? label[0].toUpperCase() + label.slice(1) : null;
+}
+
+function riskBandToneClass(label: string | null) {
+  const normalized = String(label || "").toLowerCase();
+  if (normalized === "low" || normalized === "moderate") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700";
+  if (normalized === "elevated") return "border-amber-500/30 bg-amber-500/10 text-amber-700";
+  return "border-red-500/30 bg-red-500/10 text-red-700";
+}
+
 function riskBreakdownFromResult(result: ApplyGateResult | null | undefined) {
   return result?.scoringBreakdown?.riskBreakdown || result?.explanation?.risk_breakdown || null;
 }
@@ -1260,6 +1292,8 @@ const ApplyGate = () => {
   const currentRisk = result
     ? resultApplicationRiskPercent(result, currentStatus || "risky")
     : null;
+  const currentRiskCalibration = riskCalibrationFromResult(result);
+  const currentRiskLabel = riskBandLabelFromResult(result);
   const currentRiskBreakdown = riskBreakdownFromResult(result);
   const currentOutcomeBands = result && currentStatus
     ? resultOutcomeBands(result, currentStatus)
@@ -1567,7 +1601,8 @@ const ApplyGate = () => {
                       <p className="mt-1 text-xs leading-relaxed text-muted-foreground/80">{currentDecisionCopy.body}</p>
                     ) : null}
                   </div>
-                  {typeof currentRisk === "number" ? (
+                  {currentRiskCalibration === APPLY_GATE_RISK_CALIBRATED && typeof currentRisk === "number" ? (
+                    // Outcome-calibrated → the % is a real probability; show the ring.
                     <div className="shrink-0 text-center">
                       <div
                         className="grid h-[78px] w-[78px] place-items-center rounded-full"
@@ -1583,6 +1618,19 @@ const ApplyGate = () => {
                       </div>
                       <p className="mt-2 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                         Rejection risk
+                      </p>
+                    </div>
+                  ) : currentRiskLabel ? (
+                    // Not outcome-calibrated → never fake a probability. Show the honest
+                    // qualitative fit-based band instead of a precise % (Phase A honesty fix).
+                    <div className="shrink-0 text-center" data-testid="risk-band">
+                      <div
+                        className={`grid h-[78px] min-w-[78px] place-items-center rounded-full border px-3 ${riskBandToneClass(currentRiskLabel)}`}
+                      >
+                        <span className="text-base font-bold tracking-[-0.01em]">{currentRiskLabel}</span>
+                      </div>
+                      <p className="mt-2 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                        Rejection risk · fit-based estimate
                       </p>
                     </div>
                   ) : null}

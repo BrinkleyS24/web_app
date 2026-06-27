@@ -547,7 +547,9 @@ function getSourceCheckPurpose(item: QueueItem) {
   }
 
   if (item.source === "cleanup") {
-    return "Use this to fix missing company or role details so the queue stays accurate.";
+    return isInlineCleanupIntent(item.intent)
+      ? "Fix the missing company or role right here in the card — no need to dig through the original email or the extension."
+      : "Use this to fix missing company or role details so the queue stays accurate.";
   }
 
   if (actionType === "thank_you") {
@@ -600,11 +602,17 @@ function getSourceCheckChecklist(item: QueueItem) {
   }
 
   if (item.source === "cleanup") {
-    return [
-      "Confirm the company and role from the original email.",
-      "Fix the missing fields before relying on this recommendation.",
-      "Mark the cleanup done once the source data is corrected.",
-    ];
+    return isInlineCleanupIntent(item.intent)
+      ? [
+          "Open the repair panel below and correct the company and role in place.",
+          "Hit Save and relink — it re-checks the application journey for you.",
+          "No need to open the original email or hunt through the extension.",
+        ]
+      : [
+          "Confirm the company and role from the original email.",
+          "Fix the missing fields before relying on this recommendation.",
+          "Mark the cleanup done once the source data is corrected.",
+        ];
   }
 
   if (actionType === "thank_you") {
@@ -1372,7 +1380,11 @@ const FixSuggestions = () => {
         await closeApplication({
           applicationId: item.applicationId ?? null,
           emailId: item.emailId ?? null,
-          reason: `Closed from Daily Action Queue close-out cue: ${item.title}`,
+          // Lead with "No response" so the close is classified as a neutral
+          // ghosting close-out, NOT a rejection (this queue only closes stale /
+          // ghosted roles — see isCloseIntent). Counting employer silence as a
+          // rejection inflated the rejection rate. See classifyManualCloseOutcome.
+          reason: `No response - ghosted, closed from Daily Action Queue: ${item.title}`,
         });
         await refreshQueueState();
         toast.success("Application closed and removed from active focus.");
