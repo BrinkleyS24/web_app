@@ -1175,6 +1175,23 @@ export type ApplyGateScoringBreakdown = {
   totalScore: number;
 };
 
+// ── Variant Strategy ──────────────────────────────────────────────────
+export type VariantStrategyGapDraft = { target: "summary" | "bullet"; before: string; after: string };
+export type VariantStrategyGap = {
+  type: "missing" | "buried" | "reframe";
+  requirement: string;
+  location: "summary" | "skills" | "experience" | "education" | "none";
+  severity: "high" | "medium";
+  draft: VariantStrategyGapDraft | null;   // null for missing gaps
+  skipSignal: boolean;                      // true only for missing gaps
+};
+export type VariantStrategy = {
+  recommended: { variantId: string; name: string; basis: "requirements" | "your_outcomes"; sampleSize: number; reason: string };
+  alternatives: { variantId: string; name: string; contentMatch: { coverage: number | null; matchedCount: number; requiredCount: number; missing: string[] } }[];
+  gaps: VariantStrategyGap[];
+  basisLabel: string;   // e.g. "Based on this role's requirements"
+};
+
 export type ApplyGateResult = {
   success: boolean;
   /**
@@ -1321,6 +1338,7 @@ export type ApplyGateResult = {
     rationale: string;
   };
   priorHistory?: ApplyGatePriorHistory | null;
+  variantStrategy?: VariantStrategy | null;
 };
 
 export interface ApplyGatePriorHistoryExample {

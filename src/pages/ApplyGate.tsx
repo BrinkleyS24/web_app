@@ -22,6 +22,7 @@ import {
   type ApplyGateRiskTolerance,
   type ApplyGateCalibrationBucket,
 } from "@/lib/emails";
+import { VariantStrategyCard, type VariantDraftDecisions } from "@/components/VariantStrategyCard";
 
 const APPLY_GATE_STAGES = [
   "Reading the job description",
@@ -1024,6 +1025,7 @@ const ApplyGate = () => {
   const [expandedHistoryWarnings, setExpandedHistoryWarnings] = useState<Record<string, boolean>>({});
   const [savingAction, setSavingAction] = useState<ApplyGateActionSaveState>(null);
   const [actionSaveError, setActionSaveError] = useState<{ verdictId: string; message: string } | null>(null);
+  const [variantDraftDecisions, setVariantDraftDecisions] = useState<VariantDraftDecisions>({ accepted: [], dismissed: [] });
   const queryClient = useQueryClient();
 
   const resumeQuery = useQuery({
@@ -1096,6 +1098,7 @@ const ApplyGate = () => {
       setActionConfirmation(null);
       setSavingAction(null);
       setActionSaveError(null);
+      setVariantDraftDecisions({ accepted: [], dismissed: [] });
       // An insufficient-profile result is not a verdict — don't fold it into history.
       if (data.insufficientProfile) {
         return;
@@ -1166,7 +1169,7 @@ const ApplyGate = () => {
         const decision = useDisplayDecision
           ? legacyDecisionFromDisplayDecision(displayDecision)
           : result.explanation?.decision || null;
-        const feedback = buildApplyGateActionFeedback({
+        const baseFeedback = buildApplyGateActionFeedback({
           surface: "current_result",
           action,
           status,
@@ -1180,6 +1183,24 @@ const ApplyGate = () => {
           hardBlocker: result.scoringBreakdown?.hardBlocker,
           calibrationBucket: result.explanation?.calibration_bucket || null,
         });
+        const feedback = {
+          ...baseFeedback,
+          ...(result.variantStrategy ? {
+            variant_strategy: {
+              recommendedVariantId: result.variantStrategy.recommended.variantId,
+              basis: result.variantStrategy.recommended.basis,
+              sampleSize: result.variantStrategy.recommended.sampleSize,
+              gapsShown: result.variantStrategy.gaps.map((g) => ({
+                type: g.type,
+                requirement: g.requirement,
+                severity: g.severity,
+                hadDraft: g.draft != null,
+              })),
+              draftsAccepted: variantDraftDecisions.accepted,
+              draftsDismissed: variantDraftDecisions.dismissed,
+            },
+          } : {}),
+        };
 
         let pendingApplyWindow: Window | null = null;
         if (action === "applied" && targetUrl) {
@@ -1221,7 +1242,7 @@ const ApplyGate = () => {
       }
       setActionConfirmation({ action });
     },
-    [companyName, jobTitle, markVerdictActionInCache, queryClient, result],
+    [companyName, jobTitle, markVerdictActionInCache, queryClient, result, variantDraftDecisions],
   );
 
   const handleHistoryAction = useCallback(
@@ -1581,6 +1602,7 @@ const ApplyGate = () => {
                 </div>
               </div>
             ) : result ? (
+              <>
               <div className="glass-card space-y-3 rounded-2xl p-6">
             {currentDecisionCopy && (
               <div
@@ -2000,6 +2022,13 @@ const ApplyGate = () => {
               </div>
             )}
               </div>
+              {result.variantStrategy ? (
+                <VariantStrategyCard
+                  strategy={result.variantStrategy}
+                  onDraftDecisionsChange={setVariantDraftDecisions}
+                />
+              ) : null}
+              </>
             ) : (
               <div className="glass-card rounded-2xl p-8 text-center text-sm leading-6 text-muted-foreground">
                 Paste a job on the left and run the gate to see the verdict, rejection risk, and fix-first guidance here.
