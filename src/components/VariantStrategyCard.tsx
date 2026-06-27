@@ -107,9 +107,10 @@ export function VariantStrategyCard({ strategy, onDraftDecisionsChange }: Varian
                     </p>
                   </div>
                 ) : (
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    {gapHumanLine(gap.type, gap.location)}
-                  </p>
+                  (() => {
+                    const line = gapHumanLine(gap.type, gap.location);
+                    return line ? <p className="text-xs leading-relaxed text-muted-foreground">{line}</p> : null;
+                  })()
                 )}
 
                 {/* Draft rewrite (buried/reframe only — missing+skipSignal has no draft) */}

@@ -162,7 +162,9 @@ const Resumes = () => {
                               {outcomeBadge(row.outcome)}
                             </div>
                           ))}
-                          <p className="text-[11px] text-muted-foreground">Pending applications aren't counted in the rate.</p>
+                          {rows.some((r) => r.outcome === "pending") && (
+                            <p className="text-[11px] text-muted-foreground">Pending applications aren't counted in the rate.</p>
+                          )}
                         </div>
                       )}
                     </div>
