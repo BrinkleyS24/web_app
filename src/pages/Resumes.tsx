@@ -113,7 +113,7 @@ const Resumes = () => {
               <div key={v.id} className="glass-card space-y-2 rounded-xl p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-emerald-500" />
+                    <FileText className="h-4 w-4 text-accent" />
                     <span className="font-semibold text-foreground">{v.name}</span>
                     {v.isDefault ? (
                       <span className="rounded border border-accent/20 bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
@@ -156,7 +156,7 @@ const Resumes = () => {
                       {isOpen && (
                         <div className="space-y-1.5 pt-1">
                           {rows.map((row, i) => (
-                            <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg bg-muted/50 px-3 py-1.5 text-xs">
+                            <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-muted/50 px-3 py-2 text-xs">
                               <span className="font-medium text-foreground">{row.role ?? "Unknown role"}</span>
                               {row.company ? <span className="text-muted-foreground">{row.company}</span> : null}
                               {outcomeBadge(row.outcome)}

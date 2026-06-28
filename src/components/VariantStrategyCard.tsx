@@ -17,9 +17,9 @@ function gapTypeLabel(type: VariantStrategyGap["type"]): string {
 }
 
 function gapTypeBadgeClass(type: VariantStrategyGap["type"]): string {
-  if (type === "missing") return "border-red-500/30 bg-red-500/5 text-red-700";
-  if (type === "buried") return "border-amber-500/30 bg-amber-500/5 text-amber-700";
-  return "border-accent/30 bg-accent/5 text-accent";
+  if (type === "missing") return "border-destructive/20 bg-destructive/10 text-destructive";
+  if (type === "buried") return "border-amber-500/20 bg-amber-500/10 text-amber-700";
+  return "border-accent/20 bg-accent/10 text-accent";
 }
 
 function gapHumanLine(type: VariantStrategyGap["type"], location: VariantStrategyGap["location"]): string {
@@ -60,7 +60,7 @@ export function VariantStrategyCard({ strategy, onDraftDecisionsChange }: Varian
   );
 
   return (
-    <div className="glass-card space-y-4 rounded-2xl p-5 mt-3.5">
+    <div className="glass-card space-y-4 rounded-xl p-4 mt-3.5">
       {/* Header */}
       <div>
         <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
@@ -69,12 +69,12 @@ export function VariantStrategyCard({ strategy, onDraftDecisionsChange }: Varian
         <h3 className="mt-1 text-[15px] font-bold tracking-[-0.01em] text-foreground">
           {strategy.recommended.name}
         </h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">{strategy.basisLabel}</p>
         {strategy.recommended.basis === "your_outcomes" && (
-          <span className="mt-1 inline-flex items-center rounded border border-accent/30 bg-accent/5 px-2 py-0.5 text-[11px] font-medium text-accent">
+          <span className="mt-1.5 inline-flex items-center rounded border border-accent/20 bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
             Learning from your {strategy.recommended.outcomeBand?.sampleSize ?? strategy.recommended.sampleSize} outcomes
           </span>
         )}
-        <p className="mt-0.5 text-xs text-muted-foreground">{strategy.basisLabel}</p>
       </div>
 
       {/* Gaps */}
@@ -125,8 +125,9 @@ export function VariantStrategyCard({ strategy, onDraftDecisionsChange }: Varian
                       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Before</p>
                       <p className="text-xs leading-relaxed text-foreground">{gap.draft.before}</p>
                     </div>
-                    <div className="flex items-center gap-1 pl-1 text-muted-foreground" aria-hidden="true">
-                      <ArrowRight className="h-3 w-3" />
+                    <div className="flex items-center gap-1 pl-1 text-muted-foreground">
+                      <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                      <span className="sr-only">rewritten to</span>
                     </div>
                     <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 space-y-1">
                       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">After</p>

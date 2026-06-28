@@ -116,6 +116,21 @@ describe("VariantStrategyCard", () => {
     expect(screen.queryByRole("button", { name: "Dismiss" })).not.toBeInTheDocument();
   });
 
+  test("shows 'Dismissed' confirmation after dismissing, hiding Accept/Dismiss buttons", async () => {
+    const onDraftDecisionsChange = vi.fn();
+    render(<VariantStrategyCard strategy={strategy} onDraftDecisionsChange={onDraftDecisionsChange} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+
+    expect(screen.getByText("Dismissed")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Dismiss" })).not.toBeInTheDocument();
+    expect(onDraftDecisionsChange).toHaveBeenLastCalledWith({
+      accepted: [],
+      dismissed: ["Selenium automation"],
+    });
+  });
+
   test("your_outcomes: renders learning badge and basisLabel without any percentage", () => {
     const { container } = render(<VariantStrategyCard strategy={outcomeStrategy} />);
     expect(screen.getByText(/Learning from your 5 outcomes/i)).toBeInTheDocument();

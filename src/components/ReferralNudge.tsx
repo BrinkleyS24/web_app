@@ -11,7 +11,7 @@ export function ReferralNudge({ company }: ReferralNudgeProps) {
   const href = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(name)}`;
 
   return (
-    <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 space-y-1.5">
+    <div className="rounded-xl border border-accent/20 bg-accent/10 p-4 space-y-1.5">
       <div className="flex items-start gap-2">
         <Users className="h-4 w-4 shrink-0 mt-0.5 text-accent" aria-hidden="true" />
         <div>
