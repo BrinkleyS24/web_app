@@ -23,6 +23,7 @@ import {
   type ApplyGateCalibrationBucket,
 } from "@/lib/emails";
 import { VariantStrategyCard, type VariantDraftDecisions } from "@/components/VariantStrategyCard";
+import { ReferralNudge } from "@/components/ReferralNudge";
 
 const APPLY_GATE_STAGES = [
   "Reading the job description",
@@ -1942,6 +1943,10 @@ const ApplyGate = () => {
                   ))}
                 </div>
               </div>
+            )}
+
+            {(currentStatus === "strong" || currentStatus === "potential") && (
+              <ReferralNudge company={result.companyName} />
             )}
 
             {actionConfirmation ? (
