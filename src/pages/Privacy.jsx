@@ -5,7 +5,7 @@ export default function Privacy() {
     <main className="page page--legal">
       <section className="legal-shell">
         <h1>Privacy Policy</h1>
-        <p className="muted">Effective date: May 8, 2026</p>
+        <p className="muted">Effective date: June 30, 2026</p>
 
         <h2>What Applendium accesses</h2>
         <p>
@@ -32,6 +32,37 @@ export default function Privacy() {
           OAuth refresh tokens, Gmail subjects, senders, message bodies, misclassification report
           content, and resume text are encrypted before storage. Production secrets are stored in
           Google Secret Manager and are not committed to source control.
+        </p>
+
+        <h2>Service providers</h2>
+        <p>
+          Applendium relies on a small set of vetted service providers to operate, and shares data with
+          them only as needed to provide the features you use. Providers that may process your data, or
+          information derived from it, include:
+        </p>
+        <ul>
+          <li><strong>Google Cloud</strong> — hosting, secret storage, and background task processing.</li>
+          <li><strong>Supabase</strong> — encrypted database storage of your application data.</li>
+          <li><strong>Firebase Authentication</strong> (Google) — account sign-in.</li>
+          <li>
+            <strong>OpenAI</strong> — powers AI features. It processes job-search content you provide
+            (such as job postings and your résumé for Apply Gate) and information derived from your emails
+            (for inbox coaching). Data sent through OpenAI's API is used only to generate results for you
+            and is not used to train OpenAI's models.
+          </li>
+          <li><strong>Stripe</strong> — payment processing for premium subscriptions. No Gmail data is shared with Stripe.</li>
+        </ul>
+        <p>
+          These providers act as our processors and are bound by their own terms and security commitments.
+          We do not transfer your Google user data to any party for advertising, resale, or AI model training.
+        </p>
+
+        <h2>Data retention</h2>
+        <p>
+          We retain your data only while your account is active and as needed to provide the service. When
+          you delete your account, Gmail-derived records are removed from our live systems promptly; residual
+          copies in encrypted backups are purged within our standard backup-retention window. You can request
+          deletion at any time.
         </p>
 
         <h2>Deletion</h2>
