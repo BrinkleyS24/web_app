@@ -64,7 +64,7 @@ export function VariantStrategyCard({ strategy, onDraftDecisionsChange }: Varian
       {/* Header */}
       <div>
         <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-          Résumé variant strategy
+          Résumé strategy
         </p>
         <h3 className="mt-1 text-[15px] font-bold tracking-[-0.01em] text-foreground">
           {strategy.recommended.name}

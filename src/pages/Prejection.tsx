@@ -62,7 +62,7 @@ const OVERALL_CONFIG = {
     color: "text-red-500",
     bg: "bg-red-500/10 border-red-500/30",
     icon: ShieldAlert,
-    desc: "Rejection is very likely without significant repositioning.",
+    desc: "Rejection is very likely unless you make major changes to your résumé.",
   },
   moderate: {
     label: "Moderate Risk",
@@ -127,12 +127,12 @@ function normalizeRisks(result: PrejectionResult | null): PrejectionRisk[] {
 
 function normalizeSuggestion(result: PrejectionResult | null): string {
   if (!result) return "";
-  return result.mitigationPlan || result.suggestedMove || "No mitigation guidance available.";
+  return result.mitigationPlan || result.suggestedMove || "No fix suggestions available for this one.";
 }
 
-function normalizeStageLabel(stage: string | undefined): "ATS" | "Recruiter Screen" | "Hiring Manager Screen" | null {
+function normalizeStageLabel(stage: string | undefined): "Résumé screen (ATS)" | "Recruiter Screen" | "Hiring Manager Screen" | null {
   if (!stage) return null;
-  if (stage === "ATS") return "ATS";
+  if (stage === "ATS") return "Résumé screen (ATS)";
   if (stage === "Recruiter Screen") return "Recruiter Screen";
   if (stage === "Hiring Manager Screen") return "Hiring Manager Screen";
   return null;
@@ -150,7 +150,7 @@ function RiskCard({ risk }: { risk: PrejectionRisk }) {
         <span
           className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full border uppercase tracking-wider ${badge}`}
         >
-          {risk.severity}
+          {risk.severity.replace(/_/g, " ")}
         </span>
         <span className="text-xs text-muted-foreground">{catLabel}</span>
       </div>
@@ -252,7 +252,7 @@ const Prejection = () => {
             Pre-jection Simulator
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            See potential HR screening risks before you apply. Think of it as a system insight, not a verdict.
+            See potential HR screening risks before you apply. Think of it as an early warning, not a verdict.
           </p>
         </div>
 
@@ -363,7 +363,7 @@ const Prejection = () => {
                   <div className="glass-card rounded-xl p-5 space-y-3">
                     <h3 className="text-sm font-semibold text-foreground">Stage Risk Breakdown</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                      <div className="rounded-md border border-border px-3 py-2">ATS: {result.breakdown.atsRisk}%</div>
+                      <div className="rounded-md border border-border px-3 py-2">Résumé screen (ATS): {result.breakdown.atsRisk}%</div>
                       <div className="rounded-md border border-border px-3 py-2">Recruiter: {result.breakdown.recruiterRisk}%</div>
                       <div className="rounded-md border border-border px-3 py-2">Hiring Manager: {result.breakdown.hiringManagerRisk}%</div>
                     </div>

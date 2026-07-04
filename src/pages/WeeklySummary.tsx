@@ -420,7 +420,7 @@ const WeeklySummary = () => {
                 </ul>
                 {weekMetrics.windowMisaligned ? (
                   <p className="mt-2 text-xs text-muted-foreground italic">
-                    Some outcomes this week match applications sent outside the 7-day window. Rates are capped at 100% — check the all-time view in Outcome Memory for an unclipped picture.
+                    Some outcomes this week match applications sent outside the 7-day window. Rates are capped at 100% — check the all-time view in Outcome Memory for the full picture.
                   </p>
                 ) : null}
               </div>

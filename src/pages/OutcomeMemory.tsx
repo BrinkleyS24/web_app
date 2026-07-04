@@ -98,7 +98,7 @@ const OutcomeMemory = () => {
     const linkedRatio = totalEmails > 0 ? ((linked / totalEmails) * 100).toFixed(1) : "0.0";
 
     return {
-      "Response Signals": [
+      "Response Patterns": [
         { text: `${cohortMetrics.reachedInterview} of ${cohortMetrics.applicationsSent} applications reached an interview.`, icon: TrendingUp },
         { text: `Interview rate is ${interviewRate}% of applications.`, icon: TrendingUp },
         { text: `Offer rate is ${offerRate}% of applications.`, icon: TrendingUp },
@@ -112,8 +112,8 @@ const OutcomeMemory = () => {
         { text: `Total tracked emails: ${metrics?.totalEmails ?? totalEmails}.`, icon: Clock },
         { text: `Applications: ${cohortMetrics.applicationsSent} - Reached interview: ${cohortMetrics.reachedInterview} - Offers: ${cohortMetrics.reachedOffer}.`, icon: Clock },
       ],
-      "Key Signals": [
-        { text: "Use interview rate to refine which roles convert best.", icon: Briefcase },
+      "What to Watch": [
+        { text: "Use your interview rate to spot which kinds of roles respond best.", icon: Briefcase },
         { text: "Track unlinked emails to improve application grouping.", icon: Briefcase },
       ],
     };

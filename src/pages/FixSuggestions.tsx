@@ -905,12 +905,12 @@ function SuggestionDraftPanel({
 
           <div className="space-y-3">
             <div className="rounded-2xl border border-border/70 bg-background/80 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Send path</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">How to send</p>
               <p className="mt-2 text-sm font-medium text-foreground">
                 {draft.sendStrategyLabel || "Review recipient"}
               </p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                {draft.sendStrategyDescription || "Verify the recipient and send path before you act."}
+                {draft.sendStrategyDescription || "Double-check who this goes to before you act."}
               </p>
               {draft.recipient ? (
                 <p className="mt-2 truncate rounded-xl bg-muted/60 px-3 py-2 text-xs text-muted-foreground" title={draft.recipient}>
@@ -939,7 +939,7 @@ function SuggestionDraftPanel({
             </div>
 
             <div className="rounded-2xl border border-border/70 bg-background/80 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Grounding</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Based on</p>
               {draft.evidence?.length ? (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {draft.evidence.map((entry) => (
@@ -1719,7 +1719,7 @@ const FixSuggestions = () => {
                         <div className="rounded-xl border border-border/70 bg-card/80 p-3">
                           <div className="flex items-center gap-2">
                             <Layers3 className="h-4 w-4 text-warning" />
-                            <p className="text-sm font-semibold text-foreground">Batch close-out lane</p>
+                            <p className="text-sm font-semibold text-foreground">Close these out together</p>
                           </div>
                           <p className="mt-1 text-sm leading-6 text-muted-foreground">
                             This group replaces repeated low-urgency stale cards so you can clear aging applications without scrolling through identical layouts.
@@ -2195,9 +2195,9 @@ const FixSuggestions = () => {
                       ["3", "Check the broader backlog", `${Math.max(combinedSuggestions.length - daqInboxSuggestions.length, 0)} non-inbox action(s) live under all actions.`],
                     ]
                   : [
-                      ["1", "Clear blockers", `${sourceCounts.cleanup} cleanup task(s) that affect downstream accuracy.`],
+                      ["1", "Clear blockers", `${sourceCounts.cleanup} cleanup task(s) that keep your tracking accurate.`],
                       ["2", "Handle ambiguity", `${sourceCounts.stale} role(s) need a check-in or close-out.`],
-                      ["3", "Improve conversion", `${sourceCounts.followup + sourceCounts.apply_gate + sourceCounts.resume} fit, resume gap, or outreach action(s).`],
+                      ["3", "Improve your odds", `${sourceCounts.followup + sourceCounts.apply_gate + sourceCounts.resume} fit, resume gap, or outreach action(s).`],
                     ]).map(([step, title, body]) => (
                   <div key={step} className="rounded-xl border border-border/70 bg-background/70 p-3">
                     <div className="flex gap-3">

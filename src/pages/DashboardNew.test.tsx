@@ -381,7 +381,7 @@ describe("DashboardNew", () => {
 
     expect(screen.getByText("Search memory")).toBeInTheDocument();
     expect(screen.getByText("Completed follow-ups are showing better outcomes")).toBeInTheDocument();
-    expect(screen.getByText("Observed lift +40.0 pts")).toBeInTheDocument();
+    expect(screen.getByText("50.0% vs 10.0%")).toBeInTheDocument();
 
     expect(screen.getByText("Strategy alert")).toBeInTheDocument();
     expect(screen.getByText("You are applying mostly to low-match roles")).toBeInTheDocument();

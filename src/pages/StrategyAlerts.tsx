@@ -28,7 +28,7 @@ const severityStyles: Record<StrategyAlert["severity"], string> = {
 const severityLabels: Record<StrategyAlert["severity"], string> = {
   high: "Act now",
   medium: "Watch closely",
-  low: "Needs more signal",
+  low: "Needs more data",
   positive: "Working",
 };
 
@@ -42,7 +42,7 @@ const kindLabels: Record<StrategyAlert["kind"], string> = {
 const kindDescriptions: Record<StrategyAlert["kind"], string> = {
   performance: "How response and interview rates are moving across recent application windows.",
   fit: "Whether Apply Gate decisions suggest you are applying into avoidable mismatch.",
-  focus: "Where repeated company, role, or industry signals are starting to cluster.",
+  focus: "Where the same companies, roles, or industries keep showing up in your results.",
   execution: "Whether completed actions are building a measurable search habit.",
 };
 
@@ -168,7 +168,7 @@ const StrategyAlerts = () => {
       return "Upgrade to Premium to unlock strategy alerts.";
     }
     if (alertsQuery.isLoading) return "Loading strategy alerts...";
-    return "No strategy alerts yet. More signals appear once Applendium has enough tracked history.";
+    return "No strategy alerts yet. More alerts appear once Applendium has enough tracked history.";
   }, [alertsQuery.data?.error, alertsQuery.isLoading, isAuthed]);
 
   const primaryCta = getAlertCta(grouped.primary);
@@ -200,7 +200,7 @@ const StrategyAlerts = () => {
               ["Active", summary.active],
               ["Actionable", summary.actionable],
               ["Working", summary.positive],
-              ["Calibrating", summary.calibration],
+              ["Learning", summary.calibration],
             ].map(([label, value]) => (
               <div key={label} className="glass-card rounded-2xl px-4 py-3">
                 <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
@@ -214,7 +214,7 @@ const StrategyAlerts = () => {
           isAlertsColdStart ? (
             <PremiumEmptyState
               title="No strategy alerts yet"
-              body="Strategy Alerts surface once Applendium has enough tracked history to spot a pattern. Running Apply Gate on the roles you're weighing seeds those signals."
+              body="Strategy Alerts appear once Applendium has enough tracked history to spot a pattern. Running Apply Gate on the roles you're weighing builds that history."
               cta={{ label: "Run Apply Gate", to: "/apply-gate" }}
             />
           ) : (
@@ -232,7 +232,7 @@ const StrategyAlerts = () => {
                           Next strategic move
                         </span>
                         <span className="rounded-full border border-white/15 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.1em] text-white/60">
-                          High conf
+                          High confidence
                         </span>
                       </div>
                       <h2 className="mt-3 text-xl font-bold tracking-[-0.01em] text-white">{grouped.primary.title}</h2>
@@ -255,7 +255,7 @@ const StrategyAlerts = () => {
                 <div>
                   <h2 className="text-sm font-semibold text-foreground">Act or watch now</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    These alerts have enough signal to deserve a decision, not just passive monitoring.
+                    There's enough behind these alerts to act on, not just keep watching.
                   </p>
                 </div>
                 {grouped.actionable.length === 0 ? (
@@ -294,7 +294,7 @@ const StrategyAlerts = () => {
               <section className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
                 <div className="flex items-center gap-2">
                   <Gauge className="h-4 w-4 text-accent" />
-                  <h2 className="text-sm font-semibold text-foreground">Signal lanes</h2>
+                  <h2 className="text-sm font-semibold text-foreground">Alert categories</h2>
                 </div>
                 <div className="mt-3 space-y-2">
                   {(["performance", "fit", "focus", "execution"] as StrategyAlert["kind"][]).map((kind) => (
@@ -319,7 +319,7 @@ const StrategyAlerts = () => {
                 <div className="mt-3 space-y-3 text-sm leading-6 text-muted-foreground">
                   <p>Alerts use minimum-history gates before making stronger recommendations.</p>
                   <p>Low-priority alerts are not failures. They tell you what data is still missing.</p>
-                  <p>Execution alerts are framed as observed correlation, not proof that one action caused an outcome.</p>
+                  <p>These alerts show patterns we've noticed in your results — not proof that one action caused an outcome.</p>
                 </div>
               </section>
             </aside>

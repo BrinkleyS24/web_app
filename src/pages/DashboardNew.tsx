@@ -182,15 +182,15 @@ function buildOutcomeMemoryBrief({
         body: improved
           ? `Completed follow-up actions reached interviews or offers ${formatFractionPercent(completedRate)} of the time versus ${formatFractionPercent(ignoredRate)} when left untouched. Keep clearing the highest-signal outreach first.`
           : "Completed follow-up actions are not beating ignored suggestions yet. Review timing, message quality, and whether the right threads are getting attention.",
-        stat: `Observed lift ${formatPointDelta(observedLift)}`,
+        stat: `${formatFractionPercent(completedRate)} vs ${formatFractionPercent(ignoredRate)}`,
         ctaLabel: "Review Outcome Memory",
       };
     }
 
     return {
-      title: "Follow-up outcomes are still calibrating",
+      title: "Not enough follow-up results yet",
       body: `${followup?.summary.completedApplications || 0} of ${followup?.summary.shownApplications || 0} shown follow-up opportunities have been marked complete. Keep marking actions so the memory can separate useful habits from noise.`,
-      stat: `Completed vs ignored ${formatPointDelta(observedLift)}`,
+      stat: `${followup?.summary.completedApplications || 0} of ${followup?.summary.shownApplications || 0} marked done`,
       ctaLabel: "Review Outcome Memory",
     };
   }
@@ -208,7 +208,7 @@ function buildOutcomeMemoryBrief({
   if (cohortMetrics && cohortMetrics.applicationsSent > 0) {
     const reached = cohortMetrics.reachedInterview;
     return {
-      title: reached > 0 ? "Your search has early conversion signal" : "Your search memory is still warming up",
+      title: reached > 0 ? "Your applications are starting to reach interviews" : "Your search memory is still warming up",
       body:
         reached > 0
           ? `${reached} of ${cohortMetrics.applicationsSent} applications have reached an interview. Use Apply Gate before the next batch so the system can learn which roles are worth repeating.`
@@ -230,7 +230,7 @@ function buildOutcomeMemoryBrief({
   return {
     title: "Search memory starts with the next action",
     body: "Connect more application history, run Apply Gate before applying, and mark queue actions complete so Applendium can learn what is actually working.",
-    stat: "Calibrating",
+    stat: "Getting started",
     ctaLabel: "Open Outcome Memory",
   };
 }
@@ -295,7 +295,7 @@ function formatDecisionBrief(item: ApplyGateHistoryItem | null) {
         : [
             showingRiskReasons
               ? "Apply Gate flagged this role as risky, but the detailed blocker breakdown needs a fuller review."
-              : "Run the full Apply Gate review to inspect the strongest fit signal and next action.",
+              : "Run the full Apply Gate review to see how strong the fit is and what to do next.",
           ],
     supportingSignals: showingRiskReasons ? supportingSignals : [],
     nextActions:

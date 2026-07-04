@@ -713,7 +713,7 @@ describe("FixSuggestions", () => {
     await user.click(await screen.findByRole("button", { name: /All actions \(4\)/ }));
 
     expect(await screen.findByText("Review 3 stale roles in one pass")).toBeInTheDocument();
-    expect(screen.getByText("Batch close-out lane")).toBeInTheDocument();
+    expect(screen.getByText("Close these out together")).toBeInTheDocument();
     expect(screen.getByText("Move Associate Quality Engineer - Software (QA) out of active focus")).toBeInTheDocument();
     expect(screen.getByText("Move Backend Engineer - AI Infrastructure out of active focus")).toBeInTheDocument();
     expect(screen.getByText("Move SDET Quality Assurance Specialist with Automation out of active focus")).toBeInTheDocument();

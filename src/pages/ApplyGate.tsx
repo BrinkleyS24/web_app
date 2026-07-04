@@ -104,7 +104,7 @@ const HARD_BLOCKER_LABELS: Record<string, string> = {
   required_prior_role_gap: "A required prior-role background is missing",
   required_program_completion_gap: "A required program or training completion is missing",
   language_requirement_gap: "A required language capability is missing",
-  discipline_mismatch: "Core discipline/environment mismatch is high-risk",
+  discipline_mismatch: "This role's core field or work setting doesn't match your background",
 };
 
 const RISK_TOLERANCE_COPY: Record<ApplyGateRiskTolerance, { label: string; helper: string }> = {
@@ -410,7 +410,7 @@ function structuredWarningAndBullets(
     : null)
     || hardBlockers[0]
     || primaryDrivers[0]
-    || formatSkillGapSummary(roleCoreGaps, "Role-core domain gaps")
+    || formatSkillGapSummary(roleCoreGaps, "Missing core skills for this role")
     || formatSkillGapSummary(missingRequired, "Missing required skills")
     || formatSkillGapSummary(missingPreferred, "Missing preferred skills")
     || null;
@@ -428,7 +428,7 @@ function structuredWarningAndBullets(
     if (missingRequiredSummary && missingRequiredSummary !== warning) bullets.push(missingRequiredSummary);
   }
 
-  const roleCoreSummary = formatSkillGapSummary(roleCoreGaps, "Role-core domain gaps");
+  const roleCoreSummary = formatSkillGapSummary(roleCoreGaps, "Missing core skills for this role");
   if (roleCoreSummary && roleCoreSummary !== warning) bullets.push(roleCoreSummary);
 
   const missingPreferredSummary = formatSkillGapSummary(missingPreferred, "Missing preferred skills");
@@ -529,7 +529,7 @@ function explanationActionSections(explanation: ApplyGateResult["explanation"] |
 
 function memoryConfidenceLabel(value: string | null | undefined) {
   if (value === "meaningful") return "Meaningful pattern";
-  if (value === "weak") return "Weak signal";
+  if (value === "weak") return "Weak pattern";
   return "Context only";
 }
 
@@ -677,7 +677,7 @@ function decisionCopyForStatus(status: VerdictStatus, recommendation: string | n
       title: "Fix first before applying",
       body: hardBlocker
         ? "A hard blocker or major proof gap is visible. Fix the strongest issue before this becomes another low-probability application."
-        : "The fit signal needs a targeted resume fix before applying.",
+        : "The fit isn't strong enough yet — make a targeted resume fix before applying.",
       toneClass: "border-red-500/30 bg-red-500/10 text-red-700",
     };
   }
@@ -685,7 +685,7 @@ function decisionCopyForStatus(status: VerdictStatus, recommendation: string | n
   if (status === "strong") {
     return {
       title: "Apply now",
-      body: "This role has the strongest fit signal. Keep the application tight and send it while the posting is still fresh.",
+      body: "This role is a strong fit. Keep the application tight and send it while the posting is still fresh.",
       toneClass: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700",
     };
   }
@@ -703,7 +703,7 @@ function decisionCopyForStatus(status: VerdictStatus, recommendation: string | n
       title: "Fix first before applying",
       body: hardBlocker
         ? "A hard blocker or major proof gap is visible. Fix the strongest issue before this becomes another low-probability application."
-        : "The fit signal is weak enough that applying without edits is likely to waste time.",
+        : "The fit is weak enough that applying without edits is likely to waste time.",
       toneClass: "border-red-500/30 bg-red-500/10 text-red-700",
     };
   }
@@ -1899,9 +1899,9 @@ const ApplyGate = () => {
               <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 space-y-1">
                 {currentOutcomeBands ? (
                   <p className="text-xs text-muted-foreground">
-                    Signal check: ATS pass <span className={bandTone(currentOutcomeBands.atsPass)}>{currentOutcomeBands.atsPass}</span>
+                    Screening check: résumé screen <span className={bandTone(currentOutcomeBands.atsPass)}>{currentOutcomeBands.atsPass}</span>
                     <span className="px-1">-</span>
-                    human win <span className={bandTone(currentOutcomeBands.humanWin)}>{currentOutcomeBands.humanWin}</span>
+                    human review <span className={bandTone(currentOutcomeBands.humanWin)}>{currentOutcomeBands.humanWin}</span>
                   </p>
                 ) : null}
                 {currentDecisionConfidence && (
@@ -2036,7 +2036,7 @@ const ApplyGate = () => {
               </>
             ) : (
               <div className="glass-card rounded-2xl p-8 text-center text-sm leading-6 text-muted-foreground">
-                Paste a job on the left and run the gate to see the verdict, rejection risk, and fix-first guidance here.
+                Paste a job on the left to see whether to apply, the rejection risk, and what to fix first.
               </div>
             )}
           </div>
@@ -2115,14 +2115,14 @@ const ApplyGate = () => {
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-xs pt-0.5">
                   <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground">{decisionCopy.title}</span>
-                  <span className="text-muted-foreground">ATS pass: <span className={bandTone(outcomeBands.atsPass)}>{outcomeBands.atsPass}</span></span>
-                  <span className="text-muted-foreground">Human win: <span className={bandTone(outcomeBands.humanWin)}>{outcomeBands.humanWin}</span></span>
+                  <span className="text-muted-foreground">Résumé screen: <span className={bandTone(outcomeBands.atsPass)}>{outcomeBands.atsPass}</span></span>
+                  <span className="text-muted-foreground">Human review: <span className={bandTone(outcomeBands.humanWin)}>{outcomeBands.humanWin}</span></span>
                   {decisionConfidence ? (
                     <span className="text-muted-foreground">Decision confidence: <span className={bandTone(decisionConfidence)}>{decisionConfidence}</span></span>
                   ) : null}
                 </div>
                 {!displayDecisionMissing && riskBreakdown?.summary ? (
-                  <p className="text-xs text-muted-foreground leading-relaxed">Decision driver: {riskBreakdown.summary}</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">Main factor: {riskBreakdown.summary}</p>
                 ) : null}
                 {historyVisibleReasons.map((reason, index) => (
                   <p key={index} className="text-sm text-muted-foreground leading-relaxed">• {reason}</p>

@@ -174,7 +174,7 @@ const Resumes = () => {
             ))}
             {variants.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No résumés saved yet. Add the version you send most so Apply Gate can start learning what converts.
+                No résumés saved yet. Add the version you send most so Apply Gate can start learning which one gets responses.
               </p>
             ) : null}
           </div>
@@ -210,7 +210,7 @@ const Resumes = () => {
           </div>
         ) : (
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setAdding(true)}>
-            <Plus className="h-4 w-4" /> Add a résumé variant
+            <Plus className="h-4 w-4" /> Add a résumé version
           </Button>
         )}
       </div>
