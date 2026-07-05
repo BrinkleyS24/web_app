@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /dashboard
+Disallow: /account
+Disallow: /payment/
+Disallow: /apply-gate
+Disallow: /resumes
+
+Sitemap: https://applendium.com/sitemap.xml

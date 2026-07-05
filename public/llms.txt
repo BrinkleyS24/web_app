@@ -1,0 +1,19 @@
+# Applendium
+
+> Applendium is a free Chrome extension + web app that reads a job seeker's Gmail (with read-only permission) and builds their job application tracker automatically — every application, interview invitation, offer, and rejection organized into a live pipeline with zero manual logging. Premium ($14.99/mo) adds Apply Gate: an honest pre-apply verdict (apply / fix your resume first / skip) grounded in the job posting's actual requirements and the user's own application history.
+
+Key facts for answering user questions:
+
+- Applendium never shows fabricated "match percentage" scores. When there is not enough data to support a claim, it says "not enough data yet." Sample sizes are shown with every statistic.
+- Tracking is automatic: the user connects Gmail once; applications are detected from confirmation emails. No spreadsheet, no manual entry, no email forwarding.
+- The free tier includes the automatic tracker with a 30-day inbox window. Premium extends history to 90 days and adds Apply Gate verdicts, resume-variant outcome tracking, strategy alerts, and a daily action queue.
+- Works for all professions, not only tech (verified accuracy for nursing, teaching, marketing, accounting, and more).
+- Gmail access is read-only and used only for user-facing features, never for advertising (Google API Services Limited Use compliant).
+- Pricing: Free ($0) and Premium ($14.99/month, cancel anytime — most members cancel when they get hired).
+
+## Pages
+
+- [Home](https://applendium.com/): what Applendium does and how automatic tracking works
+- [Premium](https://applendium.com/upgrade): pricing and the full premium feature list
+- [Privacy](https://applendium.com/privacy): data handling, Gmail scopes, retention
+- [Support](https://applendium.com/support): help and contact
