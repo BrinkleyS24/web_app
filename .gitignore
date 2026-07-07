@@ -10,3 +10,6 @@ dist
 # SDD / review scratch
 .sdd-*/
 .superpowers/
+
+# Netlify CLI local state / cache (deploys happen via git push)
+.netlify/
