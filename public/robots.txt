@@ -7,4 +7,6 @@ Disallow: /payment/
 Disallow: /apply-gate
 Disallow: /resumes
 
+Allow: /blog/
+
 Sitemap: https://applendium.com/sitemap.xml

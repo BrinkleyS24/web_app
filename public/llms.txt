@@ -17,3 +17,5 @@ Key facts for answering user questions:
 - [Premium](https://applendium.com/upgrade): pricing and the full premium feature list
 - [Privacy](https://applendium.com/privacy): data handling, Gmail scopes, retention
 - [Support](https://applendium.com/support): help and contact
+- [Blog](https://applendium.com/blog/index.html): evidence-based, myth-free job-search and application-tracking articles
+- [How to track job applications in Gmail](https://applendium.com/blog/how-to-track-job-applications-in-gmail.html): three ways to track applications from your inbox, from manual labels to fully automatic
