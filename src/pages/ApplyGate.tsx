@@ -1127,12 +1127,16 @@ const ApplyGate = () => {
     },
   });
 
-  const canAnalyze = jobDescription.trim().length > 0;
+  // URL-only analysis is allowed again: the backend fetches the posting with
+  // hardened extraction (SSRF-guarded, redirect-validated, size-capped) and
+  // returns an honest 400 when it can't extract a usable description.
+  const jobUrlLooksFetchable = /^https?:\/\/\S+\.\S+/i.test(jobUrl.trim());
+  const canAnalyze = jobDescription.trim().length > 0 || jobUrlLooksFetchable;
 
   const handleAnalyze = useCallback(() => {
-    if (!jobDescription.trim()) return;
+    if (!jobDescription.trim() && !jobUrlLooksFetchable) return;
     analyzeMutation.mutate();
-  }, [analyzeMutation, jobDescription]);
+  }, [analyzeMutation, jobDescription, jobUrlLooksFetchable]);
 
   const markVerdictActionInCache = useCallback(
     (verdictId: string, action: ApplyGateAction) => {
@@ -1522,7 +1526,7 @@ const ApplyGate = () => {
               onChange={(e) => setJobUrl(e.target.value)}
               placeholder="https://…"
             />
-            <p className="text-xs text-muted-foreground">We won't read the page — this just lets "Apply" open the posting in a new tab.</p>
+            <p className="text-xs text-muted-foreground">If you leave the description empty, we read the posting from this URL (public job pages only). It also lets "Apply" open the posting in a new tab.</p>
           </div>
           {variants.length > 0 ? (
             <div className="space-y-2">
@@ -1567,7 +1571,7 @@ const ApplyGate = () => {
               onChange={(e) => setJobDescription(e.target.value)}
               placeholder="Paste the job description"
             />
-            <p className="text-xs text-muted-foreground">Paste the full job description. URL import is temporarily disabled while we harden extraction.</p>
+            <p className="text-xs text-muted-foreground">Paste the full job description, or leave it empty and we will read the posting from the URL above.</p>
           </div>
           <Button onClick={handleAnalyze} disabled={analyzeMutation.isPending || !canAnalyze}>
             {analyzeMutation.isPending ? "Checking..." : "Get decision"}

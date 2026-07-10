@@ -100,7 +100,7 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
             <p
               class="text-xs text-muted-foreground"
             >
-              We won't read the page — this just lets "Apply" open the posting in a new tab.
+              If you leave the description empty, we read the posting from this URL (public job pages only). It also lets "Apply" open the posting in a new tab.
             </p>
           </div>
           <div
@@ -157,7 +157,7 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
             <p
               class="text-xs text-muted-foreground"
             >
-              Paste the full job description. URL import is temporarily disabled while we harden extraction.
+              Paste the full job description, or leave it empty and we will read the posting from the URL above.
             </p>
           </div>
           <button
