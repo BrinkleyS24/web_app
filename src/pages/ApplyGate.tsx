@@ -2167,7 +2167,7 @@ const ApplyGate = () => {
                   <span className="text-muted-foreground">Résumé screen: <span className={bandTone(outcomeBands.atsPass)}>{outcomeBands.atsPass}</span></span>
                   <span className="text-muted-foreground">Human review: <span className={bandTone(outcomeBands.humanWin)}>{outcomeBands.humanWin}</span></span>
                   {decisionConfidence ? (
-                    <span className="text-muted-foreground">Decision confidence: <span className={bandTone(decisionConfidence)}>{decisionConfidence}</span></span>
+                    <span className="text-muted-foreground">{String(decisionConfidence).toLowerCase() === "high" ? "Confident read" : String(decisionConfidence).toLowerCase() === "medium" ? "Solid read" : "First read, thin signal"}</span>
                   ) : null}
                 </div>
                 {!displayDecisionMissing && riskBreakdown?.summary ? (
