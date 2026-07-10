@@ -434,7 +434,8 @@ function structuredWarningAndBullets(
   const missingPreferredSummary = formatSkillGapSummary(missingPreferred, "Missing preferred skills");
   if (missingPreferredSummary && missingPreferredSummary !== warning) bullets.push(missingPreferredSummary);
 
-  const maxFitNotes = hasGapSignal ? 2 : 4;
+  // Three notes keep the coach line, the experience credit, and the overlap visible together.
+  const maxFitNotes = hasGapSignal ? 3 : 4;
   for (const note of fitNotes) {
     if (!note) continue;
     if (bullets.includes(note)) continue;
