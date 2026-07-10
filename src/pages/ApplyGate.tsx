@@ -1133,6 +1133,38 @@ const ApplyGate = () => {
   const jobUrlLooksFetchable = /^https?:\/\/\S+\.\S+/i.test(jobUrl.trim());
   const canAnalyze = jobDescription.trim().length > 0 || jobUrlLooksFetchable;
 
+  // ── Coach-voice translation ─────────────────────────────────────────
+  // The backend's structured levels (bands, confidence) are model-card
+  // vocabulary. Users get the same facts as a coach would say them; the
+  // precise readings stay available in a details disclosure below.
+  const coachScreeningLine = (atsPass?: string | null, humanWin?: string | null): string | null => {
+    const ats = String(atsPass || "").toLowerCase();
+    const human = String(humanWin || "").toLowerCase();
+    if (!ats && !human) return null;
+    if (ats === "low") {
+      return human === "high"
+        ? "A recruiter's quick scan: your résumé may not surface in the search yet, but when a human actually reads it, you compete well. Getting seen is the battle."
+        : "A recruiter's quick scan: your résumé may not surface in the search yet, and it won't stand out on a fast read. Both need work before this is worth the hour.";
+    }
+    if (human === "low") {
+      return "A recruiter's quick scan: your résumé probably passes the search, but it won't stand out when a human reads it yet.";
+    }
+    if (ats === "high" && human === "high") {
+      return "A recruiter's quick scan: you clear the search and you stand out on the read. Strong screening position.";
+    }
+    return "A recruiter's quick scan: you likely get through the search and hold up on the read. Decent screening position.";
+  };
+
+  const coachConfidenceLine = (level?: string | null, type?: string | null): string | null => {
+    const lvl = String(level || "").toLowerCase();
+    if (!lvl) return null;
+    if (lvl === "high") return "This is a confident read.";
+    if (lvl === "medium") return "This is a solid read, with some open questions noted below.";
+    return String(type || "").toUpperCase() === "CONFLICTED_SIGNAL"
+      ? "Take this read with a grain of salt: the signals point in different directions on this one."
+      : "Take this read with a grain of salt: there isn't much history like this role to lean on yet.";
+  };
+
   const handleAnalyze = useCallback(() => {
     if (!jobDescription.trim() && !jobUrlLooksFetchable) return;
     analyzeMutation.mutate();
@@ -1902,23 +1934,13 @@ const ApplyGate = () => {
             {!currentIsCompressedDecision && (currentDecisionConfidence || currentAssessmentConfidence || currentDecisionConfidenceFactors.length > 0 || currentUncertaintyNotes.length > 0 || currentOpportunityCost?.message) && (
               <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 space-y-1">
                 {currentOutcomeBands ? (
-                  <p className="text-xs text-muted-foreground">
-                    Screening check: résumé screen <span className={bandTone(currentOutcomeBands.atsPass)}>{currentOutcomeBands.atsPass}</span>
-                    <span className="px-1">-</span>
-                    human review <span className={bandTone(currentOutcomeBands.humanWin)}>{currentOutcomeBands.humanWin}</span>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {coachScreeningLine(currentOutcomeBands.atsPass, currentOutcomeBands.humanWin)}
                   </p>
                 ) : null}
                 {currentDecisionConfidence && (
-                  <p className="text-xs text-muted-foreground">
-                    Decision confidence: <span className="text-foreground font-medium">{currentDecisionConfidence}</span>
-                    {currentConfidenceType ? (
-                      <span className="text-muted-foreground"> ({currentConfidenceType.replace(/_/g, " ").toLowerCase()})</span>
-                    ) : null}
-                  </p>
-                )}
-                {currentAssessmentConfidence && (
-                  <p className="text-xs text-muted-foreground">
-                    Assessment quality: <span className="text-foreground font-medium">{currentAssessmentConfidence}</span>
+                  <p className="text-xs text-foreground font-medium leading-relaxed">
+                    {coachConfidenceLine(currentDecisionConfidence, currentConfidenceType)}
                   </p>
                 )}
                 {currentDecisionConfidenceFactors.map((note, idx) => (
@@ -1929,6 +1951,29 @@ const ApplyGate = () => {
                 ))}
                 {currentOpportunityCost?.message ? (
                   <p className="text-xs text-muted-foreground leading-relaxed">{"\u2022"} {currentOpportunityCost.message}</p>
+                ) : null}
+                {(currentOutcomeBands || currentDecisionConfidence || currentAssessmentConfidence) ? (
+                  <details className="pt-1">
+                    <summary className="cursor-pointer text-[11px] text-muted-foreground/80">Exact readings</summary>
+                    <div className="mt-1 space-y-0.5">
+                      {currentOutcomeBands ? (
+                        <p className="text-[11px] text-muted-foreground">
+                          Screening check: r\u00e9sum\u00e9 screen <span className={bandTone(currentOutcomeBands.atsPass)}>{currentOutcomeBands.atsPass}</span>
+                          <span className="px-1">-</span>
+                          human review <span className={bandTone(currentOutcomeBands.humanWin)}>{currentOutcomeBands.humanWin}</span>
+                        </p>
+                      ) : null}
+                      {currentDecisionConfidence ? (
+                        <p className="text-[11px] text-muted-foreground">
+                          Decision confidence: {currentDecisionConfidence}
+                          {currentConfidenceType ? ` (${currentConfidenceType.replace(/_/g, " ").toLowerCase()})` : ""}
+                        </p>
+                      ) : null}
+                      {currentAssessmentConfidence ? (
+                        <p className="text-[11px] text-muted-foreground">Assessment quality: {currentAssessmentConfidence}</p>
+                      ) : null}
+                    </div>
+                  </details>
                 ) : null}
               </div>
             )}
