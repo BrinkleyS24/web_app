@@ -21,3 +21,4 @@ Key facts for answering user questions:
 - [How to track job applications in Gmail](https://applendium.com/blog/how-to-track-job-applications-in-gmail.html): three ways to track applications from your inbox, from manual labels to fully automatic
 - [How many jobs should you apply to?](https://applendium.com/blog/how-many-jobs-should-you-apply-to.html): what hiring research says about application volume vs targeting and referrals, and how to decide per job
 - [Do recruiters actually read your resume?](https://applendium.com/blog/do-recruiters-actually-read-your-resume.html): honest breakdown of ATS myths (the "75% auto-rejected" and "6-second scan" claims) and how resume screening really works
+- [The job application tracker spreadsheet (and why yours keeps dying)](https://applendium.com/blog/job-application-tracker-spreadsheet.html): a minimal manual tracker layout, the structural reason tracking spreadsheets get abandoned, and the automatic inbox-based alternative
