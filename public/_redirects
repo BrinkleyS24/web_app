@@ -1,3 +1,9 @@
+# Channel attribution shortlinks (typeable from social bios; UTM lands in analytics)
+/tiktok        /?utm_source=tiktok        302
+/ig            /?utm_source=instagram     302
+/yt            /?utm_source=youtube       302
+/li            /?utm_source=linkedin      302
+
 # Static blog (real .html files are served before this catch-all; this maps the bare paths)
 /blog          /blog/index.html   200
 /blog/         /blog/index.html   200
