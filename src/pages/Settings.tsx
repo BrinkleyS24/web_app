@@ -112,7 +112,7 @@ export default function Settings() {
     : isPremium;
   const statusLabel = subscription?.status || (subLoading ? "loading" : isPremium ? "active" : "inactive");
   const renewalDate = formatDate(subscription?.current_period_end);
-  const monthlyLimit = subStatus?.quotaData?.limit ?? (isPremium ? 10000 : 100);
+  const monthlyLimit = subStatus?.quotaData?.limit ?? (isPremium ? 10000 : 500);
   const monthlyProcessed = subStatus?.quotaData?.monthlyProcessed ?? 0;
   const billingPortalAvailable = Boolean(subscription?.billingPortalAvailable);
   const accountInitials = (() => {

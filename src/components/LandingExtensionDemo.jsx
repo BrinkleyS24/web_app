@@ -1098,9 +1098,9 @@ export default function LandingExtensionDemo() {
               </span>
               <span
                 className="rounded bg-primary-foreground/10 px-1.5 py-0.5 text-[10px] text-primary-foreground/75"
-                title="47 of 100 tracked applications used on the free plan."
+                title="128 of 500 tracked applications used on the free plan."
               >
-                47/100
+                128/500
               </span>
             </div>
             <div className="text-[10px] text-primary-foreground/60">
