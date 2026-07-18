@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Chrome, Menu, X } from "lucide-react";
 import LandingHero from "../components/landing/LandingHero.jsx";
+import LandingDemoVideo from "../components/landing/LandingDemoVideo.jsx";
 import TiltCard from "../components/landing/TiltCard.jsx";
 import Reveal from "../components/landing/Reveal.jsx";
 import Magnetic from "../components/landing/Magnetic.jsx";
@@ -11,6 +12,7 @@ import { CHROME_WEB_STORE_URL } from "../lib/publicSiteConfig.js";
 import { fetchPremiumPrice, formatPremiumPrice } from "../lib/premiumCheckout.js";
 
 const NAV_LINKS = [
+  { href: "#demo", label: "Demo" },
   { href: "#how-it-works", label: "How it works" },
   { href: "#features", label: "Features" },
   { href: "#premium", label: "Premium" },
@@ -391,6 +393,8 @@ export default function Landing() {
             </div>
           </div>
         </section>
+
+        <LandingDemoVideo />
 
         <section id="how-it-works" className="border-t border-[#E9EAE5] bg-[#F4F5F1]">
           <div className="mx-auto max-w-[1180px] px-6 py-[88px] md:px-8">

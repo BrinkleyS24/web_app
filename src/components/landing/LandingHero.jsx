@@ -405,7 +405,7 @@ export default function LandingHero({ chromeHref }) {
                 </span>
                 <span className="text-[13px] font-semibold lowercase text-white">applendium</span>
                 <span className="landingMono rounded bg-white/[0.06] px-1.5 py-0.5 text-[9px] text-[#9AA7BD]">Free</span>
-                <span className="landingMono rounded bg-white/[0.06] px-1.5 py-0.5 text-[9px] text-[#9AA7BD]">47/100</span>
+                <span className="landingMono rounded bg-white/[0.06] px-1.5 py-0.5 text-[9px] text-[#9AA7BD]">128/500</span>
               </div>
               <span className="landingMono inline-flex items-center gap-1.5 text-[10px] text-[#5FD9AE]">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#34E3A8] shadow-[0_0_8px_2px_rgba(52,227,168,0.6)]" />
