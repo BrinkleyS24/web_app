@@ -109,7 +109,7 @@ export default function Upgrade() {
     }
   }
 
-  async function handleLocalSignOut() {
+  async function handleSignOut() {
     setSignOutBusy(true);
     setCheckoutError("");
     try {
@@ -229,6 +229,21 @@ export default function Upgrade() {
                   </div>
                 )}
               </div>
+
+              {authReady && user && !isPremium ? (
+                <p className="mt-4 text-center text-xs text-[#98A1B3]">
+                  Signed in as <span className="font-semibold text-[#C9D0DC]">{signedInEmail}</span>
+                  {" · "}
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    disabled={signOutBusy}
+                    className="font-semibold text-[#C9D0DC] underline underline-offset-2 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {signOutBusy ? "Signing out..." : "Sign out"}
+                  </button>
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -265,7 +280,7 @@ export default function Upgrade() {
                     <button
                       type="button"
                       className="landingButtonDark inline-flex items-center justify-center rounded-lg bg-[#0B1220] px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#0E8C63] disabled:cursor-not-allowed disabled:opacity-60"
-                      onClick={handleLocalSignOut}
+                      onClick={handleSignOut}
                       disabled={signOutBusy}
                     >
                       {signOutBusy ? "Signing out..." : "Sign out"}
