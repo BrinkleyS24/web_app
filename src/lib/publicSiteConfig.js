@@ -33,7 +33,7 @@ export const CHROME_STORE_STATUS_SENTENCE = CHROME_EXTENSION_IS_LIVE
 // Founding-member lifetime deal (one-time Stripe Payment Link).
 // Empty string = the founding section does not render. Paste the live
 // Payment Link URL here (or set VITE_FOUNDING_CHECKOUT_URL) to launch it.
-const DEFAULT_FOUNDING_CHECKOUT_URL = "";
+const DEFAULT_FOUNDING_CHECKOUT_URL = "https://buy.stripe.com/28EeVc68A7ZQ5D2bTmeQM00";
 
 export const FOUNDING_CHECKOUT_URL =
   (import.meta.env.VITE_FOUNDING_CHECKOUT_URL || DEFAULT_FOUNDING_CHECKOUT_URL).trim();
