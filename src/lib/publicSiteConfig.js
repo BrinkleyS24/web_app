@@ -29,3 +29,11 @@ export const CHROME_STORE_STATUS_LABEL = CHROME_EXTENSION_IS_LIVE
 export const CHROME_STORE_STATUS_SENTENCE = CHROME_EXTENSION_IS_LIVE
   ? "The Chrome extension is available now."
   : "The Chrome extension listing is under review right now.";
+
+// Founding-member lifetime deal (one-time Stripe Payment Link).
+// Empty string = the founding section does not render. Paste the live
+// Payment Link URL here (or set VITE_FOUNDING_CHECKOUT_URL) to launch it.
+const DEFAULT_FOUNDING_CHECKOUT_URL = "";
+
+export const FOUNDING_CHECKOUT_URL =
+  (import.meta.env.VITE_FOUNDING_CHECKOUT_URL || DEFAULT_FOUNDING_CHECKOUT_URL).trim();

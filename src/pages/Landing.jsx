@@ -6,9 +6,10 @@ import LandingDemoVideo from "../components/landing/LandingDemoVideo.jsx";
 import TiltCard from "../components/landing/TiltCard.jsx";
 import Reveal from "../components/landing/Reveal.jsx";
 import Magnetic from "../components/landing/Magnetic.jsx";
+import LandingFounding from "../components/landing/LandingFounding.jsx";
 import usePageMetadata from "../lib/usePageMetadata.js";
 import { premiumUpdatesHref } from "../lib/premiumLaunchContent.js";
-import { CHROME_WEB_STORE_URL } from "../lib/publicSiteConfig.js";
+import { CHROME_WEB_STORE_URL, FOUNDING_CHECKOUT_URL } from "../lib/publicSiteConfig.js";
 import { fetchPremiumPrice, formatPremiumPrice } from "../lib/premiumCheckout.js";
 
 const NAV_LINKS = [
@@ -16,6 +17,7 @@ const NAV_LINKS = [
   { href: "#how-it-works", label: "How it works" },
   { href: "#features", label: "Features" },
   { href: "#premium", label: "Premium" },
+  ...(FOUNDING_CHECKOUT_URL ? [{ href: "#founding", label: "Founding" }] : []),
   { href: "#privacy", label: "Privacy" },
   { to: "/terms", label: "Terms" },
 ];
@@ -571,6 +573,8 @@ export default function Landing() {
             </Reveal>
           </div>
         </section>
+
+        <LandingFounding priceLabel={priceLabel} />
 
         <section
           id="privacy"

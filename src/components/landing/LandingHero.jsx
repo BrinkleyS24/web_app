@@ -386,6 +386,21 @@ export default function LandingHero({ chromeHref }) {
               </span>
             ))}
           </div>
+
+          <a
+            href="https://www.producthunt.com/products/applendium?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-applendium"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-6 inline-block opacity-90 transition-opacity hover:opacity-100"
+            data-testid="product-hunt-badge"
+          >
+            <img
+              alt="Applendium - Your AI copilot for every job application. | Product Hunt"
+              width="250"
+              height="54"
+              src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1200982&theme=dark&t=1784510126800"
+            />
+          </a>
         </motion.div>
 
         {/* RIGHT — the actual extension popup (interactive) */}
