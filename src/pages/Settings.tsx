@@ -5,6 +5,7 @@ import { apiFetch } from "../lib/api.js";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { ResumePrompt } from "@/components/ResumePrompt";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   CheckCircle2,
   CreditCard,
@@ -13,6 +14,7 @@ import {
   FileText,
   Loader2,
   LogOut,
+  MessageSquareText,
   RefreshCw,
   User,
 } from "lucide-react";
@@ -25,6 +27,14 @@ type SubscriptionStatus = {
   subscription_id?: string;
   billingPortalAvailable?: boolean;
   billingSource?: string;
+};
+
+type CoachPreference = {
+  /** The user's choice: does the coach get to speak? */
+  enabled?: boolean;
+  /** Whether that choice currently has any effect (premium + backend flag on). */
+  available?: boolean;
+  premium?: boolean;
 };
 
 type SubscriptionResponse = {
@@ -57,6 +67,47 @@ export default function Settings() {
   const [subLoading, setSubLoading] = useState(false);
   const [subError, setSubError] = useState("");
   const [busyPortal, setBusyPortal] = useState(false);
+  const [coachPref, setCoachPref] = useState<CoachPreference | null>(null);
+  const [coachLoading, setCoachLoading] = useState(false);
+  const [coachSaving, setCoachSaving] = useState(false);
+  const [coachError, setCoachError] = useState("");
+
+  async function fetchCoachPreference() {
+    if (!user) {
+      setCoachPref(null);
+      return;
+    }
+    setCoachError("");
+    setCoachLoading(true);
+    try {
+      const resp = await apiFetch("/api/user/coach-preference", { method: "GET" });
+      setCoachPref(resp || null);
+    } catch (error: any) {
+      setCoachError(error?.message || "Failed to load your coach settings.");
+    } finally {
+      setCoachLoading(false);
+    }
+  }
+
+  async function saveCoachPreference(nextEnabled: boolean) {
+    const previous = coachPref;
+    setCoachError("");
+    setCoachSaving(true);
+    // Optimistic: the switch should move under the finger, not after a round trip.
+    setCoachPref((current) => ({ ...(current || {}), enabled: nextEnabled }));
+    try {
+      const resp = await apiFetch("/api/user/coach-preference", {
+        method: "POST",
+        body: JSON.stringify({ enabled: nextEnabled }),
+      });
+      setCoachPref(resp || null);
+    } catch (error: any) {
+      setCoachPref(previous);
+      setCoachError(error?.message || "Failed to save your coach settings.");
+    } finally {
+      setCoachSaving(false);
+    }
+  }
 
   async function fetchSubStatus() {
     if (!user) {
@@ -97,6 +148,7 @@ export default function Settings() {
   useEffect(() => {
     if (!user) return;
     fetchSubStatus();
+    fetchCoachPreference();
   }, [user?.uid]);
 
   async function handleSignOut() {
@@ -201,6 +253,47 @@ export default function Settings() {
           </p>
           <ResumePrompt />
         </section>
+
+        {isPremium ? (
+          <section className="glass-card space-y-4 rounded-2xl p-6" data-testid="coach-voice-settings">
+            <div className="flex items-center gap-2">
+              <MessageSquareText className="h-5 w-5 text-accent" />
+              <h2 className="text-base font-semibold text-foreground">Coach voice</h2>
+            </div>
+
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-2">
+                <p className="text-sm text-foreground">
+                  Write your next-step suggestions in plain language instead of a fixed template.
+                </p>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  When this is on, Applendium sends the structured details of a thread (company, role,
+                  sender domain, stage and dates) to an AI model to draft the suggestion. It does not
+                  send the text of your emails. Turn it off and you still get every suggestion, just in
+                  the standard wording.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 sm:pt-1">
+                {coachSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" /> : null}
+                <Switch
+                  aria-label="Coach voice"
+                  checked={coachPref?.enabled !== false}
+                  disabled={coachLoading || coachSaving}
+                  onCheckedChange={saveCoachPreference}
+                />
+              </div>
+            </div>
+
+            {coachPref && coachPref.available === false && coachPref.enabled !== false ? (
+              <p className="text-xs text-muted-foreground">
+                The coach voice is on for your account but is not running yet. Suggestions stay in the
+                standard wording until it is enabled on the server.
+              </p>
+            ) : null}
+
+            {coachError ? <p className="text-xs text-red-500">{coachError}</p> : null}
+          </section>
+        ) : null}
 
         <section className="glass-card space-y-5 rounded-2xl p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
