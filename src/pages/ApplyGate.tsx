@@ -14,6 +14,7 @@ import {
   fetchApplyGateHistory,
   updateApplyGateAction,
   fetchResume,
+  saveResume,
   fetchResumeVariants,
   fetchVariantScoreboard,
   type ApplyGateResult,
@@ -1039,6 +1040,25 @@ const ApplyGate = () => {
 
   const hasResume = Boolean(resumeQuery.data?.resumeText && resumeQuery.data.resumeText.trim().length > 20);
 
+  // Apply Gate compares a posting against the user's actual experience, so with
+  // no résumé on file there is nothing to compare and the score is guesswork.
+  // A real premium account tracked 85 applications and never got past this:
+  // the only signal was a 9px "Resume: not found" badge, and the form still ran.
+  // Refuse the form instead, and offer the paste box right here so the setup
+  // cliff is one step, not a trip to another page. (Churn audit 2026-07-26, C5.)
+  const needsResume = resumeQuery.isSuccess && !hasResume;
+  const [resumePaste, setResumePaste] = useState("");
+  const MIN_RESUME_CHARS = 200;
+  const resumePasteLength = resumePaste.trim().length;
+  const saveResumeMutation = useMutation({
+    mutationFn: (text: string) => saveResume(text),
+    onSuccess: () => {
+      setResumePaste("");
+      queryClient.invalidateQueries({ queryKey: ["user-resume"] });
+      queryClient.invalidateQueries({ queryKey: ["resume-variants"] });
+    },
+  });
+
   // Résumé variants: pick which one to run the gate against; the choice rides
   // analyze → verdict → apply so the outcome attributes back to that variant.
   const variantsQuery = useQuery({
@@ -1132,7 +1152,7 @@ const ApplyGate = () => {
   // hardened extraction (SSRF-guarded, redirect-validated, size-capped) and
   // returns an honest 400 when it can't extract a usable description.
   const jobUrlLooksFetchable = /^https?:\/\/\S+\.\S+/i.test(jobUrl.trim());
-  const canAnalyze = jobDescription.trim().length > 0 || jobUrlLooksFetchable;
+  const canAnalyze = (jobDescription.trim().length > 0 || jobUrlLooksFetchable) && !needsResume;
 
   // ── Coach-voice translation ─────────────────────────────────────────
   // The backend's structured levels (bands, confidence) are model-card
@@ -1528,6 +1548,59 @@ const ApplyGate = () => {
               Resume: {hasResume ? "saved" : "not found"}
             </span>
           </div>
+          {needsResume ? (
+          <div className="space-y-3" data-testid="apply-gate-resume-required">
+            <div className="rounded-xl border border-border bg-muted/40 p-4">
+              <p className="text-sm font-semibold text-foreground">Add your résumé to unlock Apply Gate</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Every verdict compares a posting against your actual experience. With nothing on file
+                there is nothing to compare, so a score would be guesswork. Paste it once and it is
+                reused for every verdict after this.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground" htmlFor="resume-paste">Your résumé</label>
+              <textarea
+                id="resume-paste"
+                className="w-full min-h-[200px] rounded-md border border-border bg-background px-3 py-2 text-sm"
+                value={resumePaste}
+                onChange={(e) => setResumePaste(e.target.value)}
+                placeholder="Paste the full text of your résumé. Plain text is fine — formatting does not matter."
+              />
+              <p className="text-xs text-muted-foreground">
+                Select all in your résumé document and paste here. Layout is ignored; only the wording is read.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                onClick={() => saveResumeMutation.mutate(resumePaste.trim())}
+                disabled={saveResumeMutation.isPending || resumePasteLength < MIN_RESUME_CHARS}
+              >
+                {saveResumeMutation.isPending ? "Saving..." : "Save résumé"}
+              </Button>
+              <a
+                href="/resumes"
+                className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+              >
+                Manage résumés
+              </a>
+            </div>
+            {resumePasteLength > 0 && resumePasteLength < MIN_RESUME_CHARS ? (
+              <p className="text-xs text-muted-foreground">
+                That is shorter than a résumé usually runs ({resumePasteLength} of {MIN_RESUME_CHARS} characters).
+                Paste the whole thing so the gaps it finds are real.
+              </p>
+            ) : null}
+            {saveResumeMutation.isError ? (
+              <p className="text-xs text-destructive">
+                {saveResumeMutation.error instanceof Error
+                  ? saveResumeMutation.error.message
+                  : "Could not save your résumé. Try again."}
+              </p>
+            ) : null}
+          </div>
+          ) : (
+          <>
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground" htmlFor="job-title">Job Title</label>
             <input
@@ -1615,6 +1688,8 @@ const ApplyGate = () => {
                 ? analyzeMutation.error.message
                 : "Apply Gate could not analyze this role. Paste the full job description and try again."}
             </p>
+          )}
+          </>
           )}
           </div>
 
