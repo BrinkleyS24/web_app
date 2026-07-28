@@ -10,6 +10,7 @@ import Resumes from "./Resumes";
 const {
   fetchResumeVariants,
   fetchVariantScoreboard,
+  fetchApplicationStats,
   createResumeVariant,
   setDefaultResumeVariant,
   archiveResumeVariant,
@@ -17,6 +18,7 @@ const {
 } = vi.hoisted(() => ({
   fetchResumeVariants: vi.fn(),
   fetchVariantScoreboard: vi.fn(),
+  fetchApplicationStats: vi.fn(),
   createResumeVariant: vi.fn(),
   setDefaultResumeVariant: vi.fn(),
   archiveResumeVariant: vi.fn(),
@@ -33,6 +35,7 @@ vi.mock("@/lib/emails", async () => {
     ...actual,
     fetchResumeVariants,
     fetchVariantScoreboard,
+    fetchApplicationStats,
     createResumeVariant,
     setDefaultResumeVariant,
     archiveResumeVariant,
@@ -53,10 +56,15 @@ function renderPage() {
 
 beforeEach(() => {
   fetchVariantScoreboard.mockResolvedValue({ success: true, scoreboard: { minSample: 5, perVariant: [] }, recommendation: null });
+  fetchApplicationStats.mockResolvedValue({
+    success: true,
+    stats: { applications: { applied: 0, interviewed: 0, offered: 0, rejected: 0, total: 0 }, emails: { linked: 0, total: 0, ungrouped: 0 } },
+  });
   createResumeVariant.mockResolvedValue({ success: true, id: "new-1" });
   setDefaultResumeVariant.mockResolvedValue({ success: true });
   archiveResumeVariant.mockResolvedValue({ success: true });
   renameResumeVariant.mockResolvedValue({ success: true });
+  localStorage.clear();
 });
 
 afterEach(() => vi.clearAllMocks());
@@ -155,5 +163,79 @@ describe("Résumés page", () => {
     const arg = createResumeVariant.mock.calls[0][0];
     expect(arg.name).toBe("Generic");
     expect(arg.text).toBe("a valid resume body well over twenty characters long");
+  });
+
+  describe("second-variant nudge", () => {
+    beforeEach(() => {
+      fetchResumeVariants.mockResolvedValue({
+        success: true,
+        variants: [{ id: "A", name: "My résumé", isDefault: true, createdAt: "", charCount: 1200 }],
+      });
+    });
+
+    test("shows after a rejection when only one variant exists", async () => {
+      fetchApplicationStats.mockResolvedValue({
+        success: true,
+        stats: { applications: { applied: 3, interviewed: 0, offered: 0, rejected: 2, total: 3 }, emails: { linked: 0, total: 0, ungrouped: 0 } },
+      });
+      renderPage();
+
+      expect(await screen.findByText(/You've had 2 rejections\. Try a different résumé next time\./i)).toBeInTheDocument();
+    });
+
+    test("stays hidden with zero rejections", async () => {
+      renderPage();
+
+      await waitFor(() => expect(screen.getByText("My résumé")).toBeInTheDocument());
+      expect(screen.queryByText(/Try a different résumé next time/i)).not.toBeInTheDocument();
+    });
+
+    test("stays hidden once a second variant already exists", async () => {
+      fetchResumeVariants.mockResolvedValue({
+        success: true,
+        variants: [
+          { id: "A", name: "My résumé", isDefault: true, createdAt: "", charCount: 1200 },
+          { id: "B", name: "QA-focused", isDefault: false, createdAt: "", charCount: 1300 },
+        ],
+      });
+      fetchApplicationStats.mockResolvedValue({
+        success: true,
+        stats: { applications: { applied: 3, interviewed: 0, offered: 0, rejected: 2, total: 3 }, emails: { linked: 0, total: 0, ungrouped: 0 } },
+      });
+      renderPage();
+
+      await waitFor(() => expect(screen.getByText("My résumé")).toBeInTheDocument());
+      expect(screen.queryByText(/Try a different résumé next time/i)).not.toBeInTheDocument();
+    });
+
+    test("dismiss hides it and the dismissal survives a fresh mount", async () => {
+      fetchApplicationStats.mockResolvedValue({
+        success: true,
+        stats: { applications: { applied: 1, interviewed: 0, offered: 0, rejected: 1, total: 1 }, emails: { linked: 0, total: 0, ungrouped: 0 } },
+      });
+      renderPage();
+
+      const nudge = await screen.findByText(/You've had a rejection\. Try a different résumé next time\./i);
+      expect(nudge).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: /Dismiss/i }));
+      expect(screen.queryByText(/Try a different résumé next time/i)).not.toBeInTheDocument();
+
+      renderPage();
+      await waitFor(() => expect(screen.getByText("My résumé")).toBeInTheDocument());
+      expect(screen.queryByText(/Try a different résumé next time/i)).not.toBeInTheDocument();
+    });
+
+    test("clicking the nudge's CTA opens the add-variant form", async () => {
+      fetchApplicationStats.mockResolvedValue({
+        success: true,
+        stats: { applications: { applied: 1, interviewed: 0, offered: 0, rejected: 1, total: 1 }, emails: { linked: 0, total: 0, ungrouped: 0 } },
+      });
+      renderPage();
+
+      await screen.findByText(/You've had a rejection\. Try a different résumé next time\./i);
+      const [nudgeCta] = screen.getAllByRole("button", { name: /Add a résumé version/i });
+      await userEvent.click(nudgeCta);
+      expect(screen.getByPlaceholderText(/Name/i)).toBeInTheDocument();
+    });
   });
 });

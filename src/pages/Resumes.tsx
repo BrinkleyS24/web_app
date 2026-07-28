@@ -2,10 +2,11 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronDown, FileText, Loader2, Plus, Star, Trash2 } from "lucide-react";
+import { Check, ChevronDown, FileText, Loader2, Plus, Star, Trash2, X } from "lucide-react";
 import {
   fetchResumeVariants,
   fetchVariantScoreboard,
+  fetchApplicationStats,
   createResumeVariant,
   setDefaultResumeVariant,
   archiveResumeVariant,
@@ -15,6 +16,24 @@ import {
 
 function roundedChars(n: number) {
   return `${Math.round(n / 100) * 100}+ chars`;
+}
+
+const VARIANT_NUDGE_DISMISS_KEY = "variantNudge.dismissed";
+
+function readVariantNudgeDismissed(): boolean {
+  try {
+    return localStorage.getItem(VARIANT_NUDGE_DISMISS_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writeVariantNudgeDismissed() {
+  try {
+    localStorage.setItem(VARIANT_NUDGE_DISMISS_KEY, "true");
+  } catch {
+    /* private mode — ignore */
+  }
 }
 
 function outcomeBadge(outcome: VariantBreakdownRow["outcome"]) {
@@ -58,11 +77,13 @@ const Resumes = () => {
   const queryClient = useQueryClient();
   const variantsQuery = useQuery({ queryKey: ["resume-variants"], queryFn: fetchResumeVariants });
   const scoreboardQuery = useQuery({ queryKey: ["variant-scoreboard"], queryFn: () => fetchVariantScoreboard() });
+  const statsQuery = useQuery({ queryKey: ["application-stats"], queryFn: fetchApplicationStats });
 
   const [adding, setAdding] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draft, setDraft] = useState("");
   const [openDrilldowns, setOpenDrilldowns] = useState<Set<string>>(new Set());
+  const [nudgeDismissed, setNudgeDismissed] = useState(readVariantNudgeDismissed);
 
   const toggleDrilldown = (id: string) => {
     setOpenDrilldowns((prev) => {
@@ -78,6 +99,21 @@ const Resumes = () => {
     (scoreboardQuery.data?.scoreboard?.perVariant ?? []).map((r) => [r.variantId, r]),
   );
   const breakdown = scoreboardQuery.data?.breakdown ?? {};
+
+  // Nudge toward a second variant: with only one résumé on file, Apply Gate has
+  // nothing to compare and the outcome-steering guidance can never fire. A
+  // rejection is the natural moment to suggest trying a different version.
+  const rejectedCount = statsQuery.data?.stats?.applications?.rejected ?? 0;
+  const showVariantNudge =
+    !nudgeDismissed &&
+    !variantsQuery.isLoading &&
+    !statsQuery.isLoading &&
+    variants.length === 1 &&
+    rejectedCount > 0;
+  const dismissVariantNudge = () => {
+    writeVariantNudgeDismissed();
+    setNudgeDismissed(true);
+  };
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["resume-variants"] });
@@ -102,6 +138,35 @@ const Resumes = () => {
             Save the versions you tailor, then see which one actually gets interviews — and which gets auto-rejected.
           </p>
         </div>
+
+        {showVariantNudge ? (
+          <div className="glass-card relative space-y-1.5 rounded-xl border border-accent/20 bg-accent/10 p-4">
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={dismissVariantNudge}
+              className="absolute right-3 top-3 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="flex items-start gap-2 pr-6">
+              <FileText className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+              <div>
+                <p className="text-xs font-semibold leading-snug text-foreground">
+                  {rejectedCount === 1
+                    ? "You've had a rejection. Try a different résumé next time."
+                    : `You've had ${rejectedCount} rejections. Try a different résumé next time.`}
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Save a second version and Apply Gate will start tracking which one actually gets responses.
+                </p>
+                <Button size="sm" className="mt-2 gap-1.5" onClick={() => setAdding(true)}>
+                  <Plus className="h-3.5 w-3.5" /> Add a résumé version
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {variantsQuery.isLoading ? (
           <div className="glass-card flex items-center gap-2 rounded-xl px-5 py-3 text-sm text-muted-foreground">
