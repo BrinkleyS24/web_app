@@ -6,7 +6,8 @@ import { useAuth } from "../lib/AuthContext.jsx";
 import { getApiBaseUrl } from "../lib/api.js";
 import { startPremiumCheckout, fetchPremiumPrice, formatPremiumPrice } from "../lib/premiumCheckout.js";
 import usePageMetadata from "../lib/usePageMetadata.js";
-import { CHROME_WEB_STORE_URL } from "../lib/publicSiteConfig.js";
+import LandingFounding from "../components/landing/LandingFounding.jsx";
+import { CHROME_WEB_STORE_URL, FOUNDING_CHECKOUT_URL } from "../lib/publicSiteConfig.js";
 
 const FREE_FEATURES = [
   "Pipeline by stage, live from Gmail",
@@ -66,6 +67,13 @@ export default function Upgrade() {
   const formattedPrice = formatPremiumPrice(premiumPrice);
   const isPremium = plan === "premium";
   const authReady = !loading && !planLoading;
+  // The founding seat is a one-time Payment Link fulfilled by hand, and the manual
+  // grant path only works on accounts with no stripe_customer_id. Offering it to a
+  // live subscriber would sell a second, unreconcilable entitlement -- so hide it
+  // once we know the visitor is premium. While auth is still resolving `plan` is
+  // undefined, which keeps the offer visible for the anonymous majority with no
+  // load-in delay; a premium user sees it only for the moment before plan lands.
+  const showFounding = Boolean(FOUNDING_CHECKOUT_URL) && !isPremium;
   const isLocalDevWorkspace =
     import.meta.env.DEV
     && typeof window !== "undefined"
@@ -133,7 +141,7 @@ export default function Upgrade() {
       <BrandHeader />
 
       <main>
-        <section className="mx-auto max-w-[980px] px-6 pb-24 pt-20 md:px-8">
+        <section className={`mx-auto max-w-[980px] px-6 pt-20 md:px-8 ${showFounding ? "pb-16" : "pb-24"}`}>
           <div className="text-center">
             <p className="landingMono text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0E8C63]">
               Premium
@@ -145,6 +153,31 @@ export default function Upgrade() {
               The tracker stays free forever. Premium adds the decision layer on top of your inbox.
             </p>
           </div>
+
+          {showFounding ? (
+            <a
+              href="#founding"
+              data-testid="founding-banner"
+              className="mt-10 flex flex-col items-start gap-3 rounded-[14px] border border-[#D9EDE4] bg-[#EAF5F0] px-5 py-4 transition-colors hover:border-[#0E8C63] sm:flex-row sm:items-center sm:justify-between sm:gap-6"
+            >
+              <div className="min-w-0">
+                <p className="landingMono text-[10px] font-bold uppercase tracking-[0.16em] text-[#0E8C63]">
+                  Founding members &middot; 20 seats
+                </p>
+                <p className="mt-1.5 text-[15px] leading-[1.55] text-[#0B1220]">
+                  <span className="font-semibold">$79 once, premium for life.</span>{" "}
+                  <span className="text-[#5C6470]">
+                    Founding seats fund the independent security audit that removes the
+                    &quot;unverified app&quot; notice for everyone.
+                  </span>
+                </p>
+              </div>
+              <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[14px] font-semibold text-[#0E8C63]">
+                See the offer
+                <ArrowRight className="h-4 w-4" />
+              </span>
+            </a>
+          ) : null}
 
           <div className="mt-14 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[1fr_1.2fr]">
             <div className="rounded-[18px] border border-[#E9EAE5] bg-white p-8">
@@ -331,6 +364,8 @@ export default function Upgrade() {
             </a>
           </p>
         </section>
+
+        {showFounding ? <LandingFounding priceLabel={formattedPrice} /> : null}
       </main>
     </div>
   );
