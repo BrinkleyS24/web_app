@@ -889,6 +889,8 @@ export type ApplyGateRequirementClassification = {
   label: string;
   classification: "hard" | "semi-hard" | "soft";
   enforcementLikelihood: number;
+  /** null = not evaluated. Only `true` suppresses the screening-risk framing. */
+  satisfied?: boolean | null;
   source?: string;
 };
 
