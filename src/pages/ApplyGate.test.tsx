@@ -671,6 +671,66 @@ describe("ApplyGate current UI", () => {
     });
   });
 
+  test("a positive primary driver is not dressed up as a gap", async () => {
+    // Live repro 2026-08-02 (Onebrief SDET). `primary_rejection_drivers[0]` is not always a
+    // rejection driver: when the human-readiness signal is strong the backend deliberately puts
+    // a POSITIVE sentence there, meaning "no single hard gap drives this". The banner picked its
+    // red "Key gap to review" prefix from the verdict STATUS alone, so it labeled a compliment
+    // as a gap — the same defect as listing a satisfied requirement as a screening risk.
+    const positiveDriver = "The human-readiness signal is the strongest part of this application.";
+    analyzeJobAlignment.mockResolvedValue({
+      ...baseResult,
+      verdict: "potential_fit",
+      reasons: [],
+      scoringBreakdown: { ...baseResult.scoringBreakdown, hardBlocker: false, riskFlags: [] },
+      explanation: {
+        decision: "apply_now",
+        primary_driver: "HUMAN_COMPETITIVE",
+        primary_rejection_drivers: [positiveDriver],
+        hard_blockers: [],
+        role_core_gaps: [],
+        missing_required: [],
+        missing_preferred: [],
+        fit_notes: [],
+      },
+    });
+    renderPage();
+
+    await runAnalyze({ jobTitle: "Software Development Engineer in Test" });
+
+    await waitFor(() => {
+      expect(screen.getByText(`What's driving this: ${positiveDriver}`)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(new RegExp(`Key gap to review: ${positiveDriver}`))).not.toBeInTheDocument();
+  });
+
+  test("a real gap keeps the red warning prefix", async () => {
+    // The paired negative: the suppression above must not swallow genuine risk framing.
+    const gapDriver = "Required education level is missing for this posting.";
+    analyzeJobAlignment.mockResolvedValue({
+      ...baseResult,
+      verdict: "potential_fit",
+      reasons: [],
+      scoringBreakdown: { ...baseResult.scoringBreakdown, hardBlocker: false, riskFlags: [] },
+      explanation: {
+        decision: "apply_now",
+        primary_rejection_drivers: [gapDriver],
+        hard_blockers: [],
+        role_core_gaps: [],
+        missing_required: [],
+        missing_preferred: [],
+        fit_notes: [],
+      },
+    });
+    renderPage();
+
+    await runAnalyze({ jobTitle: "Software Development Engineer in Test" });
+
+    await waitFor(() => {
+      expect(screen.getByText(`Key gap to review: ${gapDriver}`)).toBeInTheDocument();
+    });
+  });
+
   test("passes optional company name and renders it for pasted descriptions", async () => {
     analyzeJobAlignment.mockResolvedValue({
       ...baseResult,

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Check, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronUp, Info, Loader2 } from "lucide-react";
 import {
   normalizeCompanyName,
   splitRoleAndCompany as splitApplyGateRoleAndCompany,
@@ -294,11 +294,34 @@ function parseHistoryReasons(raw: string | null | undefined) {
   return [String(raw)];
 }
 
+// One predicate for "does this sentence describe a deficiency?", shared by the reason picker
+// and the warning banner so the two can never disagree about the same string.
+const RISK_LANGUAGE = /\b(missing|lack|gap|risk|weak|below|limited|mismatch|not shown|insufficient|blocker|stretch|short of|no evidence)\b/i;
+
+function readsAsRisk(text: string | null | undefined) {
+  return RISK_LANGUAGE.test(String(text || ""));
+}
+
 function warningPrefixForStatus(status: VerdictStatus) {
   if (status === "potential") return "Key gap to review";
   if (status === "risky") return "Likely rejection driver";
   if (status === "not-recommended") return "Primary blocker";
   return "Risk note";
+}
+
+/**
+ * `primary_rejection_drivers[0]` is not always a rejection driver. When the human-readiness
+ * signal is strong the backend deliberately puts a POSITIVE sentence there ("The human-readiness
+ * signal is the strongest part of this application"), meaning "no single hard gap drives this".
+ * Choosing the red banner and its "Key gap to review" prefix from the verdict STATUS alone
+ * labeled that compliment as a gap — the same defect as listing a satisfied requirement as a
+ * screening risk. The prefix and the tone now both consult the sentence they are wrapping.
+ */
+function warningPresentation(status: VerdictStatus, message: string | null | undefined) {
+  if (!readsAsRisk(message)) {
+    return { prefix: "What's driving this", isRisk: false } as const;
+  }
+  return { prefix: warningPrefixForStatus(status), isRisk: true } as const;
 }
 
 
@@ -344,8 +367,7 @@ function truncateReason(reason: string, maxLength = 110) {
 function pickWarningReason(reasons: string[]) {
   const items = (reasons || []).map((entry) => String(entry || "").trim()).filter(Boolean);
   if (items.length === 0) return null;
-  const riskLike = items.find((entry) => /\b(missing|lack|gap|risk|weak|below|limited|mismatch|not shown|insufficient)\b/i.test(entry));
-  return riskLike || items[0];
+  return items.find(readsAsRisk) || items[0];
 }
 
 function warningText(reason: string | null | undefined, maxLength = 140) {
@@ -1968,23 +1990,36 @@ const ApplyGate = () => {
               ))}
             </div>
 
-            {(!currentIsCompressedDecision && currentStatus !== "strong" && currentWarning) && (
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/5 border border-destructive/10">
-                <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-                <div className="text-sm text-destructive leading-snug">
-                  <span>{warningPrefixForStatus(currentStatus || "risky")}: {currentWarning}</span>
-                  {currentWarningCanExpand && (
-                    <button
-                      type="button"
-                      className="ml-1 underline underline-offset-2"
-                      onClick={() => setIsCurrentWarningExpanded((prev) => !prev)}
-                    >
-                      {isCurrentWarningExpanded ? "Show less" : "Read more"}
-                    </button>
+            {(!currentIsCompressedDecision && currentStatus !== "strong" && currentWarning) && (() => {
+              // Classify the FULL sentence, not the truncated one, so an ellipsis can never
+              // change whether this reads as a risk.
+              const presentation = warningPresentation(currentStatus || "risky", currentWarningFull);
+              return (
+                <div
+                  className={presentation.isRisk
+                    ? "flex items-start gap-2 p-3 rounded-lg bg-destructive/5 border border-destructive/10"
+                    : "flex items-start gap-2 p-3 rounded-lg bg-muted/30 border border-border/60"}
+                >
+                  {presentation.isRisk ? (
+                    <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                  ) : (
+                    <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
                   )}
+                  <div className={presentation.isRisk ? "text-sm text-destructive leading-snug" : "text-sm text-muted-foreground leading-snug"}>
+                    <span>{presentation.prefix}: {currentWarning}</span>
+                    {currentWarningCanExpand && (
+                      <button
+                        type="button"
+                        className="ml-1 underline underline-offset-2"
+                        onClick={() => setIsCurrentWarningExpanded((prev) => !prev)}
+                      >
+                        {isCurrentWarningExpanded ? "Show less" : "Read more"}
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {!currentIsCompressedDecision && currentRequirementLedgerItems.length > 0 && (
               <div className="rounded-lg border border-border/70 bg-background/70 p-3 space-y-2">
@@ -2252,11 +2287,21 @@ const ApplyGate = () => {
                 {historyVisibleReasons.map((reason, index) => (
                   <p key={index} className="text-sm text-muted-foreground leading-relaxed">• {reason}</p>
                 ))}
-                {!displayDecisionMissing && status !== "strong" && warning && (
-                  <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/5 border border-destructive/10">
-                    <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-                    <div className="text-sm text-destructive leading-snug">
-                      <span>{warningPrefixForStatus(status)}: {warning}</span>
+                {!displayDecisionMissing && status !== "strong" && warning && (() => {
+                  const presentation = warningPresentation(status, warningFull);
+                  return (
+                  <div
+                    className={presentation.isRisk
+                      ? "flex items-start gap-2 p-3 rounded-lg bg-destructive/5 border border-destructive/10"
+                      : "flex items-start gap-2 p-3 rounded-lg bg-muted/30 border border-border/60"}
+                  >
+                    {presentation.isRisk ? (
+                      <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                    ) : (
+                      <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                    )}
+                    <div className={presentation.isRisk ? "text-sm text-destructive leading-snug" : "text-sm text-muted-foreground leading-snug"}>
+                      <span>{presentation.prefix}: {warning}</span>
                       {warningCanExpand && (
                         <button
                           type="button"
@@ -2268,7 +2313,8 @@ const ApplyGate = () => {
                       )}
                     </div>
                   </div>
-                )}
+                  );
+                })()}
                 <div className="space-y-2 pt-1">
                   <div className="flex flex-wrap items-center gap-2">
                     {decisionActions.map((actionItem) => (
