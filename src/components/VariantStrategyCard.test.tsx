@@ -144,4 +144,38 @@ describe("VariantStrategyCard", () => {
     render(<VariantStrategyCard strategy={strategy} />);
     expect(screen.queryByText(/Learning from your/i)).not.toBeInTheDocument();
   });
+
+  test("a buried gap shows the existing line it would rewrite", () => {
+    render(<VariantStrategyCard strategy={strategy} />);
+    expect(screen.getByText("Before")).toBeInTheDocument();
+    expect(screen.getByText("After")).toBeInTheDocument();
+    expect(screen.getByText("Wrote automated tests using various tools.")).toBeInTheDocument();
+  });
+
+  test("a reframe with no line to replace renders a suggestion, not an empty Before box", () => {
+    const reframeStrategy: VariantStrategy = {
+      ...strategy,
+      gaps: [
+        {
+          type: "reframe",
+          requirement: "test automation",
+          location: "none",
+          severity: "high",
+          draft: {
+            target: "summary",
+            before: null,
+            after: "Authored test automation suites using Playwright, Jest, and Supertest.",
+          },
+          skipSignal: false,
+        },
+      ],
+    };
+
+    render(<VariantStrategyCard strategy={reframeStrategy} />);
+    expect(screen.queryByText("Before")).not.toBeInTheDocument();
+    expect(screen.getByText("Suggested line")).toBeInTheDocument();
+    expect(
+      screen.getByText("Authored test automation suites using Playwright, Jest, and Supertest."),
+    ).toBeInTheDocument();
+  });
 });

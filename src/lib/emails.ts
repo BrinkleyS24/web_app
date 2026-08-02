@@ -1178,7 +1178,8 @@ export type ApplyGateScoringBreakdown = {
 };
 
 // ── Variant Strategy ──────────────────────────────────────────────────
-export type VariantStrategyGapDraft = { target: "summary" | "bullet"; before: string; after: string };
+/** `before` is null for a reframe — there is no existing résumé line to replace. */
+export type VariantStrategyGapDraft = { target: "summary" | "bullet"; before: string | null; after: string };
 export type VariantStrategyGap = {
   type: "missing" | "buried" | "reframe";
   requirement: string;

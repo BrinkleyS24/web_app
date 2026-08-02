@@ -121,16 +121,25 @@ export function VariantStrategyCard({ strategy, onDraftDecisionsChange }: Varian
                 {/* Draft rewrite (buried/reframe only — missing+skipSignal has no draft) */}
                 {!gap.skipSignal && gap.draft ? (
                   <div className="space-y-2 pt-1">
+                    {/* A reframe has no existing line to replace, so there is nothing to show
+                        as "before" — rendering the panel anyway left an empty box with an
+                        arrow pointing out of it. */}
+                    {gap.draft.before ? (
+                      <>
+                        <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 space-y-1">
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Before</p>
+                          <p className="text-xs leading-relaxed text-foreground">{gap.draft.before}</p>
+                        </div>
+                        <div className="flex items-center gap-1 pl-1 text-muted-foreground">
+                          <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                          <span className="sr-only">rewritten to</span>
+                        </div>
+                      </>
+                    ) : null}
                     <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 space-y-1">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Before</p>
-                      <p className="text-xs leading-relaxed text-foreground">{gap.draft.before}</p>
-                    </div>
-                    <div className="flex items-center gap-1 pl-1 text-muted-foreground">
-                      <ArrowRight className="h-3 w-3" aria-hidden="true" />
-                      <span className="sr-only">rewritten to</span>
-                    </div>
-                    <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 space-y-1">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">After</p>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                        {gap.draft.before ? "After" : "Suggested line"}
+                      </p>
                       <p className="text-xs leading-relaxed text-foreground">{gap.draft.after}</p>
                     </div>
 
