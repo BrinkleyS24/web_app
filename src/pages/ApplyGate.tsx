@@ -1477,6 +1477,7 @@ const ApplyGate = () => {
     .filter(Boolean)
     .slice(0, 2);
   const currentSearchMemory = result?.explanation?.search_memory || result?.searchMemory || null;
+  const currentBaseRateContext = currentSearchMemory?.baseRateContext || null;
   const currentActionSections = explanationActionSections(result?.explanation);
   const currentRequirementLedgerItems = (
     result?.explanation?.requirement_ledger?.items
@@ -1827,6 +1828,15 @@ const ApplyGate = () => {
                         ))}
                       </ul>
                     ) : null}
+                    {/* A rejection count with no base rate next to it reads as a verdict on
+                        the person. This is the only place in the screen that can say "this
+                        is normal", so it sits inside the same panel as the count itself. */}
+                    {currentBaseRateContext?.message ? (
+                      <p className="mt-2 rounded-md bg-background/60 px-2.5 py-1.5 text-xs leading-relaxed text-muted-foreground">
+                        <span className="font-medium text-foreground">For perspective: </span>
+                        {currentBaseRateContext.message}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -2069,7 +2079,7 @@ const ApplyGate = () => {
                     <div className="mt-1 space-y-0.5">
                       {currentOutcomeBands ? (
                         <p className="text-[11px] text-muted-foreground">
-                          Screening check: r\u00e9sum\u00e9 screen <span className={bandTone(currentOutcomeBands.atsPass)}>{currentOutcomeBands.atsPass}</span>
+                          Screening check: {"r\u00e9sum\u00e9"} screen <span className={bandTone(currentOutcomeBands.atsPass)}>{currentOutcomeBands.atsPass}</span>
                           <span className="px-1">-</span>
                           human review <span className={bandTone(currentOutcomeBands.humanWin)}>{currentOutcomeBands.humanWin}</span>
                         </p>

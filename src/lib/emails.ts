@@ -1075,12 +1075,20 @@ export type ApplyGateSearchMemory = {
     similarity: number;
     matchedSignals?: string[];
   }>;
+  baseRateContext?: {
+    level: "typical" | "below_typical";
+    rate: number;
+    message: string;
+  } | null;
   outcomeSummary: {
     similarRoleCount: number;
     interviewed: number;
     offered: number;
     rejected: number;
     noResponse: number;
+    sameCompanyRejected?: number;
+    sameCompanyRejectedRole?: string | null;
+    sameCompanyDaysSinceRejection?: number | null;
     interviewRate: number;
     rejectionRate: number;
     noResponseRate: number;
