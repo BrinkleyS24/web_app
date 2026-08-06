@@ -76,10 +76,13 @@ const OutcomeMemory = () => {
   // non-zero rejection rate.
   const stats = useMemo(() => {
     return [
+      // Every label here is EVER-REACHED, not current stage: one application can appear in
+      // both "Ever interviewed" and "Rejected" because it did both. The extension's tabs
+      // show current stage instead, so its Interviews number is smaller by design.
       { label: "Applications", value: cohortMetrics?.applicationsSent ?? "-" },
-      { label: "Reached interview", value: cohortMetrics?.reachedInterview ?? "-" },
+      { label: "Ever interviewed", value: cohortMetrics?.reachedInterview ?? "-" },
       { label: "Offers", value: cohortMetrics?.reachedOffer ?? "-" },
-      { label: "Rejected", value: cohortMetrics?.rejectedCohorts ?? "-" },
+      { label: "Ever rejected", value: cohortMetrics?.rejectedCohorts ?? "-" },
     ];
   }, [cohortMetrics]);
 

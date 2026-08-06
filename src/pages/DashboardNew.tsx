@@ -592,7 +592,11 @@ const Dashboard = () => {
         {/* Metric row */}
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard label="Applications" value={appliedCount ?? "-"} />
-          <MetricCard label="Reached interview" value={interviewsCount ?? "-"} />
+          {/* "Ever interviewed", not "Interviews": this counts applications that reached the
+              interview stage at any point, so an interview that later ended in a rejection
+              still counts here. The extension's Interviews tab shows CURRENT stage, which is
+              why the two legitimately differ — the labels now say which is which. */}
+          <MetricCard label="Ever interviewed" value={interviewsCount ?? "-"} />
           <MetricCard label="Offers" value={offersCount ?? "-"} />
           <MetricCard
             label="Interview rate"
