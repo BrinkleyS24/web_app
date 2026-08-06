@@ -64,6 +64,39 @@ export type MetricsResponse = {
     basis: string;
     ungroupableEmails: number;
   };
+  // The Signal Layer (backend `services/searchSignalsService.js`), derived from the SAME
+  // rows as `cohortMetrics` in the same request. `funnel` returns the identical counts —
+  // `applied` is `applicationsSent`, `reachedInterview` matches — so a surface can render a
+  // count from one block and a read from the other without them disagreeing.
+  searchSignals?: {
+    funnel: {
+      applied: number;
+      settled: number;
+      /** Still inside the response window — censored observations, not failures. */
+      pending: number;
+      silent: number;
+      rejected: number;
+      reachedInterview: number;
+      reachedOffer: number;
+      /** 0-1. The rate to DISPLAY; identical to cohortMetrics.interviewRate unscaled. */
+      interviewRate: number | null;
+      /** 0-1. Censoring-corrected, used only to pick `focus`. Never show this as "your rate". */
+      settledInterviewRate: number | null;
+      offerRate: number | null;
+      focus: "reach" | "interview" | "offer" | "insufficient_data";
+      basis: string;
+    };
+    rejectionVelocity: {
+      counts: Record<string, number>;
+      classified: number;
+      unknown: number;
+      medianEligible: boolean;
+      averageDays: number | null;
+      /** Only set when one class holds a real majority of a large enough sample. */
+      dominant: "auto_screen" | "recruiter_screen" | "late_stage" | "post_interview" | null;
+    };
+    computedAt: string;
+  };
   dataCompleteness?: {
     syncComplete: boolean;
     oldestEmailDate: string | null;

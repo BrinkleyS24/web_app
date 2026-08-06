@@ -83,6 +83,63 @@ const OutcomeMemory = () => {
     ];
   }, [cohortMetrics]);
 
+  // The Signal Layer, shipped alongside cohortMetrics in the same /metrics response.
+  // This page states FACTS from it — how the outcomes it already counts actually arrived —
+  // and deliberately does not write advice. Advice has one home (Strategy Alerts, and Apply
+  // Gate at the moment of decision); a second copy of the same recommendations in a
+  // different language is how two screens end up telling a user opposite things.
+  const searchSignals = metricsQuery.data?.searchSignals;
+
+  const velocityFact = useMemo(() => {
+    const profile = searchSignals?.rejectionVelocity;
+    if (!profile?.dominant || !profile.classified) return null;
+    const count = profile.counts[profile.dominant] ?? 0;
+    const stem = `${count} of your ${profile.classified} timed rejections`;
+
+    switch (profile.dominant) {
+      case "auto_screen":
+        return `${stem} arrived within days of applying — averaging ${profile.averageDays} days, too fast for anyone to have read the résumé.`;
+      case "recruiter_screen":
+        return `${stem} took an average of ${profile.averageDays} days — the timing of a person reading it and choosing someone else.`;
+      case "late_stage":
+        return `${stem} took an average of ${profile.averageDays} days, which means you were being held and compared.`;
+      case "post_interview":
+        return `${stem} came after you had already interviewed, not before.`;
+      default:
+        return null;
+    }
+  }, [searchSignals]);
+
+  // Applications still in flight are censored observations, not failures. Naming them keeps
+  // the rejection rate above from reading as the whole story.
+  const pendingFact = useMemo(() => {
+    const funnel = searchSignals?.funnel;
+    if (!funnel || funnel.pending <= 0) return null;
+    return `${funnel.pending} of ${funnel.applied} applications are still inside the response window — not yet a no.`;
+  }, [searchSignals]);
+
+  const watchItems = useMemo(() => {
+    const funnel = searchSignals?.funnel;
+    const base = [{ text: "Track unlinked emails to improve application grouping.", icon: Briefcase }];
+
+    if (!funnel || funnel.focus === "insufficient_data") {
+      return [
+        { text: "Use your interview rate to spot which kinds of roles respond best.", icon: Briefcase },
+        ...base,
+      ];
+    }
+
+    // Same conclusion the Strategy Alerts card reaches from the same signal, stated as
+    // where the page thinks the attention belongs rather than as a coaching paragraph.
+    const byFocus: Record<string, string> = {
+      offer: "You have an offer in play. The numbers above are history now — the live work is evaluating and negotiating it.",
+      interview: "Interviews are happening and not converting yet. That is where the next block of effort belongs, not the résumé.",
+      reach: "Applications are the plentiful part; conversations are the scarce one. A referral moves this more than another cold application.",
+    };
+    const focusText = byFocus[funnel.focus];
+    return focusText ? [{ text: focusText, icon: Briefcase }, ...base] : base;
+  }, [searchSignals]);
+
   const insights = useMemo(() => {
     if (!cohortMetrics) return {};
 
@@ -102,22 +159,24 @@ const OutcomeMemory = () => {
         { text: `${cohortMetrics.reachedInterview} of ${cohortMetrics.applicationsSent} applications reached an interview.`, icon: TrendingUp },
         { text: `Interview rate is ${interviewRate}% of applications.`, icon: TrendingUp },
         { text: `Offer rate is ${offerRate}% of applications.`, icon: TrendingUp },
+        // Timing is the thing this page counts outcomes of but never described. It comes
+        // from the same request as the rates above, over the same cohorts, so the shape and
+        // the totals can never be out of step.
+        ...(velocityFact ? [{ text: velocityFact, icon: TrendingUp }] : []),
       ],
       "Pipeline Health": [
         { text: `${ungrouped} emails are not linked to applications.`, icon: Building2 },
         { text: `${linkedRatio}% of emails are linked to applications.`, icon: Building2 },
         { text: `Rejection rate is ${rejectionRate}% of applications.`, icon: Building2 },
+        ...(pendingFact ? [{ text: pendingFact, icon: Building2 }] : []),
       ],
       "Timing and Volume": [
         { text: `Total tracked emails: ${metrics?.totalEmails ?? totalEmails}.`, icon: Clock },
         { text: `Applications: ${cohortMetrics.applicationsSent} - Reached interview: ${cohortMetrics.reachedInterview} - Offers: ${cohortMetrics.reachedOffer}.`, icon: Clock },
       ],
-      "What to Watch": [
-        { text: "Use your interview rate to spot which kinds of roles respond best.", icon: Briefcase },
-        { text: "Track unlinked emails to improve application grouping.", icon: Briefcase },
-      ],
+      "What to Watch": watchItems,
     };
-  }, [appStats, cohortMetrics, metrics]);
+  }, [appStats, cohortMetrics, metrics, pendingFact, velocityFact, watchItems]);
 
   const suggestionFunnelStats = useMemo(() => {
     if (!suggestionAnalytics) {
