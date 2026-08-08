@@ -17,6 +17,7 @@ import {
   saveResume,
   fetchResumeVariants,
   fetchVariantScoreboard,
+  fetchResumeHealth,
   type ApplyGateResult,
   type ApplyGateHistoryItem,
   type ApplyGateDisplayDecision,
@@ -566,13 +567,47 @@ function memoryOutcomeLabel(value: string | null | undefined, noResponse?: boole
   return "Tracked";
 }
 
-function hasMemoryNumber(value: unknown) {
-  if (value === null || value === undefined || value === "") return false;
-  return Number.isFinite(Number(value));
-}
-
 function pluralize(count: number, singular: string, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
+}
+
+type MemoryOutcomeSummary = NonNullable<ApplyGateResult["searchMemory"]>["outcomeSummary"];
+
+/**
+ * Which counts this history is actually entitled to state.
+ *
+ * The panel used to print four fixed tiles, so a user with fourteen tracked roles — nine of them
+ * still silent — read "No response 0" and reasonably concluded everyone had answered. A zero is
+ * only a measurement when every role in the sample has an ending; otherwise it is just the part of
+ * the picture we cannot see, and it has to be named rather than shown as a number.
+ */
+export function memoryOutcomeTiles(summary: MemoryOutcomeSummary | null | undefined) {
+  if (!summary || Number(summary.similarRoleCount || 0) <= 0) return [];
+  const unresolved = Number(summary.unresolved ?? 0);
+  const fullyObserved = unresolved === 0;
+  const tiles = [
+    { label: "Interviews", value: Number(summary.interviewed || 0) },
+    { label: "Offers", value: Number(summary.offered || 0) },
+    { label: "Rejected", value: Number(summary.rejected || 0) },
+    { label: "No response", value: Number(summary.noResponse || 0) },
+  ].filter((tile) => fullyObserved || tile.value > 0);
+  if (unresolved > 0) tiles.push({ label: "Still open", value: unresolved });
+  return tiles;
+}
+
+/**
+ * A median of zero is not a response time. It is what an unmeasured interval collapses to, and it
+ * reached the screen as "Median response time: 0 days" because `Number(null)` is 0 and 0 is finite.
+ */
+export function memoryResponseTimeLine(summary: MemoryOutcomeSummary | null | undefined) {
+  const median = summary?.medianDaysToResponse;
+  // Empty string included deliberately: Number("") is 0, the same coercion that put an unmeasured
+  // interval on screen in the first place.
+  if (median === null || median === undefined || String(median).trim() === "") return null;
+  const days = Number(median);
+  if (!Number.isFinite(days) || days < 0) return null;
+  if (days === 0) return "Similar roles that answered did so the same day.";
+  return `Median response time: ${pluralize(days, "day")}.`;
 }
 
 function memoryBadgeText(memory: ApplyGateResult["searchMemory"] | null | undefined) {
@@ -615,8 +650,12 @@ function behavioralNudgeForResult(params: {
     if (similarCount > 0 && noResponse >= Math.max(1, Math.ceil(similarCount * 0.5))) {
       return `Skip this. You've tried ${pluralize(similarCount, "similar role")} and ${pluralize(noResponse, "got no response", "got no response")}.`;
     }
-    if (similarCount > 0 && rejected + noResponse > positive) {
-      return `Skip this. Similar roles have mostly ended in rejection or no response.`;
+    // "mostly ended in" is a claim about endings, so it has to be counted over the roles that
+    // actually have one. Measured against every similar role it read as a verdict on nine
+    // applications that were still open.
+    const endings = Math.max(0, similarCount - Number(summary?.unresolved ?? 0));
+    if (endings > 0 && rejected + noResponse > positive) {
+      return `Skip this. Of the ${pluralize(endings, "similar role")} with a known ending, most were rejections or silence.`;
     }
     if (params.opportunityCost?.message) {
       return `Skip this. ${params.opportunityCost.message}`;
@@ -1106,6 +1145,22 @@ const ApplyGate = () => {
     staleTime: 30_000,
   });
   const variantRecommendation = guidanceQuery.data?.recommendation ?? null;
+
+  // Résumé-level findings deliberately do NOT appear in the verdict — they are the same on every
+  // run, so putting them there is what made the advice read as boilerplate. All that crosses over
+  // is a count, outside the verdict card, pointing at the page that owns them. A count is not
+  // advice: it cannot repeat itself into meaninglessness, and without it the new surface would be
+  // invisible to the one user who has already learned to read the verdict.
+  const resumeHealthQuery = useQuery({
+    queryKey: ["resume-health"],
+    queryFn: fetchResumeHealth,
+    enabled: Boolean(user) && Boolean(result),
+    staleTime: 60_000,
+  });
+  const scoredVariantId = result?.resumeDocument?.variantId ?? variantId ?? null;
+  const scoredResumeHealth = (resumeHealthQuery.data?.resumes ?? [])
+    .find((entry) => entry.variantId === scoredVariantId) ?? null;
+  const resumeHealthOpenCount = scoredResumeHealth?.openCount ?? 0;
 
   const historyQuery = useQuery<ApplyGateHistoryQueryData>({
     queryKey: ["apply-gate-history"],
@@ -1803,14 +1858,32 @@ const ApplyGate = () => {
                     ? "border-destructive/40 bg-destructive/5 text-destructive"
                     : result.priorHistory.recommendation === "fix_first"
                       ? "border-yellow-500/40 bg-yellow-500/5 text-yellow-700 dark:text-yellow-300"
-                      : "border-emerald-500/40 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300"
+                      : result.priorHistory.recommendation === "proceed_with_confidence"
+                        ? "border-emerald-500/40 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300"
+                        /* No recommendation means history had nothing to say about THIS posting —
+                           which is the common case now that a raw rejection count no longer drives
+                           the verdict. It used to fall through to the green style, so a headline
+                           counting rejections rendered as good news. Neutral is the honest state. */
+                        : "border-border bg-muted/40 text-muted-foreground"
                 }`}
               >
                 <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  {result.priorHistory.recommendation === "skip"
+                    || result.priorHistory.recommendation === "fix_first" ? (
+                    <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  ) : result.priorHistory.recommendation === "proceed_with_confidence" ? (
+                    <Check className="w-4 h-4 mt-0.5 shrink-0" />
+                  ) : (
+                    <Info className="w-4 h-4 mt-0.5 shrink-0" />
+                  )}
                   <div className="flex-1">
                     <p className="text-xs font-semibold uppercase tracking-wide">
-                      Prior inbox history
+                      {/* The count comes from applications now, not the inbox, whenever the
+                          canonical summary is available. Labelling it "inbox" would name the wrong
+                          source for the number directly underneath. */}
+                      {result.priorHistory.rejectionCountSource === "emails"
+                        ? "Prior inbox history"
+                        : "Your history with roles like this"}
                     </p>
                     <p className="mt-1 text-sm font-medium leading-relaxed">
                       {result.priorHistory.headline}
@@ -1941,30 +2014,20 @@ const ApplyGate = () => {
                   </span>
                 </div>
 
-                {currentSearchMemory.outcomeSummary.similarRoleCount > 0 ? (
-                  <div className="grid gap-2 sm:grid-cols-4">
-                    <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Interviews</p>
-                      <p className="text-sm font-semibold text-foreground">{currentSearchMemory.outcomeSummary.interviewed}</p>
-                    </div>
-                    <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Offers</p>
-                      <p className="text-sm font-semibold text-foreground">{currentSearchMemory.outcomeSummary.offered}</p>
-                    </div>
-                    <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Rejected</p>
-                      <p className="text-sm font-semibold text-foreground">{currentSearchMemory.outcomeSummary.rejected}</p>
-                    </div>
-                    <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">No response</p>
-                      <p className="text-sm font-semibold text-foreground">{currentSearchMemory.outcomeSummary.noResponse}</p>
-                    </div>
+                {memoryOutcomeTiles(currentSearchMemory.outcomeSummary).length > 0 ? (
+                  <div className="grid gap-2 grid-cols-2 sm:grid-cols-4">
+                    {memoryOutcomeTiles(currentSearchMemory.outcomeSummary).map((tile) => (
+                      <div key={tile.label} className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{tile.label}</p>
+                        <p className="text-sm font-semibold text-foreground">{tile.value}</p>
+                      </div>
+                    ))}
                   </div>
                 ) : null}
 
-                {hasMemoryNumber(currentSearchMemory.outcomeSummary.medianDaysToResponse) ? (
+                {memoryResponseTimeLine(currentSearchMemory.outcomeSummary) ? (
                   <p className="text-xs text-muted-foreground">
-                    Median response time: {currentSearchMemory.outcomeSummary.medianDaysToResponse} days.
+                    {memoryResponseTimeLine(currentSearchMemory.outcomeSummary)}
                   </p>
                 ) : null}
 
@@ -2197,6 +2260,19 @@ const ApplyGate = () => {
               </div>
             )}
               </div>
+              {resumeHealthOpenCount > 0 ? (
+                <a
+                  href="/resumes"
+                  className="block rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs leading-relaxed text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+                >
+                  <span className="font-medium text-foreground">
+                    {resumeHealthOpenCount === 1
+                      ? "1 open check on this résumé"
+                      : `${resumeHealthOpenCount} open checks on this résumé`}
+                  </span>{" "}
+                  — about the document, not this job. Review on Résumés.
+                </a>
+              ) : null}
               {result.variantStrategy ? (
                 <VariantStrategyCard
                   strategy={result.variantStrategy}

@@ -262,6 +262,34 @@ export function buildDaqV1InboxQueue(items: QueueItem[]) {
   return Array.from(deduped.values());
 }
 
+/**
+ * What the dashboard offers as "next moves".
+ *
+ * Deliberately NOT `buildDaqV1InboxQueue`. That filter keeps the Next Actions *inbox lane* to
+ * Gmail-thread work (`source === "followup"` plus six action types), which is correct for a lane
+ * called "inbox" and wrong for the dashboard. Every Signal-Layer strategy action is generated
+ * with `actionType: fix_targeting | prep_interview`, which the backend maps to `queueSource`
+ * `resume` or `apply_gate` — never `followup` — so running the inbox filter here meant the
+ * dashboard could only ever show follow-ups and thank-yous. The coaching layer was reaching the
+ * payload and being discarded before render, the same shape as the sliced `action_plan` buckets.
+ *
+ * The backend already ranked and bucketed these. Respecting doToday -> thisWeek -> later beats
+ * re-filtering by source on the client. Blocked items are dropped because the user cannot act on
+ * one from here, and non-open items because they are already resolved.
+ */
+export function buildDashboardMoveQueue(items: QueueItem[]) {
+  const deduped = new Map<string, QueueItem>();
+
+  for (const item of items || []) {
+    if (item.bucket === "blocked") continue;
+    if (item.status && item.status !== "open") continue;
+    const key = String(item.dedupeKey || item.logicalKey || item.id);
+    if (!deduped.has(key)) deduped.set(key, item);
+  }
+
+  return Array.from(deduped.values());
+}
+
 const APPLIED_ACTIVE_WINDOW_DAYS = 30;
 const INTERVIEW_ACTIVE_WINDOW_DAYS = 21;
 

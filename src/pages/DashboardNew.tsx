@@ -14,10 +14,11 @@ import { Link } from "react-router-dom";
 
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { FirstMoveCard } from "@/components/FirstMoveCard";
-import { MetricCard } from "@/components/MetricCard";
+import { InterviewDebriefCards } from "@/components/InterviewDebriefCards";
 import { StatusBadge } from "@/components/StatusBadge";
 import { splitRoleAndCompany } from "@/lib/applyGateDisplay";
 import { useAuth } from "@/lib/AuthContext.jsx";
+import { buildDashboardAnswer } from "@/lib/dashboardAnswer";
 import {
   fetchApplicationStats,
   fetchApplyGateHistory,
@@ -30,9 +31,8 @@ import {
   type ApplyGateResult,
 } from "@/lib/emails";
 import {
-  buildDaqV1InboxQueue,
+  buildDashboardMoveQueue,
   buildQueueItemsFromRankedQueue,
-  buildRankedQueueStats,
   buildGmailThreadUrl,
   formatRelativeAge,
   urgencyClasses,
@@ -468,29 +468,48 @@ const Dashboard = () => {
     () => strategyAlertsQuery.data?.alerts || [],
     [strategyAlertsQuery.data],
   );
-  const strategyHighlights = useMemo(() => strategyAlerts.slice(0, 2), [strategyAlerts]);
+  const strategyEmptyMessage = !isAuthed
+    ? "Sign in to see strategy alerts."
+    : strategyAlertsQuery.data?.error?.includes("Premium feature required")
+      ? "Upgrade to Premium to see strategy alerts."
+      : "No strategy alerts yet — keep applying and they'll surface here.";
 
   const rankedQueue = queueQuery.data?.queue || null;
   const activeQueue = useMemo(() => buildQueueItemsFromRankedQueue(rankedQueue), [rankedQueue]);
-  const queueStats = useMemo(() => buildRankedQueueStats(rankedQueue), [rankedQueue]);
-  const daqInboxQueue = useMemo(
-    () => buildDaqV1InboxQueue(activeQueue),
-    [activeQueue],
+  const moveQueue = useMemo(() => buildDashboardMoveQueue(activeQueue), [activeQueue]);
+
+  // The answer, and the single action that belongs to it.
+  const answer = useMemo(
+    () =>
+      buildDashboardAnswer({
+        alerts: strategyAlerts,
+        cohortMetrics,
+        alertsUnavailableMessage: strategyAlerts.length === 0 ? strategyEmptyMessage : null,
+      }),
+    [cohortMetrics, strategyAlerts, strategyEmptyMessage],
   );
-  const daqStats = useMemo(
-    () => ({
-      active: daqInboxQueue.length,
-      highPriority: daqInboxQueue.filter((item) => item.urgency === "high").length,
-      totalMinutes: daqInboxQueue.reduce((sum, item) => {
-        const match = item.estimatedTime.match(/(\d+)/);
-        return sum + (match ? Number(match[1]) : 0);
-      }, 0),
-    }),
-    [daqInboxQueue],
+  // Prefer the queue item generated FROM the answer's own alert (the generator ids those
+  // `strategy:<alertId>`). Then the button under the claim is provably about that claim rather
+  // than whatever happened to rank first — and when there is no such item we fall back to the
+  // top of the queue and label it as such instead of implying a connection that isn't there.
+  const answerMove = useMemo(
+    () => (answer.alertId ? moveQueue.find((item) => item.id === `strategy:${answer.alertId}`) || null : null),
+    [answer.alertId, moveQueue],
   );
-  const todaysMoves = useMemo(
-    () => daqInboxQueue.slice(0, 3),
-    [daqInboxQueue],
+  // When the answer is a question, the hero shows the debrief cards and consumes NO queue item.
+  // Letting it claim one anyway would promote a move into a slot that never renders it and then
+  // filter that same move out of "Next moves" below — the top of the user's queue would simply
+  // vanish from the page on exactly the days we interrupt them with an ask.
+  const asksInPlace = answer.debriefItems.length > 0;
+  const heroMove = asksInPlace ? null : answerMove || moveQueue[0] || null;
+  const nextMoves = useMemo(
+    () => moveQueue.filter((item) => item.id !== heroMove?.id).slice(0, 3),
+    [heroMove?.id, moveQueue],
+  );
+  // Alerts already spent on the hero must not appear again below it.
+  const remainingAlerts = useMemo(
+    () => strategyAlerts.filter((alert) => alert.id !== answer.alertId).slice(0, 2),
+    [answer.alertId, strategyAlerts],
   );
   const dataLoadErrors = [
     metricsQuery.isError ? `Metrics: ${metricsQuery.error instanceof Error ? metricsQuery.error.message : "Unable to load metrics"}` : null,
@@ -527,12 +546,6 @@ const Dashboard = () => {
   const dateLabel = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
   const rawName = String(user?.displayName || user?.email || "").split(/[@\s]/)[0];
   const firstName = rawName ? rawName.charAt(0).toUpperCase() + rawName.slice(1) : "";
-  const topAlert = strategyHighlights[0] || null;
-  const strategyEmptyMessage = !isAuthed
-    ? "Sign in to see strategy alerts."
-    : strategyAlertsQuery.data?.error?.includes("Premium feature required")
-      ? "Upgrade to Premium to see strategy alerts."
-      : "No strategy alerts yet — keep applying and they'll surface here.";
 
   return (
     <DashboardLayout>
@@ -589,128 +602,124 @@ const Dashboard = () => {
           </div>
         ) : null}
 
-        {/* Metric row */}
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard label="Applications" value={appliedCount ?? "-"} />
-          {/* "Ever interviewed", not "Interviews": this counts applications that reached the
-              interview stage at any point, so an interview that later ended in a rejection
-              still counts here. The extension's Interviews tab shows CURRENT stage, which is
-              why the two legitimately differ — the labels now say which is which. */}
-          <MetricCard label="Ever interviewed" value={interviewsCount ?? "-"} />
-          <MetricCard label="Offers" value={offersCount ?? "-"} />
-          <MetricCard
-            label="Interview rate"
-            value={interviewRate}
-            change={
-              daqStats.active > 0
-                ? `${daqStats.active} inbox action${daqStats.active === 1 ? "" : "s"} waiting`
-                : queueStats.active > 0
-                  ? `${queueStats.active} broader queue item${queueStats.active === 1 ? "" : "s"} waiting`
-                  : "No active move queue right now"
-            }
-            changeType={daqStats.active > 0 || queueStats.active > 0 ? "neutral" : "positive"}
-          />
-        </div>
+        {/* THE ANSWER. One claim, its evidence underneath, one action. Everything below this
+            block is support for it, and everything that used to compete with it at equal weight
+            is now either demoted to the stat strip or folded into "Everything else". */}
+        <section className="glass-card overflow-hidden rounded-2xl">
+          <div className="px-6 py-6 sm:px-7">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className={dashboardEyebrow}>What matters today</span>
+              {answer.stat ? (
+                <span className="rounded-full border border-border bg-muted/50 px-2.5 py-1 font-mono text-[10px] font-semibold text-muted-foreground">
+                  {answer.stat}
+                </span>
+              ) : null}
+            </div>
+            <h2 className="mt-3 max-w-[42ch] text-[26px] font-bold leading-[1.15] tracking-[-0.025em] text-foreground">
+              {answer.claim}
+            </h2>
+            {answer.evidence ? (
+              <p className="mt-3 max-w-[72ch] text-[14px] leading-relaxed text-muted-foreground">
+                {answer.evidence}
+              </p>
+            ) : null}
 
-        {/* Daily Action Queue | Strategy alert + Recent Apply Gate */}
-        <div className="grid items-start gap-3.5 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,1fr)]">
-          <section className="glass-card overflow-hidden rounded-2xl">
-            <div className="flex items-center justify-between gap-3 px-5 py-4">
-              <h2 className="text-[15px] font-bold tracking-[-0.01em] text-foreground">Daily Action Queue</h2>
-              <span className="rounded-full bg-accent/10 px-2.5 py-1 font-mono text-[10px] font-bold text-accent">
-                {daqStats.active} open
+            {/* The advice, ALWAYS. This was an `else` branch behind heroMove, which meant the one
+                sentence that answers "so what do I do about it" was dropped precisely when there
+                was also an action to take. Founder's read: "it tells me the problem without giving
+                me a solution." The claim is the diagnosis; this is the prescription; the button
+                below is where you start. All three, or the screen is not coaching anybody. */}
+            {answer.recommendation ? (
+              <p className="mt-4 max-w-[72ch] rounded-xl border border-border bg-muted/40 px-4 py-3 text-[13px] leading-relaxed text-foreground/80">
+                {answer.recommendation}
+              </p>
+            ) : null}
+
+            {/* When the answer is a QUESTION, the answering happens right here. Sending the user
+                to another screen to supply the data this screen is blocked on is how the ask
+                gets abandoned, and an unanswered ask leaves us advising from 17% visibility. */}
+            {asksInPlace ? (
+              <InterviewDebriefCards items={answer.debriefItems} total={answer.debriefTotal} />
+            ) : heroMove ? (
+              <div className="mt-5 space-y-2">
+                <MoveLink move={heroMove} className={dashboardButtonPrimary}>
+                  {heroMove.title}
+                  <ArrowRight className="h-4 w-4" />
+                </MoveLink>
+                {/* Says which of the two it is. When the action came from the same alert as the
+                    claim we can say so; when it is just the top of the queue, saying "start here"
+                    would imply a connection to the claim that does not exist. */}
+                <p className="text-[12px] leading-snug text-muted-foreground">
+                  {answerMove
+                    ? "This is the move for the read above."
+                    : `Top of your queue right now · ${heroMove.sourceLabel}`}
+                </p>
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        {/* The numbers, demoted. They are evidence for the claim above, not the headline — a
+            dashboard that opens with a count is asking the user to do the interpreting. */}
+        <div className="glass-card flex flex-wrap items-baseline gap-x-7 gap-y-2 rounded-2xl px-5 py-3.5">
+          {[
+            { label: "Applications", value: appliedCount ?? "-" },
+            // "Ever interviewed", not "Interviews": this counts applications that reached the
+            // interview stage at any point, so an interview that later ended in a rejection
+            // still counts here. The extension's Interviews tab shows CURRENT stage, which is
+            // why the two legitimately differ — the labels now say which is which.
+            { label: "Ever interviewed", value: interviewsCount ?? "-" },
+            { label: "Offers", value: offersCount ?? "-" },
+            { label: "Interview rate", value: interviewRate },
+          ].map((stat) => (
+            <div key={stat.label} className="flex items-baseline gap-2">
+              <span className="text-[17px] font-bold tabular-nums tracking-[-0.02em] text-foreground">
+                {stat.value}
+              </span>
+              <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                {stat.label}
               </span>
             </div>
-            {todaysMoves.length === 0 ? (
-              <div className="border-t border-border px-5 py-6 text-sm leading-6 text-muted-foreground">
-                No urgent inbox actions right now. The broader queue may still have Apply Gate, cleanup, or strategy work, but the Daily Action Queue stays focused on time-sensitive Gmail context.
-              </div>
-            ) : (
-              todaysMoves.map((move) => <QueueRow key={move.id} move={move} />)
-            )}
-            <Link
-              to="/fix-suggestions"
-              className="block border-t border-border px-5 py-3 text-[13px] font-semibold text-accent transition-colors hover:bg-muted/40"
-            >
-              View full queue &rarr;
-            </Link>
-          </section>
-
-          <div className="grid gap-3.5">
-            {/* Strategy alert (dark) */}
-            <div className="rounded-2xl bg-primary p-5">
-              {!topAlert ? (
-                <>
-                  <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-[#2FBE8F]">
-                    Strategy alert
-                  </span>
-                  <p className="mt-3 text-[13px] leading-relaxed text-white/60">{strategyEmptyMessage}</p>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-[#2FBE8F]">
-                      Strategy alert
-                    </span>
-                    {topAlert.supporting_stat ? (
-                      <span className="rounded-full border border-white/15 px-2 py-0.5 font-mono text-[9px] font-bold text-white/60">
-                        {topAlert.supporting_stat}
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-3 text-[14.5px] font-semibold leading-snug text-white">{topAlert.title}</p>
-                  <p className="mt-2 text-[12.5px] leading-relaxed text-white/60">{topAlert.description}</p>
-                  <Link
-                    to="/strategy-alerts"
-                    className="mt-3.5 inline-block text-[12.5px] font-semibold text-[#2FBE8F] hover:underline"
-                  >
-                    Review alerts &rarr;
-                  </Link>
-                </>
-              )}
-            </div>
-
-            {/* Recent Apply Gate */}
-            <div className="glass-card overflow-hidden rounded-2xl">
-              <div className="px-5 py-3.5">
-                <h2 className="text-sm font-bold text-foreground">Recent Apply Gate</h2>
-              </div>
-              {recentItems.length === 0 ? (
-                <div className="border-t border-border px-5 py-3.5 text-sm text-muted-foreground">
-                  {isAuthed ? "No recent Apply Gate results yet." : "Sign in to see recent results."}
-                </div>
-              ) : (
-                recentItems.map((job) => (
-                  <div
-                    key={job.id}
-                    className="flex items-center justify-between gap-3 border-t border-border px-5 py-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-[13px] font-semibold text-foreground">
-                        {job.title}
-                        {job.company ? <span className="text-muted-foreground"> &middot; {job.company}</span> : null}
-                      </div>
-                    </div>
-                    <StatusBadge status={job.status} />
-                  </div>
-                ))
-              )}
-              <Link
-                to="/apply-gate"
-                className="block border-t border-border px-5 py-3 text-[12.5px] font-semibold text-accent transition-colors hover:bg-muted/40"
-              >
-                Open Apply Gate &rarr;
-              </Link>
-            </div>
-          </div>
+          ))}
         </div>
 
-        {/* Next decision brief — collapsed by default to match the mockup's lean dashboard (nothing removed) */}
+        {/* Next moves. Drawn from the whole ranked queue in the backend's own priority order —
+            see buildDashboardMoveQueue for why the inbox filter does not belong here. */}
+        <section className="glass-card overflow-hidden rounded-2xl">
+          <div className="flex items-center justify-between gap-3 px-5 py-4">
+            <h2 className="text-[15px] font-bold tracking-[-0.01em] text-foreground">Next moves</h2>
+            <span className="rounded-full bg-accent/10 px-2.5 py-1 font-mono text-[10px] font-bold text-accent">
+              {moveQueue.length} open
+            </span>
+          </div>
+          {nextMoves.length === 0 ? (
+            <div className="border-t border-border px-5 py-6 text-sm leading-6 text-muted-foreground">
+              {heroMove
+                ? "Nothing else is queued. The move above is the whole list right now."
+                : "No queued moves right now. New ones appear as your inbox brings in replies and outcomes."}
+            </div>
+          ) : (
+            nextMoves.map((move) => <QueueRow key={move.id} move={move} />)
+          )}
+          <Link
+            to="/fix-suggestions"
+            className="block border-t border-border px-5 py-3 text-[13px] font-semibold text-accent transition-colors hover:bg-muted/40"
+          >
+            View full queue &rarr;
+          </Link>
+        </section>
+
+        {/* Everything else. One drawer, not three sections and two drawers. Nothing was deleted —
+            the alerts, the verdict history, the decision brief and the memory brief all still
+            render, they just no longer compete with the answer for the first read. */}
         <details className="group glass-card overflow-hidden rounded-2xl">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 [&::-webkit-details-marker]:hidden">
             <span className="flex items-center gap-2">
-              <span className={dashboardEyebrow}>Latest Apply Gate decision</span>
-              {decisionBrief?.status ? <StatusBadge status={decisionBrief.status} /> : null}
+              <Brain className="h-4 w-4 text-accent" />
+              <span className="text-sm font-semibold text-foreground">Everything else</span>
+              <span className="text-[12px] text-muted-foreground">
+                Alerts, recent verdicts, search memory
+              </span>
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
               <ChevronsUpDown className="h-3.5 w-3.5" />
@@ -718,172 +727,235 @@ const Dashboard = () => {
               <span className="hidden group-open:inline">Hide</span>
             </span>
           </summary>
-          <section className="space-y-5 px-6 pb-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className={dashboardEyebrow}>Next decision</p>
-              <p className="mt-1.5 text-sm text-muted-foreground">
-                Decide whether to apply now, fix first, or skip before another application eats time.
-              </p>
-            </div>
-            {decisionBrief?.status ? <StatusBadge status={decisionBrief.status} /> : null}
-          </div>
 
-          {!decisionBrief ? (
-            <div className="space-y-3 rounded-xl border border-dashed border-border bg-muted/40 p-5">
-              <p className="text-sm text-muted-foreground">
-                Check one target role and get a clear apply, fix, or skip recommendation before you spend time on the application.
-              </p>
-              <Link to="/apply-gate" className={dashboardButtonPrimary}>
-                <Shield className="h-4 w-4" />
-                Open Apply Gate
-              </Link>
-            </div>
-          ) : (
-            <>
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-3">
-                  <h2 className="text-2xl font-bold tracking-[-0.02em] text-foreground">{decisionBrief.role}</h2>
-                  <span className="inline-flex items-center rounded-full border border-accent/20 bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent">
-                    {decisionBrief.recommendation}
-                  </span>
-                  {decisionBrief.confidence ? (
-                    <span className="inline-flex items-center rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                      {decisionBrief.confidence}
-                    </span>
-                  ) : null}
-                </div>
-                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                  {decisionBrief.company ? (
-                    <span className="inline-flex items-center gap-1.5">
-                      <Mail className="h-4 w-4" />
-                      {decisionBrief.company}
-                    </span>
-                  ) : null}
-                  <span className="inline-flex items-center gap-1.5">
-                    <Clock3 className="h-4 w-4" />
-                    {decisionBrief.isUnresolved ? "Unresolved" : "Latest verdict"} - {decisionBrief.ageLabel}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid gap-5 md:grid-cols-2">
-                <div className="space-y-3">
-                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                    {decisionBrief.reasonHeadline}
+          <div className="space-y-3.5 border-t border-border px-5 py-5">
+            <div className="grid items-start gap-3.5 xl:grid-cols-2">
+              {/* Strategy alerts the hero did not already use */}
+              <div className="rounded-2xl bg-primary p-5">
+                <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-[#2FBE8F]">
+                  Strategy alerts
+                </span>
+                {remainingAlerts.length === 0 ? (
+                  <p className="mt-3 text-[13px] leading-relaxed text-white/60">
+                    {strategyAlerts.length > 0
+                      ? "The read above is the only alert right now."
+                      : strategyEmptyMessage}
                   </p>
-                  <div className="space-y-2">
-                    {decisionBrief.reasons.map((reason) => (
-                      <div key={reason} className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
-                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
-                        <p className="text-sm text-muted-foreground">{reason}</p>
+                ) : (
+                  <div className="mt-3 space-y-4">
+                    {remainingAlerts.map((alert) => (
+                      <div key={alert.id}>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-[14.5px] font-semibold leading-snug text-white">{alert.title}</p>
+                          {alert.supporting_stat ? (
+                            <span className="shrink-0 rounded-full border border-white/15 px-2 py-0.5 font-mono text-[9px] font-bold text-white/60">
+                              {alert.supporting_stat}
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 text-[12.5px] leading-relaxed text-white/60">{alert.description}</p>
                       </div>
                     ))}
                   </div>
-                  {decisionBrief.supportingSignals?.length ? (
-                    <div className="rounded-lg border border-accent/20 bg-accent/5 px-3 py-3">
-                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-accent">
-                        What still supports it
+                )}
+                <Link
+                  to="/strategy-alerts"
+                  className="mt-3.5 inline-block text-[12.5px] font-semibold text-[#2FBE8F] hover:underline"
+                >
+                  Review alerts &rarr;
+                </Link>
+              </div>
+
+              {/* Recent Apply Gate */}
+              <div className="overflow-hidden rounded-2xl border border-border bg-card">
+                <div className="px-5 py-3.5">
+                  <h2 className="text-sm font-bold text-foreground">Recent Apply Gate</h2>
+                </div>
+                {recentItems.length === 0 ? (
+                  <div className="border-t border-border px-5 py-3.5 text-sm text-muted-foreground">
+                    {isAuthed ? "No recent Apply Gate results yet." : "Sign in to see recent results."}
+                  </div>
+                ) : (
+                  recentItems.map((job) => (
+                    <div
+                      key={job.id}
+                      className="flex items-center justify-between gap-3 border-t border-border px-5 py-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-[13px] font-semibold text-foreground">
+                          {job.title}
+                          {job.company ? <span className="text-muted-foreground"> &middot; {job.company}</span> : null}
+                        </div>
+                      </div>
+                      <StatusBadge status={job.status} />
+                    </div>
+                  ))
+                )}
+                <Link
+                  to="/apply-gate"
+                  className="block border-t border-border px-5 py-3 text-[12.5px] font-semibold text-accent transition-colors hover:bg-muted/40"
+                >
+                  Open Apply Gate &rarr;
+                </Link>
+              </div>
+            </div>
+
+            <section className="space-y-5 rounded-2xl border border-border bg-card px-6 py-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className={dashboardEyebrow}>Next decision</p>
+                  <p className="mt-1.5 text-sm text-muted-foreground">
+                    Decide whether to apply now, fix first, or skip before another application eats time.
+                  </p>
+                </div>
+                {decisionBrief?.status ? <StatusBadge status={decisionBrief.status} /> : null}
+              </div>
+
+              {!decisionBrief ? (
+                <div className="space-y-3 rounded-xl border border-dashed border-border bg-muted/40 p-5">
+                  <p className="text-sm text-muted-foreground">
+                    Check one target role and get a clear apply, fix, or skip recommendation before you spend time on the application.
+                  </p>
+                  <Link to="/apply-gate" className={dashboardButtonPrimary}>
+                    <Shield className="h-4 w-4" />
+                    Open Apply Gate
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h2 className="text-2xl font-bold tracking-[-0.02em] text-foreground">{decisionBrief.role}</h2>
+                      <span className="inline-flex items-center rounded-full border border-accent/20 bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent">
+                        {decisionBrief.recommendation}
+                      </span>
+                      {decisionBrief.confidence ? (
+                        <span className="inline-flex items-center rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                          {decisionBrief.confidence}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                      {decisionBrief.company ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Mail className="h-4 w-4" />
+                          {decisionBrief.company}
+                        </span>
+                      ) : null}
+                      <span className="inline-flex items-center gap-1.5">
+                        <Clock3 className="h-4 w-4" />
+                        {decisionBrief.isUnresolved ? "Unresolved" : "Latest verdict"} - {decisionBrief.ageLabel}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-5 md:grid-cols-2">
+                    <div className="space-y-3">
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                        {decisionBrief.reasonHeadline}
                       </p>
-                      <div className="mt-2 space-y-2">
-                        {decisionBrief.supportingSignals.map((signal: string) => (
-                          <p key={signal} className="text-sm text-foreground/80">
-                            &bull; {signal}
+                      <div className="space-y-2">
+                        {decisionBrief.reasons.map((reason) => (
+                          <div key={reason} className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
+                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                            <p className="text-sm text-muted-foreground">{reason}</p>
+                          </div>
+                        ))}
+                      </div>
+                      {decisionBrief.supportingSignals?.length ? (
+                        <div className="rounded-lg border border-accent/20 bg-accent/5 px-3 py-3">
+                          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-accent">
+                            What still supports it
                           </p>
+                          <div className="mt-2 space-y-2">
+                            {decisionBrief.supportingSignals.map((signal: string) => (
+                              <p key={signal} className="text-sm text-foreground/80">
+                                &bull; {signal}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="space-y-3">
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                        Do this next
+                      </p>
+                      <div className="space-y-2">
+                        {decisionBrief.nextActions.map((action, index) => (
+                          <div key={`${index}-${action}`} className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2">
+                            <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent/10 text-xs font-semibold text-accent">
+                              {index + 1}
+                            </span>
+                            <p className="text-sm text-muted-foreground">{action}</p>
+                          </div>
                         ))}
                       </div>
                     </div>
-                  ) : null}
-                </div>
-
-                <div className="space-y-3">
-                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                    Do this next
-                  </p>
-                  <div className="space-y-2">
-                    {decisionBrief.nextActions.map((action, index) => (
-                      <div key={`${index}-${action}`} className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2">
-                        <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent/10 text-xs font-semibold text-accent">
-                          {index + 1}
-                        </span>
-                        <p className="text-sm text-muted-foreground">{action}</p>
-                      </div>
-                    ))}
                   </div>
-                </div>
-              </div>
 
-              <div className="flex flex-wrap gap-3">
-                <Link to="/apply-gate" className={dashboardButtonPrimary}>
-                  Review in Apply Gate
+                  <div className="flex flex-wrap gap-3">
+                    <Link to="/apply-gate" className={dashboardButtonPrimary}>
+                      Review in Apply Gate
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                    <Link to="/fix-suggestions" className={dashboardButtonSecondary}>
+                      Open action queue
+                    </Link>
+                  </div>
+                </>
+              )}
+            </section>
+
+            <div className="grid items-start gap-3.5 lg:grid-cols-[minmax(0,1fr)_300px]">
+              <section className="rounded-2xl border border-border bg-card p-6">
+                <div className="flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-accent" />
+                  <span className={dashboardEyebrow}>Search memory</span>
+                </div>
+                <div className="mt-3 rounded-xl border border-border bg-muted/40 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-sm font-bold text-foreground">{outcomeMemoryBrief.title}</h3>
+                    <span className="rounded-full border border-border bg-card px-2.5 py-1 font-mono text-[10px] font-semibold text-muted-foreground">
+                      {outcomeMemoryBrief.stat}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{outcomeMemoryBrief.body}</p>
+                </div>
+                <Link
+                  to="/outcome-memory"
+                  className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-accent hover:underline"
+                >
+                  {outcomeMemoryBrief.ctaLabel}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
-                <Link to="/fix-suggestions" className={dashboardButtonSecondary}>
-                  Open action queue
-                </Link>
-              </div>
-            </>
-          )}
-          </section>
-        </details>
+              </section>
 
-        {/* Search memory + Quick links — collapsed by default to match the mockup's lean dashboard (nothing removed) */}
-        <details className="group">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl border border-border bg-card px-5 py-3.5 [&::-webkit-details-marker]:hidden">
-            <span className="flex items-center gap-2">
-              <Brain className="h-4 w-4 text-accent" />
-              <span className="text-sm font-semibold text-foreground">Search memory &amp; quick links</span>
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-              <ChevronsUpDown className="h-3.5 w-3.5" />
-              <span className="group-open:hidden">Show</span>
-              <span className="hidden group-open:inline">Hide</span>
-            </span>
-          </summary>
-          <div className="mt-3.5 grid items-start gap-3.5 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <section className="glass-card space-y-3 rounded-2xl p-6">
-            <div className="flex items-center gap-2">
-              <Brain className="h-4 w-4 text-accent" />
-              <span className={dashboardEyebrow}>Search memory</span>
+              <section className="rounded-2xl border border-border bg-card p-5">
+                <div className="flex items-center gap-2">
+                  <Wrench className="h-4 w-4 text-accent" />
+                  <span className={dashboardEyebrow}>Quick links</span>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {[
+                    { label: "Next Actions", to: "/fix-suggestions" },
+                    { label: "Outcome Memory", to: "/outcome-memory" },
+                    { label: "Strategy Alerts", to: "/strategy-alerts" },
+                    { label: "Weekly Summary", to: "/weekly-summary" },
+                  ].map((item) => (
+                    <Link
+                      key={item.label}
+                      to={item.to}
+                      className="flex items-center justify-between rounded-xl border border-border bg-muted/40 px-3 py-3 text-sm font-semibold text-foreground transition-colors hover:border-accent/40 hover:bg-card"
+                    >
+                      <span>{item.label}</span>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </Link>
+                  ))}
+                </div>
+              </section>
             </div>
-            <div className="rounded-xl border border-border bg-muted/40 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h3 className="text-sm font-bold text-foreground">{outcomeMemoryBrief.title}</h3>
-                <span className="rounded-full border border-border bg-card px-2.5 py-1 font-mono text-[10px] font-semibold text-muted-foreground">
-                  {outcomeMemoryBrief.stat}
-                </span>
-              </div>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">{outcomeMemoryBrief.body}</p>
-            </div>
-            <Link to="/outcome-memory" className="inline-flex items-center gap-2 text-sm font-semibold text-accent hover:underline">
-              {outcomeMemoryBrief.ctaLabel}
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </section>
-
-          <section className="glass-card space-y-3 rounded-2xl p-5">
-            <div className="flex items-center gap-2">
-              <Wrench className="h-4 w-4 text-accent" />
-              <span className={dashboardEyebrow}>Quick links</span>
-            </div>
-            <div className="space-y-2">
-              {[
-                { label: "Next Actions", to: "/fix-suggestions" },
-                { label: "Outcome Memory", to: "/outcome-memory" },
-                { label: "Strategy Alerts", to: "/strategy-alerts" },
-                { label: "Weekly Summary", to: "/weekly-summary" },
-              ].map((item) => (
-                <Link
-                  key={item.label}
-                  to={item.to}
-                  className="flex items-center justify-between rounded-xl border border-border bg-muted/40 px-3 py-3 text-sm font-semibold text-foreground transition-colors hover:border-accent/40 hover:bg-card"
-                >
-                  <span>{item.label}</span>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                </Link>
-              ))}
-            </div>
-          </section>
           </div>
         </details>
       </div>
@@ -891,12 +963,46 @@ const Dashboard = () => {
   );
 };
 
-function QueueRow({ move }: { move: QueueItem }) {
+/**
+ * Where a queue item actually goes.
+ *
+ * Shared by the hero button and the queue rows so the same item can never send the user to two
+ * different places depending on which slot it rendered in. Only follow-up and stale items own a
+ * Gmail thread worth opening directly; everything else is work done inside the app.
+ */
+function resolveMoveTarget(move: QueueItem) {
   const gmailUrl =
     move.source === "followup" || move.source === "stale" ? buildGmailThreadUrl(move.threadId) : null;
   const href = gmailUrl || move.routeHref || "/fix-suggestions";
-  const isExternal = href.startsWith("http");
-  const actionLabel = gmailUrl ? "Open in Gmail ↗" : "Open";
+  return { href, isExternal: href.startsWith("http"), isGmail: Boolean(gmailUrl) };
+}
+
+/** The hero's single action. Same destination logic as a queue row, styled as the primary button. */
+function MoveLink({
+  move,
+  className,
+  children,
+}: {
+  move: QueueItem;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const { href, isExternal } = resolveMoveTarget(move);
+
+  return isExternal ? (
+    <a href={href} target="_blank" rel="noreferrer" className={className}>
+      {children}
+    </a>
+  ) : (
+    <Link to={href} className={className}>
+      {children}
+    </Link>
+  );
+}
+
+function QueueRow({ move }: { move: QueueItem }) {
+  const { href, isExternal, isGmail } = resolveMoveTarget(move);
+  const actionLabel = isGmail ? "Open in Gmail ↗" : "Open";
 
   const inner = (
     <>

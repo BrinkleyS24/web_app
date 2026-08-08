@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   buildDaqV1InboxQueue,
   buildCombinedSuggestionQueue,
+  buildDashboardMoveQueue,
   buildQueueItemsFromRankedQueue,
   buildOutreachDiagnostics,
   buildUpcomingFollowupWindows,
@@ -791,5 +792,81 @@ describe("premiumTaskQueue coach response override", () => {
     const item = queue.find((q) => q.threadId === "thread-gamma");
     expect(item?.title).toBe("Templated title");
     expect(item?.description).toBe("Templated description");
+  });
+});
+
+describe("buildDashboardMoveQueue", () => {
+  const item = (overrides: Record<string, unknown> = {}) =>
+    ({
+      id: "queue-1",
+      logicalKey: "queue:1",
+      dedupeKey: "queue:1:v1",
+      bucket: "doToday",
+      status: "open",
+      source: "apply_gate",
+      urgency: "high",
+      title: "Tailor resume",
+      ...overrides,
+    }) as never;
+
+  test("keeps coaching work the inbox filter used to discard", () => {
+    // The regression this function exists for: every Signal-Layer strategy action is generated as
+    // queueSource `resume` or `apply_gate`, never `followup`, and the inbox filter requires
+    // `source === "followup"`. Running it on the dashboard meant the dashboard could only ever
+    // show follow-ups and thank-yous.
+    const moves = buildDashboardMoveQueue([
+      item({ id: "strategy:performance-focus-interview", source: "apply_gate" }),
+      item({ id: "resume-proof:aggregate", dedupeKey: "resume:1", source: "resume" }),
+    ]);
+
+    expect(moves.map((move) => move.id)).toEqual([
+      "strategy:performance-focus-interview",
+      "resume-proof:aggregate",
+    ]);
+  });
+
+  test("drops blocked items, which the user cannot act on from here", () => {
+    const moves = buildDashboardMoveQueue([
+      item({ id: "open-1" }),
+      item({ id: "blocked-1", dedupeKey: "queue:2:v1", bucket: "blocked" }),
+    ]);
+
+    expect(moves.map((move) => move.id)).toEqual(["open-1"]);
+  });
+
+  test("drops anything already resolved", () => {
+    const moves = buildDashboardMoveQueue([
+      item({ id: "open-1" }),
+      item({ id: "done-1", dedupeKey: "queue:2:v1", status: "done" }),
+      item({ id: "snoozed-1", dedupeKey: "queue:3:v1", status: "dismissed" }),
+    ]);
+
+    expect(moves.map((move) => move.id)).toEqual(["open-1"]);
+  });
+
+  test("collapses duplicates so one piece of work is offered once", () => {
+    const moves = buildDashboardMoveQueue([
+      item({ id: "first", dedupeKey: "same-work" }),
+      item({ id: "second", dedupeKey: "same-work" }),
+    ]);
+
+    // First wins: the backend already ranked these, so the earlier one is the higher-priority
+    // rendering of the same work.
+    expect(moves.map((move) => move.id)).toEqual(["first"]);
+  });
+
+  test("preserves the backend's ranking instead of re-sorting on the client", () => {
+    const moves = buildDashboardMoveQueue([
+      item({ id: "today", dedupeKey: "a", bucket: "doToday", urgency: "low" }),
+      item({ id: "week", dedupeKey: "b", bucket: "thisWeek", urgency: "high" }),
+      item({ id: "later", dedupeKey: "c", bucket: "later", urgency: "high" }),
+    ]);
+
+    expect(moves.map((move) => move.id)).toEqual(["today", "week", "later"]);
+  });
+
+  test("survives a missing queue", () => {
+    expect(buildDashboardMoveQueue([])).toEqual([]);
+    expect(buildDashboardMoveQueue(null as never)).toEqual([]);
   });
 });

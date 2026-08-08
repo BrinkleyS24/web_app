@@ -160,6 +160,25 @@ export type FollowupSuggestionsResponse = {
   };
 };
 
+/**
+ * One interview whose ending we never saw, offered back to the user as a question.
+ *
+ * `emailId` is the row the answer is written against — the backend only sends items it can
+ * actually persist, so a card on screen is always answerable.
+ */
+export type InterviewDebriefItem = {
+  key: string;
+  emailId: number;
+  /** "Verisk · Software Engineer in Test", pre-composed by the backend. */
+  label: string;
+  company?: string | null;
+  position?: string | null;
+  interviewedAt: string;
+  daysSilent: number | null;
+  /** "20 days ago" / "7 months ago". Coarsened server-side so both surfaces read the same. */
+  silentLabel?: string | null;
+};
+
 export type StrategyAlert = {
   id: string;
   kind: "performance" | "fit" | "focus" | "execution";
@@ -169,7 +188,49 @@ export type StrategyAlert = {
   recommendation?: string | null;
   supporting_stat?: string | null;
   timeframe_label?: string | null;
+  /**
+   * Present only on the interview-debrief alert. An alert that asks a question has to carry
+   * the things it is asking about, or the surface has to re-derive them and we are back to
+   * two definitions of the same list.
+   */
+  debrief?: {
+    kind: "interview_outcome";
+    items: InterviewDebriefItem[];
+    total: number;
+  } | null;
 };
+
+/**
+ * What the user tapped, and the reason label it is stored as.
+ *
+ * The labels are not free text: `utils/applicationCloseOutcome.classifyManualCloseKind` reads
+ * the leading segment before " - " and routes it to rejection / silence / user_choice. Get a
+ * label wrong here and a "never heard back" is recorded as a rejection, which is exactly the
+ * inflation that taxonomy was written to prevent. The suffix is provenance, and is ignored by
+ * the classifier by design.
+ */
+export const INTERVIEW_DEBRIEF_ANSWERS = {
+  no_response: { label: "Never heard back", reason: "No response - interview debrief" },
+  rejected: { label: "Rejected", reason: "Rejected - interview debrief" },
+  withdrew: { label: "I withdrew", reason: "Withdrew - interview debrief" },
+} as const;
+
+export type InterviewDebriefAnswer = keyof typeof INTERVIEW_DEBRIEF_ANSWERS;
+
+/**
+ * Records how one interview ended. Rides the existing manual-close path rather than inventing
+ * a second outcome store: `applications.user_closed_at/_reason` is already the place the
+ * product records an ending it did not learn from email, and the Signal Layer already reads it.
+ */
+export async function recordInterviewDebrief(params: {
+  emailId: number;
+  answer: InterviewDebriefAnswer;
+}): Promise<{ success: boolean; message?: string }> {
+  return closeApplication({
+    emailId: params.emailId,
+    reason: INTERVIEW_DEBRIEF_ANSWERS[params.answer].reason,
+  });
+}
 
 export type StrategyAlertsResponse = {
   success: boolean;
@@ -1119,6 +1180,8 @@ export type ApplyGateSearchMemory = {
     offered: number;
     rejected: number;
     noResponse: number;
+    /** Tracked roles with no ending on record — neither finished nor old enough to call ghosted. */
+    unresolved?: number;
     sameCompanyRejected?: number;
     sameCompanyRejectedRole?: string | null;
     sameCompanyDaysSinceRejection?: number | null;
@@ -1230,10 +1293,28 @@ export type VariantStrategyGap = {
   skipSignal: boolean;                      // true only for missing gaps
 };
 export type VariantStrategy = {
-  recommended: { variantId: string; name: string; basis: "requirements" | "your_outcomes"; sampleSize: number; reason: string; outcomeBand?: { kind: "stronger" | "tracked"; sampleSize: number; comparison: string } | null };
+  recommended: { variantId: string; name: string; basis: "requirements" | "your_outcomes"; sampleSize: number; reason: string; requiredCount?: number; outcomeBand?: { kind: "stronger" | "tracked"; sampleSize: number; comparison: string } | null };
   alternatives: { variantId: string; name: string; contentMatch: { coverage: number | null; matchedCount: number; requiredCount: number; missing: string[] } }[];
   gaps: VariantStrategyGap[];
   basisLabel: string;   // e.g. "Based on this role's requirements"
+  /**
+   * True when every résumé scored the same coverage and the pick fell through to the default flag.
+   * The card must not present a tie-break as a finding — that is what made a user ask why it had
+   * "analysed a résumé he didn't use", when in fact all six of his covered the posting equally.
+   */
+  isTieBreak?: boolean;
+  /** How many variants finished level at the top. Only meaningful when isTieBreak. */
+  tiedCount?: number;
+  /**
+   * Which document these gaps were actually read out of. The card enumerates every saved résumé and
+   * recommends one, so it is frequently a different file than the verdict above it scored — and a
+   * requirement the verdict counted as covered can then appear here as a gap. Naming both is the
+   * difference between a second opinion and a contradiction.
+   */
+  analyzedVariant?: { variantId: string; name: string; isDefault: boolean } | null;
+  scoredVariant?: { variantId: string; name: string } | null;
+  /** Only set when BOTH documents can be named — see buildVariantStrategy. */
+  analyzedDifferentDocument?: boolean;
 };
 
 export type ApplyGateResult = {
@@ -1249,6 +1330,18 @@ export type ApplyGateResult = {
   jobTitle?: string | null;
   companyName?: string | null;
   jobUrl?: string | null;
+  /**
+   * Which résumé this verdict was actually computed from. A verdict is advice about one specific
+   * document, and Apply Gate once scored a variant the user had not chosen — reporting a gap the
+   * selected résumé did not contain, with nothing on screen able to reveal it. Fingerprint only:
+   * résumé text is encrypted at rest.
+   */
+  resumeDocument?: {
+    variantId: string | null;
+    source: string | null;
+    fingerprint: string;
+    characters: number;
+  } | null;
   extractionMeta?: {
     attempted: boolean;
     host?: string | null;
@@ -1397,6 +1490,14 @@ export interface ApplyGatePriorHistory {
   recommendation: "skip" | "fix_first" | "proceed_with_confidence" | null;
   rejectionCount: number;
   sameCompanyRejectionCount?: number;
+  /** The base `rejectionCount` came out of, or null when only the email fallback was available. */
+  rejectionSampleSize?: number | null;
+  /**
+   * Which loader produced `rejectionCount`. This banner and Search Memory used to count different
+   * things — rejection EMAILS vs rejected APPLICATIONS — and rendered 32 and 25 on one screen.
+   * "applications" is the canonical source every other surface uses.
+   */
+  rejectionCountSource?: "applications" | "emails";
   similarRolesEvaluated: number;
   verdictBreakdown: { skip: number; fix: number; apply: number; total: number };
   recurringTheme: string | null;
@@ -1635,6 +1736,40 @@ export async function setDefaultResumeVariant(id: string): Promise<{ success: bo
 
 export async function archiveResumeVariant(id: string): Promise<{ success: boolean }> {
   return apiFetch(`/api/resumes/${id}`, { method: "DELETE" });
+}
+
+// ── Résumé health ────────────────────────────────────────────────────
+// Findings about a document, not about a posting. They used to be mixed into every Apply Gate
+// verdict, where — being derived from the résumé alone — they came out identical on every run.
+export type ResumeHealthFinding = {
+  key: string;
+  title: string;
+  severity: "blocking" | "important" | "suggested";
+  evidence: string;
+  action: string;
+  dismissed: boolean;
+};
+
+export type ResumeHealthEntry = {
+  variantId: string | null;
+  name: string;
+  isDefault: boolean;
+  /** Hash + length only; résumé text is encrypted at rest and never leaves the backend. */
+  document: { variantId: string | null; source: string | null; fingerprint: string; characters: number } | null;
+  findings: ResumeHealthFinding[];
+  openCount: number;
+};
+
+export async function fetchResumeHealth(): Promise<{ success: boolean; resumes: ResumeHealthEntry[] }> {
+  return apiFetch("/api/resumes/health", { method: "GET" });
+}
+
+export async function setResumeHealthFinding(body: {
+  variantId: string | null;
+  key: string;
+  state: "dismissed" | "active";
+}): Promise<{ success: boolean }> {
+  return apiFetch("/api/resumes/health/dismiss", { method: "POST", body: JSON.stringify(body) });
 }
 
 export async function fetchVariantScoreboard(title?: string): Promise<{ success: boolean; scoreboard: VariantScoreboard; recommendation: VariantRecommendation; breakdown?: { [variantId: string]: VariantBreakdownRow[] } }> {

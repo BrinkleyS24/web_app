@@ -1,7 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
-import { VariantStrategyCard } from "./VariantStrategyCard";
+import {
+  VariantStrategyCard,
+  variantStrategyDocumentNote,
+  variantStrategyNoGapsNote,
+  variantStrategyPickLabel,
+} from "./VariantStrategyCard";
 import type { VariantStrategy } from "@/lib/emails";
 
 const strategy: VariantStrategy = {
@@ -177,5 +182,137 @@ describe("VariantStrategyCard", () => {
     expect(
       screen.getByText("Authored test automation suites using Playwright, Jest, and Supertest."),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * This card and the verdict above it can read two different résumés — that is by design, since
+ * recommending a better-suited document for the role is the card's whole job. What was NOT by design
+ * is doing it silently: a requirement the verdict counted as covered could appear here as a gap,
+ * leaving the user to reconcile two confident, contradictory readings of "my résumé".
+ */
+describe("variantStrategyDocumentNote", () => {
+  const twoDocuments: VariantStrategy = {
+    ...strategy,
+    analyzedVariant: { variantId: "variant-a", name: "QA-Focused", isDefault: false },
+    scoredVariant: { variantId: "variant-b", name: "General" },
+    analyzedDifferentDocument: true,
+  };
+
+  test("names both documents when the card read a different résumé than the verdict scored", () => {
+    expect(variantStrategyDocumentNote(twoDocuments)).toBe(
+      "These gaps are from QA-Focused. The verdict above was scored on General, so the two can disagree.",
+    );
+  });
+
+  test("says nothing when both sides read the same document", () => {
+    expect(
+      variantStrategyDocumentNote({
+        ...twoDocuments,
+        scoredVariant: { variantId: "variant-a", name: "QA-Focused" },
+        analyzedDifferentDocument: false,
+      }),
+    ).toBeNull();
+  });
+
+  test("says nothing when only one of the two documents can be named", () => {
+    // "Different from something we can't identify" is a worse experience than the silence it
+    // replaces — it raises a doubt the user has no way to resolve.
+    expect(variantStrategyDocumentNote({ ...twoDocuments, scoredVariant: null })).toBeNull();
+    expect(variantStrategyDocumentNote({ ...twoDocuments, analyzedVariant: null })).toBeNull();
+  });
+
+  test("a strategy from a backend that predates these fields is silent, not broken", () => {
+    expect(variantStrategyDocumentNote(strategy)).toBeNull();
+  });
+
+  test("the note renders inside the card", () => {
+    render(<VariantStrategyCard strategy={twoDocuments} />);
+    expect(screen.getByText(/These gaps are from QA-Focused/)).toBeInTheDocument();
+    expect(screen.getByText(/scored on General/)).toBeInTheDocument();
+  });
+
+  test("with no gaps to point at, the note does not say 'these gaps'", () => {
+    // The first version of this note shipped and immediately pointed at nothing: the user's card had
+    // zero gaps, so "These gaps are from New-Resume" referred to an empty list.
+    const note = variantStrategyDocumentNote({ ...twoDocuments, gaps: [] });
+    expect(note).not.toMatch(/these gaps/i);
+    expect(note).toBe(
+      "We checked QA-Focused here. The verdict above was scored on General, the one you picked for this run.",
+    );
+  });
+});
+
+/**
+ * Naming a résumé under a "Résumé strategy" heading is a recommendation, and the card never said so.
+ *
+ * The founder ran a real QA posting, saw a document he had not selected, and asked why we analysed
+ * the wrong one. We hadn't — we had recommended one. And the recommendation was a six-way tie
+ * (every résumé covered all three must-haves), decided by the default flag, presented with the same
+ * confidence a genuine winner would get.
+ */
+describe("variantStrategyPickLabel", () => {
+  const requirementsPick: VariantStrategy = { ...strategy, recommended: { ...strategy.recommended, requiredCount: 3 } };
+
+  test("a pick that beat the others is labelled a best match", () => {
+    expect(variantStrategyPickLabel({ ...requirementsPick, isTieBreak: false })).toBe("Best match");
+  });
+
+  test("a tie is labelled as a tie, not as a match", () => {
+    expect(variantStrategyPickLabel({ ...requirementsPick, isTieBreak: true, tiedCount: 6 })).toBe("Any of these work");
+  });
+
+  test("no readable requirements means we are only showing the default", () => {
+    expect(
+      variantStrategyPickLabel({ ...strategy, recommended: { ...strategy.recommended, requiredCount: 0 } }),
+    ).toBe("Your default");
+  });
+
+  test("the outcomes basis is ranked on real results, so it never reports a tie", () => {
+    expect(variantStrategyPickLabel(outcomeStrategy)).toBe("Best results so far");
+  });
+
+  test("the label and the computed reason both render — the reason used to be discarded", () => {
+    render(<VariantStrategyCard strategy={{ ...requirementsPick, isTieBreak: true, tiedCount: 6 }} />);
+    expect(screen.getByText("Any of these work")).toBeInTheDocument();
+    expect(screen.getByText("Highest keyword match for this posting.")).toBeInTheDocument();
+  });
+});
+
+describe("variantStrategyNoGapsNote", () => {
+  test("stays silent while there are gaps to render", () => {
+    expect(variantStrategyNoGapsNote(strategy)).toBeNull();
+  });
+
+  test("a clean read against real requirements says so plainly", () => {
+    expect(
+      variantStrategyNoGapsNote({
+        ...strategy,
+        gaps: [],
+        recommended: { ...strategy.recommended, requiredCount: 3 },
+        analyzedVariant: { variantId: "variant-a", name: "New-Resume", isDefault: true },
+      }),
+    ).toBe("Nothing to fix on New-Resume for this posting — send it as it is.");
+  });
+
+  test("an empty gap list with NO requirements read is not reported as a clean résumé", () => {
+    // Two causes, opposite meanings, identical empty list. Calling the second one clean would be
+    // the product congratulating a user on a check it never ran.
+    const note = variantStrategyNoGapsNote({
+      ...strategy,
+      gaps: [],
+      recommended: { ...strategy.recommended, requiredCount: 0 },
+    });
+    expect(note).toMatch(/couldn't read specific requirements/i);
+    expect(note).toMatch(/not a clean bill of health/i);
+  });
+
+  test("the note renders where an empty panel used to be", () => {
+    render(
+      <VariantStrategyCard
+        strategy={{ ...strategy, gaps: [], recommended: { ...strategy.recommended, requiredCount: 3 } }}
+      />,
+    );
+    expect(screen.getByText(/Nothing to fix on QA-Focused/)).toBeInTheDocument();
   });
 });

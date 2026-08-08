@@ -64,6 +64,46 @@ vi.mock("@/lib/emails", async () => {
   };
 });
 
+/**
+ * A ranked action with every field the mapper insists on. `mapRankedActionToQueueItem` throws on a
+ * missing contract field rather than rendering a half-item, so tests that build their own queue
+ * spread this and override only what they are actually asserting on.
+ */
+const QUEUE_ITEM_TEMPLATE = {
+  id: "queue-1",
+  logicalKey: "queue:1",
+  dedupeKey: "queue:1:v1",
+  primaryEntityId: "thread-1",
+  evidenceVersion: "v1",
+  actionType: "follow_up",
+  actionCategory: "communication",
+  title: "Send follow-up to Acme Health",
+  whyNow: "Acme Health is inside the follow-up window.",
+  targetOutcome: "Increase the chance of a recruiter response.",
+  effortMinutes: 10,
+  urgencyLevel: "high",
+  confidenceLevel: "strong",
+  source: "followup_engine",
+  status: "open",
+  effectiveStatus: "open",
+  createdAt: "2026-04-02T12:00:00.000Z",
+  evidence: ["No tracked terminal outcome."],
+  threadId: "thread-1",
+  emailId: "email-1",
+  applicationId: "app-1",
+  suggestionSource: "email_followup",
+  queueSource: "followup",
+  intent: "FOLLOW_UP_THREAD",
+  intentLabel: "Follow-up",
+  playbook: ["Ask for timing or next steps, not a decision."],
+  sourceLabel: "Outreach task",
+  draftEligible: true,
+  routeHref: "/fix-suggestions",
+  routeLabel: "Open queue",
+  stageLabel: "Outreach",
+  company: "Acme Health",
+};
+
 function renderDashboard() {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -365,28 +405,220 @@ afterEach(() => {
 });
 
 describe("DashboardNew", () => {
-  test("renders the MVP command center with decision, actions, and memory", async () => {
+  test("opens with one claim, its evidence, and a single action", async () => {
     renderDashboard();
 
     expect(await screen.findByText(/Good (morning|afternoon|evening), Stacey\./)).toBeInTheDocument();
 
-    expect(await screen.findByText("Next decision")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "QA Analyst" })).toBeInTheDocument();
-    expect(screen.getByText("Fix first")).toBeInTheDocument();
+    // The claim comes from the alert verbatim. The dashboard used to open with "Applications 344",
+    // a number the user has to interpret before it means anything.
+    expect(await screen.findByText("What matters today")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "You are applying mostly to low-match roles" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Recent Apply Gate decisions show repeated fix-first signals.")).toBeInTheDocument();
+    expect(screen.getByText("3 of 4 recent checks were risky")).toBeInTheDocument();
+
+    // The counts still render, demoted to a strip under the claim rather than leading the page.
+    expect(screen.getByText("Applications")).toBeInTheDocument();
+    expect(screen.getByText("Ever interviewed")).toBeInTheDocument();
+    expect(screen.getByText("Offers")).toBeInTheDocument();
+    expect(screen.getByText("Interview rate")).toBeInTheDocument();
+  });
+
+  test("surfaces optimization work, not just follow-ups, as a move", async () => {
+    renderDashboard();
+
+    // This assertion is deliberately the inverse of what it used to be. The dashboard fed its
+    // queue through `buildDaqV1InboxQueue`, whose filter requires `source === "followup"` — and
+    // every Signal-Layer coaching action is generated as `resume` or `apply_gate`, never
+    // `followup`. So the coaching layer reached the payload and was discarded before render, and
+    // the old test pinned that bug in place. See buildDashboardMoveQueue.
+    expect(await screen.findByText("Tailor resume before applying to Datadog")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Send follow-up to Acme Health" })).toBeInTheDocument();
+
+    expect(screen.getByText("Next moves")).toBeInTheDocument();
+    expect(screen.getByText("2 open")).toBeInTheDocument();
+  });
+
+  test("labels the hero action honestly when it did not come from the claim's alert", async () => {
+    renderDashboard();
+
+    // `alert-1` produced no queue item, so the button is just the top of the queue. Saying
+    // "start here" would imply a link to the claim above that does not exist.
+    expect(await screen.findByText(/Top of your queue right now · Optimization task/)).toBeInTheDocument();
+    expect(screen.queryByText("This is the move for the read above.")).not.toBeInTheDocument();
+  });
+
+  test("pairs the hero action with the alert that produced the claim", async () => {
+    fetchRankedActionQueue.mockResolvedValue({
+      success: true,
+      queue: {
+        now: "2026-04-13T12:00:00.000Z",
+        doToday: [
+          // Ranked BELOW the strategy action on purpose: if the hero simply took the top of the
+          // queue, this is what it would show.
+          {
+            ...QUEUE_ITEM_TEMPLATE,
+            id: "queue-followup-1",
+            logicalKey: "followup:thread-1",
+            dedupeKey: "followup:thread-1:v1",
+            title: "Send follow-up to Acme Health",
+          },
+          {
+            ...QUEUE_ITEM_TEMPLATE,
+            id: "strategy:performance-focus-interview",
+            logicalKey: "strategy:performance-focus-interview",
+            dedupeKey: "strategy:performance-focus-interview:v1",
+            actionType: "prep_interview",
+            title: "Prep for the Verisk interview",
+            source: "strategy",
+            queueSource: "apply_gate",
+            intent: "PREP_INTERVIEW",
+            intentLabel: "Interview prep",
+            sourceLabel: "Optimization task",
+            routeHref: "/fix-suggestions",
+            threadId: null,
+          },
+        ],
+        thisWeek: [],
+        later: [],
+        blocked: [],
+        dismissed: [],
+        expired: [],
+        done: [],
+        emptyState: null,
+        resolvedActions: [],
+      },
+    });
+
+    fetchStrategyAlerts.mockResolvedValue({
+      success: true,
+      alerts: [
+        {
+          id: "performance-focus-interview",
+          kind: "performance",
+          severity: "high",
+          title: "Getting interviews is working; converting them is the live problem",
+          description: "23 of 344 applications reached an interview (6.7%), and none has become an offer yet.",
+          recommendation: "Put the next hour into interview prep, not more applications.",
+          supporting_stat: "23 interviews, 0 offers",
+          timeframe_label: "All time",
+        },
+      ],
+    });
+
+    renderDashboard();
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Getting interviews is working; converting them is the live problem",
+      }),
+    ).toBeInTheDocument();
+
+    // The generator ids strategy-derived queue items `strategy:<alertId>`. When one exists we use
+    // it, so the button under a claim is provably about that claim.
+    expect(screen.getByText("Prep for the Verisk interview")).toBeInTheDocument();
+    expect(screen.getByText("This is the move for the read above.")).toBeInTheDocument();
+  });
+
+  test("says what to do about the claim even when there is also a button", async () => {
+    renderDashboard();
+
+    await screen.findByRole("heading", { name: "You are applying mostly to low-match roles" });
+
+    // The regression this pins: the recommendation was an `else` branch behind the hero action,
+    // so the one sentence answering "so what do I do about it" was dropped precisely when there
+    // was also work queued. Founder's read: "it tells me the problem without giving me a
+    // solution." Diagnosis, prescription, and a place to start — all three or it is not coaching.
+    expect(screen.getByText("Review Apply Gate before sending more applications.")).toBeInTheDocument();
+    expect(screen.getByText("Tailor resume before applying to Datadog")).toBeInTheDocument();
+  });
+
+  test("asks about the silent interviews in place rather than pointing at another screen", async () => {
+    fetchStrategyAlerts.mockResolvedValue({
+      success: true,
+      alerts: [
+        {
+          id: "performance-interview-debrief",
+          kind: "performance",
+          severity: "medium",
+          title: "You have reached 23 interviews. I can only see how 4 of them ended.",
+          description: "14 went quiet after the interview and never came back — the oldest 7 months ago.",
+          recommendation: "Tell me how the ones you remember ended — one tap each, no typing.",
+          supporting_stat: "4 of 23 endings visible",
+          timeframe_label: "Across your whole tracked search",
+          debrief: {
+            kind: "interview_outcome",
+            total: 14,
+            items: [
+              {
+                key: "verisk||sdet",
+                emailId: 101,
+                label: "Verisk · Software Engineer in Test",
+                company: "Verisk",
+                position: "Software Engineer in Test",
+                interviewedAt: "2026-03-24T00:00:00.000Z",
+                daysSilent: 20,
+                silentLabel: "20 days ago",
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    renderDashboard();
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "You have reached 23 interviews. I can only see how 4 of them ended.",
+      }),
+    ).toBeInTheDocument();
+
+    // The cards replace the hero button. Sending someone to another screen to supply the data
+    // this screen is blocked on is how the ask gets abandoned — and an unanswered ask leaves the
+    // product advising from 17% visibility, which is what produced the claim it cannot support.
+    expect(screen.getByText("Verisk · Software Engineer in Test")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Never heard back" })).toBeInTheDocument();
+    expect(screen.getByText(/13 more/)).toBeInTheDocument();
+    expect(screen.queryByText(/Top of your queue right now/)).not.toBeInTheDocument();
+
+    // The queued work is still there, demoted below the ask rather than deleted.
+    expect(screen.getByText("Tailor resume before applying to Datadog")).toBeInTheDocument();
+  });
+
+  test("demotes the rest of the dashboard into one drawer without dropping it", async () => {
+    renderDashboard();
+
+    // Wait on something the queries produce, not on static chrome — "Next decision" is a label
+    // that renders before any data lands, so awaiting it proves nothing.
+    expect(await screen.findByRole("heading", { name: "QA Analyst" })).toBeInTheDocument();
+
+    // Present, so nothing was deleted. Not visible, so nothing competes with the claim on
+    // first read. `toBeVisible` understands a closed <details>.
+    const nextDecision = screen.getByText("Next decision");
+    expect(nextDecision).toBeInTheDocument();
+    expect(nextDecision).not.toBeVisible();
+
     expect(screen.getAllByText("Resume does not show SQL proof").length).toBeGreaterThan(0);
 
-    expect(screen.getByText("Daily Action Queue")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Send follow-up to Acme Health" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Tailor resume before applying to Datadog" })).not.toBeInTheDocument();
-
-    expect(screen.getByText("Search memory")).toBeInTheDocument();
+    expect(screen.getByText("Search memory")).not.toBeVisible();
     expect(screen.getByText("Completed follow-ups are showing better outcomes")).toBeInTheDocument();
     expect(screen.getByText("50.0% vs 10.0%")).toBeInTheDocument();
 
-    expect(screen.getByText("Strategy alert")).toBeInTheDocument();
-    expect(screen.getByText("You are applying mostly to low-match roles")).toBeInTheDocument();
+    expect(screen.getByText("Quick links")).toBeInTheDocument();
+    expect(screen.getByText("Everything else")).toBeVisible();
+  });
 
-    expect(screen.queryByTestId("first-move-card")).not.toBeInTheDocument();
+  test("does not repeat the hero's alert further down the page", async () => {
+    renderDashboard();
+
+    // `alert-1` is the claim. Rendering it again in the alerts card would make the drawer look
+    // like new information.
+    await screen.findByRole("heading", { name: "You are applying mostly to low-match roles" });
+    expect(screen.getAllByText("You are applying mostly to low-match roles")).toHaveLength(1);
+    expect(screen.getByText("The read above is the only alert right now.")).toBeInTheDocument();
   });
 
   test("shows the First Move card for a cold-start account", async () => {

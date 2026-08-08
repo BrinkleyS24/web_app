@@ -2,16 +2,20 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronDown, FileText, Loader2, Plus, Star, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, CircleCheck, FileText, Loader2, Plus, Star, Trash2, X } from "lucide-react";
 import {
   fetchResumeVariants,
   fetchVariantScoreboard,
   fetchApplicationStats,
+  fetchResumeHealth,
+  setResumeHealthFinding,
   createResumeVariant,
   setDefaultResumeVariant,
   archiveResumeVariant,
   type VariantScoreRow,
   type VariantBreakdownRow,
+  type ResumeHealthEntry,
+  type ResumeHealthFinding,
 } from "@/lib/emails";
 
 function roundedChars(n: number) {
@@ -73,11 +77,118 @@ function recordLine(score: VariantScoreRow | undefined) {
   return `${sentLabel} · ${plural(score.interviewed, "interview")} · ${plural(score.offered, "offer")} · ${plural(score.rejected, "rejected")} · ${score.noResponse} no response`;
 }
 
+/**
+ * One line answering "is this résumé in good shape?" before any list of findings.
+ *
+ * Exported for its own test: the interesting cases are the two empty ones, which read very
+ * differently. Nothing flagged means we checked and found nothing. No résumé to check means we
+ * have not looked — and a health panel that renders those identically is claiming a clean bill
+ * of health it never established.
+ */
+export function resumeHealthHeadline(entry: ResumeHealthEntry | undefined | null) {
+  if (!entry || !entry.document) return null;
+  const open = entry.findings.filter((f) => !f.dismissed);
+  if (open.length === 0) return { clean: true as const, text: "Nothing flagged on this version." };
+  const blocking = open.filter((f) => f.severity === "blocking").length;
+  if (blocking > 0) {
+    return {
+      clean: false as const,
+      text: blocking === 1 && open.length === 1
+        ? "1 thing here stops a reviewer reaching you."
+        : `${open.length} things to fix — ${blocking} stops a reviewer reaching you.`,
+    };
+  }
+  return {
+    clean: false as const,
+    text: open.length === 1 ? "1 thing worth fixing on this version." : `${open.length} things worth fixing on this version.`,
+  };
+}
+
+const SEVERITY_STYLE: Record<ResumeHealthFinding["severity"], string> = {
+  blocking: "border-destructive/25 bg-destructive/5",
+  important: "border-warning/25 bg-warning/5",
+  suggested: "border-border/60 bg-muted/30",
+};
+
+function ResumeHealthBlock({
+  entry,
+  onSetState,
+  pendingKey,
+}: {
+  entry: ResumeHealthEntry | undefined;
+  onSetState: (finding: ResumeHealthFinding, next: "dismissed" | "active") => void;
+  pendingKey: string | null;
+}) {
+  const [showDismissed, setShowDismissed] = useState(false);
+  const headline = resumeHealthHeadline(entry);
+  if (!entry || !headline) return null;
+
+  const open = entry.findings.filter((f) => !f.dismissed);
+  const dismissed = entry.findings.filter((f) => f.dismissed);
+
+  return (
+    <div className="space-y-2 border-t border-border/60 pt-2">
+      <p className={`flex items-center gap-1.5 text-xs font-medium ${headline.clean ? "text-accent" : "text-foreground"}`}>
+        {headline.clean ? <CircleCheck className="h-3.5 w-3.5" aria-hidden="true" /> : null}
+        {headline.text}
+      </p>
+
+      {open.map((finding) => (
+        <div key={finding.key} className={`rounded-lg border px-3 py-2 ${SEVERITY_STYLE[finding.severity]}`}>
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-xs font-semibold text-foreground">{finding.title}</p>
+            <button
+              type="button"
+              onClick={() => onSetState(finding, "dismissed")}
+              disabled={pendingKey === finding.key}
+              className="shrink-0 text-[11px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-50"
+            >
+              Not an issue
+            </button>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{finding.evidence}</p>
+          <p className="mt-1 text-xs leading-relaxed text-foreground">{finding.action}</p>
+        </div>
+      ))}
+
+      {dismissed.length > 0 ? (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowDismissed((v) => !v)}
+            className="flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+            aria-expanded={showDismissed}
+          >
+            <ChevronDown className={`h-3 w-3 transition-transform ${showDismissed ? "rotate-180" : ""}`} />
+            {showDismissed ? "Hide" : `${dismissed.length} dismissed`}
+          </button>
+          {showDismissed
+            ? dismissed.map((finding) => (
+                <div key={finding.key} className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-1.5">
+                  <p className="text-[11px] text-muted-foreground">{finding.evidence}</p>
+                  <button
+                    type="button"
+                    onClick={() => onSetState(finding, "active")}
+                    disabled={pendingKey === finding.key}
+                    className="shrink-0 text-[11px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-50"
+                  >
+                    Undo
+                  </button>
+                </div>
+              ))
+            : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 const Resumes = () => {
   const queryClient = useQueryClient();
   const variantsQuery = useQuery({ queryKey: ["resume-variants"], queryFn: fetchResumeVariants });
   const scoreboardQuery = useQuery({ queryKey: ["variant-scoreboard"], queryFn: () => fetchVariantScoreboard() });
   const statsQuery = useQuery({ queryKey: ["application-stats"], queryFn: fetchApplicationStats });
+  const healthQuery = useQuery({ queryKey: ["resume-health"], queryFn: fetchResumeHealth });
 
   const [adding, setAdding] = useState(false);
   const [draftName, setDraftName] = useState("");
@@ -115,9 +226,16 @@ const Resumes = () => {
     setNudgeDismissed(true);
   };
 
+  const healthByVariant = new Map(
+    (healthQuery.data?.resumes ?? []).map((entry) => [entry.variantId, entry]),
+  );
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["resume-variants"] });
     queryClient.invalidateQueries({ queryKey: ["variant-scoreboard"] });
+    // A new or edited résumé is a different document, so its findings are recomputed from
+    // scratch — there is no stored "resolved" state that could go stale against the text.
+    queryClient.invalidateQueries({ queryKey: ["resume-health"] });
   };
   const createMut = useMutation({
     mutationFn: createResumeVariant,
@@ -125,6 +243,11 @@ const Resumes = () => {
   });
   const setDefaultMut = useMutation({ mutationFn: setDefaultResumeVariant, onSuccess: invalidate });
   const archiveMut = useMutation({ mutationFn: archiveResumeVariant, onSuccess: invalidate });
+  const healthMut = useMutation({
+    mutationFn: setResumeHealthFinding,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["resume-health"] }),
+  });
+  const pendingHealthKey = healthMut.isPending ? healthMut.variables?.key ?? null : null;
 
   return (
     <DashboardLayout>
@@ -204,6 +327,13 @@ const Resumes = () => {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">{recordLine(scoreByVariant.get(v.id))}</p>
+                <ResumeHealthBlock
+                  entry={healthByVariant.get(v.id)}
+                  pendingKey={pendingHealthKey}
+                  onSetState={(finding, next) =>
+                    healthMut.mutate({ variantId: v.id, key: finding.key, state: next })
+                  }
+                />
                 {(() => {
                   const rows = breakdown[v.id] ?? [];
                   if (rows.length === 0) return null;
