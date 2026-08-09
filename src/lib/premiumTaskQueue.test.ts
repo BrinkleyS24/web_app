@@ -400,6 +400,87 @@ describe("premiumTaskQueue outreach timing", () => {
     expect(daqItems[0].actionType).toBe("thank_you");
   });
 
+  test("an assessment the employer is waiting on reaches the default inbox view, ahead of the reply", () => {
+    // The founder, 2026-08-08: "the assessment still reads as a generic recruiter reply." The
+    // backend now emits a card for doing the work — but `queueView` defaults to "inbox", and this
+    // allowlist would have dropped the card before render, leaving the complaint intact with a
+    // green backend suite behind it.
+    const base = {
+      logicalKey: "base",
+      dedupeKey: "base:v1",
+      primaryEntityId: "base",
+      evidenceVersion: "v1",
+      actionCategory: "application",
+      targetOutcome: "Clear the gate this employer put in front of the application",
+      effortMinutes: 45,
+      urgencyLevel: "high",
+      confidenceLevel: "strong",
+      source: "followup_engine",
+      status: "open",
+      effectiveStatus: "open",
+      createdAt: "2026-08-08T12:00:00.000Z",
+      evidence: ["Subject: Next step: Assessment"],
+      queueSource: "followup",
+      routeHref: "/fix-suggestions",
+      routeLabel: "Open queue",
+      company: "GitLab",
+      threadId: "thread-gitlab",
+      applicationId: null,
+    };
+    const items = buildQueueItemsFromRankedQueue({
+      now: "2026-08-08T12:00:00.000Z",
+      doToday: [
+        {
+          ...base,
+          id: "reply",
+          logicalKey: "followup:reply",
+          dedupeKey: "followup:reply:v1",
+          actionType: "reply",
+          legacyActionType: "reply",
+          title: "Reply to GitLab",
+          whyNow: "Message text appears to request a response.",
+          intent: "FOLLOW_UP_THREAD",
+          intentLabel: "Reply",
+          sourceLabel: "Recruiter reply",
+          stageLabel: "Needs response",
+          draftEligible: true,
+          playbook: ["Open the thread and answer the direct question first."],
+        },
+        {
+          ...base,
+          id: "assessment",
+          logicalKey: "assessment:gitlab",
+          dedupeKey: "assessment:gitlab:v1",
+          actionType: "complete_assessment",
+          legacyActionType: "complete_assessment",
+          title: "Finish the GitLab assessment",
+          whyNow: "Nothing on the thread says it has been handed in yet.",
+          intent: "COMPLETE_ASSESSMENT",
+          intentLabel: "Complete assessment",
+          sourceLabel: "Employer task",
+          stageLabel: "Assessment",
+          draftEligible: false,
+          playbook: ["Open the invitation and check the link still works before you plan around it."],
+        },
+      ],
+      thisWeek: [],
+      later: [],
+      blocked: [],
+      dismissed: [],
+      expired: [],
+      done: [],
+      emptyState: null,
+      resolvedActions: [],
+    } as any);
+
+    const daqItems = buildDaqV1InboxQueue(items);
+
+    // Both are on one thread, so the client dedupes to one — and it must be the work, not the note.
+    expect(daqItems).toHaveLength(1);
+    expect(daqItems[0].actionType).toBe("complete_assessment");
+    expect(daqItems[0].title).toBe("Finish the GitLab assessment");
+  });
+
   test("carries lastMessageSnippet through to the queue item for Source check", () => {
     const items = buildQueueItemsFromRankedQueue({
       now: "2026-04-11T12:00:00.000Z",

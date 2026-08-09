@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowRight,
+  CalendarClock,
   CheckCircle2,
   Compass,
   Gauge,
@@ -37,6 +38,7 @@ const kindLabels: Record<StrategyAlert["kind"], string> = {
   fit: "Targeting",
   focus: "Focus lane",
   execution: "Execution",
+  commitment: "Owed now",
 };
 
 const kindDescriptions: Record<StrategyAlert["kind"], string> = {
@@ -44,9 +46,16 @@ const kindDescriptions: Record<StrategyAlert["kind"], string> = {
   fit: "Whether Apply Gate decisions suggest you are applying into avoidable mismatch.",
   focus: "Where the same companies, roles, or industries keep showing up in your results.",
   execution: "Whether completed actions are building a measurable search habit.",
+  // The only group on this page that is not a read of the past. Everything else here would be
+  // just as true tomorrow; these stop being true on a specific day.
+  commitment: "Interviews already on your calendar and assessments nobody has seen you hand in.",
 };
 
 function alertIcon(alert: StrategyAlert) {
+  // Checked before severity, unlike every other kind. A commitment is always `high`, so leaving it
+  // to fall through would give the one dated item on the page the same warning triangle as a
+  // rejection-velocity finding — and a booked interview is not a problem.
+  if (alert.kind === "commitment") return CalendarClock;
   if (alert.severity === "high") return AlertTriangle;
   if (alert.kind === "focus") return Compass;
   if (alert.kind === "execution") return Target;
@@ -59,6 +68,9 @@ function getAlertCta(alert?: StrategyAlert | null) {
   if (alert.kind === "fit") return { to: "/apply-gate", label: "Review Apply Gate" };
   if (alert.kind === "execution") return { to: "/fix-suggestions", label: "Open Next Actions" };
   if (alert.kind === "focus") return { to: "/fix-suggestions", label: "Review focus actions" };
+  // The commitment alert is deliberately excluded from the queue (`queue.exclude`), but the work
+  // itself is there as the interview-prep and assessment cards, so this is the right destination.
+  if (alert.kind === "commitment") return { to: "/fix-suggestions", label: "Open today's actions" };
   return { to: "/fix-suggestions", label: "Review today's queue" };
 }
 
@@ -136,7 +148,10 @@ const StrategyAlerts = () => {
     const actionable = alerts.filter((alert) => alert.severity === "high" || alert.severity === "medium");
     const positive = alerts.filter((alert) => alert.severity === "positive");
     const calibration = alerts.filter((alert) => alert.severity === "low");
-    const byKind = {
+    // Typed rather than inferred, so the next kind added to the union fails the build here instead
+    // of quietly vanishing from the category panel — which is exactly what `commitment` did.
+    const byKind: Record<StrategyAlert["kind"], number> = {
+      commitment: alerts.filter((alert) => alert.kind === "commitment").length,
       performance: alerts.filter((alert) => alert.kind === "performance").length,
       fit: alerts.filter((alert) => alert.kind === "fit").length,
       focus: alerts.filter((alert) => alert.kind === "focus").length,
@@ -297,7 +312,7 @@ const StrategyAlerts = () => {
                   <h2 className="text-sm font-semibold text-foreground">Alert categories</h2>
                 </div>
                 <div className="mt-3 space-y-2">
-                  {(["performance", "fit", "focus", "execution"] as StrategyAlert["kind"][]).map((kind) => (
+                  {(["commitment", "performance", "fit", "focus", "execution"] as StrategyAlert["kind"][]).map((kind) => (
                     <div key={kind} className="rounded-xl border border-border/70 bg-background/70 p-3">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-semibold text-foreground">{kindLabels[kind]}</p>

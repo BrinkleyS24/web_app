@@ -38,6 +38,21 @@ function debriefAlert(itemCount: number, total = itemCount) {
 }
 
 describe("selectAnswerAlert", () => {
+  test("anything with an expiry outranks everything without one", () => {
+    const chosen = selectAnswerAlert([
+      alert("performance-focus-interview"),
+      alert("performance-rejection-velocity-fast"),
+      debriefAlert(3),
+      alert("commitment-assessment", { kind: "commitment" }),
+    ]);
+
+    // The actual defect the founder hit: his dashboard opened with his conversion rate on a
+    // morning when he had an assessment open and an interview booked. Every other entry in the
+    // priority list is a READ — true about the whole history and just as true tomorrow. A read
+    // delivered a day late is unchanged; an interview reminder delivered a day late is worthless.
+    expect(chosen?.id).toBe("commitment-assessment");
+  });
+
   test("prefers the funnel focus read over everything else", () => {
     const chosen = selectAnswerAlert([
       alert("performance-coverage-gap"),

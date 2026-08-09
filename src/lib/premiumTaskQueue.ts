@@ -124,6 +124,7 @@ export const actionTypeLabels: Record<string, string> = {
   resume_proof_gap: "Resume gap",
   cleanup_structured_fields: "Extraction cleanup",
   cleanup_application_links: "Link cleanup",
+  complete_assessment: "Complete assessment",
 };
 
 export const daqV1ActionTypes = new Set([
@@ -133,6 +134,10 @@ export const daqV1ActionTypes = new Set([
   "thank_you",
   "follow_up",
   "status_check",
+  // Omitting this would have made the backend work pointless in the most literal way: the card
+  // reaches the payload, the default queue view is "inbox", and this allowlist drops it before it
+  // ever renders. Same shape as the dashboard filter that silently discarded every coaching action.
+  "complete_assessment",
 ]);
 
 export function isDaqV1InboxAction(item: QueueItem) {
@@ -242,6 +247,10 @@ function getDaqIdentityKey(item: QueueItem) {
 
 function getDaqActionPriority(item: QueueItem) {
   const actionType = normalizeQueueActionType(item.actionType);
+  // Mirrors getOpportunityActionPriority on the backend, which already resolves this collision
+  // before the payload is built. Kept in step anyway: the two deduplicate on different keys, and a
+  // client that quietly disagreed would put "Reply" back on top of the one card that is real work.
+  if (actionType === "complete_assessment") return -1;
   if (actionType === "reply" || actionType === "thank_you") return 0;
   if (actionType === "status_check" || actionType === "follow_up") return 1;
   if (actionType === "prep_interview" || actionType === "prepare_interview") return 2;

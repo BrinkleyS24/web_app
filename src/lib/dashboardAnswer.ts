@@ -39,11 +39,20 @@ export type DashboardAnswer = {
 /**
  * Answer priority, most specific first.
  *
- * `performance-interview-debrief` outranks everything, and it is the only entry here that is a
- * question rather than a read. It is raised precisely when the product cannot see how most of
- * a user's interviews ended, and in that state every alert below it would be characterising a
- * search we can barely observe. Asking has to come before advising, or the advice is a guess
- * delivered in the voice of a finding.
+ * `commitment-*` leads, and adding it changed what this list is capable of saying. Every other
+ * entry is a READ — a true statement about the whole history of the account that will be just as
+ * true tomorrow. That is why the founder's dashboard opened with his conversion rate on a morning
+ * when he had an assessment open and an interview booked: not because the ranking was wrong, but
+ * because nothing in the ranking had a date on it. A read delivered a day late is unchanged; an
+ * interview reminder delivered a day late is worthless. So anything with an expiry outranks
+ * everything without one.
+ *
+ * `performance-interview-debrief` comes next, and it is the only entry that is a question rather
+ * than a read. It is raised precisely when the product cannot see how most of a user's interviews
+ * ended, and in that state every alert below it would be characterising a search we can barely
+ * observe. Asking has to come before advising, or the advice is a guess delivered in the voice of
+ * a finding. It yields to a commitment because a question about last month can wait a day and a
+ * deadline cannot.
  *
  * `performance-focus-*` names where effort belongs and is the closest thing the product has to
  * a thesis about a user's search. `performance-rejection-velocity-*` describes how rejections
@@ -52,6 +61,7 @@ export type DashboardAnswer = {
  * than silently promoting an unrelated alert into the hero slot.
  */
 const ANSWER_ALERT_PRIORITY = [
+  "commitment-",
   "performance-interview-debrief",
   "performance-focus-",
   "performance-rejection-velocity-",

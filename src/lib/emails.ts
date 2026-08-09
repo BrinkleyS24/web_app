@@ -181,7 +181,11 @@ export type InterviewDebriefItem = {
 
 export type StrategyAlert = {
   id: string;
-  kind: "performance" | "fit" | "focus" | "execution";
+  /**
+   * `commitment` is the odd one out, deliberately: the other four classify a READ of the search,
+   * this one carries something the user owes somebody on a particular day.
+   */
+  kind: "performance" | "fit" | "focus" | "execution" | "commitment";
   severity: "high" | "medium" | "low" | "positive";
   title: string;
   description: string;
@@ -361,6 +365,7 @@ export type RankedAction = {
     | "TAILOR_RESUME"
     | "FIX_TARGETING"
     | "PREP_INTERVIEW"
+    | "COMPLETE_ASSESSMENT"
     | "CLEANUP_STRUCTURED_FIELDS"
     | "LINK_APPLICATIONS"
     | "CLOSE_STALE_ROLE"
