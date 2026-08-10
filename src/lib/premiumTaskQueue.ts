@@ -127,21 +127,35 @@ export const actionTypeLabels: Record<string, string> = {
   complete_assessment: "Complete assessment",
 };
 
-export const daqV1ActionTypes = new Set([
-  "prepare_interview",
-  "prep_interview",
-  "reply",
-  "thank_you",
-  "follow_up",
-  "status_check",
-  // Omitting this would have made the backend work pointless in the most literal way: the card
-  // reaches the payload, the default queue view is "inbox", and this allowlist drops it before it
-  // ever renders. Same shape as the dashboard filter that silently discarded every coaching action.
-  "complete_assessment",
-]);
-
+/**
+ * Does this card belong in the Next Actions *inbox* lane (the default view)?
+ *
+ * `source` is mapped straight from the backend's `queueSource`, and `followup` means exactly one
+ * thing there: work anchored to a Gmail thread. `deriveQueueSource` assigns it to everything from
+ * the follow-up engine, plus the three generators that set it explicitly (reply, interview prep,
+ * assessment). That IS the definition of this lane, so the source check is the whole test.
+ *
+ * There used to be a second gate here — a hand-maintained allowlist of seven action types. It was
+ * redundant with the source check on its good days and silently destructive on its bad ones,
+ * because the backend picks the action type from a vocabulary this file did not own:
+ *
+ *   - `complete_assessment` was missing until 2026-08-08 and was caught by luck, one review away
+ *     from making a whole feature invisible.
+ *   - `research` (applied, days 0-3) and `networking` (days 4-9) were missing the entire time.
+ *     `determineActionType` returns those for EVERY tracked application in its first nine days, so
+ *     the most active window of every application produced a card that never rendered. Worse, the
+ *     `networkingOutreach` coach detector exists solely to write copy for those cards — a detector,
+ *     an LLM call and a validator, all running, all discarded before paint.
+ *
+ * The failure mode is why the list is gone rather than corrected. A missing entry does not throw,
+ * does not warn, and does not empty the lane: it removes some cards while others still render, so
+ * the "Show all actions" escape hatch (which only appears when the lane is EMPTY) never offers
+ * itself. The screen looks like a working queue that simply has less on it.
+ *
+ * Anything the backend routes to `followup` now appears here by construction.
+ */
 export function isDaqV1InboxAction(item: QueueItem) {
-  return item.source === "followup" && daqV1ActionTypes.has(String(item.actionType || ""));
+  return item.source === "followup";
 }
 
 const actionPlaybook: Record<string, string[]> = {

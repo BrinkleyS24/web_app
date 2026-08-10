@@ -481,6 +481,145 @@ describe("premiumTaskQueue outreach timing", () => {
     expect(daqItems[0].title).toBe("Finish the GitLab assessment");
   });
 
+  test("the first nine days of an application are not invisible in the default view", () => {
+    // Found 2026-08-09, live in production. `determineActionType` returns "research" for days 0-3
+    // after applying and "networking" for days 4-9. Neither was in the inbox lane's allowlist, so
+    // every tracked application spent its first nine days — the most active window it has —
+    // generating a card that reached the payload and was dropped before render.
+    //
+    // The networking card is the expensive one to lose: `networkingOutreach` is a full coach
+    // detector, so a signal fired, an LLM wrote copy and a validator passed it, all for a card
+    // nobody could see.
+    //
+    // This asserts on the two types that were actually missing rather than on the absence of a
+    // list, because the point is the behaviour, not the implementation that used to break it.
+    const base = {
+      logicalKey: "base",
+      dedupeKey: "base:v1",
+      primaryEntityId: "base",
+      evidenceVersion: "v1",
+      actionCategory: "communication",
+      targetOutcome: "Improve the quality of the next human touchpoint",
+      effortMinutes: 15,
+      urgencyLevel: "medium",
+      confidenceLevel: "moderate",
+      source: "followup_engine",
+      status: "open",
+      effectiveStatus: "open",
+      createdAt: "2026-08-09T12:00:00.000Z",
+      evidence: ["Subject: Thanks for applying"],
+      queueSource: "followup",
+      routeHref: "/fix-suggestions",
+      routeLabel: "Open queue",
+      applicationId: null,
+      draftEligible: false,
+      intent: "NETWORKING_OUTREACH",
+      intentLabel: "Networking",
+      sourceLabel: "Outreach task",
+      stageLabel: "Application",
+      playbook: ["Find one person on the team and send a short, specific note."],
+    };
+
+    const items = buildQueueItemsFromRankedQueue({
+      now: "2026-08-09T12:00:00.000Z",
+      doToday: [
+        {
+          ...base,
+          id: "research",
+          logicalKey: "followup:research",
+          dedupeKey: "followup:research:v1",
+          threadId: "thread-acme",
+          company: "Acme",
+          actionType: "follow_up",
+          legacyActionType: "research",
+          title: "Research Acme and role",
+          whyNow: "Application sent 2 days ago.",
+        },
+        {
+          ...base,
+          id: "networking",
+          logicalKey: "followup:networking",
+          dedupeKey: "followup:networking:v1",
+          threadId: "thread-globex",
+          company: "Globex",
+          actionType: "follow_up",
+          legacyActionType: "networking",
+          title: "Connect with Globex team on LinkedIn",
+          whyNow: "Application sent 5 days ago.",
+        },
+      ],
+      thisWeek: [],
+      later: [],
+      blocked: [],
+      dismissed: [],
+      expired: [],
+      done: [],
+      emptyState: null,
+      resolvedActions: [],
+    } as any);
+
+    const daqItems = buildDaqV1InboxQueue(items);
+
+    // Different threads, so both survive dedupe. Before the fix this was [].
+    expect(daqItems).toHaveLength(2);
+    expect(daqItems.map((item) => item.actionType).sort()).toEqual(["networking", "research"]);
+  });
+
+  test("the inbox lane admits any thread-anchored card the backend routes to it", () => {
+    // The guard against a third recurrence. The lane's contract is `queueSource === "followup"`,
+    // which the backend assigns to everything from the follow-up engine; a client-side vocabulary
+    // of action types cannot stay in step with a server-side one and does not fail loudly when it
+    // drifts. An action type invented tomorrow must render without a matching change in this file.
+    const items = buildQueueItemsFromRankedQueue({
+      now: "2026-08-09T12:00:00.000Z",
+      doToday: [
+        {
+          id: "novel",
+          logicalKey: "followup:novel",
+          dedupeKey: "followup:novel:v1",
+          primaryEntityId: "followup:novel",
+          evidenceVersion: "v1",
+          threadId: "thread-novel",
+          company: "Initech",
+          actionType: "follow_up",
+          legacyActionType: "some_future_action_type",
+          actionCategory: "communication",
+          title: "A card type that did not exist when this file was written",
+          whyNow: "Because the backend said so.",
+          targetOutcome: "Keep the conversation moving",
+          effortMinutes: 10,
+          urgencyLevel: "medium",
+          confidenceLevel: "moderate",
+          source: "followup_engine",
+          queueSource: "followup",
+          status: "open",
+          effectiveStatus: "open",
+          createdAt: "2026-08-09T12:00:00.000Z",
+          evidence: [],
+          routeHref: "/fix-suggestions",
+          routeLabel: "Open queue",
+          applicationId: null,
+          draftEligible: false,
+          intent: "FOLLOW_UP_THREAD",
+          intentLabel: "Follow up",
+          sourceLabel: "Outreach task",
+          stageLabel: "Application",
+          playbook: ["Do the thing."],
+        },
+      ],
+      thisWeek: [],
+      later: [],
+      blocked: [],
+      dismissed: [],
+      expired: [],
+      done: [],
+      emptyState: null,
+      resolvedActions: [],
+    } as any);
+
+    expect(buildDaqV1InboxQueue(items)).toHaveLength(1);
+  });
+
   test("carries lastMessageSnippet through to the queue item for Source check", () => {
     const items = buildQueueItemsFromRankedQueue({
       now: "2026-04-11T12:00:00.000Z",
