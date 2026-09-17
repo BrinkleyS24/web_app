@@ -394,6 +394,10 @@ export type RankedActionQueue = {
     title: string;
     nextSteps: string[];
   } | null;
+  // Repeat actions the backend deliberately did not ask for yet, grouped by intent. These are not
+  // lost — each is promoted as soon as one of the surfaced actions ahead of it is completed.
+  heldBackSimilarActions?: { intent: string | null; intentLabel: string; count: number }[];
+  heldBackSimilarCount?: number;
   resolvedActions?: RankedAction[];
 };
 

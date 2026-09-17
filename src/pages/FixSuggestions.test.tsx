@@ -564,6 +564,49 @@ describe("FixSuggestions", () => {
     expect(recordQueueActionImpression).toHaveBeenCalledTimes(2);
   });
 
+  test("tells the user how many repeat actions are being held back, and why", async () => {
+    // A short queue with no explanation reads as "the product didn't find my other applications".
+    // The same short queue with this line reads as curation, which is the whole premise of the
+    // coaching tier.
+    fetchRankedActionQueue.mockResolvedValue({
+      ...buildQueueResponse(),
+      queue: {
+        ...buildQueueResponse().queue,
+        heldBackSimilarCount: 9,
+        heldBackSimilarActions: [
+          { intent: "FOLLOW_UP_THREAD", intentLabel: "Follow-up", count: 5 },
+          { intent: "NETWORKING_OUTREACH", intentLabel: "Networking", count: 4 },
+        ],
+      },
+    });
+
+    renderPage();
+
+    expect(await screen.findByText(/9 more actions are waiting behind these/)).toBeInTheDocument();
+    expect(screen.getByText(/5 follow-up, 4 networking/)).toBeInTheDocument();
+    expect(screen.getByText(/Clear one above and the next takes its place/)).toBeInTheDocument();
+  });
+
+  test("stays silent about held-back actions when the user's own filter is what shortened the list", async () => {
+    const user = userEvent.setup();
+    fetchRankedActionQueue.mockResolvedValue({
+      ...buildQueueResponse(),
+      queue: {
+        ...buildQueueResponse().queue,
+        heldBackSimilarCount: 9,
+        heldBackSimilarActions: [
+          { intent: "FOLLOW_UP_THREAD", intentLabel: "Follow-up", count: 9 },
+        ],
+      },
+    });
+
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: /All actions \(2\)/ }));
+    await user.click(screen.getByRole("button", { name: "high" }));
+
+    expect(screen.queryByText(/more actions are waiting behind these/)).not.toBeInTheDocument();
+  });
+
   test("updates category counts when urgency filters are active", async () => {
     const user = userEvent.setup();
     renderPage();

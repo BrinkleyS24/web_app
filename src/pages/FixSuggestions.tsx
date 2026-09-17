@@ -1214,6 +1214,18 @@ const FixSuggestions = () => {
     });
   }, [effectiveSourceFilter, urgencyFilteredSuggestionPool]);
 
+  // Repeat actions the backend capped. Suppressed once the user narrows by urgency or source: a
+  // filter already explains a short list, and saying "more are waiting" there would credit the
+  // coach for the user's own choice. The inbox/all lane toggle is not a filter in that sense —
+  // these are held back in either lane — so it does not suppress the line.
+  const showHeldBack = effectiveSourceFilter === "all" && urgencyFilter === "all";
+  const heldBackGroups = showHeldBack ? rankedQueue?.heldBackSimilarActions || [] : [];
+  const heldBackTotal = heldBackGroups.reduce((sum, group) => sum + group.count, 0);
+  const heldBackHeadline = `${heldBackTotal} more ${heldBackTotal === 1 ? "action is" : "actions are"} waiting behind these.`;
+  const heldBackBreakdown = heldBackGroups
+    .map((group) => `${group.count} ${group.intentLabel.toLowerCase()}`)
+    .join(", ");
+
   const allStats = useMemo(() => buildRankedQueueStats(rankedQueue), [rankedQueue]);
   const allVisibleStats = useMemo(() => buildQueueItemStats(combinedSuggestions, urgencyFilter), [combinedSuggestions, urgencyFilter]);
   const daqStats = useMemo(() => buildQueueItemStats(daqInboxSuggestions, urgencyFilter), [daqInboxSuggestions, urgencyFilter]);
@@ -2303,6 +2315,17 @@ const FixSuggestions = () => {
                   <FileSearch className="h-4 w-4 text-accent" />
                   <h2 className="text-sm font-semibold text-foreground">Hidden right now</h2>
                 </div>
+                {/* Repeats the coach is holding back on purpose. Without this line the queue looks
+                    like it simply failed to find the rest of your applications, which is the more
+                    damaging reading of the same screen. */}
+                {heldBackGroups.length > 0 ? (
+                  <div className="mt-4 rounded-2xl border border-border/70 bg-card/80 p-3">
+                    <p className="text-sm text-foreground">{heldBackHeadline}</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      {`${heldBackBreakdown} — held back so the list stays short enough to finish. Clear one above and the next takes its place.`}
+                    </p>
+                  </div>
+                ) : null}
                 {queueQuery.isLoading ? (
                   <p className="mt-4 text-sm text-muted-foreground">Loading action state...</p>
                 ) : snoozedItems.length === 0 ? (
