@@ -7,6 +7,7 @@ import {
   buildQueueItemsFromRankedQueue,
   buildOutreachDiagnostics,
   buildUpcomingFollowupWindows,
+  describeQueueCount,
 } from "./premiumTaskQueue";
 import type { StoredEmail } from "./emails";
 
@@ -1088,5 +1089,53 @@ describe("buildDashboardMoveQueue", () => {
   test("survives a missing queue", () => {
     expect(buildDashboardMoveQueue([])).toEqual([]);
     expect(buildDashboardMoveQueue(null as never)).toEqual([]);
+  });
+});
+
+describe("Dashboard vs Next Actions badge parity (2026-09-24 'why does 18 not equal 9')", () => {
+  const item = (overrides: Record<string, unknown> = {}) =>
+    ({
+      id: "queue-1",
+      logicalKey: "queue:1",
+      dedupeKey: "queue:1:v1",
+      bucket: "doToday",
+      status: "open",
+      source: "apply_gate",
+      urgency: "high",
+      title: "Tailor resume",
+      ...overrides,
+    }) as never;
+
+  test("buildDashboardMoveQueue (Dashboard 'Next moves') counts every source; buildDaqV1InboxQueue (Next Actions default view) counts only the Gmail inbox lane", () => {
+    // Mirrors the real breakdown reproduced against prod on 2026-09-24 for
+    // brinkleystacey12@gmail.com: 10 followup + 1 apply_gate + 4 stale + 3 cleanup = 18 total,
+    // of which only the 10 followup items are source==="followup".
+    const mixedSourceQueue = [
+      ...Array.from({ length: 10 }, (_, i) =>
+        item({ id: `followup-${i}`, dedupeKey: `followup:${i}`, source: "followup", threadId: `thread-${i}` })),
+      item({ id: "apply-gate-1", dedupeKey: "apply-gate:1", source: "apply_gate" }),
+      ...Array.from({ length: 4 }, (_, i) =>
+        item({ id: `stale-${i}`, dedupeKey: `stale:${i}`, source: "stale" })),
+      ...Array.from({ length: 3 }, (_, i) =>
+        item({ id: `cleanup-${i}`, dedupeKey: `cleanup:${i}`, source: "cleanup" })),
+    ];
+
+    const dashboardCount = buildDashboardMoveQueue(mixedSourceQueue).length;
+    const nextActionsDefaultCount = buildDaqV1InboxQueue(mixedSourceQueue).length;
+
+    expect(dashboardCount).toBe(18);
+    expect(nextActionsDefaultCount).toBe(10);
+    // The two badges disagree by construction whenever any non-followup work is queued — this is
+    // the mechanism behind the reported "18 open" vs "9 open" bug, not a data error.
+    expect(dashboardCount).not.toBe(nextActionsDefaultCount);
+  });
+
+  test("describeQueueCount labels the same number consistently for the same scope, and differently for a different scope", () => {
+    expect(describeQueueCount(18, "queue")).toBe("18 in queue");
+    expect(describeQueueCount(10, "inbox")).toBe("10 from your inbox");
+    // Same scope -> same word, on either page, for any count.
+    expect(describeQueueCount(9, "queue")).toContain("in queue");
+    // The inbox lane holds cards ranked `later` too, so its label may not claim urgency.
+    expect(describeQueueCount(9, "inbox")).not.toMatch(/due|now|today/i);
   });
 });

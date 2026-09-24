@@ -438,7 +438,11 @@ describe("DashboardNew", () => {
     expect(screen.getByRole("heading", { name: "Send follow-up to Acme Health" })).toBeInTheDocument();
 
     expect(screen.getByText("Next moves")).toBeInTheDocument();
-    expect(screen.getByText("2 open")).toBeInTheDocument();
+    // "open" -> "in queue": this badge counts every source in the whole ranked queue (see
+    // buildDashboardMoveQueue), which is a different scope than the Next Actions page's default
+    // "Today's queue" badge (Gmail-inbox-lane only). Two badges that both said "open" for two
+    // different scopes of the same Daily Action Queue read as the coach disagreeing with itself.
+    expect(screen.getByText("2 in queue")).toBeInTheDocument();
   });
 
   test("labels the hero action honestly when it did not come from the claim's alert", async () => {

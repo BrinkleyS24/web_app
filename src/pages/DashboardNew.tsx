@@ -33,6 +33,7 @@ import {
 import {
   buildDashboardMoveQueue,
   buildQueueItemsFromRankedQueue,
+  describeQueueCount,
   buildGmailThreadUrl,
   formatRelativeAge,
   urgencyClasses,
@@ -687,7 +688,7 @@ const Dashboard = () => {
           <div className="flex items-center justify-between gap-3 px-5 py-4">
             <h2 className="text-[15px] font-bold tracking-[-0.01em] text-foreground">Next moves</h2>
             <span className="rounded-full bg-accent/10 px-2.5 py-1 font-mono text-[10px] font-bold text-accent">
-              {moveQueue.length} open
+              {describeQueueCount(moveQueue.length, "queue")}
             </span>
           </div>
           {nextMoves.length === 0 ? (

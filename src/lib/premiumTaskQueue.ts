@@ -313,6 +313,28 @@ export function buildDashboardMoveQueue(items: QueueItem[]) {
   return Array.from(deduped.values());
 }
 
+/**
+ * Shared badge copy for "how many items does this count represent". The Dashboard's "Next
+ * moves" badge and the Next Actions page's "Today's queue" badge both used to say bare "N open"
+ * even though they count two different scopes of the same Daily Action Queue: the Dashboard
+ * counts every queueSource (followup/apply_gate/resume/stale/cleanup) via
+ * `buildDashboardMoveQueue`, while Next Actions defaults to the Gmail-thread-only inbox lane via
+ * `buildDaqV1InboxQueue`. Two badges both saying "open" for two different numbers reads as the
+ * coach disagreeing with itself about one list. Centralizing the word choice here means the two
+ * pages can no longer drift back into using the same word for different scopes by accident.
+ *
+ * `scope: "inbox"` -> the Gmail-thread-only lane (what buildDaqV1InboxQueue returns).
+ * `scope: "queue"` -> the whole ranked queue across every source (what buildDashboardMoveQueue
+ * returns — both pages must count it with that function).
+ *
+ * The inbox label names the SCOPE, not an urgency. "due now" was considered and rejected: the
+ * inbox lane includes cards the backend itself ranked `later` (about 4 of 10 on the founder's
+ * account, 2026-09-24), so it would have overstated what is due.
+ */
+export function describeQueueCount(count: number, scope: "inbox" | "queue") {
+  return `${count} ${scope === "inbox" ? "from your inbox" : "in queue"}`;
+}
+
 const APPLIED_ACTIVE_WINDOW_DAYS = 30;
 const INTERVIEW_ACTIVE_WINDOW_DAYS = 21;
 

@@ -52,11 +52,13 @@ import {
   actionTypeLabels,
   buildDaqV1InboxQueue,
   buildActionKey,
+  buildDashboardMoveQueue,
   buildQueueItemsFromRankedQueue,
   buildRankedQueueStats,
   buildGmailThreadUrl,
   buildOutreachDiagnostics,
   buildUpcomingFollowupWindows,
+  describeQueueCount,
   formatRelativeAge,
   formatSnoozedUntil,
   sourceClasses,
@@ -1230,6 +1232,14 @@ const FixSuggestions = () => {
   const allVisibleStats = useMemo(() => buildQueueItemStats(combinedSuggestions, urgencyFilter), [combinedSuggestions, urgencyFilter]);
   const daqStats = useMemo(() => buildQueueItemStats(daqInboxSuggestions, urgencyFilter), [daqInboxSuggestions, urgencyFilter]);
   const stats = queueView === "inbox" ? daqStats : urgencyFilter === "all" ? allStats : allVisibleStats;
+  // The whole queue, counted by the SAME function the Dashboard's "Next moves" badge uses, so the
+  // two pages can never print different totals for it. buildRankedQueueStats also counts blocked
+  // items and does not dedupe; it matched the Dashboard on 2026-09-24 only because this account had
+  // nothing blocked and no duplicates.
+  const queueTotal = useMemo(
+    () => buildDashboardMoveQueue(buildQueueItemsFromRankedQueue(rankedQueue)).length,
+    [rankedQueue],
+  );
 
   const upcomingFollowupWindows = useMemo(() => {
     return buildUpcomingFollowupWindows({
@@ -1651,9 +1661,18 @@ const FixSuggestions = () => {
           <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
             <div className="flex items-center justify-between gap-3 px-5 py-4">
               <h2 className="text-[15px] font-bold tracking-[-0.01em] text-foreground">Today's queue</h2>
-              <span className="rounded-full bg-accent/10 px-2.5 py-1 font-mono text-[10px] font-bold text-accent">
-                {stats.active} open
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="rounded-full bg-accent/10 px-2.5 py-1 font-mono text-[10px] font-bold text-accent">
+                  {queueView === "inbox"
+                    ? describeQueueCount(stats.active, "inbox")
+                    : describeQueueCount(urgencyFilter === "all" ? queueTotal : stats.active, "queue")}
+                </span>
+                {queueView === "inbox" && queueTotal > stats.active ? (
+                  <span className="font-mono text-[10px] text-muted-foreground">
+                    · {describeQueueCount(queueTotal, "queue")}
+                  </span>
+                ) : null}
+              </div>
             </div>
             {displayEntries.length === 0 ? (
               <div className="border-t border-border/70 px-5 py-6">
