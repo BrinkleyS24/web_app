@@ -18,7 +18,7 @@ import { InterviewDebriefCards } from "@/components/InterviewDebriefCards";
 import { StatusBadge } from "@/components/StatusBadge";
 import { splitRoleAndCompany } from "@/lib/applyGateDisplay";
 import { useAuth } from "@/lib/AuthContext.jsx";
-import { buildDashboardAnswer } from "@/lib/dashboardAnswer";
+import { buildDashboardAnswer, findAnswerMove } from "@/lib/dashboardAnswer";
 import {
   fetchApplicationStats,
   fetchApplyGateHistory,
@@ -492,10 +492,8 @@ const Dashboard = () => {
   // `strategy:<alertId>`). Then the button under the claim is provably about that claim rather
   // than whatever happened to rank first — and when there is no such item we fall back to the
   // top of the queue and label it as such instead of implying a connection that isn't there.
-  const answerMove = useMemo(
-    () => (answer.alertId ? moveQueue.find((item) => item.id === `strategy:${answer.alertId}`) || null : null),
-    [answer.alertId, moveQueue],
-  );
+  // A commitment answer has no strategy row; it pairs through its anchor thread instead.
+  const answerMove = useMemo(() => findAnswerMove(answer, moveQueue), [answer, moveQueue]);
   // When the answer is a question, the hero shows the debrief cards and consumes NO queue item.
   // Letting it claim one anyway would promote a move into a slot that never renders it and then
   // filter that same move out of "Next moves" below — the top of the user's queue would simply

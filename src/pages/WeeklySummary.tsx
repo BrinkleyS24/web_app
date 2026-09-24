@@ -7,7 +7,6 @@ import {
   Sparkles,
   XCircle,
   Clock,
-  AlertCircle,
   TrendingUp,
   TrendingDown,
   Minus,
@@ -15,7 +14,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext.jsx";
-import { fetchEmailMetrics, fetchWeeklyHighlights } from "@/lib/emails";
+import { fetchWeeklyHighlights } from "@/lib/emails";
 import type {
   WeeklyHighlightEmail,
   WeeklyHighlightSilent,
@@ -228,16 +227,8 @@ const WeeklySummary = () => {
     staleTime: 60_000,
   });
 
-  const weekMetricsQuery = useQuery({
-    queryKey: ["weekly-summary", "metrics", "last_7_days"],
-    queryFn: () => fetchEmailMetrics("last_7_days"),
-    enabled: isAuthed,
-    staleTime: 60_000,
-  });
-
   const highlights = highlightsQuery.data;
   const readout = highlights?.readout;
-  const weekMetrics = weekMetricsQuery.data?.metrics;
 
   const cards = useMemo(() => {
     const counts = highlights?.counts;
@@ -406,32 +397,19 @@ const WeeklySummary = () => {
               </div>
             )}
 
-            {weekMetrics ? (
-              <div className="glass-card rounded-2xl p-5 space-y-2">
-                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-muted-foreground" />
-                  Weekly rates
-                </h3>
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                  <li>Response rate: {weekMetrics.responseRate.toFixed(1)}%</li>
-                  <li>Interview rate: {weekMetrics.interviewRate.toFixed(1)}%</li>
-                  <li>Offer rate: {weekMetrics.offerRate.toFixed(1)}%</li>
-                  <li>Rejection rate: {weekMetrics.rejectionRate.toFixed(1)}%</li>
-                </ul>
-                {weekMetrics.windowMisaligned ? (
-                  <p className="mt-2 text-xs text-muted-foreground italic">
-                    Some outcomes this week match applications sent outside the 7-day window. Rates are capped at 100% — check the all-time view in Outcome Memory for the full picture.
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
+            {/* No "weekly rates" block. It divided this week's outcomes by this week's applications, and
+                those are different cohorts: an interview landing today belongs to an application sent
+                weeks ago. The backend removed the same ratio from Strategy Alerts for that reason
+                (strategyAlertService.buildWindowMetrics), and here it was still printing figures like
+                "Rejection rate: 69.2%" (9 rejections / 13 applications) that describe no real rate.
+                The honest all-time rate is on the Dashboard, computed over cohorts. */}
           </>
         )}
 
         <div className="glass-card rounded-2xl p-5">
           <h3 className="text-sm font-semibold text-foreground mb-2">Note</h3>
           <p className="text-sm text-muted-foreground">
-            This is an in-app summary. Scheduled email delivery is not available yet.
+            A shorter version of this summary arrives by email each week. Every digest carries an unsubscribe link.
           </p>
         </div>
       </div>

@@ -34,7 +34,49 @@ export type DashboardAnswer = {
    */
   debriefItems: InterviewDebriefItem[];
   debriefTotal: number;
+  /** The thread a commitment answer is about. See `findAnswerMove`. */
+  anchor?: { threadId: string; kind: string } | null;
 };
+
+/** The fields `findAnswerMove` reads off a queue item — structural, so tests need no fixtures. */
+export type AnswerMoveCandidate = {
+  id: string;
+  threadId?: string | null;
+  actionType?: string | null;
+};
+
+/** The card types that ARE a commitment, by commitment kind. */
+const COMMITMENT_ACTION_TYPES: Record<string, string> = {
+  interview: "prep_interview",
+  assessment: "complete_assessment",
+};
+
+/**
+ * The one queue item that belongs under the answer, or null.
+ *
+ * A read (`performance-*`) is paired through the queue row generated FROM it, `strategy:<id>`. A
+ * commitment has no such row — it is deliberately excluded from the queue, because the queue
+ * already carries the real work as the prep or assessment card on the thread. So a commitment is
+ * paired by its anchor thread instead: that thread's card of the matching type first, then any
+ * card on the thread. Returning null (rather than the top of the queue) is what lets the hero
+ * label a fallback honestly instead of implying a connection that is not there — on 2026-09-24
+ * "A company interviews you tomorrow" sat above "Follow up on your application now".
+ */
+export function findAnswerMove<T extends AnswerMoveCandidate>(
+  answer: Pick<DashboardAnswer, "alertId" | "anchor">,
+  moves: T[],
+): T | null {
+  const list = moves || [];
+  if (answer.alertId) {
+    const fromAlert = list.find((item) => item.id === `strategy:${answer.alertId}`);
+    if (fromAlert) return fromAlert;
+  }
+  const threadId = answer.anchor?.threadId;
+  if (!threadId) return null;
+  const onThread = list.filter((item) => String(item.threadId || "") === threadId);
+  const wantedType = COMMITMENT_ACTION_TYPES[answer.anchor?.kind || ""];
+  return onThread.find((item) => item.actionType === wantedType) || onThread[0] || null;
+}
 
 /**
  * Answer priority, most specific first.
@@ -107,6 +149,7 @@ export function buildDashboardAnswer({
       // carries. Showing the cap as the total would understate the ask and make the counter
       // stall at "0 more" while questions remain.
       debriefTotal: Math.max(alert.debrief?.total ?? 0, debriefItems.length),
+      anchor: alert.anchor?.threadId ? { threadId: String(alert.anchor.threadId), kind: String(alert.anchor.kind || "") } : null,
     };
   }
 

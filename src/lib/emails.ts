@@ -202,6 +202,12 @@ export type StrategyAlert = {
     items: InterviewDebriefItem[];
     total: number;
   } | null;
+  /**
+   * Present only on commitment alerts: the thread the recommendation is about. Commitments never
+   * become queue rows of their own (`queue.exclude`), so this is how the dashboard finds the card
+   * that IS the commitment — the interview prep card, the assessment card — for its hero button.
+   */
+  anchor?: { threadId: string; kind: "interview" | "assessment" | string } | null;
 };
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { buildDashboardAnswer, selectAnswerAlert } from "./dashboardAnswer";
+import { buildDashboardAnswer, findAnswerMove, selectAnswerAlert } from "./dashboardAnswer";
 
 function alert(id: string, overrides: Record<string, unknown> = {}) {
   return {
@@ -206,5 +206,41 @@ describe("buildDashboardAnswer", () => {
     const answer = buildDashboardAnswer({ alerts: [], cohortMetrics: { applicationsSent: 1, reachedInterview: 0 } });
 
     expect(answer.evidence).toContain("1 application tracked so far");
+  });
+});
+
+describe("findAnswerMove", () => {
+  // Founder's dashboard, 2026-09-24: "A company interviews you tomorrow" above a button reading
+  // "Follow up on your application now". The commitment alert is excluded from the queue, so the
+  // old strategy:<id> lookup found nothing and the hero fell back to the top of the queue.
+  const queue = [
+    { id: "followup:t-other:follow_up", threadId: "t-other", actionType: "follow_up" },
+    { id: "reply:t-interview", threadId: "t-interview", actionType: "reply" },
+    { id: "interview-prep:t-interview", threadId: "t-interview", actionType: "prep_interview" },
+    { id: "strategy:performance-focus-reach", threadId: null, actionType: "fix_targeting" },
+  ];
+
+  test("a commitment is paired with the card of its kind on its own thread", () => {
+    const answer = buildDashboardAnswer({
+      alerts: [alert("commitment-interview", { kind: "commitment", anchor: { threadId: "t-interview", kind: "interview" } })],
+    });
+    expect(findAnswerMove(answer, queue)?.id).toBe("interview-prep:t-interview");
+  });
+
+  test("with no card of that kind, any card on the thread beats an unrelated one", () => {
+    const answer = { alertId: "commitment-interview", anchor: { threadId: "t-interview", kind: "interview" } };
+    expect(findAnswerMove(answer, queue.filter((item) => item.actionType !== "prep_interview"))?.id)
+      .toBe("reply:t-interview");
+  });
+
+  test("no card on the anchor thread returns null, so the hero labels its fallback honestly", () => {
+    const answer = { alertId: "commitment-interview", anchor: { threadId: "t-missing", kind: "interview" } };
+    expect(findAnswerMove(answer, queue)).toBeNull();
+  });
+
+  test("a read still pairs through the row generated from it", () => {
+    const answer = buildDashboardAnswer({ alerts: [alert("performance-focus-reach")] });
+    expect(answer.anchor).toBeNull();
+    expect(findAnswerMove(answer, queue)?.id).toBe("strategy:performance-focus-reach");
   });
 });
