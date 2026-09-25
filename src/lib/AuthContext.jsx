@@ -87,7 +87,13 @@ export function AuthProvider({ children }) {
   const [extensionDetected, setExtensionDetected] = useState(false);
   const [extensionAuthResolved, setExtensionAuthResolved] = useState(isLocalDevBypass || !firebaseConfigured);
   const [plan, setPlan] = useState(isLocalDevBypass ? "premium" : null);
-  const [planLoading, setPlanLoading] = useState(!isLocalDevBypass);
+  const [planLoadingState, setPlanLoading] = useState(!isLocalDevBypass);
+  // Which signed-in user the current `plan` was fetched for. The plan effect runs after the
+  // render that first shows a restored user, so without this there is one render where the user
+  // is signed in, the previous (signed-out) pass has already marked the plan "loaded", and the
+  // plan is still null — RequirePremiumUser redirected premium users to /upgrade on exactly that
+  // render on every refresh or deep link (found 2026-09-25).
+  const [planUid, setPlanUid] = useState(isLocalDevBypass ? DEV_AUTH_BYPASS_UID : null);
   const [planError, setPlanError] = useState("");
   const [accountStatus, setAccountStatus] = useState(
     isLocalDevBypass
@@ -143,6 +149,7 @@ export function AuthProvider({ children }) {
     setExtensionAuthResolved(true);
     setPlan(null);
     setPlanLoading(false);
+    setPlanUid(null);
     setPlanError("");
     setAccountStatus(null);
     setAdminEmail(false);
@@ -278,6 +285,7 @@ export function AuthProvider({ children }) {
     if (!user) {
       setPlan(null);
       setPlanLoading(false);
+      setPlanUid(null);
       setPlanError("");
       setAccountStatus(null);
       setAdminEmail(false);
@@ -305,12 +313,14 @@ export function AuthProvider({ children }) {
         setAdminEmail(Boolean(data?.adminEmail));
         setDebugRoutesEnabled(Boolean(data?.debugRoutesEnabled));
         setDebugAdminAccess(Boolean(data?.debugAdminAccess));
+        setPlanUid(user.uid);
         setPlanLoading(false);
         setPlanError("");
       })
       .catch((error) => {
         console.error("[Applendium] Failed to fetch user plan:", error);
         if (cancelled) return;
+        setPlanUid(user.uid);
         setPlanLoading(false);
         setPlanError(error instanceof Error ? error.message : "Failed to load user plan.");
         setAccountStatus({
@@ -331,6 +341,10 @@ export function AuthProvider({ children }) {
   }, [user, isLocalDevBypass]);
 
   const loading = !authReady || (extensionDetected && !extensionAuthResolved);
+  // Derived at render time, so a signed-in user whose plan has not been fetched yet is always
+  // "loading" — there is no render in between for a route guard to act on.
+  const planLoading = planLoadingState
+    || Boolean(user && !isLocalDevBypass && planUid !== user.uid);
 
   return (
     <AuthContext.Provider value={{
