@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   AlarmClock,
   ArrowUpRight,
@@ -25,6 +25,19 @@ import { toast } from "sonner";
 
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { CleanupTaskInlinePanel } from "@/components/CleanupTaskInlinePanel";
+import { ActionCtaButton, ActionIcon, actionVisual } from "@/components/premium/ActionPieces";
+import {
+  EmptyState,
+  ErrorState,
+  LoadingRows,
+  PageHeader,
+  Panel,
+  SectionLabel,
+  ToneChip,
+} from "@/components/premium/PremiumUI";
+import { BUTTON, CARD, EYEBROW, TONES } from "@/components/premium/tone";
+import { describeActionIdentity, describeActionKind, resolveActionCta } from "@/lib/actionPresentation";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useCanonicalQueueImpressions } from "@/hooks/useCanonicalQueueImpressions";
 import { useAuth } from "@/lib/AuthContext.jsx";
@@ -90,47 +103,7 @@ const actionMenuItemClass =
 const destructiveActionMenuItemClass =
   "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50";
 
-const sourceFilterLabels: Record<SourceFilter, string> = {
-  all: "All",
-  followup: "Outreach tasks",
-  stale: "Ghosting",
-  apply_gate: "Apply Gate",
-  resume: "Resume Gaps",
-  cleanup: "Cleanup",
-};
-
-const sourceFilterHelp: Record<SourceFilter, string> = {
-  all: "Everything that can improve today's search: inbox moves, role decisions, resume gaps, cleanup, and stale roles.",
-  followup: "Recruiter replies, thank-you notes, and follow-ups from Gmail conversations.",
-  stale: "Applications or interviews that have gone quiet and may need a final check or close-out.",
-  apply_gate: "One specific role needs an Apply Gate review before you apply, skip, or fix first.",
-  resume: "The same resume gap is showing up across roles you target. Fix it once so future applications are stronger.",
-  cleanup: "Missing or stale data that can make the rest of the queue less reliable.",
-};
-
-const sourceAccentClasses: Record<QueueSource, string> = {
-  followup: "from-primary/10 via-background to-background border-primary/20",
-  stale: "from-warning/10 via-background to-background border-warning/20",
-  apply_gate: "from-accent/10 via-background to-background border-accent/20",
-  resume: "from-success/10 via-background to-background border-success/20",
-  cleanup: "from-muted/80 via-background to-background border-border",
-};
-
-const sourceRailClasses: Record<QueueSource, string> = {
-  followup: "bg-primary",
-  stale: "bg-warning",
-  apply_gate: "bg-accent",
-  resume: "bg-success",
-  cleanup: "bg-foreground/30",
-};
-
 // Compact, squared mono urgency pill matching the redesign queue rows.
-const urgencyMonoClasses: Record<"low" | "medium" | "high", string> = {
-  high: "bg-destructive/10 text-destructive",
-  medium: "bg-warning/10 text-warning",
-  low: "bg-muted text-muted-foreground",
-};
-
 type PrimaryActionKind = "cleanup" | "close" | "draft" | "gmail" | "route" | "complete" | null;
 
 function isCloseIntent(intent?: QueueItem["intent"] | null) {
@@ -1063,7 +1036,11 @@ const FixSuggestions = () => {
   const { user, loading } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [queueView, setQueueView] = useState<QueueView>("inbox");
+  // All actions, in the backend's ranked order. The old default was an inbox-only lane that hid
+  // Apply Gate, résumé and close-out work behind a toggle.
+  const [queueView, setQueueView] = useState<QueueView>("all");
+  const [moreFilter, setMoreFilter] = useState<MoreFilter>("all");
+  const [expandedDetailsId, setExpandedDetailsId] = useState<string>("");
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [expandedInlineTaskId, setExpandedInlineTaskId] = useState<string>("");
@@ -1276,7 +1253,6 @@ const FixSuggestions = () => {
       },
     );
   }, [urgencyFilteredSuggestionPool]);
-  const activeSourceHelp = sourceFilterHelp[effectiveSourceFilter];
 
   const visibleQueueActions = useMemo(
     () => getRankedQueueActionsForQueueItems(rankedQueue, filteredSuggestions),
@@ -1406,7 +1382,7 @@ const FixSuggestions = () => {
           // ghosting close-out, NOT a rejection (this queue only closes stale /
           // ghosted roles — see isCloseIntent). Counting employer silence as a
           // rejection inflated the rejection rate. See classifyManualCloseOutcome.
-          reason: `No response - ghosted, closed from Daily Action Queue: ${item.title}`,
+          reason: `No response - ghosted, closed from Next Actions: ${item.title}`,
         });
         await refreshQueueState();
         toast.success("Application closed and removed from active focus.");
@@ -1543,857 +1519,373 @@ const FixSuggestions = () => {
     );
   };
 
+  // ── Presentation ─────────────────────────────────────────────────────────────────────────
+  // Founder review, 2026-09-25: "Today" is the three most useful actions; everything else is
+  // under More. Every card names its application and carries the one button that fits the task.
+  const todayItems = filteredSuggestions.slice(0, 3);
+  const moreItems = filteredSuggestions.slice(3);
+  const moreFiltered = useMemo(
+    () => (moreFilter === "all" ? moreItems : moreItems.filter((item) => moreFilterGroup(item) === moreFilter)),
+    [moreFilter, moreItems],
+  );
+  const moreFilterCounts = useMemo(() => {
+    const counts: Record<MoreFilter, number> = { all: moreItems.length, outreach: 0, interviews: 0, closeouts: 0, tools: 0, data: 0 };
+    for (const item of moreItems) counts[moreFilterGroup(item)] += 1;
+    return counts;
+  }, [moreItems]);
+  const moreEntries = useMemo(() => buildDisplayQueueEntries(moreFiltered), [moreFiltered]);
+
+  // Deep links from the Dashboard (/next-actions#<id>) land on the card and open what the button
+  // promised: the draft for a follow-up, the plan for interview prep.
+  const location = useLocation();
+  const [handledHash, setHandledHash] = useState("");
+  useEffect(() => {
+    const id = decodeURIComponent((location.hash || "").replace(/^#/, ""));
+    if (!id || id === handledHash || combinedSuggestions.length === 0) return;
+    const target = combinedSuggestions.find((item) => item.id === id);
+    if (!target) return;
+    setHandledHash(id);
+    const cta = resolveActionCta(target, getDraftUiForItem(target).gmailUrl);
+    if (cta.kind === "draft") toggleDraftForItem(target, getDraftUiForItem(target).draftTone);
+    else setExpandedDetailsId(id);
+    window.requestAnimationFrame(() => {
+      document.getElementById(`action-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.hash, combinedSuggestions]);
+
+  const queueError = (queueQuery.data as { error?: string } | undefined)?.error || null;
+
+  const renderCard = (item: QueueItem, variant: "today" | "more") => {
+    const mutationBusy = Boolean(item.logicalKey && pendingLogicalKeys[item.logicalKey]);
+    const inlineOpen = expandedInlineTaskId === item.id;
+    const { gmailUrl, draft, draftOpen, draftTone, canDraft } = getDraftUiForItem(item);
+    const canCloseFromCard = isCloseIntent(item.intent) && Boolean(item.applicationId || item.emailId);
+    let cta = resolveActionCta(item, gmailUrl);
+    // A close-out with nothing to close, or a draft with nothing to draft from, falls back honestly.
+    if ((cta.kind === "close" && !canCloseFromCard) || (cta.kind === "draft" && !canDraft)) {
+      cta = gmailUrl ? { kind: "gmail", label: "Open in Gmail", href: gmailUrl } : { kind: "complete", label: "Mark done" };
+    }
+    const identity = describeActionIdentity(item);
+    const { kind } = actionVisual(item);
+    const detailsOpen = expandedDetailsId === item.id;
+    const menuOpen = openActionMenuId === item.id;
+    const reason = item.whyNow || item.sourceDescription || item.description || "";
+    const isHandledInGmail = isGmailHandledCandidate(item);
+
+    const runCta = () => {
+      setOpenActionMenuId("");
+      if (cta.kind === "draft") toggleDraftForItem(item, draftTone);
+      else if (cta.kind === "prep") setExpandedDetailsId((current) => (current === item.id ? "" : item.id));
+      else if (cta.kind === "close") void closeQueueItem(item);
+      else if (cta.kind === "cleanup") setExpandedInlineTaskId((current) => (current === item.id ? "" : item.id));
+      else if (cta.kind === "complete") void completeQueueItem(item, isHandledInGmail ? "Removed from today's list." : undefined);
+    };
+
+    const ctaLabel =
+      cta.kind === "draft" && draftOpen ? "Hide draft"
+        : cta.kind === "draft" && draft ? "Show draft"
+          : cta.kind === "prep" && detailsOpen ? "Hide prep plan"
+            : cta.kind === "cleanup" && inlineOpen ? "Hide repair"
+              : cta.label;
+    const ctaClass = cn(
+      variant === "today" ? BUTTON.primary : BUTTON.secondary,
+      cta.kind === "close" && "border-destructive/30 text-destructive hover:border-destructive/50 hover:bg-destructive/5",
+      "shrink-0",
+    );
+    const ctaDisabled = cta.kind === "draft" ? draftMutation.isPending : (cta.kind === "close" || cta.kind === "complete") ? mutationBusy : false;
+
+    return (
+      <article
+        key={item.id}
+        id={`action-${item.id}`}
+        className={cn(
+          "scroll-mt-24",
+          variant === "today" ? cn(CARD, "px-5 py-4") : "px-1 py-3.5",
+        )}
+      >
+        <div className="flex items-start gap-3.5">
+          <ActionIcon item={item} />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h3 className={cn("font-semibold leading-snug tracking-[-0.01em] text-foreground", variant === "today" ? "text-[15px]" : "text-[14px]")}>
+                {item.title}
+              </h3>
+              {item.urgency === "high" ? <ToneChip tone="attention">Do today</ToneChip> : null}
+            </div>
+            <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+              <span className="font-medium text-foreground/70">{kind}</span>
+              {identity ? ` · ${identity}` : ""}
+              {item.daysAgo != null ? ` · ${formatRelativeAge(item.daysAgo)}` : ""}
+              {item.estimatedTime ? ` · ${item.estimatedTime}` : ""}
+            </p>
+            {reason && variant === "today" ? (
+              <p className="mt-2 max-w-[72ch] text-[13.5px] leading-relaxed text-foreground/80">{reason}</p>
+            ) : null}
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            {cta.kind === "external" || cta.kind === "gmail" || cta.kind === "route" ? (
+              <ActionCtaButton item={item} cta={cta} className={ctaClass} />
+            ) : (
+              <button type="button" onClick={runCta} disabled={ctaDisabled} className={ctaClass}>
+                {ctaLabel}
+              </button>
+            )}
+            {item.logicalKey && cta.kind !== "complete" ? (
+              <button
+                type="button"
+                onClick={() => void completeQueueItem(item, isHandledInGmail ? "Removed from today's list." : undefined)}
+                disabled={mutationBusy}
+                className={cn(BUTTON.ghost, "px-2")}
+                aria-label={isHandledInGmail ? "Already handled — remove from list" : "Mark done"}
+                title={isHandledInGmail ? "Already handled" : "Mark done"}
+              >
+                <Check className="h-4 w-4" aria-hidden />
+              </button>
+            ) : null}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setOpenActionMenuId((current) => (current === item.id ? "" : item.id))}
+                className={cn(BUTTON.ghost, "px-2")}
+                aria-label="More options"
+                aria-expanded={menuOpen}
+              >
+                <MoreHorizontal className="h-4 w-4" aria-hidden />
+              </button>
+              {menuOpen ? (
+                <div className="absolute right-0 z-30 mt-1.5 w-56 overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-lg" role="menu">
+                  <button type="button" className={actionMenuItemClass} onClick={() => { setOpenActionMenuId(""); setExpandedDetailsId((c) => (c === item.id ? "" : item.id)); }}>
+                    <FileSearch className="h-4 w-4" aria-hidden />
+                    {detailsOpen ? "Hide details" : "Why this, and how"}
+                  </button>
+                  {gmailUrl && cta.kind !== "gmail" ? (
+                    <a className={actionMenuItemClass} href={gmailUrl} target="_blank" rel="noreferrer" onClick={() => setOpenActionMenuId("")}>
+                      <ArrowUpRight className="h-4 w-4" aria-hidden />
+                      Open in Gmail
+                    </a>
+                  ) : null}
+                  {canDraft && cta.kind !== "draft" ? (
+                    <button type="button" className={actionMenuItemClass} disabled={draftMutation.isPending} onClick={() => { setOpenActionMenuId(""); toggleDraftForItem(item, draftTone); }}>
+                      <MessageSquare className="h-4 w-4" aria-hidden />
+                      {draft ? "Show draft" : "Draft an email"}
+                    </button>
+                  ) : null}
+                  {item.logicalKey && item.dedupeKey ? (
+                    <button type="button" className={actionMenuItemClass} disabled={mutationBusy} onClick={() => { setOpenActionMenuId(""); void dismissQueueItem(item); }}>
+                      <PauseCircle className="h-4 w-4" aria-hidden />
+                      Snooze for a day
+                    </button>
+                  ) : null}
+                  {canCloseFromCard && cta.kind !== "close" ? (
+                    <button type="button" className={destructiveActionMenuItemClass} disabled={mutationBusy} onClick={() => { setOpenActionMenuId(""); void closeQueueItem(item); }}>
+                      <XCircle className="h-4 w-4" aria-hidden />
+                      Close this application
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        {detailsOpen ? (
+          <div className={cn("mt-3 space-y-3", variant === "today" ? "pl-[50px]" : "pl-[50px]")}>
+            {reason && variant === "more" ? <p className="text-[13px] leading-relaxed text-foreground/80">{reason}</p> : null}
+            {item.description && item.description.trim().toLowerCase() !== reason.trim().toLowerCase() ? (
+              <p className="text-[13px] leading-relaxed text-muted-foreground">{item.description}</p>
+            ) : null}
+            {item.status === "blocked" && (item.blockingReason || item.blockerTitles?.length) ? (
+              <div className="rounded-lg border border-warning/25 bg-warning/[0.05] px-3 py-2 text-[13px] text-foreground/85">
+                <span className="font-semibold">Waiting on: </span>
+                {item.blockerTitles?.length ? item.blockerTitles.join(", ") : item.blockingReason}
+              </div>
+            ) : null}
+            {item.playbook.length ? (
+              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
+                <p className={EYEBROW}>{cta.kind === "prep" ? "Your prep plan" : "How to handle it"}</p>
+                <ol className="mt-2 space-y-2">
+                  {item.playbook.map((tip, tipIndex) => (
+                    <li key={tip} className="flex gap-2.5 text-[13px] leading-relaxed text-foreground/85">
+                      <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-accent/10 text-[11px] font-semibold text-accent">
+                        {tipIndex + 1}
+                      </span>
+                      <span>{tip}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ) : null}
+            <SourceCheckSection item={item} />
+          </div>
+        ) : null}
+
+        {canDraft && draftOpen ? <div className="mt-4">{renderDraftPanel(item)}</div> : null}
+        {isInlineCleanupIntent(item.intent) && inlineOpen ? (
+          <div className="mt-3">
+            <CleanupTaskInlinePanel task={item} storedEmails={storedEmails} onRefresh={() => invalidateSuggestionQueries(queryClient)} />
+          </div>
+        ) : null}
+      </article>
+    );
+  };
+
   return (
     <DashboardLayout>
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-end justify-between gap-5">
-          <div className="max-w-3xl">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-              Ranked by impact
-            </p>
-            <h1 className="mt-2 text-[28px] font-bold tracking-[-0.025em] text-foreground">
-              Daily Action Queue
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-              Career-coach next actions based on your Gmail context: interview prep, recruiter replies, and follow-up windows.
-            </p>
-          </div>
+      <div className="space-y-5">
+        <PageHeader
+          eyebrow="Ranked for today"
+          title="Next Actions"
+          description="What to do next in your search, most useful first. Each action opens the email, draft or tool it needs — nothing is ever sent for you."
+          actions={
+            !queueQuery.isLoading && filteredSuggestions.length > 0 ? (
+              <span className="text-[12.5px] text-muted-foreground">
+                {todayItems.length} for today{moreItems.length ? ` · ${moreItems.length} more` : ""}
+              </span>
+            ) : null
+          }
+        />
 
-        </div>
-
-        <details className="group">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-3 shadow-sm [&::-webkit-details-marker]:hidden">
-            <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Filter className="h-4 w-4 text-accent" />
-              Filter &amp; focus the queue
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-              <ChevronsUpDown className="h-3.5 w-3.5" />
-              <span className="group-open:hidden">Show</span>
-              <span className="hidden group-open:inline">Hide</span>
-            </span>
-          </summary>
-          <div className="mt-3">
-        <section className="rounded-2xl border border-border/70 bg-card/80 p-3 shadow-sm">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <Filter className="h-4 w-4 text-accent" />
-                Focus the queue
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground sm:hidden">
-                Inbox actions are time-sensitive Gmail moves. All actions includes Apply Gate, resume gaps, cleanup, and stale-role work.
-              </p>
+        <section aria-labelledby="today-heading" className="space-y-3">
+          <SectionLabel>
+            <span id="today-heading">Today</span>
+          </SectionLabel>
+          {queueQuery.isLoading ? (
+            <div className={cn(CARD, "px-5 py-5")}>
+              <LoadingRows rows={3} />
             </div>
-
-            <div className="flex flex-wrap gap-2">
-              <div className="flex flex-wrap gap-1.5">
-                {(["inbox", "all"] as QueueView[]).map((value) => (
-                  <Button
-                    key={value}
-                    variant={queueView === value ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setQueueView(value);
-                      setSourceFilter("all");
-                    }}
-                  >
-                    {value === "inbox" ? `Inbox actions (${daqInboxSuggestions.length})` : `All actions (${combinedSuggestions.length})`}
-                  </Button>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {(["all", "high", "medium", "low"] as UrgencyFilter[]).map((value) => (
-                  <Button
-                    key={value}
-                    variant={urgencyFilter === value ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setUrgencyFilter(value)}
-                  >
-                    {value === "all" ? "All urgency" : value}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-            {sourceFilterOptions.map((value) => {
-              const count = value === "all" ? urgencyFilteredSuggestionPool.length : sourceCounts[value];
-              const active = effectiveSourceFilter === value;
-
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-left transition-all ${
-                    active
-                      ? "border-accent/50 bg-accent/10 shadow-sm"
-                      : "border-border/70 bg-background/60 hover:border-accent/30 hover:bg-accent/5"
-                  }`}
-                  onClick={() => setSourceFilter(value)}
-                >
-                  <span className="text-sm font-semibold text-foreground">
-                    {queueView === "inbox" && value === "all" ? "Inbox due now" : sourceFilterLabels[value]}
-                  </span>
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                    {count}
-                  </span>
-                  {value === "followup" && upcomingFollowupWindows.length > 0 ? (
-                    <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
-                      {upcomingFollowupWindows.length} upcoming
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
-          <div className="mt-2 rounded-xl border border-border/60 bg-background/55 px-3 py-2 text-sm leading-6 text-muted-foreground">
-            <span className="font-medium text-foreground">
-              {effectiveSourceFilter === "all" ? "All actions" : sourceFilterLabels[effectiveSourceFilter]}:
-            </span>{" "}
-            {activeSourceHelp}
-          </div>
-        </section>
-          </div>
-        </details>
-        <div className="space-y-4">
-          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-            <div className="flex items-center justify-between gap-3 px-5 py-4">
-              <h2 className="text-[15px] font-bold tracking-[-0.01em] text-foreground">Today's queue</h2>
-              <div className="flex items-center gap-1.5">
-                <span className="rounded-full bg-accent/10 px-2.5 py-1 font-mono text-[10px] font-bold text-accent">
-                  {queueView === "inbox"
-                    ? describeQueueCount(stats.active, "inbox")
-                    : describeQueueCount(urgencyFilter === "all" ? queueTotal : stats.active, "queue")}
-                </span>
-                {queueView === "inbox" && queueTotal > stats.active ? (
-                  <span className="font-mono text-[10px] text-muted-foreground">
-                    · {describeQueueCount(queueTotal, "queue")}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-            {displayEntries.length === 0 ? (
-              <div className="border-t border-border/70 px-5 py-6">
-                <p className="text-sm font-semibold text-foreground">
-                  {effectiveSourceFilter === "followup" && followupSuppressionReason === "dev_bypass_auth"
-                    ? "Outreach is suppressed in local bypass mode"
-                    : effectiveSourceFilter === "followup" && upcomingFollowupWindows.length > 0
-                    ? hasDueFollowupWindow
-                      ? "Outreach window detected"
-                      : "No outreach is due yet"
-                    : "No active actions"}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  {effectiveSourceFilter === "followup" && followupSuppressionReason === "dev_bypass_auth"
-                    ? followupQuery.data?.meta?.message || "The backend returned no outreach cards because this session is using local bypass auth."
-                    : effectiveSourceFilter === "followup" && upcomingFollowupWindows.length > 0
-                    ? hasDueFollowupWindow
-                      ? "The stored email timing says an outreach window is open, but no active card is visible. It may be hidden, snoozed, completed, or waiting on the latest sync."
-                      : "Your applications are between action windows. Nothing is broken; the queue is waiting until a follow-up would help instead of adding noise."
-                    : emptyMessage}
-                </p>
-                {queueView === "inbox" && combinedSuggestions.length > daqInboxSuggestions.length ? (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="mt-4"
-                    onClick={() => {
-                      setQueueView("all");
-                      setSourceFilter("all");
-                    }}
-                  >
-                    Show all actions ({combinedSuggestions.length})
-                  </Button>
-                ) : null}
-                {effectiveSourceFilter === "followup" && upcomingFollowupWindows.length > 0 ? (
-                  <div className="mt-5">
-                    <UpcomingFollowupWindowList windows={upcomingFollowupWindows} />
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              displayEntries.map((entry, index) => {
-                if (entry.type === "stale_group") {
-                  return (
-                    <div
-                      key={entry.key}
-                      className="border-t border-border/70 animate-fade-in"
-                      style={{ animationDelay: `${index * 60}ms` }}
-                    >
-                      <div className="space-y-3 px-5 py-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${urgencyClasses.low}`}>
-                            LOW
-                          </span>
-                          <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${sourceClasses.stale}`}>
-                            Ghosting
-                          </span>
-                          <span className="inline-flex items-center rounded-full border border-border bg-background/80 px-2.5 py-1 text-xs font-medium text-foreground">
-                            Batch close-out
-                          </span>
-                          <span className="inline-flex items-center rounded-full border border-border bg-background/80 px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                            {entry.items.length} roles
-                          </span>
-                        </div>
-
-                        <div>
-                          <h3 className="text-lg font-semibold tracking-tight text-foreground">
-                            Review {entry.items.length} stale roles in one pass
-                          </h3>
-                          <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-                            These low-urgency roles are all in close-out territory. Review them once, send a final note only if a role still matters, and close the rest without letting them consume the whole queue.
-                          </p>
-                        </div>
-
-                        <div className="rounded-xl border border-border/70 bg-card/80 p-3">
-                          <div className="flex items-center gap-2">
-                            <Layers3 className="h-4 w-4 text-warning" />
-                            <p className="text-sm font-semibold text-foreground">Close these out together</p>
-                          </div>
-                          <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                            This group replaces repeated low-urgency stale cards so you can clear aging applications without scrolling through identical layouts.
-                          </p>
-                        </div>
-
-                        <div className="space-y-3">
-                          {entry.items.map((item) => {
-                            const mutationBusy = Boolean(item.logicalKey && pendingLogicalKeys[item.logicalKey]);
-                            const { gmailUrl, draft, draftOpen, draftTone, canDraft } = getDraftUiForItem(item);
-
-                            return (
-                              <div key={item.id} className="rounded-xl border border-border/70 bg-background/80 p-3 shadow-sm">
-                                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-semibold text-foreground">{item.title}</p>
-                                    <div className="mt-1.5 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                      {item.company ? (
-                                        <span className="rounded-full bg-muted px-2 py-1">{item.company}</span>
-                                      ) : null}
-                                      <span className="rounded-full bg-muted px-2 py-1">{formatRelativeAge(item.daysAgo)}</span>
-                                      <span className="rounded-full bg-muted px-2 py-1">{item.estimatedTime}</span>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex flex-wrap gap-2">
-                                    {canDraft ? (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={draftMutation.isPending}
-                                        onClick={() => toggleDraftForItem(item, draftTone)}
-                                      >
-                                        <MessageSquare className="h-4 w-4" />
-                                        {draftOpen ? "Hide copilot" : draft ? "Show copilot" : "Generate draft"}
-                                      </Button>
-                                    ) : null}
-                                    {gmailUrl ? (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => window.open(gmailUrl, "_blank", "noopener,noreferrer")}
-                                      >
-                                        <ArrowUpRight className="h-4 w-4" />
-                                        Open Gmail
-                                      </Button>
-                                    ) : null}
-                                    <Button
-                                      variant="destructive"
-                                      size="sm"
-                                      disabled={mutationBusy}
-                                      onClick={() => void closeQueueItem(item)}
-                                    >
-                                      <XCircle className="h-4 w-4" />
-                                      Close
-                                    </Button>
-                                  </div>
-                                </div>
-
-                                {canDraft && draftOpen ? <div className="mt-4">{renderDraftPanel(item)}</div> : null}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  );
+          ) : queueError ? (
+            <ErrorState title="Your actions did not load" detail={queueError} onRetry={() => void queueQuery.refetch()} />
+          ) : todayItems.length === 0 ? (
+            <div className={cn(CARD, "p-5")}>
+              <EmptyState
+                icon={CheckCircle2}
+                title={rankedQueue?.emptyState?.title || "You're caught up"}
+                body={
+                  upcomingFollowupWindows.length > 0
+                    ? "Nothing needs you today. The follow-ups below open soon."
+                    : "New actions appear as replies, interviews and outcomes arrive in your inbox."
                 }
-
-                const item = entry.item;
-                const mutationBusy = Boolean(item.logicalKey && pendingLogicalKeys[item.logicalKey]);
-                const inlineCleanupTask = isInlineCleanupIntent(item.intent);
-                const inlineOpen = expandedInlineTaskId === item.id;
-                const {
-                  gmailUrl,
-                  draftKey,
-                  draft,
-                  draftOpen,
-                  availableDraftToneOptions,
-                  draftTone,
-                  draftToneMeta,
-                  canDraft,
-                } = getDraftUiForItem(item);
-                const showRouteAction = Boolean(item.routeHref && item.routeHref !== "/fix-suggestions");
-                const canCloseFromCard =
-                  isCloseIntent(item.intent) && Boolean(item.applicationId || item.emailId);
-                const actionMenuOpen = openActionMenuId === item.id;
-                const primaryActionKind = getPrimaryActionKind({
-                  inlineCleanupTask,
-                  canCloseFromCard,
-                  canDraft,
-                  gmailUrl,
-                  showRouteAction,
-                  item,
-                });
-                const primaryActionLabel = getPrimaryActionLabel(primaryActionKind, item, draft, inlineOpen, draftOpen);
-                const primaryActionHelper = getPrimaryActionHelper(primaryActionKind, item);
-                const canMarkHandledFromCard =
-                  isGmailHandledCandidate(item) && Boolean(item.logicalKey) && primaryActionKind !== "complete";
-                const primaryActionDisabled =
-                  primaryActionKind === "draft"
-                    ? draftMutation.isPending
-                    : primaryActionKind === "close" || primaryActionKind === "complete"
-                      ? mutationBusy
-                      : false;
-                const hasSecondaryContextActions =
-                  (canCloseFromCard && primaryActionKind !== "close")
-                  || (canDraft && primaryActionKind !== "draft")
-                  || Boolean(gmailUrl && primaryActionKind !== "gmail")
-                  || Boolean(showRouteAction && primaryActionKind !== "route");
-                const runDraftAction = () => toggleDraftForItem(item, draftTone);
-                const runCompleteAction = (message?: string) => {
-                  void completeQueueItem(item, message);
-                };
-                const runHandledAction = () => runCompleteAction("Removed from today's queue.");
-                const runPrimaryAction = () => {
-                  setOpenActionMenuId("");
-                  if (primaryActionKind === "cleanup") {
-                    setExpandedInlineTaskId((current) => (current === item.id ? "" : item.id));
-                  } else if (primaryActionKind === "close") {
-                    void closeQueueItem(item);
-                  } else if (primaryActionKind === "draft") {
-                    runDraftAction();
-                  } else if (primaryActionKind === "gmail" && gmailUrl) {
-                    window.open(gmailUrl, "_blank", "noopener,noreferrer");
-                  } else if (primaryActionKind === "route") {
-                    navigate(item.routeHref || "/");
-                  } else if (primaryActionKind === "complete") {
-                    runCompleteAction(
-                      isGmailHandledCandidate(item) ? "Removed from today's queue." : undefined,
-                    );
-                  }
-                };
-
-                const reason = item.whyNow || item.sourceDescription || item.description || "";
-
-                return (
-                  <div
-                    key={item.id}
-                    className="animate-fade-in border-t border-border/70"
-                    style={{ animationDelay: `${index * 60}ms` }}
-                  >
-                    <div className="flex items-start gap-3 px-5 py-4">
-                      <button
-                        type="button"
-                        aria-label="Mark done"
-                        disabled={mutationBusy}
-                        onClick={() =>
-                          runCompleteAction(
-                            isGmailHandledCandidate(item) ? "Removed from today's queue." : undefined,
-                          )
-                        }
-                        className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border border-border text-transparent transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Check className="h-3 w-3" />
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-sm font-semibold tracking-[-0.01em] text-foreground">{item.title}</h3>
-                          <span
-                            className={`shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.08em] ${urgencyMonoClasses[item.urgency]}`}
-                          >
-                            {item.urgency}
-                          </span>
-                        </div>
-                        {reason ? (
-                          <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{reason}</p>
-                        ) : null}
-                        <p className="mt-1.5 font-mono text-[10px] text-muted-foreground/80">
-                          {item.sourceLabel} · {formatRelativeAge(item.daysAgo)}
-                        </p>
-                      </div>
-                      {primaryActionKind ? (
-                        <Button
-                          size="sm"
-                          variant={primaryActionKind === "close" ? "destructive" : "outline"}
-                          disabled={primaryActionDisabled}
-                          onClick={runPrimaryAction}
-                          className="shrink-0"
-                        >
-                          {primaryActionLabel}
-                        </Button>
-                      ) : null}
-                    </div>
-
-                    <details className="group/row px-5 pb-4">
-                      <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-medium text-muted-foreground [&::-webkit-details-marker]:hidden">
-                        <ChevronsUpDown className="h-3.5 w-3.5" />
-                        <span className="group-open/row:hidden">Details</span>
-                        <span className="hidden group-open/row:inline">Hide details</span>
-                      </summary>
-                      <div className="mt-3 grid gap-4 xl:grid-cols-[minmax(0,1fr)_240px]">
-                        <div className="min-w-0 space-y-4">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${urgencyClasses[item.urgency]}`}>
-                              {item.urgency.toUpperCase()}
-                            </span>
-                            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${sourceClasses[item.source]}`}>
-                              {item.sourceLabel}
-                            </span>
-                            {item.stageLabel ? (
-                              <span className="inline-flex items-center rounded-full border border-border bg-background/80 px-2.5 py-1 text-xs font-medium text-foreground">
-                                {item.stageLabel}
-                              </span>
-                            ) : null}
-                            {item.intentLabel || item.actionType ? (
-                              <span className="inline-flex items-center rounded-full border border-border bg-background/80 px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                                {item.intentLabel || (item.actionType ? actionTypeLabels[item.actionType] || item.actionType : "")}
-                              </span>
-                            ) : null}
-                          </div>
-
-                          <div>
-                            {item.description
-                              && item.description.trim().toLowerCase()
-                                !== (item.whyNow || "").trim().toLowerCase() ? (
-                              <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-                                {item.description}
-                              </p>
-                            ) : null}
-                            {item.status === "blocked" && (item.blockingReason || item.blockerTitles?.length) ? (
-                              <div className="mt-3 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-warning">Blocked by</p>
-                                <p className="mt-1 text-sm text-warning">
-                                  {item.blockerTitles?.length
-                                    ? item.blockerTitles.join(", ")
-                                    : item.blockingReason || "A prerequisite action is still open."}
-                                </p>
-                              </div>
-                            ) : null}
-                          </div>
-
-                          <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                            {item.company ? (
-                              <span className="inline-flex items-center gap-1.5 rounded-full bg-background/70 px-2.5 py-1">
-                                <Mail className="h-4 w-4" />
-                                {item.company}
-                              </span>
-                            ) : null}
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-background/70 px-2.5 py-1">
-                              <Clock3 className="h-4 w-4" />
-                              {formatRelativeAge(item.daysAgo)}
-                            </span>
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-background/70 px-2.5 py-1">
-                              <AlarmClock className="h-4 w-4" />
-                              {item.estimatedTime}
-                            </span>
-                          </div>
-
-                          <div className="space-y-2.5">
-                            <div className="rounded-xl border border-border/70 bg-background/70 px-4 py-3">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-sm font-semibold text-foreground">Why now</p>
-                                {item.actionConfidence ? (
-                                  <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                                    {item.actionConfidence} confidence
-                                  </span>
-                                ) : null}
-                              </div>
-                              <p className="mt-1.5 text-sm leading-6 text-foreground">
-                                {item.whyNow || item.sourceDescription}
-                              </p>
-                              {item.source === "followup" ? (
-                                <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                                  Already handled this in Gmail? Use <span className="font-medium text-foreground">Already handled</span> so it leaves your active queue.
-                                </p>
-                              ) : null}
-                            </div>
-
-                            <SourceCheckSection item={item} />
-
-                            <CollapsibleQueueSection
-                              title="How to handle it"
-                              preview={item.playbook[0] || item.sourceDescription}
-                              badge={item.sourceDescription}
-                            >
-                              <ol className="space-y-2 text-sm text-muted-foreground">
-                                {item.playbook.map((tip, tipIndex) => (
-                                  <li key={tip} className="flex gap-3">
-                                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent/10 text-[11px] font-semibold text-accent">
-                                      {tipIndex + 1}
-                                    </span>
-                                    <span className="leading-6">{tip}</span>
-                                  </li>
-                                ))}
-                              </ol>
-                            </CollapsibleQueueSection>
-                          </div>
-                        </div>
-
-                        <aside className="rounded-xl border border-border/70 bg-background/80 p-3 shadow-sm xl:sticky xl:top-4 xl:self-start">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Best next move</p>
-                              <p className="mt-1.5 text-xs leading-5 text-muted-foreground">{primaryActionHelper}</p>
-                            </div>
-                            <div className="relative">
-                              <Button
-                                variant={actionMenuOpen ? "secondary" : "ghost"}
-                                size="icon-sm"
-                                onClick={() => setOpenActionMenuId((current) => (current === item.id ? "" : item.id))}
-                                aria-label="More actions"
-                                aria-expanded={actionMenuOpen}
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-
-                              {actionMenuOpen ? (
-                                <div className="absolute right-0 z-30 mt-2 w-[min(82vw,290px)] overflow-hidden rounded-2xl border border-border bg-background shadow-xl">
-                                  <div className="border-b border-border/70 px-4 py-3">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                      Secondary actions
-                                    </p>
-                                    <p className="mt-1 text-sm text-muted-foreground">
-                                      Snooze, clear handled work, or jump to the source context.
-                                    </p>
-                                  </div>
-
-                                  {hasSecondaryContextActions ? (
-                                    <div className="p-2">
-                                      {canCloseFromCard && primaryActionKind !== "close" ? (
-                                        <button
-                                          type="button"
-                                          className={destructiveActionMenuItemClass}
-                                          disabled={mutationBusy}
-                                          onClick={() => {
-                                            setOpenActionMenuId("");
-                                            void closeQueueItem(item);
-                                          }}
-                                        >
-                                          <XCircle className="h-4 w-4" />
-                                          Close application
-                                        </button>
-                                      ) : null}
-                                      {canDraft && primaryActionKind !== "draft" ? (
-                                        <button
-                                          type="button"
-                                          className={actionMenuItemClass}
-                                          disabled={draftMutation.isPending}
-                                          onClick={() => {
-                                            setOpenActionMenuId("");
-                                            runDraftAction();
-                                          }}
-                                        >
-                                          <MessageSquare className="h-4 w-4" />
-                                          {draft ? "Show copilot" : "Generate draft"}
-                                        </button>
-                                      ) : null}
-                                      {gmailUrl && primaryActionKind !== "gmail" ? (
-                                        <button
-                                          type="button"
-                                          className={actionMenuItemClass}
-                                          onClick={() => {
-                                            setOpenActionMenuId("");
-                                            window.open(gmailUrl, "_blank", "noopener,noreferrer");
-                                          }}
-                                        >
-                                          <ArrowUpRight className="h-4 w-4" />
-                                          Open Gmail
-                                        </button>
-                                      ) : null}
-                                      {showRouteAction && primaryActionKind !== "route" ? (
-                                        <button
-                                          type="button"
-                                          className={actionMenuItemClass}
-                                          onClick={() => {
-                                            setOpenActionMenuId("");
-                                            navigate(item.routeHref || "/");
-                                          }}
-                                        >
-                                          <ArrowUpRight className="h-4 w-4" />
-                                          {item.routeLabel || "Open"}
-                                        </button>
-                                      ) : null}
-                                    </div>
-                                  ) : null}
-
-                                  {item.logicalKey && item.dedupeKey ? (
-                                    <div className={`${hasSecondaryContextActions ? "border-t border-border/70" : ""} p-2`}>
-                                      <button
-                                        type="button"
-                                        className={actionMenuItemClass}
-                                        disabled={mutationBusy}
-                                        onClick={() => {
-                                          setOpenActionMenuId("");
-                                          void dismissQueueItem(item);
-                                        }}
-                                      >
-                                        <PauseCircle className="h-4 w-4" />
-                                        Snooze 1 day
-                                      </button>
-                                      {primaryActionKind !== "complete" ? (
-                                        <button
-                                          type="button"
-                                          className={actionMenuItemClass}
-                                          disabled={mutationBusy}
-                                          onClick={() => {
-                                            setOpenActionMenuId("");
-                                            runCompleteAction(
-                                              isGmailHandledCandidate(item) ? "Removed from today's queue." : undefined,
-                                            );
-                                          }}
-                                        >
-                                          <CheckCircle2 className="h-4 w-4" />
-                                          {isGmailHandledCandidate(item) ? "Already handled" : "Mark done"}
-                                        </button>
-                                      ) : null}
-                                    </div>
-                                  ) : null}
-                                </div>
-                              ) : null}
-                            </div>
-                          </div>
-
-                          {canMarkHandledFromCard ? (
-                            <Button
-                              className="mt-2 w-full"
-                              variant="outline"
-                              disabled={mutationBusy}
-                              onClick={runHandledAction}
-                            >
-                              <CheckCircle2 className="h-4 w-4" />
-                              Already handled
-                            </Button>
-                          ) : null}
-
-                          <div className="mt-3 flex items-center gap-2 rounded-full bg-muted/45 px-3 py-2 text-xs text-muted-foreground">
-                            <ShieldAlert className="h-3.5 w-3.5" />
-                            Based on your source, never auto-sent
-                          </div>
-                        </aside>
-                      </div>
-
-                    {canDraft && draftOpen ? <div className="mt-4">{renderDraftPanel(item)}</div> : null}
-
-                    {inlineCleanupTask && inlineOpen ? (
-                      <CleanupTaskInlinePanel
-                        task={item}
-                        storedEmails={storedEmails}
-                        onRefresh={() => invalidateSuggestionQueries(queryClient)}
-                      />
-                    ) : null}
-                    </details>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          <details className="group">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl border border-border/70 bg-card px-4 py-3 shadow-sm [&::-webkit-details-marker]:hidden">
-              <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <CheckSquare className="h-4 w-4 text-accent" />
-                Operating order &amp; upcoming outreach
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-                <ChevronsUpDown className="h-3.5 w-3.5" />
-                <span className="group-open:hidden">Show</span>
-                <span className="hidden group-open:inline">Hide</span>
-              </span>
-            </summary>
-            <div className="mt-3 space-y-3">
-            <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-              <div className="flex items-center gap-2">
-                <CheckSquare className="h-4 w-4 text-accent" />
-                <h2 className="text-sm font-semibold text-foreground">Today's operating order</h2>
-              </div>
-              <div className="mt-3 space-y-2">
-                {(queueView === "inbox"
-                  ? [
-                      ["1", "Handle urgent inbox moves", `${daqStats.highPriority} high-priority Gmail-grounded action(s).`],
-                      ["2", "Act from the conversation", "Open Gmail before drafting, replying, or preparing."],
-                      ["3", "Check the broader backlog", `${Math.max(combinedSuggestions.length - daqInboxSuggestions.length, 0)} non-inbox action(s) live under all actions.`],
-                    ]
-                  : [
-                      ["1", "Clear blockers", `${sourceCounts.cleanup} cleanup task(s) that keep your tracking accurate.`],
-                      ["2", "Handle ambiguity", `${sourceCounts.stale} role(s) need a check-in or close-out.`],
-                      ["3", "Improve your odds", `${sourceCounts.followup + sourceCounts.apply_gate + sourceCounts.resume} fit, resume gap, or outreach action(s).`],
-                    ]).map(([step, title, body]) => (
-                  <div key={step} className="rounded-xl border border-border/70 bg-background/70 p-3">
-                    <div className="flex gap-3">
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 text-xs font-bold text-accent">
-                        {step}
-                      </span>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{title}</p>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">{body}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              />
             </div>
+          ) : (
+            <div className="space-y-3">{todayItems.map((item) => renderCard(item, "today"))}</div>
+          )}
+          {/* Repeats held back on purpose. Without this line a short list reads as "it didn't find my
+              other applications" — the more damaging reading of the same screen. */}
+          {heldBackTotal > 0 ? (
+            <p className="px-1 text-[12.5px] leading-relaxed text-muted-foreground">
+              {heldBackTotal} more {heldBackTotal === 1 ? "is" : "are"} waiting behind these ({heldBackBreakdown}). Clear one and the next takes its place.
+            </p>
+          ) : null}
+        </section>
 
-            <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-              <div className="flex items-center gap-2">
-                <Clock3 className="h-4 w-4 text-accent" />
-                <h2 className="text-sm font-semibold text-foreground">Upcoming outreach</h2>
-              </div>
-              {upcomingFollowupWindows.length === 0 ? (
-                <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                  No upcoming outreach windows from your current applications.
-                </p>
-              ) : (
-                <div className="mt-4">
-                  <UpcomingFollowupWindowList windows={upcomingFollowupWindows.slice(0, 3)} compact />
-                </div>
+        {moreItems.length > 0 ? (
+          <Panel
+            title="More"
+            description="Worth doing this week, in order."
+            meta={<span className="text-[12px] text-muted-foreground">{moreItems.length}</span>}
+          >
+            <div className="-mx-1 mb-1 flex flex-wrap gap-1.5" role="group" aria-label="Filter actions">
+              {MORE_FILTERS.filter((option) => option.value === "all" || moreFilterCounts[option.value] > 0).map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setMoreFilter(option.value)}
+                  aria-pressed={moreFilter === option.value}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-[12px] font-medium transition-colors",
+                    moreFilter === option.value
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border bg-card text-muted-foreground hover:border-foreground/25 hover:text-foreground",
+                  )}
+                >
+                  {option.label}
+                  <span className="ml-1.5 opacity-70">{moreFilterCounts[option.value]}</span>
+                </button>
+              ))}
+            </div>
+            <div className="divide-y divide-border">
+              {moreEntries.map((entry) =>
+                entry.type === "item" ? (
+                  renderCard(entry.item, "more")
+                ) : (
+                  <details key={entry.key} className="group px-1 py-3.5">
+                    <summary className="flex cursor-pointer list-none items-center gap-3.5 [&::-webkit-details-marker]:hidden">
+                      <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg", TONES.done.icon)}>
+                        <Layers3 className="h-4 w-4" aria-hidden />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[14px] font-semibold text-foreground">
+                          Close out {entry.items.length} quiet applications
+                        </span>
+                        <span className="block text-[12.5px] text-muted-foreground">
+                          No reply in a long time. Clear them in one pass so they stop crowding the list.
+                        </span>
+                      </span>
+                      <span className={cn(BUTTON.secondary, "px-3 py-1.5 text-[12.5px]")}>
+                        <span className="group-open:hidden">Review</span>
+                        <span className="hidden group-open:inline">Hide</span>
+                      </span>
+                    </summary>
+                    <div className="mt-2 divide-y divide-border pl-[50px]">
+                      {entry.items.map((item) => renderCard(item, "more"))}
+                    </div>
+                  </details>
+                ),
               )}
             </div>
-            </div>
-          </details>
-        </div>
+          </Panel>
+        ) : null}
 
-        <details className="group rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-          <summary className="flex cursor-pointer list-none items-start justify-between gap-3 [&::-webkit-details-marker]:hidden">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <FileSearch className="h-4 w-4 text-accent" />
-                <h2 className="text-sm font-semibold text-foreground">Queue details</h2>
-              </div>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                Older, hidden, and completed actions live here so the main queue stays focused.
-              </p>
-            </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-              <ChevronsUpDown className="h-3.5 w-3.5" />
-              <span className="group-open:hidden">Show</span>
-              <span className="hidden group-open:inline">Hide</span>
-            </span>
-          </summary>
+        {upcomingFollowupWindows.length > 0 ? (
+          <Panel icon={Clock3} tone="upcoming" title="Coming up" description="Follow-ups that open in the next few days.">
+            <UpcomingFollowupWindowList windows={upcomingFollowupWindows.slice(0, 5)} compact />
+          </Panel>
+        ) : null}
 
-          <div className="mt-4 grid grid-cols-2 gap-2.5 border-t border-border/70 pt-4 sm:grid-cols-4">
-            {[
-              ["Active", stats.active],
-              ["High priority", stats.highPriority],
-              ["To clear", `${stats.totalMinutes || 0}m`],
-              ["Hidden", stats.snoozed],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-xl border border-border/70 bg-background/70 px-4 py-3">
-                <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-                <p className="mt-1.5 text-2xl font-bold leading-none text-foreground">{value}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="space-y-4">
-              <div className="rounded-3xl border border-border/70 bg-background/70 p-5 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="h-4 w-4 text-accent" />
-                  <h2 className="text-sm font-semibold text-foreground">Outreach diagnostics</h2>
-                </div>
-                <div className="mt-4 space-y-3">
-                  {outreachDiagnostics.map((item) => (
-                    <div key={item.id} className="rounded-2xl border border-border/70 bg-card/80 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">{item.label}</p>
-                          <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.description}</p>
-                        </div>
-                        <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                          {item.count}
-                        </span>
-                      </div>
-                      {item.examples.length > 0 ? (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {item.examples.map((example) => (
-                            <span key={example} className="rounded-full bg-muted/70 px-2 py-1 text-[11px] text-muted-foreground">
-                              {example}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-border/70 bg-background/70 p-5 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <FileSearch className="h-4 w-4 text-accent" />
-                  <h2 className="text-sm font-semibold text-foreground">Hidden right now</h2>
-                </div>
-                {/* Repeats the coach is holding back on purpose. Without this line the queue looks
-                    like it simply failed to find the rest of your applications, which is the more
-                    damaging reading of the same screen. */}
-                {heldBackGroups.length > 0 ? (
-                  <div className="mt-4 rounded-2xl border border-border/70 bg-card/80 p-3">
-                    <p className="text-sm text-foreground">{heldBackHeadline}</p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      {`${heldBackBreakdown} — held back so the list stays short enough to finish. Clear one above and the next takes its place.`}
-                    </p>
+        {snoozedItems.length > 0 ? (
+          <Panel icon={PauseCircle} tone="done" title="Snoozed" description="These come back on their own.">
+            <ul className="divide-y divide-border">
+              {snoozedItems.map((item) => (
+                <li key={item.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="truncate text-[13.5px] font-medium text-foreground">{item.title}</p>
+                    {describeActionIdentity(item) ? (
+                      <p className="truncate text-[12px] text-muted-foreground">{describeActionIdentity(item)}</p>
+                    ) : null}
                   </div>
-                ) : null}
-                {queueQuery.isLoading ? (
-                  <p className="mt-4 text-sm text-muted-foreground">Loading action state...</p>
-                ) : snoozedItems.length === 0 ? (
-                  <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                    No snoozed suggestions. Anything you snooze will come back here with its return time.
-                  </p>
-                ) : (
-                  <div className="mt-4 space-y-3">
-                    {snoozedItems.map((item) => (
-                      <div key={item.id} className="rounded-2xl border border-border/70 bg-card/80 p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-foreground">{item.title}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              Resurfaces {formatSnoozedUntil(rankedQueue?.dismissed?.find((entry) => entry.dedupeKey === item.dedupeKey)?.dismissedUntil || null) || "later"}
-                            </p>
-                          </div>
-                          <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-                            Hidden
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="rounded-3xl border border-border/70 bg-background/70 p-5 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="h-4 w-4 text-accent" />
-                  <h2 className="text-sm font-semibold text-foreground">Reliability rules</h2>
-                </div>
-                <div className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
-                  <p>Actions need clear source context, a why-now reason, and evidence before they appear.</p>
-                  <p>Follow-up outcome analytics stay scoped to email suggestions, so cleanup and Apply Gate actions do not pollute response-rate comparisons.</p>
-                </div>
-                <div className="mt-4 rounded-2xl bg-muted/40 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Completed</p>
-                  <p className="mt-1 text-2xl font-bold text-foreground">{stats.completed}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </details>
+                  <span className="shrink-0 text-[12px] text-muted-foreground">
+                    Back {formatSnoozedUntil(rankedQueue?.dismissed?.find((entry) => entry.dedupeKey === item.dedupeKey)?.dismissedUntil || null) || "later"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        ) : null}
       </div>
     </DashboardLayout>
   );
 };
+
+type MoreFilter = "all" | "outreach" | "interviews" | "closeouts" | "tools" | "data";
+
+const MORE_FILTERS: Array<{ value: MoreFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "outreach", label: "Outreach" },
+  { value: "interviews", label: "Interviews" },
+  { value: "closeouts", label: "Close-outs" },
+  { value: "tools", label: "Résumé & Apply Gate" },
+  { value: "data", label: "Data fixes" },
+];
+
+function moreFilterGroup(item: QueueItem): Exclude<MoreFilter, "all"> {
+  const kind = describeActionKind(item);
+  if (kind === "Interview prep" || kind === "Assessment") return "interviews";
+  if (kind === "Close-out") return "closeouts";
+  if (kind === "Résumé" || kind === "Apply Gate") return "tools";
+  if (kind === "Data fix") return "data";
+  return "outreach";
+}
 
 export default FixSuggestions;

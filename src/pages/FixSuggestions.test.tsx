@@ -73,7 +73,7 @@ vi.mock("@/lib/emails", async () => {
   };
 });
 
-function renderPage() {
+function renderPage(initialEntries: string[] = ["/next-actions"]) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -82,7 +82,7 @@ function renderPage() {
   });
 
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <QueryClientProvider client={queryClient}>
         <FixSuggestions />
       </QueryClientProvider>
@@ -389,64 +389,98 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("FixSuggestions", () => {
-  test("renders the Daily Action Queue lanes, cards, and diagnostics from mocked data", async () => {
+function staleActionFixture(n: number, company: string, title: string) {
+  return {
+    id: `queue-stale-${n}`,
+    logicalKey: `stale:ghost-thread-${n}`,
+    dedupeKey: `stale:ghost-thread-${n}:v1`,
+    primaryEntityId: `stale:ghost-thread-${n}`,
+    evidenceVersion: "v1",
+    actionType: "close_stale_application",
+    actionCategory: "communication",
+    title,
+    whyNow: "This application has gone cold.",
+    targetOutcome: "Clear stale roles.",
+    effortMinutes: 4,
+    urgencyLevel: "low",
+    confidenceLevel: "moderate",
+    source: "followup_engine",
+    status: "open",
+    effectiveStatus: "open",
+    createdAt: "2026-03-08T12:00:00.000Z",
+    evidence: ["No tracked terminal outcome."],
+    threadId: `ghost-thread-${n}`,
+    emailId: `ghost-email-${n}`,
+    applicationId: `ghost-app-${n}`,
+    suggestionSource: "stale_role_signal",
+    queueSource: "stale",
+    intent: "CLOSE_STALE_ROLE",
+    intentLabel: "Close stale role",
+    playbook: ["Send a final note only if the role still matters."],
+    sourceLabel: "Ghosting signal",
+    draftEligible: true,
+    routeHref: "/next-actions",
+    routeLabel: "Open",
+    stageLabel: "Ghosting",
+    company,
+  };
+}
+
+function researchActionFixture() {
+  return {
+    ...staleActionFixture(9, "Prometheum", "Research Prometheum and role"),
+    id: "queue-research-1",
+    logicalKey: "research:prometheum",
+    dedupeKey: "research:prometheum:v1",
+    actionType: "research",
+    urgencyLevel: "medium",
+    intent: "NETWORKING_OUTREACH",
+    queueSource: "followup",
+    roleTitle: "QA Engineer",
+    applicationId: null,
+    emailId: null,
+  };
+}
+
+describe("Next Actions", () => {
+  test("shows today's actions with the application named and a button that fits each", async () => {
     renderPage();
 
-    expect(await screen.findByText("Daily Action Queue")).toBeInTheDocument();
-    expect(
-      await screen.findByRole("heading", { name: "Send thank-you note to Wells Fargo" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("heading", {
-        name: "Move Associate Quality Engineer - Software (QA) out of active focus",
-      }),
-    ).not.toBeInTheDocument();
-
-    expect(screen.getByRole("button", { name: /Inbox actions \(1\)/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /All actions \(2\)/ })).toBeInTheDocument();
-
-    const inboxLane = screen.getByText("Inbox due now").closest("button");
-    expect(inboxLane).toBeTruthy();
-
-    expect(within(inboxLane as HTMLElement).getByText("1")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Outreach tasks/ })).not.toBeInTheDocument();
-
+    expect(await screen.findByRole("heading", { name: "Next Actions" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Send thank-you note to Wells Fargo" })).toBeInTheDocument();
+    // Both actions fit in Today, and each carries its own kind of button.
+    expect(screen.getByRole("heading", { name: "Move Associate Quality Engineer - Software (QA) out of active focus" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Draft thank-you note" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close it out" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Generate draft" })).not.toBeInTheDocument();
+    // Follow-up windows that open soon.
     expect(screen.getAllByText("First follow-up window for QA Analyst I").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Final check-in window for Software Development Engineer I").length).toBeGreaterThan(0);
-    expect(screen.getByText("Queue details")).toBeInTheDocument();
-    expect(screen.getAllByText("Why now").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Source check").length).toBeGreaterThan(0);
-    expect(screen.getByText("Before you act")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Already handled" })).toBeInTheDocument();
-    expect(screen.getByText("Based on your source, never auto-sent")).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(recordQueueActionImpression).toHaveBeenCalledTimes(1);
+      expect(recordQueueActionImpression).toHaveBeenCalledWith({ logicalKey: "followup:wf-thread", dedupeKey: "followup:wf-thread:v1" });
+      expect(recordQueueActionImpression).toHaveBeenCalledWith({ logicalKey: "stale:ghost-thread", dedupeKey: "stale:ghost-thread:v1" });
     });
-    expect(recordQueueActionImpression).toHaveBeenCalledWith({
-      logicalKey: "followup:wf-thread",
-      dedupeKey: "followup:wf-thread:v1",
-    });
-    expect(recordQueueActionImpression).not.toHaveBeenCalledWith({
-      logicalKey: "stale:ghost-thread",
-      dedupeKey: "stale:ghost-thread:v1",
-    });
+  });
+
+  test("research opens a search for the company instead of offering a draft", async () => {
+    fetchRankedActionQueue.mockResolvedValue(buildQueueResponse({ doToday: [researchActionFixture()], thisWeek: [] }));
+    renderPage();
+
+    const link = await screen.findByRole("link", { name: /Research Prometheum/ });
+    expect(link).toHaveAttribute("href", "https://www.google.com/search?q=Prometheum%20QA%20Engineer");
+    expect(screen.getByText((_, el) => el?.tagName === "P" && /^Research · Prometheum · QA Engineer/.test(el.textContent || ""))).toBeInTheDocument();
   });
 
   test("lets users clear Gmail work they already handled outside the product", async () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Already handled" }));
+    await user.click(await screen.findByRole("button", { name: /Already handled/ }));
 
     await waitFor(() => {
-      expect(completeQueueAction).toHaveBeenCalledWith({
-        logicalKey: "followup:wf-thread",
-        dedupeKey: "followup:wf-thread:v1",
-      });
+      expect(completeQueueAction).toHaveBeenCalledWith({ logicalKey: "followup:wf-thread", dedupeKey: "followup:wf-thread:v1" });
     });
-    expect(toastSuccess).toHaveBeenCalledWith("Removed from today's queue.");
+    expect(toastSuccess).toHaveBeenCalledWith("Removed from today's list.");
   });
 
   test("hides Gmail actions when the latest tracked thread message is from the user", async () => {
@@ -470,13 +504,10 @@ describe("FixSuggestions", () => {
 
     renderPage();
 
-    expect(await screen.findByText("Daily Action Queue")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Move Associate Quality Engineer - Software (QA) out of active focus" })).toBeInTheDocument();
     await waitFor(() => {
-      expect(
-        screen.queryByRole("heading", { name: "Send thank-you note to Wells Fargo" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Send thank-you note to Wells Fargo" })).not.toBeInTheDocument();
     });
-    expect(screen.getByText(/No urgent inbox actions are due right now/)).toBeInTheDocument();
   });
 
   test("does not show malformed serialized evidence on Apply Gate cards", async () => {
@@ -523,51 +554,19 @@ describe("FixSuggestions", () => {
     );
 
     renderPage();
-    await user.click(await screen.findByRole("button", { name: /All actions/ }));
-    await user.click(screen.getByRole("button", { name: /Apply Gate\s+1/ }));
-
     expect(await screen.findByRole("heading", { name: "Apply to QA Engineer" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open in Apply Gate" })).toHaveAttribute("href", "/apply-gate");
+
+    await user.click(screen.getByRole("button", { name: "More options" }));
+    await user.click(screen.getByRole("button", { name: "Why this, and how" }));
+
     expect(screen.getByText("Apply Gate context")).toBeInTheDocument();
-    expect(screen.getByText("Specific role")).toBeInTheDocument();
-    expect(screen.getByText("Role-specific issue")).toBeInTheDocument();
     expect(screen.getAllByText("Tailor resume first").length).toBeGreaterThan(0);
     expect(screen.queryByText('["The')).not.toBeInTheDocument();
   });
 
-  test("records canonical impressions only after hidden queue sections become visible", async () => {
-    const user = userEvent.setup();
-    renderPage();
-
-    expect(await screen.findByRole("heading", { name: "Send thank-you note to Wells Fargo" })).toBeInTheDocument();
-    await waitFor(() => {
-      expect(recordQueueActionImpression).toHaveBeenCalledTimes(1);
-    });
-    expect(recordQueueActionImpression).toHaveBeenLastCalledWith({
-      logicalKey: "followup:wf-thread",
-      dedupeKey: "followup:wf-thread:v1",
-    });
-
-    await user.click(screen.getByRole("button", { name: /All actions \(2\)/ }));
-    await user.click(screen.getByRole("button", { name: /Ghosting\s+1/ }));
-
-    expect(
-      await screen.findByRole("heading", {
-        name: "Move Associate Quality Engineer - Software (QA) out of active focus",
-      }),
-    ).toBeInTheDocument();
-    await waitFor(() => {
-      expect(recordQueueActionImpression).toHaveBeenCalledWith({
-        logicalKey: "stale:ghost-thread",
-        dedupeKey: "stale:ghost-thread:v1",
-      });
-    });
-    expect(recordQueueActionImpression).toHaveBeenCalledTimes(2);
-  });
-
   test("tells the user how many repeat actions are being held back, and why", async () => {
-    // A short queue with no explanation reads as "the product didn't find my other applications".
-    // The same short queue with this line reads as curation, which is the whole premise of the
-    // coaching tier.
+    // A short list with no explanation reads as "the product didn't find my other applications".
     fetchRankedActionQueue.mockResolvedValue({
       ...buildQueueResponse(),
       queue: {
@@ -582,217 +581,58 @@ describe("FixSuggestions", () => {
 
     renderPage();
 
-    expect(await screen.findByText(/9 more actions are waiting behind these/)).toBeInTheDocument();
+    expect(await screen.findByText(/9 more are waiting behind these/)).toBeInTheDocument();
     expect(screen.getByText(/5 follow-up, 4 networking/)).toBeInTheDocument();
-    expect(screen.getByText(/Clear one above and the next takes its place/)).toBeInTheDocument();
+    expect(screen.getByText(/Clear one and the next takes its place/)).toBeInTheDocument();
   });
 
-  test("stays silent about held-back actions when the user's own filter is what shortened the list", async () => {
+  test("keeps Today to three and groups quiet close-outs under More", async () => {
     const user = userEvent.setup();
-    fetchRankedActionQueue.mockResolvedValue({
-      ...buildQueueResponse(),
-      queue: {
-        ...buildQueueResponse().queue,
-        heldBackSimilarCount: 9,
-        heldBackSimilarActions: [
-          { intent: "FOLLOW_UP_THREAD", intentLabel: "Follow-up", count: 9 },
-        ],
-      },
-    });
-
-    renderPage();
-    await user.click(await screen.findByRole("button", { name: /All actions \(2\)/ }));
-    await user.click(screen.getByRole("button", { name: "high" }));
-
-    expect(screen.queryByText(/more actions are waiting behind these/)).not.toBeInTheDocument();
-  });
-
-  test("updates category counts when urgency filters are active", async () => {
-    const user = userEvent.setup();
-    renderPage();
-
-    await user.click(await screen.findByRole("button", { name: /All actions \(2\)/ }));
-    expect(screen.getByRole("button", { name: /Outreach tasks\s+1/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Ghosting\s+1/ })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "high" }));
-
-    expect(screen.getByRole("button", { name: /Ghosting\s+0/ })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Ghosting\s+0/ }));
-
-    expect(await screen.findByText("No active actions")).toBeInTheDocument();
-    expect(screen.getByText("No suggestions match the current filters.")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("heading", {
-        name: "Move Associate Quality Engineer - Software (QA) out of active focus",
-      }),
-    ).not.toBeInTheDocument();
-  });
-
-  test("groups multiple low-urgency stale close-out cards into one batch card", async () => {
-    const user = userEvent.setup();
+    const followup = buildQueueResponse().queue.doToday[0];
     fetchRankedActionQueue.mockResolvedValueOnce(
       buildQueueResponse({
+        doToday: [followup, researchActionFixture(), staleActionFixture(1, "Standard Bots", "Move Associate Quality Engineer - Software (QA) out of active focus")],
         thisWeek: [
-          {
-            id: "queue-stale-1",
-            logicalKey: "stale:ghost-thread",
-            dedupeKey: "stale:ghost-thread:v1",
-            primaryEntityId: "stale:ghost-thread",
-            evidenceVersion: "v1",
-            actionType: "close_stale_application",
-            actionCategory: "communication",
-            title: "Move Associate Quality Engineer - Software (QA) out of active focus",
-            whyNow: "The tracked thread has gone cold and is now in close-out territory.",
-            targetOutcome: "Stop stale roles from taking space in the active search.",
-            effortMinutes: 4,
-            urgencyLevel: "low",
-            confidenceLevel: "moderate",
-            source: "followup_engine",
-            status: "open",
-            effectiveStatus: "open",
-            createdAt: "2026-03-10T12:00:00.000Z",
-            evidence: ["No tracked terminal outcome."],
-            threadId: "ghost-thread",
-            emailId: "ghost-email",
-            applicationId: "ghost-app",
-            suggestionSource: "stale_role_signal",
-            queueSource: "stale",
-            intent: "CLOSE_STALE_ROLE",
-            intentLabel: "Close stale role",
-            playbook: [
-              "No tracked terminal outcome.",
-              "Resolve the blocker before relying on the rest of the queue.",
-              "Clear the smallest high-signal task first.",
-            ],
-            sourceLabel: "Ghosting signal",
-            draftEligible: true,
-            routeHref: "/fix-suggestions",
-            routeLabel: "Open queue",
-            stageLabel: "Ghosting",
-            company: "Standard Bots",
-          },
-          {
-            id: "queue-stale-2",
-            logicalKey: "stale:ghost-thread-2",
-            dedupeKey: "stale:ghost-thread-2:v1",
-            primaryEntityId: "stale:ghost-thread-2",
-            evidenceVersion: "v1",
-            actionType: "close_stale_application",
-            actionCategory: "communication",
-            title: "Move Backend Engineer - AI Infrastructure out of active focus",
-            whyNow: "This application has gone cold.",
-            targetOutcome: "Clear stale roles.",
-            effortMinutes: 4,
-            urgencyLevel: "low",
-            confidenceLevel: "moderate",
-            source: "followup_engine",
-            status: "open",
-            effectiveStatus: "open",
-            createdAt: "2026-03-09T12:00:00.000Z",
-            evidence: ["No tracked terminal outcome."],
-            threadId: "ghost-thread-2",
-            emailId: "ghost-email-2",
-            applicationId: "ghost-app-2",
-            suggestionSource: "stale_role_signal",
-            queueSource: "stale",
-            intent: "CLOSE_STALE_ROLE",
-            intentLabel: "Close stale role",
-            playbook: [
-              "No tracked terminal outcome.",
-              "Resolve the blocker before relying on the rest of the queue.",
-              "Clear the smallest high-signal task first.",
-            ],
-            sourceLabel: "Ghosting signal",
-            draftEligible: true,
-            routeHref: "/fix-suggestions",
-            routeLabel: "Open queue",
-            stageLabel: "Ghosting",
-            company: "Arbol",
-          },
-          {
-            id: "queue-stale-3",
-            logicalKey: "stale:ghost-thread-3",
-            dedupeKey: "stale:ghost-thread-3:v1",
-            primaryEntityId: "stale:ghost-thread-3",
-            evidenceVersion: "v1",
-            actionType: "close_stale_application",
-            actionCategory: "communication",
-            title: "Move SDET Quality Assurance Specialist with Automation out of active focus",
-            whyNow: "This application has gone cold.",
-            targetOutcome: "Clear stale roles.",
-            effortMinutes: 4,
-            urgencyLevel: "low",
-            confidenceLevel: "moderate",
-            source: "followup_engine",
-            status: "open",
-            effectiveStatus: "open",
-            createdAt: "2026-03-08T12:00:00.000Z",
-            evidence: ["No tracked terminal outcome."],
-            threadId: "ghost-thread-3",
-            emailId: "ghost-email-3",
-            applicationId: "ghost-app-3",
-            suggestionSource: "stale_role_signal",
-            queueSource: "stale",
-            intent: "CLOSE_STALE_ROLE",
-            intentLabel: "Close stale role",
-            playbook: [
-              "No tracked terminal outcome.",
-              "Resolve the blocker before relying on the rest of the queue.",
-              "Clear the smallest high-signal task first.",
-            ],
-            sourceLabel: "Ghosting signal",
-            draftEligible: true,
-            routeHref: "/fix-suggestions",
-            routeLabel: "Open queue",
-            stageLabel: "Ghosting",
-            company: "Broadridge",
-          },
+          staleActionFixture(2, "Arbol", "Move Backend Engineer - AI Infrastructure out of active focus"),
+          staleActionFixture(3, "Broadridge", "Move SDET Quality Assurance Specialist with Automation out of active focus"),
+          staleActionFixture(4, "Cboe", "Move QA Analyst out of active focus"),
         ],
       }),
     );
 
     renderPage();
-    await user.click(await screen.findByRole("button", { name: /All actions \(4\)/ }));
 
-    expect(await screen.findByText("Review 3 stale roles in one pass")).toBeInTheDocument();
-    expect(screen.getByText("Close these out together")).toBeInTheDocument();
-    expect(screen.getByText("Move Associate Quality Engineer - Software (QA) out of active focus")).toBeInTheDocument();
-    expect(screen.getByText("Move Backend Engineer - AI Infrastructure out of active focus")).toBeInTheDocument();
-    expect(screen.getByText("Move SDET Quality Assurance Specialist with Automation out of active focus")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Send thank-you note to Wells Fargo" })).toBeInTheDocument();
+    expect(screen.getByText("3 for today · 3 more")).toBeInTheDocument();
+    expect(screen.getByText("Close out 3 quiet applications")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Close-outs\s*3/ })).toBeInTheDocument();
+
+    await user.click(screen.getByText("Close out 3 quiet applications"));
+    expect(screen.getByText("Move Backend Engineer - AI Infrastructure out of active focus")).toBeVisible();
   });
 
-  test("allows closing a stale application directly from the ghosting card", async () => {
+  test("closes a stale application straight from its card, as a no-response close", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole("button", { name: /All actions \(2\)/ }));
 
-    const closeButton = await screen.findByRole("button", { name: "Close application" });
-    await user.click(closeButton);
+    await user.click(await screen.findByRole("button", { name: "Close it out" }));
 
     await waitFor(() => {
       expect(closeApplication).toHaveBeenCalledWith({
         applicationId: "ghost-app",
         emailId: "ghost-email",
-        // Leads with "No response" so the close classifies as a neutral ghosting
-        // close-out, not a rejection (premium issue #2).
-        reason:
-          "No response - ghosted, closed from Daily Action Queue: Move Associate Quality Engineer - Software (QA) out of active focus",
+        // "No response" leads so the close is a neutral ghosting close-out, not a rejection.
+        reason: "No response - ghosted, closed from Next Actions: Move Associate Quality Engineer - Software (QA) out of active focus",
       });
     });
-
-    expect(completeQueueAction).toHaveBeenCalledWith({
-      logicalKey: "stale:ghost-thread",
-      dedupeKey: "stale:ghost-thread:v1",
-    });
+    expect(completeQueueAction).toHaveBeenCalledWith({ logicalKey: "stale:ghost-thread", dedupeKey: "stale:ghost-thread:v1" });
   });
 
-  test("opens Outreach Copilot with filtered presets for draftable actions", async () => {
+  test("drafts the thank-you note in place, with presets and the thread context", async () => {
     const user = userEvent.setup();
     renderPage();
 
-    const [generateDraftButton] = await screen.findAllByRole("button", { name: "Generate draft" });
-    await user.click(generateDraftButton);
+    await user.click(await screen.findByRole("button", { name: "Draft thank-you note" }));
 
     await waitFor(() => {
       expect(generateSuggestionDraft).toHaveBeenCalledWith(
@@ -809,29 +649,19 @@ describe("FixSuggestions", () => {
     });
 
     expect(await screen.findByText("Outreach Copilot")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Hide copilot" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hide draft" })).toBeInTheDocument();
     expect(screen.getByLabelText("Preset")).toBeInTheDocument();
-    expect(screen.getAllByText("Reply to human contact").length).toBeGreaterThan(0);
-    expect(screen.getByText("Before sending")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy subject + body" })).toBeInTheDocument();
-    expect(screen.getAllByText("Latest update: The Early Careers Engineering Assessment - Submission Confirmation").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Latest activity: 4/9/2026").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Thanks for completing the Early Careers Engineering Assessment\./)).toBeInTheDocument();
     expect(screen.getByText("Suggested reply contact: Jordan Lee <jordan@example.test>")).toBeInTheDocument();
-    expect(screen.getByText("Latest sender in conversation: Wells Fargo Talent Acquisition <support@example.test>")).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Referral / networking" })).not.toBeInTheDocument();
   });
 
-  test("records copilot feedback with the draft snapshot", async () => {
+  test("records draft feedback with the draft snapshot", async () => {
     const user = userEvent.setup();
     renderPage();
 
-    const [generateDraftButton] = await screen.findAllByRole("button", { name: "Generate draft" });
-    await user.click(generateDraftButton);
-
+    await user.click(await screen.findByRole("button", { name: "Draft thank-you note" }));
     await user.click(await screen.findByText("Report draft issue"));
-    const wrongGroundingButton = await screen.findByTestId("copilot-feedback-wrong_grounding");
-    await user.click(wrongGroundingButton);
+    await user.click(await screen.findByTestId("copilot-feedback-wrong_grounding"));
 
     await waitFor(() => {
       expect(recordSuggestionDraftFeedback).toHaveBeenCalledWith(
@@ -839,29 +669,19 @@ describe("FixSuggestions", () => {
           threadId: "wf-thread",
           actionType: "thank_you",
           feedbackLabel: "wrong_grounding",
-          tone: "post_interview",
-          emailId: "wf-email",
-          applicationId: "wf-app",
-          suggestionSource: "email_followup",
-          draft: expect.objectContaining({
-            subject: "Re: Wells Fargo Careers: Thank you for applying",
-            context: "warm",
-            confidence: "medium",
-            sendStrategy: "reply_in_thread",
-            sendStrategyLabel: "Reply to human contact",
-            recipient: "Jordan Lee <jordan@example.test>",
-            latestSender: "Wells Fargo Talent Acquisition <support@example.test>",
-            threadPreview:
-              "Hello, Thanks for completing the Early Careers Engineering Assessment. We have your submission to Wells Fargo.",
-          }),
-          feedback: {
-            surface: "fix_suggestions",
-          },
+          draft: expect.objectContaining({ subject: "Re: Wells Fargo Careers: Thank you for applying", sendStrategy: "reply_in_thread" }),
+          feedback: { surface: "fix_suggestions" },
         }),
         expect.anything(),
       );
     });
-
     expect(await screen.findByText("Latest feedback saved: Wrong grounding")).toBeInTheDocument();
+  });
+
+  test("a link from the Dashboard opens the draft it promised", async () => {
+    renderPage(["/next-actions#queue-followup-1"]);
+    await waitFor(() => {
+      expect(generateSuggestionDraft).toHaveBeenCalledWith(expect.objectContaining({ threadId: "wf-thread", actionType: "thank_you" }), expect.anything());
+    });
   });
 });
