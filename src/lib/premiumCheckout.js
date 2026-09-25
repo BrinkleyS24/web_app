@@ -1,10 +1,22 @@
 import { apiFetch } from "./api.js";
 
-export async function createPremiumCheckoutSession() {
+const UPGRADE_SOURCE_PATTERN = /^[a-z0-9_]{1,40}$/;
+
+/**
+ * The surface that sent this visitor to /upgrade (e.g. "ext_search_read"), from the page URL.
+ * Anything malformed is dropped rather than forwarded — the backend would reject it anyway.
+ */
+export function readUpgradeSource(search = typeof window !== "undefined" ? window.location.search : "") {
+  const value = new URLSearchParams(search || "").get("source");
+  return value && UPGRADE_SOURCE_PATTERN.test(value) ? value : null;
+}
+
+export async function createPremiumCheckoutSession({ source = null } = {}) {
   const response = await apiFetch("/api/subscriptions/create-checkout-session", {
     method: "POST",
     body: {
       plan: "premium",
+      ...(source ? { source } : {}),
     },
     timeoutMs: 30000,
   });
@@ -17,8 +29,8 @@ export async function createPremiumCheckoutSession() {
   return url;
 }
 
-export async function startPremiumCheckout() {
-  const url = await createPremiumCheckoutSession();
+export async function startPremiumCheckout({ source = readUpgradeSource() } = {}) {
+  const url = await createPremiumCheckoutSession({ source });
   window.location.assign(url);
 }
 
