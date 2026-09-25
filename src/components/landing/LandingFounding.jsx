@@ -5,7 +5,7 @@ import Magnetic from "./Magnetic.jsx";
 import { FOUNDING_CHECKOUT_URL } from "../../lib/publicSiteConfig.js";
 
 const FOUNDING_INCLUDES = [
-  "Lifetime Premium: Apply Gate, Daily Action Queue, Outcome Memory, Strategy Alerts, Weekly Summary",
+  "Lifetime Premium: Apply Gate, Next Actions, Strategy Alerts, Weekly Summary",
   "Every premium feature we ship in the future, no upgrade fees, ever",
   "A direct line to the founder: founding members' feedback shapes the roadmap first",
 ];

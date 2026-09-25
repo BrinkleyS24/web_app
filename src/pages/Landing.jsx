@@ -95,16 +95,16 @@ const PREMIUM_FEATURES = [
     body: "One pre-apply brief combining fit review, rejection risks, and fix-first guidance — before you spend an hour applying.",
   },
   {
-    title: "Daily Action Queue",
+    title: "Next Actions",
     body: "The next follow-ups, ghosting checks, and resume fixes, prioritized — with the reason behind every move.",
   },
   {
-    title: "Outcome Memory",
-    body: "Repeated misses and evidence gaps tracked across applications, so the same mistake stops happening twice.",
+    title: "Strategy Alerts",
+    body: "Patterns across your applications — what is working, what keeps failing — and what to do about each.",
   },
   {
-    title: "Strategy Alerts",
-    body: "High-confidence warnings when your search pattern looks weak, noisy, stalled, or off-target.",
+    title: "Résumé versions",
+    body: "Save the versions you tailor and see which one actually gets interviews, from the replies in your inbox.",
   },
   {
     title: "Weekly Summary",
@@ -544,7 +544,7 @@ export default function Landing() {
                   </div>
                 </TiltCard>
 
-                {/* Daily Action Queue */}
+                {/* Next Actions */}
                 <TiltCard className="h-full rounded-2xl sm:col-span-2 lg:col-span-3">
                   <div className="flex h-full flex-col justify-center rounded-2xl border border-white/10 bg-[#0E1726]/70 p-6 backdrop-blur-sm">
                     <span className="landingMono text-[10px] font-bold uppercase tracking-[0.16em] text-[#2FBE8F]">
@@ -556,7 +556,7 @@ export default function Landing() {
                   </div>
                 </TiltCard>
 
-                {/* Outcome Memory / Strategy Alerts / Weekly Summary */}
+                {/* Strategy Alerts / Résumé versions / Weekly Summary */}
                 {[2, 3, 4].map((i) => (
                   <TiltCard key={PREMIUM_FEATURES[i].title} className="h-full rounded-2xl lg:col-span-2">
                     <div className="flex h-full flex-col justify-center rounded-2xl border border-white/10 bg-[#0E1726]/70 p-6 backdrop-blur-sm">

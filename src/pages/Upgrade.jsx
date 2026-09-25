@@ -19,8 +19,8 @@ const FREE_FEATURES = [
 const PREMIUM_FEATURES = [
   "Everything in Free",
   "Apply Gate pre-apply briefs",
-  "Daily Action Queue with reasons",
-  "Outcome Memory & Strategy Alerts",
+  "Next Actions, with the reason for each",
+  "Strategy Alerts on what is and is not working",
   "Weekly search-health summary",
 ];
 
