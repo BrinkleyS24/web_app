@@ -60,6 +60,7 @@ import {
 } from "@/lib/premiumTaskQueue";
 import { cn } from "@/lib/utils";
 import { describeVerdictDecision, describeVerdictOutcome } from "@/lib/verdictPresentation";
+import { describeOutcomeSource } from "@/lib/outcomeSource";
 
 const isPlaceholderAlert = (alert: StrategyAlert) => String(alert?.id || "").endsWith("coverage-gap");
 
@@ -546,13 +547,6 @@ function relativeDay(date: string | null) {
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";
   return `${days} days ago`;
-}
-
-/** Who an outcome is from: the employer, else the role, else the email's own subject line. */
-export function describeOutcomeSource(item: WeeklyHighlightEmail) {
-  if (item.company) return { primary: item.company, secondary: item.position };
-  if (item.position) return { primary: item.position, secondary: null };
-  return { primary: item.subject ? `“${item.subject}”` : "An email with no company named", secondary: null };
 }
 
 function RecentOutcomesPanel({ loading, weekly }: { loading: boolean; weekly?: WeeklyHighlightsResponse }) {

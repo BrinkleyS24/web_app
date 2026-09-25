@@ -1,222 +1,201 @@
 import { useMemo, type ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { DashboardLayout } from "@/components/DashboardLayout";
 import {
-  CheckCircle2,
-  Calendar,
-  Sparkles,
-  XCircle,
-  Clock,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  Lightbulb,
   ArrowRight,
+  CalendarPlus,
+  CheckCircle2,
+  Clock,
+  Hourglass,
+  Lightbulb,
+  Minus,
+  Sparkles,
+  TrendingDown,
+  TrendingUp,
+  XCircle,
 } from "lucide-react";
+
+import { DashboardLayout } from "@/components/DashboardLayout";
+import { EmptyState, ErrorState, LoadingRows, PageHeader, Panel, StatTile, ToneChip } from "@/components/premium/PremiumUI";
+import { CARD, EYEBROW, TONES, type Tone } from "@/components/premium/tone";
 import { useAuth } from "@/lib/AuthContext.jsx";
 import { fetchWeeklyHighlights } from "@/lib/emails";
-import type {
-  WeeklyHighlightEmail,
-  WeeklyHighlightSilent,
-  WeeklyReadout,
-} from "@/lib/emails";
+import type { WeeklyHighlightEmail, WeeklyHighlightSilent, WeeklyReadout, WeeklyReadoutItem } from "@/lib/emails";
+import { describeOutcomeSource } from "@/lib/outcomeSource";
+import { cn } from "@/lib/utils";
 
 function formatRelativeDate(dateString: string | null) {
   if (!dateString) return null;
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) return null;
-  const diffMs = Date.now() - date.getTime();
-  const days = Math.floor(diffMs / 86_400_000);
+  const days = Math.floor((Date.now() - date.getTime()) / 86_400_000);
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";
   if (days < 7) return `${days} days ago`;
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function HighlightRow({ item, accent }: { item: WeeklyHighlightEmail; accent?: string }) {
-  const relativeDate = formatRelativeDate(item.date);
+function EventRow({ item, tone, label }: { item: WeeklyHighlightEmail; tone: Tone; label?: string }) {
+  const source = describeOutcomeSource(item);
+  const when = formatRelativeDate(item.date);
   return (
-    <li className="text-sm leading-snug">
-      <span className={`font-medium ${accent || "text-foreground"}`}>
-        {item.company || "Unknown company"}
-      </span>
-      {item.position ? <span className="text-muted-foreground"> — {item.position}</span> : null}
-      {item.subject ? (
-        <span className="text-muted-foreground"> · "{item.subject}"</span>
-      ) : null}
-      {relativeDate ? (
-        <span className="text-muted-foreground"> · {relativeDate}</span>
-      ) : null}
+    <li className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+      <div className="min-w-0">
+        <p className="text-[13.5px] font-medium text-foreground">
+          {source.primary}
+          {source.secondary ? <span className="font-normal text-muted-foreground"> · {source.secondary}</span> : null}
+        </p>
+        {item.subject && item.company ? (
+          <p className="mt-0.5 truncate text-[12px] text-muted-foreground">“{item.subject}”</p>
+        ) : null}
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        {when ? <span className="text-[12px] text-muted-foreground">{when}</span> : null}
+        {label ? <ToneChip tone={tone}>{label}</ToneChip> : null}
+      </div>
     </li>
   );
 }
 
 function SilentRow({ item }: { item: WeeklyHighlightSilent }) {
+  const source = describeOutcomeSource(item);
+  // Whose move it is. A thread whose last email is an assessment nobody has confirmed as
+  // submitted is waiting on the user, not on them.
+  const waitingOnYou = item.waitingOn === "you";
   return (
-    <li className="text-sm leading-snug">
-      <span className="font-medium text-foreground">
-        {item.company || "Unknown company"}
-      </span>
-      {item.position ? <span className="text-muted-foreground"> — {item.position}</span> : null}
-      <span className="text-muted-foreground">
-        {" "}
-        · silent {item.daysSilent} day{item.daysSilent === 1 ? "" : "s"} after{" "}
-        {item.stage === "interviewed" ? "interview" : "application"}
-      </span>
-      {item.subject ? (
-        <span className="text-muted-foreground"> · last message "{item.subject}"</span>
-      ) : null}
+    <li className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+      <div className="min-w-0">
+        <p className="text-[13.5px] font-medium text-foreground">
+          {source.primary}
+          {source.secondary ? <span className="font-normal text-muted-foreground"> · {source.secondary}</span> : null}
+        </p>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
+          {waitingOnYou
+            ? `Their last email was about an assessment ${item.daysSilent} day${item.daysSilent === 1 ? "" : "s"} ago, and no submission has reached your inbox`
+            : `No reply for ${item.daysSilent} day${item.daysSilent === 1 ? "" : "s"} since the ${item.stage === "interviewed" ? "interview" : "application"}`}
+          {item.subject ? ` · last: “${item.subject}”` : ""}
+        </p>
+      </div>
+      <ToneChip tone={waitingOnYou ? "attention" : "neutral"}>{waitingOnYou ? "Waiting on you" : "Quiet"}</ToneChip>
     </li>
   );
 }
 
-function ReadoutBlock({
-  title,
-  icon,
-  children,
-}: {
+function ReadoutList({ title, icon: Icon, tone, items, glyph }: {
   title: string;
-  icon: ReactNode;
-  children: ReactNode;
+  icon: LucideIcon;
+  tone: Tone;
+  items: WeeklyReadoutItem[];
+  glyph?: (item: WeeklyReadoutItem) => ReactNode;
 }) {
+  if (!items.length) return null;
   return (
-    <div className="space-y-2">
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
-        {icon}
+    <div>
+      <p className={cn("flex items-center gap-1.5", EYEBROW)}>
+        <Icon className={cn("h-3.5 w-3.5", TONES[tone].text)} aria-hidden />
         {title}
-      </h4>
-      <ul className="space-y-1.5">{children}</ul>
+      </p>
+      <ul className="mt-2 space-y-1.5">
+        {items.map((item, index) => (
+          <li key={`${title}-${index}`} className="flex gap-2 text-[13px] leading-snug text-foreground/85">
+            {glyph ? glyph(item) : null}
+            <span>{item.text}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
-// Neutral-coloured movement glyph: it shows direction of change only, never a
-// good/bad verdict (more rejections "up" must not read as green/positive).
+// Direction only, in a neutral color: more rejections "up" must not read as good news.
 function DirectionGlyph({ direction }: { direction?: "up" | "down" | "flat" }) {
-  const cls = "w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0";
-  if (direction === "up") return <TrendingUp className={cls} />;
-  if (direction === "down") return <TrendingDown className={cls} />;
-  return <Minus className={cls} />;
+  const cls = "mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground";
+  if (direction === "up") return <TrendingUp className={cls} aria-hidden />;
+  if (direction === "down") return <TrendingDown className={cls} aria-hidden />;
+  return <Minus className={cls} aria-hidden />;
 }
 
-function StrategicReadout({ readout }: { readout: WeeklyReadout }) {
+function WeeksRead({ readout }: { readout: WeeklyReadout }) {
   const { headline, confidence, sections } = readout;
   return (
-    <div className="glass-card rounded-2xl p-6 space-y-5 border border-accent/20">
-      <div className="flex items-start gap-3">
-        <Sparkles className="w-5 h-5 text-accent mt-0.5 shrink-0" />
+    <section className={cn(CARD, "relative overflow-hidden")}>
+      <span className={cn("absolute inset-y-0 left-0 w-1", TONES.brand.rail)} aria-hidden />
+      <div className="space-y-5 px-6 py-6 sm:px-7">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-accent">
+          <p className={cn("inline-flex items-center gap-2", EYEBROW, TONES.brand.text)}>
+            <Sparkles className="h-3.5 w-3.5" aria-hidden />
             This week's read
           </p>
-          <p className="mt-1 text-base font-medium text-foreground leading-snug">
-            {headline}
-          </p>
+          <h2 className="mt-2 max-w-[48ch] text-[22px] font-bold leading-snug tracking-[-0.02em] text-foreground">{headline}</h2>
           {confidence !== "normal" ? (
-            <p className="mt-1 text-xs text-muted-foreground italic">
+            <p className="mt-1.5 text-[13px] text-muted-foreground">
               {confidence === "quiet"
-                ? "Not much tracked activity this week — this read is light by design."
-                : "Only a couple of events this week, so treat this as descriptive, not a trend."}
+                ? "A quiet week in your inbox, so this read is light by design."
+                : "Only a couple of events this week, so treat this as a snapshot rather than a trend."}
             </p>
           ) : null}
         </div>
-      </div>
 
-      {sections.nextWeek.length ? (
-        <ReadoutBlock title="Do next week" icon={<ArrowRight className="w-4 h-4 text-accent" />}>
-          {sections.nextWeek.map((item, idx) => (
-            <li
-              key={`nw-${idx}`}
-              className={`text-sm leading-snug flex gap-2 ${
-                item.priority === "high" ? "text-foreground font-medium" : "text-muted-foreground"
-              }`}
-            >
-              <span className={item.priority === "high" ? "text-accent" : "text-muted-foreground"}>
-                ›
-              </span>
-              <span>{item.text}</span>
-            </li>
-          ))}
-        </ReadoutBlock>
-      ) : null}
-
-      {sections.whatChanged.length || sections.whatWorked.length || sections.whatDidnt.length ? (
-        <div className="grid gap-5 sm:grid-cols-2">
-          {sections.whatChanged.length ? (
-            <ReadoutBlock
-              title="What changed"
-              icon={<TrendingUp className="w-4 h-4 text-muted-foreground" />}
-            >
-              {sections.whatChanged.map((item, idx) => (
-                <li key={`wc-${idx}`} className="text-sm leading-snug text-muted-foreground flex gap-2">
-                  <DirectionGlyph direction={item.direction} />
-                  <span>{item.text}</span>
+        {sections.nextWeek.length ? (
+          <div className="rounded-xl border border-border bg-muted/40 px-4 py-3.5">
+            <p className={EYEBROW}>Do next week</p>
+            <ol className="mt-2 space-y-2">
+              {sections.nextWeek.map((item, index) => (
+                <li key={`nw-${index}`} className="flex gap-2.5 text-[13.5px] leading-snug">
+                  <span
+                    className={cn(
+                      "mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-semibold",
+                      item.priority === "high" ? "bg-accent text-accent-foreground" : "bg-card text-muted-foreground ring-1 ring-border",
+                    )}
+                  >
+                    {index + 1}
+                  </span>
+                  <span className={item.priority === "high" ? "font-medium text-foreground" : "text-foreground/80"}>{item.text}</span>
                 </li>
               ))}
-            </ReadoutBlock>
-          ) : null}
-
-          {sections.whatWorked.length ? (
-            <ReadoutBlock
-              title="What worked"
-              icon={<CheckCircle2 className="w-4 h-4 text-success" />}
-            >
-              {sections.whatWorked.map((item, idx) => (
-                <li key={`ww-${idx}`} className="text-sm leading-snug text-foreground flex gap-2">
-                  <span className="text-success">+</span>
-                  <span>{item.text}</span>
-                </li>
-              ))}
-            </ReadoutBlock>
-          ) : null}
-
-          {sections.whatDidnt.length ? (
-            <ReadoutBlock
-              title="What didn't"
-              icon={<XCircle className="w-4 h-4 text-destructive" />}
-            >
-              {sections.whatDidnt.map((item, idx) => (
-                <li key={`wd-${idx}`} className="text-sm leading-snug text-muted-foreground flex gap-2">
-                  <span className="text-destructive">–</span>
-                  <span>{item.text}</span>
-                </li>
-              ))}
-            </ReadoutBlock>
-          ) : null}
-        </div>
-      ) : null}
-
-      {sections.emergingPattern ? (
-        <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 flex gap-3">
-          <Lightbulb className="w-4 h-4 text-accent mt-0.5 shrink-0" />
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-accent">
-              Emerging pattern
-            </p>
-            <p className="mt-1 text-sm text-foreground leading-snug">
-              {sections.emergingPattern.text}
-            </p>
+            </ol>
           </div>
-        </div>
-      ) : null}
-    </div>
+        ) : null}
+
+        {sections.whatChanged.length || sections.whatWorked.length || sections.whatDidnt.length ? (
+          <div className="grid gap-5 sm:grid-cols-3">
+            <ReadoutList title="What changed" icon={TrendingUp} tone="neutral" items={sections.whatChanged} glyph={(item) => <DirectionGlyph direction={item.direction} />} />
+            <ReadoutList title="What worked" icon={CheckCircle2} tone="positive" items={sections.whatWorked} glyph={() => <span className="text-success">+</span>} />
+            <ReadoutList title="What didn't" icon={XCircle} tone="risk" items={sections.whatDidnt} glyph={() => <span className="text-destructive">–</span>} />
+          </div>
+        ) : null}
+
+        {sections.emergingPattern ? (
+          <div className={cn("flex gap-3 rounded-xl border px-4 py-3", TONES.brand.surface)}>
+            <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+            <div>
+              <p className={cn(EYEBROW, TONES.brand.text)}>Emerging pattern</p>
+              <p className="mt-1 text-[13.5px] leading-snug text-foreground">{sections.emergingPattern.text}</p>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </section>
   );
+}
+
+function deltaHint(value: number | undefined, prior: number | undefined) {
+  if (value == null || prior == null) return undefined;
+  if (value === prior) return "Same as last week";
+  return `${prior} last week`;
 }
 
 const WeeklySummary = () => {
   const { user } = useAuth();
   const isAuthed = Boolean(user);
 
-  // Honest week-range label for the eyebrow: the same trailing 7-day window the
-  // highlights/metrics queries use (end = today, start = today - 6 days).
+  // The same trailing 7 days the highlights query uses (today and the six before it).
   const weekRangeLabel = useMemo(() => {
     const end = new Date();
     const start = new Date(end);
     start.setDate(end.getDate() - 6);
     const fmtDay = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    const fmtEnd = start.getMonth() === end.getMonth()
-      ? end.toLocaleDateString("en-US", { day: "numeric" })
-      : fmtDay(end);
+    const fmtEnd = start.getMonth() === end.getMonth() ? end.toLocaleDateString("en-US", { day: "numeric" }) : fmtDay(end);
     return `Week of ${fmtDay(start)} – ${fmtEnd}`;
   }, []);
 
@@ -227,191 +206,113 @@ const WeeklySummary = () => {
     staleTime: 60_000,
   });
 
-  const highlights = highlightsQuery.data;
-  const readout = highlights?.readout;
-
-  const cards = useMemo(() => {
-    const counts = highlights?.counts;
-    return [
-      {
-        label: "Applications Sent",
-        value: counts?.applications ?? "-",
-        tone: "text-foreground",
-      },
-      {
-        label: "Callbacks",
-        value: counts ? counts.interviews + counts.offers : "-",
-        tone: "text-success",
-      },
-      {
-        label: "Interviews",
-        value: counts?.interviews ?? "-",
-        tone: "text-accent",
-      },
-      {
-        label: "Rejections",
-        value: counts?.rejections ?? "-",
-        tone: "text-destructive",
-      },
-    ];
-  }, [highlights]);
-
-  const hasAnyHighlight =
-    !!highlights &&
-    (highlights.highlights.newCallbacks.length > 0
-      || highlights.highlights.newOffers.length > 0
-      || highlights.highlights.newRejections.length > 0
-      || highlights.highlights.newApplications.length > 0
-      || highlights.highlights.silentThreads.length > 0
-      || !!highlights.highlights.topRejectionTheme);
-
-  const isLoading = highlightsQuery.isLoading;
+  const data = highlightsQuery.data;
+  const counts = data?.counts;
+  const prior = data?.priorCounts;
+  const loading = highlightsQuery.isLoading;
+  const h = data?.highlights;
+  const hasEvents = Boolean(
+    h && (h.newCallbacks.length || h.newOffers.length || h.newRejections.length || h.newApplications.length || h.silentThreads.length),
+  );
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-            {weekRangeLabel}
-          </p>
-          <h1 className="mt-2 text-[28px] font-bold tracking-[-0.025em] text-foreground">Weekly Summary</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Built from your inbox in the last 7 days, not just totals.
-          </p>
-        </div>
+      <div className="space-y-5">
+        <PageHeader
+          eyebrow={weekRangeLabel}
+          title="Weekly Summary"
+          description="Your last 7 days, read from your inbox: what moved, what didn't, and what to do next week."
+        />
 
-        {!isAuthed ? (
-          <div className="glass-card rounded-2xl p-6 text-sm text-muted-foreground">
-            Sign in to see your weekly summary.
+        {highlightsQuery.isError ? (
+          <ErrorState title="This week did not load" detail="Your data is safe. Try again in a moment." onRetry={() => void highlightsQuery.refetch()} />
+        ) : null}
+
+        {loading ? (
+          <div className={cn(CARD, "px-6 py-6")}>
+            <LoadingRows rows={3} />
           </div>
-        ) : (
-          <>
-            {readout ? <StrategicReadout readout={readout} /> : null}
+        ) : data?.readout ? (
+          <WeeksRead readout={data.readout} />
+        ) : null}
 
-            <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
-              {cards.map((card) => (
-                <div key={card.label} className="glass-card rounded-2xl p-5">
-                  <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{card.label}</p>
-                  <p className={`mt-2 text-[30px] font-bold leading-tight tracking-[-0.03em] ${card.tone}`}>{card.value}</p>
-                </div>
-              ))}
-            </div>
-
-            {isLoading ? (
-              <div className="glass-card rounded-2xl p-6 text-sm text-muted-foreground">
-                Building your weekly summary from this week's inbox activity...
-              </div>
-            ) : !hasAnyHighlight ? (
-              <div className="glass-card rounded-2xl p-6 space-y-2">
-                <p className="text-sm text-foreground font-medium">
-                  No tracked job-search activity this week.
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  As soon as recruiter emails, interviews, offers, or rejections land in your inbox, this view will quote them back to you here.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {highlights?.highlights.newOffers.length ? (
-                  <div className="glass-card rounded-2xl p-5">
-                    <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-success" />
-                      Offers this week
-                    </h3>
-                    <ul className="space-y-2">
-                      {highlights.highlights.newOffers.map((item, idx) => (
-                        <HighlightRow key={`offer-${idx}`} item={item} accent="text-success" />
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                {highlights?.highlights.newCallbacks.length ? (
-                  <div className="glass-card rounded-2xl p-5">
-                    <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-accent" />
-                      Callbacks and interview moves
-                    </h3>
-                    <ul className="space-y-2">
-                      {highlights.highlights.newCallbacks.map((item, idx) => (
-                        <HighlightRow key={`cb-${idx}`} item={item} accent="text-accent" />
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                {highlights?.highlights.newRejections.length ? (
-                  <div className="glass-card rounded-2xl p-5">
-                    <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                      <XCircle className="w-4 h-4 text-destructive" />
-                      Rejections this week
-                    </h3>
-                    <ul className="space-y-2">
-                      {highlights.highlights.newRejections.map((item, idx) => (
-                        <HighlightRow key={`rej-${idx}`} item={item} accent="text-destructive" />
-                      ))}
-                    </ul>
-                    {highlights.highlights.topRejectionTheme ? (
-                      <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-destructive">
-                          Recurring rejection theme (last 30 days)
-                        </p>
-                        <p className="mt-1 text-sm text-foreground">
-                          "{highlights.highlights.topRejectionTheme.phrase}"{" "}
-                          <span className="text-muted-foreground">
-                            — appeared in {highlights.highlights.topRejectionTheme.occurrences} rejections
-                          </span>
-                        </p>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {highlights?.highlights.silentThreads.length ? (
-                  <div className="glass-card rounded-2xl p-5">
-                    <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-yellow-600" />
-                      Threads going silent
-                    </h3>
-                    <ul className="space-y-2">
-                      {highlights.highlights.silentThreads.map((item, idx) => (
-                        <SilentRow key={`silent-${idx}`} item={item} />
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                {highlights?.highlights.newApplications.length ? (
-                  <div className="glass-card rounded-2xl p-5">
-                    <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-muted-foreground" />
-                      New applications detected
-                    </h3>
-                    <ul className="space-y-2">
-                      {highlights.highlights.newApplications.map((item, idx) => (
-                        <HighlightRow key={`app-${idx}`} item={item} />
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-              </div>
-            )}
-
-            {/* No "weekly rates" block. It divided this week's outcomes by this week's applications, and
-                those are different cohorts: an interview landing today belongs to an application sent
-                weeks ago. The backend removed the same ratio from Strategy Alerts for that reason
-                (strategyAlertService.buildWindowMetrics), and here it was still printing figures like
-                "Rejection rate: 69.2%" (9 rejections / 13 applications) that describe no real rate.
-                The honest all-time rate is on the Dashboard, computed over cohorts. */}
-          </>
-        )}
-
-        <div className="glass-card rounded-2xl p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-2">Note</h3>
-          <p className="text-sm text-muted-foreground">
-            A shorter version of this summary arrives by email each week. Every digest carries an unsubscribe link.
-          </p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatTile label="Applications sent" value={counts?.applications ?? "–"} hint={deltaHint(counts?.applications, prior?.applications)} loading={loading} />
+          <StatTile label="Replies & interviews" value={counts ? counts.callbacks : "–"} hint={deltaHint(counts?.callbacks, prior?.callbacks)} tone="brand" loading={loading} />
+          <StatTile label="Offers" value={counts?.offers ?? "–"} hint={deltaHint(counts?.offers, prior?.offers)} tone="positive" loading={loading} />
+          <StatTile label="Rejections" value={counts?.rejections ?? "–"} hint={deltaHint(counts?.rejections, prior?.rejections)} tone="risk" loading={loading} />
         </div>
+
+        {!loading && !highlightsQuery.isError && !hasEvents ? (
+          <div className={cn(CARD, "p-5")}>
+            <EmptyState
+              icon={CalendarPlus}
+              title="A quiet week in your inbox"
+              body="As replies, interviews, offers and rejections arrive, this page lists each one and what to do about it."
+            />
+          </div>
+        ) : null}
+
+        {h && hasEvents ? (
+          <div className="grid items-start gap-5 lg:grid-cols-2">
+            {h.newOffers.length ? (
+              <Panel icon={Sparkles} tone="positive" title="Offers">
+                <ul className="divide-y divide-border">
+                  {h.newOffers.map((item, idx) => <EventRow key={`offer-${idx}`} item={item} tone="positive" label="Offer" />)}
+                </ul>
+              </Panel>
+            ) : null}
+
+            {h.newCallbacks.length ? (
+              <Panel icon={CheckCircle2} tone="brand" title="Replies and interview moves">
+                <ul className="divide-y divide-border">
+                  {h.newCallbacks.map((item, idx) => <EventRow key={`cb-${idx}`} item={item} tone="brand" label="Interview" />)}
+                </ul>
+              </Panel>
+            ) : null}
+
+            {h.silentThreads.length ? (
+              <Panel icon={Hourglass} tone="attention" title="Waiting on a reply" description="Applications that went quiet — and any where the next move is yours.">
+                <ul className="divide-y divide-border">
+                  {h.silentThreads.map((item, idx) => <SilentRow key={`silent-${idx}`} item={item} />)}
+                </ul>
+              </Panel>
+            ) : null}
+
+            {h.newRejections.length ? (
+              <Panel icon={XCircle} tone="risk" title="Rejections">
+                <ul className="divide-y divide-border">
+                  {h.newRejections.map((item, idx) => <EventRow key={`rej-${idx}`} item={item} tone="risk" />)}
+                </ul>
+                {h.topRejectionTheme ? (
+                  <div className={cn("mt-4 rounded-xl border px-4 py-3", TONES.risk.surface)}>
+                    <p className={cn(EYEBROW, TONES.risk.text)}>Keeps coming up (last 30 days)</p>
+                    <p className="mt-1 text-[13.5px] text-foreground">
+                      “{h.topRejectionTheme.phrase}”
+                      <span className="text-muted-foreground"> — in {h.topRejectionTheme.occurrences} rejections</span>
+                    </p>
+                  </div>
+                ) : null}
+              </Panel>
+            ) : null}
+
+            {h.newApplications.length ? (
+              <Panel icon={Clock} tone="neutral" title="New applications">
+                <ul className="divide-y divide-border">
+                  {h.newApplications.map((item, idx) => <EventRow key={`app-${idx}`} item={item} tone="neutral" />)}
+                </ul>
+              </Panel>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* No "weekly rates": dividing this week's outcomes by this week's applications mixes two
+            cohorts — an interview today belongs to an application sent weeks ago. The honest
+            all-time rate lives on the Dashboard. */}
+        <p className="flex items-center gap-1.5 px-1 text-[12px] text-muted-foreground">
+          <ArrowRight className="h-3 w-3" aria-hidden />
+          A shorter version of this arrives by email each week. Every email has an unsubscribe link.
+        </p>
       </div>
     </DashboardLayout>
   );
