@@ -65,8 +65,8 @@ export function Panel({
   return (
     <section id={id} className={cn(CARD, "overflow-hidden", className)}>
       {hasHeader ? (
-        <div className="flex items-start justify-between gap-3 px-5 pb-3 pt-5">
-          <div className="flex min-w-0 items-start gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 px-5 pb-3 pt-5">
+          <div className="flex min-w-[13rem] flex-1 items-start gap-3">
             {Icon ? (
               <span className={cn("mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg", TONES[tone].icon)}>
                 <Icon className="h-4 w-4" aria-hidden />

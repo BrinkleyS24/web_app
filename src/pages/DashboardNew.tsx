@@ -344,16 +344,17 @@ function TodayPanel({
             const identity = describeActionIdentity(item);
             const { kind } = actionVisual(item);
             return (
-              <li key={item.id} className="flex items-start gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-muted/30">
+              <li key={item.id} className="flex flex-wrap items-start gap-x-3 gap-y-2 rounded-lg px-2 py-3 transition-colors hover:bg-muted/30 sm:flex-nowrap">
                 <ActionIcon item={item} />
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 grow basis-[calc(100%-50px)] sm:basis-0">
                   <p className="text-[14px] font-semibold leading-snug text-foreground">{item.title}</p>
                   <p className="mt-0.5 text-[12.5px] text-muted-foreground">
                     <span className="font-medium text-foreground/70">{kind}</span>
                     {identity ? ` · ${identity}` : ""}
                   </p>
                 </div>
-                <ActionCtaButton item={item} cta={cta} className={cn(BUTTON.secondary, "shrink-0 px-3 py-1.5 text-[12.5px]")} />
+                {/* Below the text on a phone, so the title is not squeezed into a narrow column. */}
+                <ActionCtaButton item={item} cta={cta} className={cn(BUTTON.secondary, "ml-12 shrink-0 px-3 py-1.5 text-[12.5px] sm:ml-0")} />
               </li>
             );
           })}

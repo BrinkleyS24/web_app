@@ -1614,9 +1614,11 @@ const FixSuggestions = () => {
           variant === "today" ? cn(CARD, "px-5 py-4") : "px-1 py-3.5",
         )}
       >
-        <div className="flex items-start gap-3.5">
+        {/* On a phone the text takes the whole row and the buttons drop below it; side by side they
+            squeezed the title into a ~60px column and overlapped it (390px walk, 2026-09-25). */}
+        <div className="flex flex-wrap items-start gap-x-3.5 gap-y-3 sm:flex-nowrap">
           <ActionIcon item={item} />
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 grow basis-[calc(100%-52px)] sm:basis-0">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <h3 className={cn("font-semibold leading-snug tracking-[-0.01em] text-foreground", variant === "today" ? "text-[15px]" : "text-[14px]")}>
                 {item.title}
@@ -1633,7 +1635,7 @@ const FixSuggestions = () => {
               <p className="mt-2 max-w-[72ch] text-[13.5px] leading-relaxed text-foreground/80">{reason}</p>
             ) : null}
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="ml-[50px] flex shrink-0 items-center gap-1 sm:ml-0">
             {cta.kind === "external" || cta.kind === "gmail" || cta.kind === "route" ? (
               <ActionCtaButton item={item} cta={cta} className={ctaClass} />
             ) : (
