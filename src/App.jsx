@@ -10,7 +10,6 @@ import PaymentCancel from "./pages/PaymentCancel.tsx";
 import ApplyGate from "./pages/ApplyGate.tsx";
 import Resumes from "./pages/Resumes.tsx";
 import FixSuggestions from "./pages/FixSuggestions.tsx";
-import OutcomeMemory from "./pages/OutcomeMemory.tsx";
 import StrategyAlerts from "./pages/StrategyAlerts.tsx";
 import WeeklySummary from "./pages/WeeklySummary.tsx";
 import Settings from "./pages/Settings.tsx";
@@ -32,6 +31,7 @@ const DASHBOARD_ROUTES = [
   "/dashboard",
   "/apply-gate",
   "/resumes",
+  "/next-actions",
   "/fix-suggestions",
   "/outcome-memory",
   "/strategy-alerts",
@@ -170,21 +170,18 @@ export default function App() {
                 }
               />
               <Route
-                path="/fix-suggestions"
+                path="/next-actions"
                 element={
                   <RequirePremiumUser>
                     <FixSuggestions />
                   </RequirePremiumUser>
                 }
               />
-              <Route
-                path="/outcome-memory"
-                element={
-                  <RequirePremiumUser>
-                    <OutcomeMemory />
-                  </RequirePremiumUser>
-                }
-              />
+              {/* Old URLs stay valid. Next Actions used to live at /fix-suggestions, and Outcome
+                  Memory's one current finding (skill gaps across checked roles) now lives on
+                  Strategy Alerts, so bookmarks and old links land somewhere real. */}
+              <Route path="/fix-suggestions" element={<Navigate to="/next-actions" replace />} />
+              <Route path="/outcome-memory" element={<Navigate to="/strategy-alerts" replace />} />
               <Route
                 path="/strategy-alerts"
                 element={

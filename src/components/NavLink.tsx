@@ -1,8 +1,16 @@
-﻿import { NavLink as RouterNavLink } from "react-router-dom";
+import { NavLink as RouterNavLink, type NavLinkProps } from "react-router-dom";
 import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
-const NavLink = forwardRef(
+type NavLinkCompatProps = Omit<NavLinkProps, "className"> & {
+  className?: string;
+  activeClassName?: string;
+  pendingClassName?: string;
+};
+
+// A react-router NavLink that takes plain class strings for its active / pending states. It was
+// untyped, so every call site was a type error; typing it lets the sidebars check cleanly.
+const NavLink = forwardRef<HTMLAnchorElement, NavLinkCompatProps>(
   ({ className, activeClassName, pendingClassName, to, ...props }, ref) => {
     return (
       <RouterNavLink

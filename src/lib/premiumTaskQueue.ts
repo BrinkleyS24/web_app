@@ -25,6 +25,7 @@ export type QueueItem = {
   title: string;
   description: string;
   company?: string | null;
+  roleTitle?: string | null;
   estimatedTime: string;
   daysAgo?: number | null;
   playbook: string[];
@@ -580,7 +581,7 @@ function buildFollowupQueue(suggestions: FollowupSuggestion[]): QueueItem[] {
       actionType: item.actionType,
       suggestionSource: item.suggestionSource || "email_followup",
       stageLabel: item.category?.toLowerCase() === "interviewed" ? "Interview" : "Application",
-      routeHref: "/fix-suggestions",
+      routeHref: "/next-actions",
       routeLabel: "Open queue",
       coachResponse: item.coachResponse ?? null,
     };
@@ -790,7 +791,7 @@ function buildStaleQueue(emails: StoredEmail[]): QueueItem[] {
         actionType: "stale_application_status_check",
         suggestionSource: "stale_role_signal",
         stageLabel: "Stale application",
-        routeHref: "/fix-suggestions",
+        routeHref: "/next-actions",
         routeLabel: "Open queue",
       });
     }
@@ -821,7 +822,7 @@ function buildStaleQueue(emails: StoredEmail[]): QueueItem[] {
         actionType: "close_stale_application",
         suggestionSource: "stale_role_signal",
         stageLabel: "Close out",
-        routeHref: "/fix-suggestions",
+        routeHref: "/next-actions",
         routeLabel: "Open queue",
       });
     }
@@ -852,7 +853,7 @@ function buildStaleQueue(emails: StoredEmail[]): QueueItem[] {
         actionType: "stale_interview_status_check",
         suggestionSource: "stale_role_signal",
         stageLabel: "Interview follow-up",
-        routeHref: "/fix-suggestions",
+        routeHref: "/next-actions",
         routeLabel: "Open queue",
       });
     }
@@ -883,7 +884,7 @@ function buildStaleQueue(emails: StoredEmail[]): QueueItem[] {
         actionType: "close_stale_interview",
         suggestionSource: "stale_role_signal",
         stageLabel: "Close out",
-        routeHref: "/fix-suggestions",
+        routeHref: "/next-actions",
         routeLabel: "Open queue",
       });
     }
@@ -927,7 +928,7 @@ function buildCleanupQueue(emails: StoredEmail[]): QueueItem[] {
       actionType: "cleanup_structured_fields",
       suggestionSource: "cleanup_task",
       stageLabel: "Cleanup",
-      routeHref: "/fix-suggestions",
+      routeHref: "/next-actions",
       routeLabel: "Open queue",
     });
   }
@@ -962,7 +963,7 @@ function buildCleanupQueue(emails: StoredEmail[]): QueueItem[] {
       actionType: "cleanup_application_links",
       suggestionSource: "cleanup_task",
       stageLabel: "Tracking",
-      routeHref: "/fix-suggestions",
+      routeHref: "/next-actions",
       routeLabel: "Open queue",
     });
   }
@@ -1459,6 +1460,7 @@ function mapRankedActionToQueueItem(
     title: normalizeDisplayString(action.title) || "Review recommended action",
     description: buildRankedDescription(action),
     company: action.company || null,
+    roleTitle: action.roleTitle || null,
     estimatedTime: formatEstimatedTime(action.effortMinutes),
     daysAgo: daysSince(action.createdAt),
     playbook: coachDaqCopyList(playbook, 3),

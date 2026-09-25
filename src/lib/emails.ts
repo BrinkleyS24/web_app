@@ -384,6 +384,8 @@ export type RankedAction = {
   routeLabel?: string | null;
   stageLabel?: string | null;
   company?: string | null;
+  /** The role on the application this action is about, when known. */
+  roleTitle?: string | null;
   lastMessageSnippet?: string | null;
 };
 
@@ -559,6 +561,8 @@ export interface WeeklyHighlightEmail {
 export interface WeeklyHighlightSilent extends WeeklyHighlightEmail {
   stage: "applied" | "interviewed";
   daysSilent: number;
+  /** "you" when their last email was an assessment with no submission on record. */
+  waitingOn?: "you" | "them";
 }
 
 export interface WeeklyReadoutItem {
@@ -585,6 +589,14 @@ export interface WeeklyHighlightsResponse {
   windowStart: string | null;
   windowEnd: string | null;
   counts: {
+    applications: number;
+    callbacks: number;
+    interviews: number;
+    offers: number;
+    rejections: number;
+  };
+  /** The same counts for the window before this one. */
+  priorCounts?: {
     applications: number;
     callbacks: number;
     interviews: number;
@@ -839,11 +851,28 @@ export async function fetchApplicationStats(): Promise<ApplicationStatsResponse>
 export async function startEmailSync(options: {
   fullRefresh?: boolean;
   fetchOnlyQuota?: boolean;
-} = {}): Promise<{ success: boolean }> {
+} = {}): Promise<{ success: boolean; newEmailsCount?: number }> {
   return apiFetch("/api/emails", {
     method: "POST",
     body: JSON.stringify(options),
   });
+}
+
+export type SyncStatusResponse = {
+  success: boolean;
+  sync?: {
+    inProgress: boolean;
+    startedAt?: string | null;
+    /** Date of the newest email a sync has seen — not when a sync ran. */
+    lastSyncAt?: string | null;
+    /** When a sync last finished, from any client. Null until the backend has recorded one. */
+    lastRunAt?: string | null;
+  };
+  gmailAuth?: { requiresReconnect: boolean };
+};
+
+export async function fetchSyncStatus(): Promise<SyncStatusResponse> {
+  return apiFetch("/api/emails/sync-status", { method: "GET" });
 }
 
 // ── Apply Gate ────────────────────────────────────────────────────────
@@ -1538,9 +1567,24 @@ export type ApplyGateHistoryItem = {
   outcome_recorded_at?: string | null;
   feedback_payload?: Record<string, unknown> | null;
   created_at: string;
+  /** Made before Apply Gate's current scoring went live; re-check to get today's read. */
+  outdated?: boolean;
+  /** What the inbox showed happened after the check, when Applendium could link it. */
+  derived_outcome_label?: string | null;
+  derived_outcome_at?: string | null;
+  application_id?: string | number | null;
+  resume_variant_id?: string | null;
 };
 
 export type ApplyGateOutcome = "interviewed" | "offered" | "rejected" | "withdrawn" | "no_response";
+
+/** Re-run a saved check's posting through today's Apply Gate logic. */
+export async function recheckApplyGateVerdict(verdictId: string): Promise<ApplyGateResult> {
+  return apiFetch(`/api/emails/apply-gate/${encodeURIComponent(verdictId)}/recheck`, {
+    method: "POST",
+    timeoutMs: 90_000,
+  });
+}
 
 export async function analyzeJobAlignment(params: {
   jobTitle: string;

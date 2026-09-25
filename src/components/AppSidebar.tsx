@@ -1,10 +1,21 @@
-import { Crown } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  CalendarRange,
+  Crown,
+  FileText,
+  LayoutDashboard,
+  ListChecks,
+  Radar,
+  ScanSearch,
+  Settings as SettingsIcon,
+} from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -12,21 +23,49 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/lib/AuthContext.jsx";
 
-const mainNav = [
-  { title: "Dashboard", url: "/dashboard", code: "db" },
-  { title: "Apply Gate", url: "/apply-gate", code: "ag" },
-  { title: "Résumés", url: "/resumes", code: "rv" },
-  { title: "Next Actions", url: "/fix-suggestions", code: "na" },
-  { title: "Outcome Memory", url: "/outcome-memory", code: "om" },
-  { title: "Strategy Alerts", url: "/strategy-alerts", code: "sa" },
-  { title: "Weekly Summary", url: "/weekly-summary", code: "ws" },
+type NavItem = { title: string; url: string; icon: LucideIcon };
+
+// Two groups, in the order the product works: understand the search and act on it, then the
+// tools behind the decisions. Outcome Memory is gone as its own page — its one current finding
+// (skill gaps across roles you checked) lives on Strategy Alerts now.
+const searchNav: NavItem[] = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Next Actions", url: "/next-actions", icon: ListChecks },
+  { title: "Strategy Alerts", url: "/strategy-alerts", icon: Radar },
+  { title: "Weekly Summary", url: "/weekly-summary", icon: CalendarRange },
 ];
 
-function NavCode({ code }: { code: string }) {
+const toolsNav: NavItem[] = [
+  { title: "Apply Gate", url: "/apply-gate", icon: ScanSearch },
+  { title: "Résumés", url: "/resumes", icon: FileText },
+];
+
+const linkClass =
+  "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13.5px] font-medium text-sidebar-foreground transition-colors hover:bg-white/[0.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring";
+const activeLinkClass =
+  "bg-sidebar-accent text-sidebar-accent-foreground font-semibold [&_svg]:text-[#5FD9AE]";
+
+function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
   return (
-    <span className="nav-code w-[22px] h-[22px] rounded-md grid place-items-center font-mono text-[9px] font-bold tracking-[0.05em] shrink-0 bg-white/[0.06] text-[#7C8AA3] transition-colors">
-      {code}
-    </span>
+    <SidebarGroup className="px-0 py-1">
+      <SidebarGroupLabel className="px-2.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-sidebar-muted">
+        {label}
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu className="gap-0.5">
+          {items.map((item) => (
+            <SidebarMenuItem key={item.title}>
+              <SidebarMenuButton asChild>
+                <NavLink to={item.url} className={linkClass} activeClassName={activeLinkClass}>
+                  <item.icon className="h-4 w-4 shrink-0 text-[#7C8AA3] transition-colors group-hover:text-white" aria-hidden />
+                  <span>{item.title}</span>
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
   );
 }
 
@@ -50,78 +89,48 @@ export function AppSidebar() {
 
   return (
     <Sidebar className="border-r border-sidebar-border">
-      <SidebarHeader className="px-4 py-[18px] border-b border-sidebar-border">
+      <SidebarHeader className="border-b border-sidebar-border px-4 py-[18px]">
         <div className="flex items-center gap-2.5">
-          <div className="w-[26px] h-[26px] rounded-[7px] bg-white/[0.06] ring-1 ring-white/10 grid place-items-center shrink-0">
-            <img src="/logo-transparent.png" alt="Applendium" className="w-5 h-5 block" />
+          <div className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[7px] bg-white/[0.06] ring-1 ring-white/10">
+            <img src="/logo-transparent.png" alt="" className="block h-5 w-5" />
           </div>
-          <div>
-            <h2 className="text-sm font-bold tracking-[-0.01em] leading-tight text-sidebar-accent-foreground">
-              applendium
-            </h2>
-            <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[#2FBE8F]">
-              {planLoading ? "…" : isPremium ? "Premium" : "Free"}
-            </p>
-          </div>
+          <h2 className="text-[15px] font-bold leading-tight tracking-[-0.01em] text-sidebar-accent-foreground">
+            Applendium
+          </h2>
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="px-2.5 py-3.5">
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-0.5">
-              {mainNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end={item.url === "/"}
-                      className="group flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13.5px] font-medium text-sidebar-foreground hover:bg-white/[0.05] hover:text-white transition-colors"
-                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-semibold [&_.nav-code]:bg-[#0E8C63] [&_.nav-code]:text-white"
-                    >
-                      <NavCode code={item.code} />
-                      <span>{item.title}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+      <SidebarContent className="px-2.5 py-3">
+        <NavGroup label="Your search" items={searchNav} />
+        <NavGroup label="Tools" items={toolsNav} />
       </SidebarContent>
 
-      <div className="mt-auto px-2.5 py-3.5 border-t border-sidebar-border space-y-2">
-        <NavLink
-          to="/settings"
-          className="group flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13.5px] font-medium text-sidebar-foreground hover:bg-white/[0.05] hover:text-white transition-colors"
-          activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-semibold [&_.nav-code]:bg-[#0E8C63] [&_.nav-code]:text-white"
-        >
-          <NavCode code="st" />
+      <div className="mt-auto space-y-2 border-t border-sidebar-border px-2.5 py-3.5">
+        <NavLink to="/settings" className={linkClass} activeClassName={activeLinkClass}>
+          <SettingsIcon className="h-4 w-4 shrink-0 text-[#7C8AA3] transition-colors group-hover:text-white" aria-hidden />
           <span>Settings</span>
         </NavLink>
 
         {!isPremium && !planLoading ? (
           <NavLink
             to="/upgrade"
-            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-[10px] bg-[#0E8C63] text-white text-sm font-semibold hover:bg-[#10B981] transition-colors"
+            className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-[#0E8C63] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#10B981]"
             activeClassName="opacity-90"
           >
-            <Crown className="w-4 h-4" />
+            <Crown className="h-4 w-4" />
             Upgrade Plan
           </NavLink>
         ) : null}
 
         {user ? (
-          <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] bg-white/[0.04] border border-white/10">
-            <div className="w-7 h-7 rounded-full bg-[#2FBE8F]/15 text-[#5FD9AE] grid place-items-center text-[11px] font-bold shrink-0">
+          <div className="flex items-center gap-2.5 rounded-[10px] border border-white/10 bg-white/[0.04] px-3 py-2.5">
+            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#2FBE8F]/15 text-[11px] font-bold text-[#5FD9AE]">
               {initials}
             </div>
             <div className="min-w-0">
-              <div className="text-[12.5px] font-semibold text-sidebar-accent-foreground truncate">
-                {displayName}
-              </div>
+              <div className="truncate text-[12.5px] font-semibold text-sidebar-accent-foreground">{displayName}</div>
               {user?.email && user.email !== displayName ? (
-                <div className="text-[11px] text-sidebar-muted truncate">{user.email}</div>
+                <div className="truncate text-[11px] text-sidebar-muted">{user.email}</div>
               ) : null}
             </div>
           </div>

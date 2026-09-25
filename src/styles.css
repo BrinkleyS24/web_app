@@ -30,6 +30,8 @@
   --warning-foreground: #7C3A06;
   --success: #0E8C63;
   --success-foreground: #FFFFFF;
+  /* "Upcoming" — calendar items. A calm ink-blue so a date reads as scheduled, not as a warning. */
+  --info: #3656A6;
   --border: #E9EAE5;
   --input: #E9EAE5;
   --ring: #0E8C63;
@@ -239,6 +241,7 @@ a:not([class]) {
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-muted: var(--sidebar-muted);
   --color-warning: var(--warning);
+  --color-info: var(--info);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-warning-foreground: var(--warning-foreground);
