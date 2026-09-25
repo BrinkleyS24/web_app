@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -6,26 +7,28 @@ import type { ReactNode } from "react";
 
 import Settings from "./Settings";
 
-const { apiFetch, useAuth } = vi.hoisted(() => ({
+const { apiFetch, useAuth, fetchResumeVariants } = vi.hoisted(() => ({
   apiFetch: vi.fn(),
   useAuth: vi.fn(),
+  fetchResumeVariants: vi.fn(),
 }));
 
 vi.mock("@/components/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock("@/components/ResumePrompt", () => ({
-  ResumePrompt: () => <div data-testid="resume-prompt" />,
-}));
+vi.mock("@/lib/emails", async () => ({ ...(await vi.importActual("@/lib/emails")), fetchResumeVariants }));
 
 vi.mock("../lib/api.js", () => ({ apiFetch }));
 vi.mock("../lib/AuthContext.jsx", () => ({ useAuth }));
 
 function renderPage() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <MemoryRouter>
-      <Settings />
+      <QueryClientProvider client={client}>
+        <Settings />
+      </QueryClientProvider>
     </MemoryRouter>,
   );
 }
@@ -48,6 +51,13 @@ function mockApi({ coach }: { coach: Record<string, unknown> }) {
 }
 
 beforeEach(() => {
+  fetchResumeVariants.mockResolvedValue({
+    success: true,
+    variants: [
+      { id: "a", name: "QA-focused", isDefault: true, createdAt: "", charCount: 2400 },
+      { id: "b", name: "Generic", isDefault: false, createdAt: "", charCount: 2100 },
+    ],
+  });
   useAuth.mockReturnValue({
     user: { uid: "u1", email: "premium@example.com" },
     plan: "premium",
@@ -108,7 +118,23 @@ describe("Settings coach voice", () => {
 
     renderPage();
 
-    await screen.findByTestId("resume-prompt");
+    await screen.findByRole("button", { name: /Upgrade to Premium/ });
     expect(screen.queryByTestId("coach-voice-settings")).toBeNull();
+    expect(fetchResumeVariants).not.toHaveBeenCalled();
+  });
+});
+
+describe("Settings résumés", () => {
+  test("points at the Résumés page instead of a second editor, and names the version Apply Gate uses", async () => {
+    // The old box wrote to a legacy field while reading back the default version, so edits there
+    // appeared to vanish once any version existed.
+    mockApi({ coach: { enabled: true, available: true, premium: true } });
+    renderPage();
+
+    expect(await screen.findByText("QA-focused")).toBeInTheDocument();
+    expect(screen.getByText(/your default of 2 saved versions/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Manage résumés/ })).toHaveAttribute("href", "/resumes");
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByText(/Pre-jection/)).toBeNull();
   });
 });

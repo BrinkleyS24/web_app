@@ -91,6 +91,17 @@ describe("Résumés page", () => {
     });
   });
 
+  test("never shows a character count next to a résumé", async () => {
+    // Founder review, 2026-09-25: "(1200+ chars)" is a storage detail, not something a job seeker acts on.
+    fetchResumeVariants.mockResolvedValue({
+      success: true,
+      variants: [{ id: "A", name: "QA-focused", isDefault: true, createdAt: "", charCount: 1200 }],
+    });
+    renderPage();
+    await screen.findByText("QA-focused");
+    expect(screen.queryByText(/chars/)).not.toBeInTheDocument();
+  });
+
   test("shows the per-variant record once there is enough data", async () => {
     fetchResumeVariants.mockResolvedValue({
       success: true,

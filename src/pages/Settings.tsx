@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/AuthContext.jsx";
 import { apiFetch } from "../lib/api.js";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { ResumePrompt } from "@/components/ResumePrompt";
-import { Button } from "@/components/ui/button";
+import { ErrorState, LoadingRows, PageHeader, Panel, PanelLink, StatTile } from "@/components/premium/PremiumUI";
+import { BUTTON, EYEBROW } from "@/components/premium/tone";
 import { Switch } from "@/components/ui/switch";
+import { fetchResumeVariants } from "@/lib/emails";
+import { cn } from "@/lib/utils";
 import {
-  CheckCircle2,
   CreditCard,
   Crown,
   ExternalLink,
@@ -181,216 +183,198 @@ export default function Settings() {
   const accountSecondary =
     user?.displayName && user?.email ? `${user.email} · ${accountPlanLabel}` : accountPlanLabel;
 
-  const accountCards = useMemo(
-    () => [
-      {
-        label: "Plan",
-        value: planLoading ? "Loading..." : isPremium ? "Premium" : "Free",
-        body: isPremium
-          ? "Apply Gate, weekly search health, and the premium workspace are unlocked."
-          : "The Chrome extension remains free. Premium unlocks the web workspace.",
-        icon: Crown,
-      },
-      {
-        label: "Status",
-        value: statusLabel,
-        body: isActive
-          ? "Your subscription is active."
-          : "No active Premium subscription is attached to this account.",
-        icon: CheckCircle2,
-      },
-      {
-        label: "Monthly limit",
-        value: Number.isFinite(monthlyLimit) ? Number(monthlyLimit).toLocaleString() : "--",
-        body: `${Number(monthlyProcessed).toLocaleString()} processed this period.`,
-        icon: CreditCard,
-      },
-    ],
-    [isActive, isPremium, monthlyLimit, monthlyProcessed, planLoading, statusLabel]
-  );
+  const statusText = (() => {
+    const status = String(statusLabel || "").toLowerCase();
+    if (status === "loading") return "Checking…";
+    if (status === "active") return "Active";
+    if (status === "trialing") return "Trial";
+    if (status === "past_due") return "Payment due";
+    if (status === "canceled") return "Canceled";
+    return "Not active";
+  })();
 
   return (
     <DashboardLayout>
-      <div className="max-w-2xl space-y-3.5">
-        <div className="mb-2">
-          <h1 className="text-[28px] font-bold tracking-[-0.025em] text-foreground">Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage your account, resume, and subscription in one place.
-          </p>
-        </div>
+      <div className="max-w-3xl space-y-5">
+        <PageHeader title="Settings" description="Your account, résumés, coach voice and billing." />
 
-        <section className="glass-card space-y-4 rounded-2xl p-6">
-          <div className="flex items-center gap-2">
-            <User className="h-5 w-5 text-accent" />
-            <h2 className="text-base font-semibold text-foreground">Account</h2>
-          </div>
-
+        <Panel title="Account" icon={User}>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent/10 text-sm font-bold text-accent">
                 {accountInitials}
               </div>
-              <div className="space-y-0.5">
-                <p className="text-sm font-medium text-foreground">{accountName}</p>
-                <p className="text-xs text-muted-foreground">{accountSecondary}</p>
+              <div className="min-w-0 space-y-0.5">
+                <p className="truncate text-sm font-semibold text-foreground">{accountName}</p>
+                <p className="truncate text-[13px] text-muted-foreground">{accountSecondary}</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={handleSignOut}>
-              <LogOut className="h-3.5 w-3.5" />
-              Sign Out
-            </Button>
+            <button type="button" className={BUTTON.secondary} onClick={handleSignOut}>
+              <LogOut className="h-3.5 w-3.5" aria-hidden />
+              Sign out
+            </button>
           </div>
-        </section>
+        </Panel>
 
-        <section className="space-y-3">
-          <div className="flex items-center gap-2 px-1">
-            <FileText className="h-5 w-5 text-accent" />
-            <h2 className="text-base font-semibold text-foreground">Resume / Profile</h2>
-          </div>
-          <p className="px-1 text-xs text-muted-foreground">
-            Your resume is used by Apply Gate and Pre-jection to compare your experience
-            against job postings. Without it we can only infer skills from your application history.
-          </p>
-          <ResumePrompt />
-        </section>
+        {isPremium ? <ResumesSummaryPanel /> : null}
 
         {isPremium ? (
-          <section className="glass-card space-y-4 rounded-2xl p-6" data-testid="coach-voice-settings">
-            <div className="flex items-center gap-2">
-              <MessageSquareText className="h-5 w-5 text-accent" />
-              <h2 className="text-base font-semibold text-foreground">Coach voice</h2>
-            </div>
-
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="space-y-2">
-                <p className="text-sm text-foreground">
-                  Write your next-step suggestions in plain language instead of a fixed template.
-                </p>
-                <p className="text-xs leading-5 text-muted-foreground">
-                  When this is on, Applendium sends the structured details of a thread (company, role,
-                  sender domain, stage and dates) to an AI model to draft the suggestion. It does not
-                  send the text of your emails. Turn it off and you still get every suggestion, just in
-                  the standard wording.
-                </p>
+          <Panel title="Coach voice" icon={MessageSquareText} id="coach-voice">
+            <div data-testid="coach-voice-settings" className="space-y-3">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-2">
+                  <p className="text-sm text-foreground">
+                    Write your next-step suggestions in plain language instead of a fixed template.
+                  </p>
+                  <p className="text-[13px] leading-relaxed text-muted-foreground">
+                    When this is on, Applendium sends the structured details of a thread (company, role,
+                    sender domain, stage and dates) to an AI model to draft the suggestion. It does not
+                    send the text of your emails. Turn it off and you still get every suggestion, just in
+                    the standard wording.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 sm:pt-1">
+                  {coachSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" /> : null}
+                  <Switch
+                    aria-label="Coach voice"
+                    checked={coachPref?.enabled !== false}
+                    disabled={coachLoading || coachSaving}
+                    onCheckedChange={saveCoachPreference}
+                  />
+                </div>
               </div>
-              <div className="flex items-center gap-2 sm:pt-1">
-                {coachSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" /> : null}
-                <Switch
-                  aria-label="Coach voice"
-                  checked={coachPref?.enabled !== false}
-                  disabled={coachLoading || coachSaving}
-                  onCheckedChange={saveCoachPreference}
-                />
-              </div>
+
+              {coachPref && coachPref.available === false && coachPref.enabled !== false ? (
+                <p className="text-[13px] text-muted-foreground">
+                  The coach voice is on for your account but is not running yet. Suggestions stay in the
+                  standard wording until it is enabled on the server.
+                </p>
+              ) : null}
+
+              {coachError ? <ErrorState title="Your coach setting did not save" detail={coachError} /> : null}
             </div>
-
-            {coachPref && coachPref.available === false && coachPref.enabled !== false ? (
-              <p className="text-xs text-muted-foreground">
-                The coach voice is on for your account but is not running yet. Suggestions stay in the
-                standard wording until it is enabled on the server.
-              </p>
-            ) : null}
-
-            {coachError ? <p className="text-xs text-red-500">{coachError}</p> : null}
-          </section>
+          </Panel>
         ) : null}
 
-        <section className="glass-card space-y-5 rounded-2xl p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-accent" />
-                <h2 className="text-base font-semibold text-foreground">Subscription</h2>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Billing, access, and usage for this account.
-              </p>
+        <Panel
+          title="Plan & billing"
+          description="Billing, access, and usage for this account."
+          icon={CreditCard}
+          action={
+            <button type="button" className={BUTTON.ghost} onClick={fetchSubStatus} disabled={subLoading}>
+              <RefreshCw className={cn("h-3.5 w-3.5", subLoading && "animate-spin")} aria-hidden />
+              {subLoading ? "Refreshing…" : "Refresh"}
+            </button>
+          }
+        >
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <StatTile
+                label="Plan"
+                value={planLoading ? "…" : isPremium ? "Premium" : "Free"}
+                hint={
+                  isPremium
+                    ? "Next Actions, Strategy Alerts, the weekly summary and Apply Gate."
+                    : "The Chrome extension stays free. Premium adds the coach workspace."
+                }
+              />
+              <StatTile
+                label="Status"
+                value={statusText}
+                tone={isActive ? "positive" : "neutral"}
+                hint={isActive ? "Your subscription is active." : "No active Premium subscription on this account."}
+                loading={subLoading && !subStatus}
+              />
+              <StatTile
+                label="Emails checked"
+                value={Number(monthlyProcessed).toLocaleString()}
+                hint={
+                  Number.isFinite(monthlyLimit)
+                    ? `of ${Number(monthlyLimit).toLocaleString()} this period`
+                    : "this period"
+                }
+                loading={subLoading && !subStatus}
+              />
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={fetchSubStatus}
-              disabled={subLoading}
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${subLoading ? "animate-spin" : ""}`} />
-              {subLoading ? "Refreshing..." : "Refresh"}
-            </Button>
-          </div>
 
-          <div className="grid gap-3 md:grid-cols-3">
-            {accountCards.map(({ label, value, body, icon: Icon }) => (
-              <div key={label} className="rounded-xl border border-border bg-card/70 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                      {label}
-                    </p>
-                    <p className="mt-2 text-lg font-semibold text-foreground">{value}</p>
-                  </div>
-                  <Icon className="h-4 w-4 text-accent" />
+            {subStatus ? (
+              <dl className="grid gap-3 text-[13px] sm:grid-cols-2">
+                <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
+                  <dt className={EYEBROW}>Renewal</dt>
+                  <dd className="mt-1.5 font-medium text-foreground">{renewalDate || "No renewal date on file"}</dd>
                 </div>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">{body}</p>
-              </div>
-            ))}
-          </div>
+                <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
+                  <dt className={EYEBROW}>Cancellation</dt>
+                  <dd className="mt-1.5 font-medium text-foreground">
+                    {subscription?.cancel_at_period_end ? "Cancels at the end of this period" : "No cancellation scheduled"}
+                  </dd>
+                </div>
+              </dl>
+            ) : null}
 
-          {subLoading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading subscription details...
-            </div>
-          ) : subStatus ? (
-            <div className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-2">
-              <div className="rounded-xl border border-border bg-card/70 p-4">
-                <p className="font-semibold uppercase tracking-widest text-muted-foreground">Renewal</p>
-                <p className="mt-2 font-medium text-foreground">
-                  {renewalDate || "No renewal date available"}
+            {subError ? <ErrorState title="Billing details did not load" detail={subError} onRetry={fetchSubStatus} /> : null}
+
+            <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
+              {isPremium && billingPortalAvailable ? (
+                <button type="button" className={BUTTON.secondary} disabled={busyPortal} onClick={openPortal}>
+                  {busyPortal ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <ExternalLink className="h-3.5 w-3.5" aria-hidden />}
+                  {busyPortal ? "Opening…" : "Manage billing"}
+                </button>
+              ) : isPremium ? (
+                <p className="text-[13px] text-muted-foreground">
+                  Premium is active. Billing for this account is not managed through Stripe, so there is no billing portal.
                 </p>
-              </div>
-              <div className="rounded-xl border border-border bg-card/70 p-4">
-                <p className="font-semibold uppercase tracking-widest text-muted-foreground">Cancellation</p>
-                <p className="mt-2 font-medium text-foreground">
-                  {subscription?.cancel_at_period_end ? "Cancels at period end" : "No cancellation scheduled"}
-                </p>
-              </div>
-            </div>
-          ) : null}
-
-          {subError ? <p className="text-xs text-red-500">{subError}</p> : null}
-
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            {isPremium && billingPortalAvailable ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                disabled={busyPortal}
-                onClick={openPortal}
-              >
-                {busyPortal ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <ExternalLink className="h-3.5 w-3.5" />
-                )}
-                {busyPortal ? "Opening..." : "Manage Billing"}
-              </Button>
-            ) : isPremium ? (
-              <p className="text-xs text-muted-foreground">
-                Premium access is active. Billing portal management is not available for this account.
+              ) : (
+                <button type="button" className={BUTTON.primary} onClick={() => navigate("/upgrade")}>
+                  <Crown className="h-3.5 w-3.5" aria-hidden />
+                  Upgrade to Premium
+                </button>
+              )}
+              <p className="text-[12px] text-muted-foreground">
+                Payments are handled by Stripe. Applendium never stores card numbers.
               </p>
-            ) : (
-              <Button size="sm" className="gap-1.5" onClick={() => navigate("/upgrade")}>
-                <Crown className="h-3.5 w-3.5" />
-                Upgrade to Premium
-              </Button>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Payment details are handled by Stripe. Applendium does not store card numbers.
-            </p>
+            </div>
           </div>
-        </section>
+        </Panel>
       </div>
     </DashboardLayout>
+  );
+}
+
+/**
+ * Résumés live in one place. Settings used to embed a second résumé editor that wrote to the
+ * legacy profile field while reading back the default version, so once a user had any saved
+ * version an edit here appeared to vanish and never reached Apply Gate (it reads the default
+ * version first). This panel only points at the Résumés page and names what Apply Gate uses.
+ */
+function ResumesSummaryPanel() {
+  const variantsQuery = useQuery({ queryKey: ["resume-variants"], queryFn: fetchResumeVariants });
+  const variants = variantsQuery.data?.variants ?? [];
+  const defaultVariant = variants.find((variant) => variant.isDefault) ?? variants[0] ?? null;
+
+  return (
+    <Panel
+      title="Résumés"
+      icon={FileText}
+      action={<PanelLink to="/resumes">{variants.length > 0 ? "Manage résumés" : "Add your résumé"}</PanelLink>}
+    >
+      {variantsQuery.isLoading ? (
+        <LoadingRows rows={1} />
+      ) : variantsQuery.isError ? (
+        <ErrorState title="Your résumés did not load" onRetry={() => variantsQuery.refetch()} />
+      ) : defaultVariant ? (
+        <p className="text-[13px] leading-relaxed text-muted-foreground">
+          Apply Gate checks roles against{" "}
+          <span className="font-semibold text-foreground">{defaultVariant.name}</span>
+          {variants.length > 1 ? `, your default of ${variants.length} saved versions.` : ", your saved résumé."} You can
+          pick a different version for any single check.
+        </p>
+      ) : (
+        <p className="text-[13px] leading-relaxed text-muted-foreground">
+          No résumé saved yet. Apply Gate compares each posting against your résumé, so until you add one its call is
+          based only on your application history.
+        </p>
+      )}
+    </Panel>
   );
 }
