@@ -1045,6 +1045,24 @@ const FixSuggestions = () => {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [expandedInlineTaskId, setExpandedInlineTaskId] = useState<string>("");
   const [openActionMenuId, setOpenActionMenuId] = useState<string>("");
+  // A menu that only the trigger can close traps keyboard users and lingers over the list.
+  useEffect(() => {
+    if (!openActionMenuId) return;
+    const close = (event: Event) => {
+      if (event instanceof KeyboardEvent) {
+        if (event.key === "Escape") setOpenActionMenuId("");
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest("[data-action-menu]")) setOpenActionMenuId("");
+    };
+    document.addEventListener("keydown", close);
+    document.addEventListener("pointerdown", close);
+    return () => {
+      document.removeEventListener("keydown", close);
+      document.removeEventListener("pointerdown", close);
+    };
+  }, [openActionMenuId]);
   const [openDraftTaskId, setOpenDraftTaskId] = useState<string>("");
   const [draftToneByTaskId, setDraftToneByTaskId] = useState<Record<string, SuggestionDraftTone>>({});
   const [draftByTaskId, setDraftByTaskId] = useState<Record<string, SuggestionDraft>>({});
@@ -1655,42 +1673,43 @@ const FixSuggestions = () => {
                 <Check className="h-4 w-4" aria-hidden />
               </button>
             ) : null}
-            <div className="relative">
+            <div className="relative" data-action-menu>
               <button
                 type="button"
                 onClick={() => setOpenActionMenuId((current) => (current === item.id ? "" : item.id))}
                 className={cn(BUTTON.ghost, "px-2")}
                 aria-label="More options"
+                aria-haspopup="menu"
                 aria-expanded={menuOpen}
               >
                 <MoreHorizontal className="h-4 w-4" aria-hidden />
               </button>
               {menuOpen ? (
                 <div className="absolute right-0 z-30 mt-1.5 w-56 overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-lg" role="menu">
-                  <button type="button" className={actionMenuItemClass} onClick={() => { setOpenActionMenuId(""); setExpandedDetailsId((c) => (c === item.id ? "" : item.id)); }}>
+                  <button type="button" role="menuitem" className={actionMenuItemClass} onClick={() => { setOpenActionMenuId(""); setExpandedDetailsId((c) => (c === item.id ? "" : item.id)); }}>
                     <FileSearch className="h-4 w-4" aria-hidden />
                     {detailsOpen ? "Hide details" : "Why this, and how"}
                   </button>
                   {gmailUrl && cta.kind !== "gmail" ? (
-                    <a className={actionMenuItemClass} href={gmailUrl} target="_blank" rel="noreferrer" onClick={() => setOpenActionMenuId("")}>
+                    <a role="menuitem" className={actionMenuItemClass} href={gmailUrl} target="_blank" rel="noreferrer" onClick={() => setOpenActionMenuId("")}>
                       <ArrowUpRight className="h-4 w-4" aria-hidden />
                       Open in Gmail
                     </a>
                   ) : null}
                   {canDraft && cta.kind !== "draft" ? (
-                    <button type="button" className={actionMenuItemClass} disabled={draftMutation.isPending} onClick={() => { setOpenActionMenuId(""); toggleDraftForItem(item, draftTone); }}>
+                    <button type="button" role="menuitem" className={actionMenuItemClass} disabled={draftMutation.isPending} onClick={() => { setOpenActionMenuId(""); toggleDraftForItem(item, draftTone); }}>
                       <MessageSquare className="h-4 w-4" aria-hidden />
                       {draft ? "Show draft" : "Draft an email"}
                     </button>
                   ) : null}
                   {item.logicalKey && item.dedupeKey ? (
-                    <button type="button" className={actionMenuItemClass} disabled={mutationBusy} onClick={() => { setOpenActionMenuId(""); void dismissQueueItem(item); }}>
+                    <button type="button" role="menuitem" className={actionMenuItemClass} disabled={mutationBusy} onClick={() => { setOpenActionMenuId(""); void dismissQueueItem(item); }}>
                       <PauseCircle className="h-4 w-4" aria-hidden />
                       Snooze for a day
                     </button>
                   ) : null}
                   {canCloseFromCard && cta.kind !== "close" ? (
-                    <button type="button" className={destructiveActionMenuItemClass} disabled={mutationBusy} onClick={() => { setOpenActionMenuId(""); void closeQueueItem(item); }}>
+                    <button type="button" role="menuitem" className={destructiveActionMenuItemClass} disabled={mutationBusy} onClick={() => { setOpenActionMenuId(""); void closeQueueItem(item); }}>
                       <XCircle className="h-4 w-4" aria-hidden />
                       Close this application
                     </button>

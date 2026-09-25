@@ -558,7 +558,7 @@ describe("Next Actions", () => {
     expect(screen.getByRole("link", { name: "Open in Apply Gate" })).toHaveAttribute("href", "/apply-gate");
 
     await user.click(screen.getByRole("button", { name: "More options" }));
-    await user.click(screen.getByRole("button", { name: "Why this, and how" }));
+    await user.click(screen.getByRole("menuitem", { name: "Why this, and how" }));
 
     expect(screen.getByText("Apply Gate context")).toBeInTheDocument();
     expect(screen.getAllByText("Tailor resume first").length).toBeGreaterThan(0);
@@ -584,6 +584,17 @@ describe("Next Actions", () => {
     expect(await screen.findByText(/9 similar actions are held back/)).toBeInTheDocument();
     expect(screen.getByText(/5 follow-up, 4 networking/)).toBeInTheDocument();
     expect(screen.getByText(/As you clear one, the next takes its place/)).toBeInTheDocument();
+  });
+
+  test("the options menu is a real menu and Escape closes it", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const [trigger] = await screen.findAllByRole("button", { name: "More options" });
+    await user.click(trigger);
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    expect(screen.getAllByRole("menuitem").length).toBeGreaterThan(0);
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
   test("a step waiting on another action is not listed as its own row", async () => {
