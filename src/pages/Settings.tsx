@@ -169,6 +169,9 @@ export default function Settings() {
   const monthlyLimit = subStatus?.quotaData?.limit ?? (isPremium ? 10000 : 500);
   const monthlyProcessed = subStatus?.quotaData?.monthlyProcessed ?? 0;
   const billingPortalAvailable = Boolean(subscription?.billingPortalAvailable);
+  // Premium granted outside Stripe (founder, comped) has no renewal, no cancellation and no card on
+  // file, so those boxes and the Stripe line only appear when Stripe actually bills this account.
+  const billedByStripe = billingPortalAvailable || Boolean(subscription?.subscription_id);
   const accountInitials = (() => {
     const name = String(user?.displayName || "").trim();
     if (name) {
@@ -297,7 +300,7 @@ export default function Settings() {
               />
             </div>
 
-            {subStatus ? (
+            {subStatus && billedByStripe ? (
               <dl className="grid gap-3 text-[13px] sm:grid-cols-2">
                 <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
                   <dt className={EYEBROW}>Renewal</dt>
@@ -330,9 +333,11 @@ export default function Settings() {
                   Upgrade to Premium
                 </button>
               )}
-              <p className="text-[12px] text-muted-foreground">
-                Payments are handled by Stripe. Applendium never stores card numbers.
-              </p>
+              {billedByStripe || !isPremium ? (
+                <p className="text-[12px] text-muted-foreground">
+                  Payments are handled by Stripe. Applendium never stores card numbers.
+                </p>
+              ) : null}
             </div>
           </div>
         </Panel>

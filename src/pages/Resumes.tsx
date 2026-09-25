@@ -393,8 +393,8 @@ const Resumes = () => {
           <div className="space-y-4">
             {variants.map((v) => (
               <article key={v.id} className={cn(CARD, "space-y-4 p-5")}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-start gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
                     <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg", TONES.brand.icon)}>
                       <FileText className="h-4 w-4" aria-hidden />
                     </span>
@@ -406,7 +406,7 @@ const Resumes = () => {
                       <p className="mt-0.5 text-[13px] text-muted-foreground">{recordLine(scoreByVariant.get(v.id))}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="-ml-2 flex shrink-0 items-center gap-1 sm:ml-0">
                     {!v.isDefault ? (
                       <button type="button" className={BUTTON.ghost} onClick={() => setDefaultMut.mutate(v.id)}>
                         <Star className="h-3.5 w-3.5" aria-hidden /> Make default
