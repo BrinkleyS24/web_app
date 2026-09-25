@@ -282,7 +282,7 @@ function HeroCard({
               {cta.label}
             </ActionCtaButton>
             <p className="text-[12.5px] leading-snug text-muted-foreground">
-              {pairedWithClaim ? "The move for the read above" : "Top of your list right now"}
+              {pairedWithClaim ? "What to do about it" : "Top of your list right now"}
               {" · "}
               <span className="font-medium text-foreground/80">{heroMove.title}</span>
               {moveIdentity ? ` · ${moveIdentity}` : ""}

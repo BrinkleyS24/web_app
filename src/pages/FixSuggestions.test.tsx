@@ -581,9 +581,33 @@ describe("Next Actions", () => {
 
     renderPage();
 
-    expect(await screen.findByText(/9 more are waiting behind these/)).toBeInTheDocument();
+    expect(await screen.findByText(/9 similar actions are held back/)).toBeInTheDocument();
     expect(screen.getByText(/5 follow-up, 4 networking/)).toBeInTheDocument();
-    expect(screen.getByText(/Clear one and the next takes its place/)).toBeInTheDocument();
+    expect(screen.getByText(/As you clear one, the next takes its place/)).toBeInTheDocument();
+  });
+
+  test("a step waiting on another action is not listed as its own row", async () => {
+    // Founder's queue, 2026-09-25: 7 blocked "Apply to X" rows sat under their own "Tailor résumé
+    // for X" rows, one role twice, and this page counted 22 where the Dashboard counted 14.
+    const base = buildQueueResponse().queue.doToday[0] as Record<string, unknown>;
+    fetchRankedActionQueue.mockResolvedValue(buildQueueResponse({
+      blocked: [{
+        ...base,
+        id: "queue-apply-blocked",
+        logicalKey: "apply:monument",
+        dedupeKey: "apply:monument:v1",
+        actionType: "apply",
+        title: "Apply to QA Automation Engineer at Monument",
+        status: "open",
+        effectiveStatus: "blocked",
+        blockingReason: "Tailor resume first",
+      }],
+    }));
+
+    renderPage();
+
+    expect(await screen.findByText("Send thank-you note to Wells Fargo")).toBeInTheDocument();
+    expect(screen.queryByText("Apply to QA Automation Engineer at Monument")).not.toBeInTheDocument();
   });
 
   test("keeps Today to three and groups quiet close-outs under More", async () => {

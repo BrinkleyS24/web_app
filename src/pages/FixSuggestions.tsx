@@ -1165,9 +1165,13 @@ const FixSuggestions = () => {
   const actionStates = (statesQuery.data?.actions || []) as SuggestionActionState[];
   const storedEmails = (storedEmailsQuery.data?.emails || []) as StoredEmail[];
   const rankedQueue = (queueQuery.data?.queue || null) as RankedActionQueue | null;
+  // The same list the Dashboard counts: open, not blocked, one row per action. Blocked rows were
+  // "Apply to X" waiting on "Tailor résumé for X", which is already its own row, so each role
+  // appeared twice (founder's queue, 2026-09-25: 7 blocked rows, one role duplicated) and this page
+  // said "22 more" where the Dashboard said "14 more". A blocked step appears once its blocker is done.
   const combinedSuggestions = useMemo(
     () => suppressAlreadyHandledGmailActions(
-      buildQueueItemsFromRankedQueue(rankedQueue),
+      buildDashboardMoveQueue(buildQueueItemsFromRankedQueue(rankedQueue)),
       storedEmails,
       user?.email,
     ),
@@ -1523,6 +1527,14 @@ const FixSuggestions = () => {
   // Founder review, 2026-09-25: "Today" is the three most useful actions; everything else is
   // under More. Every card names its application and carries the one button that fits the task.
   const todayItems = filteredSuggestions.slice(0, 3);
+  // Held-back repeats are NOT in this list at all, so the note sits at its end rather than under
+  // Today, where "11 more are waiting behind these" read as a third count of the same list.
+  const heldBackNote = heldBackTotal > 0 ? (
+    <p className="px-1 text-[12.5px] leading-relaxed text-muted-foreground">
+      {heldBackTotal} similar {heldBackTotal === 1 ? "action is" : "actions are"} held back so this list does not
+      repeat itself ({heldBackBreakdown}). As you clear one, the next takes its place.
+    </p>
+  ) : null;
   const moreItems = filteredSuggestions.slice(3);
   const moreFiltered = useMemo(
     () => (moreFilter === "all" ? moreItems : moreItems.filter((item) => moreFilterGroup(item) === moreFilter)),
@@ -1588,11 +1600,9 @@ const FixSuggestions = () => {
           : cta.kind === "prep" && detailsOpen ? "Hide prep plan"
             : cta.kind === "cleanup" && inlineOpen ? "Hide repair"
               : cta.label;
-    const ctaClass = cn(
-      variant === "today" ? BUTTON.primary : BUTTON.secondary,
-      cta.kind === "close" && "border-destructive/30 text-destructive hover:border-destructive/50 hover:bg-destructive/5",
-      "shrink-0",
-    );
+    // One button look for every action. Close-out used to be red, which on the dark Today button was
+    // red-on-ink (hard to read) and framed the recommended move for a long-quiet thread as a warning.
+    const ctaClass = cn(variant === "today" ? BUTTON.primary : BUTTON.secondary, "shrink-0");
     const ctaDisabled = cta.kind === "draft" ? draftMutation.isPending : (cta.kind === "close" || cta.kind === "complete") ? mutationBusy : false;
 
     return (
@@ -1773,11 +1783,7 @@ const FixSuggestions = () => {
           )}
           {/* Repeats held back on purpose. Without this line a short list reads as "it didn't find my
               other applications" — the more damaging reading of the same screen. */}
-          {heldBackTotal > 0 ? (
-            <p className="px-1 text-[12.5px] leading-relaxed text-muted-foreground">
-              {heldBackTotal} more {heldBackTotal === 1 ? "is" : "are"} waiting behind these ({heldBackBreakdown}). Clear one and the next takes its place.
-            </p>
-          ) : null}
+          {moreItems.length === 0 ? heldBackNote : null}
         </section>
 
         {moreItems.length > 0 ? (
@@ -1835,6 +1841,7 @@ const FixSuggestions = () => {
                 ),
               )}
             </div>
+            {heldBackNote ? <div className="mt-3 border-t border-border pt-3">{heldBackNote}</div> : null}
           </Panel>
         ) : null}
 

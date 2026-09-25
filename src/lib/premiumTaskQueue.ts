@@ -155,6 +155,11 @@ export const actionTypeLabels: Record<string, string> = {
  *
  * Anything the backend routes to `followup` now appears here by construction.
  */
+/** "1 day", "8 days" — never "8 day(s)" in front of a paying user. */
+function daysLabel(n: number) {
+  return `${n} day${n === 1 ? "" : "s"}`;
+}
+
 export function isDaqV1InboxAction(item: QueueItem) {
   return item.source === "followup";
 }
@@ -760,7 +765,7 @@ function buildStaleQueue(emails: StoredEmail[]): QueueItem[] {
       [
         latest.subject ? `Latest conversation: ${latest.subject}` : null,
         latest.from ? `Latest sender: ${latest.from}` : null,
-        `No final outcome yet after ${age} day(s).`,
+        `No final outcome yet after ${daysLabel(age)}.`,
       ],
       4,
     );
@@ -1127,7 +1132,7 @@ export function buildUpcomingFollowupWindows(params: {
           description:
             age >= 10
               ? `${company} is inside the day 10-14 application follow-up window.`
-              : `${company} is ${age} day(s) after application. A status follow-up is usually better around day 10-14.`,
+              : `${company} is ${daysLabel(age)} after application. A status follow-up is usually better around day 10-14.`,
           sourceDescription: age >= 10 ? "Application follow-up due now" : "Application follow-up opens soon",
         });
       } else if (
@@ -1192,7 +1197,7 @@ export function buildUpcomingFollowupWindows(params: {
           description:
             age >= 6
               ? `${company} is inside the post-interview status-check window.`
-              : `${company} is ${age} day(s) after the interview. If no timeline was given, status checks become more appropriate after several business days.`,
+              : `${company} is ${daysLabel(age)} after the interview. If no timeline was given, status checks become more appropriate after several business days.`,
           sourceDescription: age >= 6 ? "Interview status check due now" : "Interview status check opens soon",
         });
       } else if (
@@ -1209,7 +1214,7 @@ export function buildUpcomingFollowupWindows(params: {
           windowStartDay: 21,
           windowEndDay: 21,
           title: `Close-loop window for ${role}`,
-          description: `${company} is ${age} day(s) after the interview. If silence continues, this should move from follow-up to close-out.`,
+          description: `${company} is ${daysLabel(age)} after the interview. If silence continues, this should move from follow-up to close-out.`,
           sourceDescription: "Interview close-out window approaching",
         });
       }

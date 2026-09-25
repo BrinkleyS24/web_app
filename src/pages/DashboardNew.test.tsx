@@ -484,7 +484,7 @@ describe("DashboardNew", () => {
   test("says honestly when the lead action is just the top of the list", async () => {
     renderDashboard();
     expect(await screen.findByText(/Top of your list right now/)).toBeInTheDocument();
-    expect(screen.queryByText(/The move for the read above/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/What to do about it/)).not.toBeInTheDocument();
   });
 
   test("pairs the lead action with the alert that produced the claim", async () => {
@@ -530,7 +530,7 @@ describe("DashboardNew", () => {
     renderDashboard();
 
     expect(await screen.findByRole("heading", { name: "Getting interviews is working; converting them is the live problem" })).toBeInTheDocument();
-    expect(screen.getByText(/The move for the read above/)).toBeInTheDocument();
+    expect(screen.getByText(/What to do about it/)).toBeInTheDocument();
     expect(screen.getByText("Prep for the Verisk interview")).toBeInTheDocument();
   });
 
