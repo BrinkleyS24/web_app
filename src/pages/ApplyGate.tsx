@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { StatusBadge } from "@/components/StatusBadge";
+import { EmptyState, PageHeader, ToneChip } from "@/components/premium/PremiumUI";
+import { BUTTON, CARD, EYEBROW, TONES } from "@/components/premium/tone";
+import { describeVerdictDecision, describeVerdictOutcome } from "@/lib/verdictPresentation";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Check, ChevronDown, ChevronUp, Info, Loader2 } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronUp, Info, Loader2, ScanSearch } from "lucide-react";
 import {
   normalizeCompanyName,
   splitRoleAndCompany as splitApplyGateRoleAndCompany,
@@ -12,6 +15,7 @@ import { useAuth } from "@/lib/AuthContext.jsx";
 import {
   analyzeJobAlignment,
   fetchApplyGateHistory,
+  recheckApplyGateVerdict,
   updateApplyGateAction,
   fetchResume,
   saveResume,
@@ -1169,6 +1173,32 @@ const ApplyGate = () => {
     staleTime: 30_000,
   });
 
+  // Re-check: re-run a saved check's posting through today's Apply Gate. Verdicts are snapshots, so
+  // one made before the 2026-09-24 scoring fix keeps its old answer until the user asks for a new one.
+  const [recheckingId, setRecheckingId] = useState<string | null>(null);
+  const [recheckError, setRecheckError] = useState<{ id: string; message: string } | null>(null);
+  const resultTopRef = useRef<HTMLDivElement | null>(null);
+  const handleRecheck = useCallback(
+    async (verdictId: string) => {
+      setRecheckingId(verdictId);
+      setRecheckError(null);
+      try {
+        const data = await recheckApplyGateVerdict(verdictId);
+        setResult(data);
+        setIsCurrentWarningExpanded(false);
+        setShowBreakdown(false);
+        setActionConfirmation(null);
+        await queryClient.invalidateQueries({ queryKey: ["apply-gate-history"] });
+        resultTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (error) {
+        setRecheckError({ id: verdictId, message: error instanceof Error ? error.message : "Could not re-check this role." });
+      } finally {
+        setRecheckingId(null);
+      }
+    },
+    [queryClient],
+  );
+
   const rawHistory: ApplyGateHistoryItem[] = historyQuery.data?.history ?? [];
   const currentHistoryProjection = useMemo(
     () => buildHistoryDisplayItemFromResult(result, jobTitle, companyName, null),
@@ -1607,24 +1637,17 @@ const ApplyGate = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-            Pre-apply decision brief
-          </p>
-          <h1 className="mt-2 text-[28px] font-bold tracking-[-0.025em] text-foreground">Apply Gate</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Decide whether to apply, fix first, or skip before you spend time on a posting.
-          </p>
-        </div>
+      <div className="space-y-5">
+        <PageHeader
+          eyebrow="Before you apply"
+          title="Apply Gate"
+          description="Paste a job and get a clear call — apply, fix first, or skip — with the reasons behind it and what to fix before you spend the time."
+        />
 
-        <div className="grid items-start gap-3.5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]">
-          <div className="glass-card space-y-3 rounded-2xl p-5">
+        <div ref={resultTopRef} className="grid scroll-mt-20 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]">
+          <div className={cn(CARD, "space-y-3 p-5")}>
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-[15px] font-bold tracking-[-0.01em] text-foreground">Job to review</h2>
-            <span className="font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-              Resume: {hasResume ? "saved" : "not found"}
-            </span>
+            <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-foreground">Check a role</h2>
           </div>
           {needsResume ? (
           <div className="space-y-3" data-testid="apply-gate-resume-required">
@@ -1680,7 +1703,7 @@ const ApplyGate = () => {
           ) : (
           <>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground" htmlFor="job-title">Job Title</label>
+            <label className="text-sm font-medium text-foreground" htmlFor="job-title">Job title</label>
             <input
               id="job-title"
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
@@ -1690,7 +1713,7 @@ const ApplyGate = () => {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground" htmlFor="company-name">Company Name (optional)</label>
+            <label className="text-sm font-medium text-foreground" htmlFor="company-name">Company (optional)</label>
             <input
               id="company-name"
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
@@ -1747,7 +1770,7 @@ const ApplyGate = () => {
             <p className="text-xs text-muted-foreground">{RISK_TOLERANCE_COPY[riskTolerance].helper}</p>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground" htmlFor="job-description">Job Description</label>
+            <label className="text-sm font-medium text-foreground" htmlFor="job-description">Job description</label>
             <textarea
               id="job-description"
               className="w-full min-h-[120px] rounded-md border border-border bg-background px-3 py-2 text-sm"
@@ -1757,9 +1780,9 @@ const ApplyGate = () => {
             />
             <p className="text-xs text-muted-foreground">Paste the full job description, or leave it empty and we will read the posting from the URL above.</p>
           </div>
-          <Button onClick={handleAnalyze} disabled={analyzeMutation.isPending || !canAnalyze}>
-            {analyzeMutation.isPending ? "Checking..." : "Get decision"}
-          </Button>
+          <button type="button" onClick={handleAnalyze} disabled={analyzeMutation.isPending || !canAnalyze} className={BUTTON.primary}>
+            {analyzeMutation.isPending ? "Checking…" : "Check this role"}
+          </button>
           {analyzeMutation.isError && (
             <p className="text-xs text-destructive">
               {analyzeMutation.error instanceof Error
@@ -1794,18 +1817,17 @@ const ApplyGate = () => {
               </div>
             ) : result ? (
               <>
-              <div className="glass-card space-y-3 rounded-2xl p-6">
+              <div className={cn(CARD, "space-y-3 p-6")}>
             {currentDecisionCopy && (
               <div
-                className="-mx-6 -mt-6 mb-1 rounded-t-2xl border-b border-border px-6 py-5"
-                style={{ background: "linear-gradient(180deg, #F2FAF6 0%, var(--card) 100%)" }}
+                className={cn(
+                  "-mx-6 -mt-6 mb-1 rounded-t-2xl border-b px-6 py-5",
+                  TONES[describeVerdictDecision({ verdict: result.verdict, explanation_payload: result.explanation }).tone].surface,
+                )}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Decision</p>
-                      <StatusBadge status={currentStatus || "risky"} />
-                    </div>
+                    <p className={cn(EYEBROW, TONES[describeVerdictDecision({ verdict: result.verdict, explanation_payload: result.explanation }).tone].text)}>Our call</p>
                     <h2 className="mt-2 text-xl font-bold tracking-[-0.01em] text-foreground">{currentDecisionCopy.title}</h2>
                     {currentDecisionNudge ? (
                       <p className="mt-1 text-sm font-medium leading-relaxed text-muted-foreground">{currentDecisionNudge}</p>
@@ -1930,21 +1952,11 @@ const ApplyGate = () => {
               ) : null}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 text-xs pt-0.5">
-              <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground">
-                Fit label: {currentFitLabel}
-              </span>
-              {currentRecommendation && (
-                <span className="px-2 py-0.5 rounded border border-accent/20 bg-accent/10 text-accent">
-                  Recommended move: {currentRecommendation}
-                </span>
-              )}
-              {currentMemoryBadge ? (
-                <span className="px-2 py-0.5 rounded border border-border bg-muted/40 text-muted-foreground">
-                  Search memory: {currentMemoryBadge}
-                </span>
-              ) : null}
-            </div>
+            {currentMemoryBadge ? (
+              <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                <ToneChip tone="neutral">Your history with roles like this: {currentMemoryBadge}</ToneChip>
+              </div>
+            ) : null}
 
             {!currentIsCompressedDecision && (currentRiskBreakdown?.components?.length || currentOccupationGrounding?.job || currentOccupationGrounding?.candidate) ? (
               <button
@@ -2002,7 +2014,7 @@ const ApplyGate = () => {
               <div className="rounded-lg border border-border/70 bg-background/70 p-3 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="text-xs font-semibold text-foreground">Search memory</p>
+                    <p className="text-xs font-semibold text-foreground">Your history with roles like this</p>
                     <p className="text-xs text-muted-foreground">
                       {currentSearchMemory.outcomeSummary.similarRoleCount > 0
                         ? `You've seen ${currentSearchMemory.outcomeSummary.similarRoleCount} similar tracked role${currentSearchMemory.outcomeSummary.similarRoleCount === 1 ? "" : "s"}.`
@@ -2136,29 +2148,6 @@ const ApplyGate = () => {
                 {currentOpportunityCost?.message ? (
                   <p className="text-xs text-muted-foreground leading-relaxed">{"\u2022"} {currentOpportunityCost.message}</p>
                 ) : null}
-                {(currentOutcomeBands || currentDecisionConfidence || currentAssessmentConfidence) ? (
-                  <details className="pt-1">
-                    <summary className="cursor-pointer text-[11px] text-muted-foreground/80">Exact readings</summary>
-                    <div className="mt-1 space-y-0.5">
-                      {currentOutcomeBands ? (
-                        <p className="text-[11px] text-muted-foreground">
-                          Screening check: {"r\u00e9sum\u00e9"} screen <span className={bandTone(currentOutcomeBands.atsPass)}>{currentOutcomeBands.atsPass}</span>
-                          <span className="px-1">-</span>
-                          human review <span className={bandTone(currentOutcomeBands.humanWin)}>{currentOutcomeBands.humanWin}</span>
-                        </p>
-                      ) : null}
-                      {currentDecisionConfidence ? (
-                        <p className="text-[11px] text-muted-foreground">
-                          Decision confidence: {currentDecisionConfidence}
-                          {currentConfidenceType ? ` (${currentConfidenceType.replace(/_/g, " ").toLowerCase()})` : ""}
-                        </p>
-                      ) : null}
-                      {currentAssessmentConfidence ? (
-                        <p className="text-[11px] text-muted-foreground">Assessment quality: {currentAssessmentConfidence}</p>
-                      ) : null}
-                    </div>
-                  </details>
-                ) : null}
               </div>
             )}
 
@@ -2249,12 +2238,12 @@ const ApplyGate = () => {
                 ) : (
                   <p className="text-xs text-muted-foreground" aria-live="polite">
                     {currentSavePending
-                      ? "Saving your choice..."
+                      ? "Saving your choice…"
                       : currentDisplayDecisionMissing
-                      ? "Choose what you did only after the decision reloads cleanly."
+                      ? "This call could not load cleanly. Run the check again before deciding."
                       : currentHasUniversalHardGate
-                      ? "Apply anyway only if you already meet these requirements and your resume is missing the proof."
-                      : "Choose what you did. This keeps future recommendations grounded."}
+                      ? "Apply anyway only if you already meet these requirements and your résumé is missing the proof."
+                      : null}
                   </p>
                 )}
               </div>
@@ -2281,8 +2270,12 @@ const ApplyGate = () => {
               ) : null}
               </>
             ) : (
-              <div className="glass-card rounded-2xl p-8 text-center text-sm leading-6 text-muted-foreground">
-                Paste a job on the left to see whether to apply, the rejection risk, and what to fix first.
+              <div className={cn(CARD, "p-5")}>
+                <EmptyState
+                  icon={ScanSearch}
+                  title="Check a role before you apply"
+                  body="Paste the job description (or a public link) and pick a résumé. You get a clear call, what could get you rejected, and what to fix first."
+                />
               </div>
             )}
           </div>
@@ -2290,9 +2283,9 @@ const ApplyGate = () => {
 
         {history.length > 0 && (
           <div className="space-y-3">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Recent verdicts</p>
+            <p className={EYEBROW}>Roles you checked</p>
             {history.slice(0, 5).map((item) => (
-              <div key={item.id} className="glass-card rounded-xl p-5 space-y-3">
+              <div key={item.id} className={cn(CARD, "space-y-3 p-5")}>
                 {(() => {
                   const displayDecision = displayDecisionFromHistory(item);
                   const displayDecisionMissing = Boolean(
@@ -2345,30 +2338,42 @@ const ApplyGate = () => {
                   const decisionConfidence = decisionConfidenceLabel(item.explanation_payload?.decision_confidence || null);
                   const historyVisibleReasons = displayDecisionMissing ? [] : visibleReasons;
                   const historySavePending = savingAction?.verdictId === item.id;
+                  const historyDecision = describeVerdictDecision(item);
+                  const historyOutcome = describeVerdictOutcome(item);
+                  // Once Applendium has seen what happened (or the user recorded it), the decision
+                  // buttons have done their job — the outcome line above says the rest.
+                  const historyDecided = Boolean(historyOutcome);
                   const historySaveError = actionSaveError?.verdictId === item.id
                     ? actionSaveError.message
                     : null;
                   return (
                     <>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground leading-tight">{roleCompany.role}</p>
-                    {roleCompany.company ? (
-                      <p className="text-xs text-muted-foreground leading-tight mt-0.5">{roleCompany.company}</p>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[14px] font-semibold leading-tight text-foreground">{roleCompany.role}</p>
+                    <p className="mt-0.5 text-[12.5px] leading-tight text-muted-foreground">
+                      {[roleCompany.company, historyOutcome?.label].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  <ToneChip tone={item.outdated ? "neutral" : historyDecision.tone}>{historyDecision.label}</ToneChip>
+                </div>
+                {item.outdated ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3">
+                    <p className="text-[13px] leading-snug text-muted-foreground">
+                      Checked before Apply Gate's Sep 24 update, so this read may be out of date.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void handleRecheck(item.id)}
+                      disabled={recheckingId === item.id}
+                      className={cn(BUTTON.secondary, "px-3 py-1.5 text-[12.5px]")}
+                    >
+                      {recheckingId === item.id ? "Re-checking…" : "Re-check"}
+                    </button>
+                    {recheckError?.id === item.id ? (
+                      <p role="alert" className="w-full text-xs font-medium text-destructive">{recheckError.message}</p>
                     ) : null}
                   </div>
-                  <StatusBadge status={status} />
-                </div>
-                <div className="flex flex-wrap items-center gap-3 text-xs pt-0.5">
-                  <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground">{decisionCopy.title}</span>
-                  <span className="text-muted-foreground">Résumé screen: <span className={bandTone(outcomeBands.atsPass)}>{outcomeBands.atsPass}</span></span>
-                  <span className="text-muted-foreground">Human review: <span className={bandTone(outcomeBands.humanWin)}>{outcomeBands.humanWin}</span></span>
-                  {decisionConfidence ? (
-                    <span className="text-muted-foreground">{String(decisionConfidence).toLowerCase() === "high" ? "Confident read" : String(decisionConfidence).toLowerCase() === "medium" ? "Solid read" : "First read, thin signal"}</span>
-                  ) : null}
-                </div>
-                {!displayDecisionMissing && riskBreakdown?.summary ? (
-                  <p className="text-xs text-muted-foreground leading-relaxed">Main factor: {riskBreakdown.summary}</p>
                 ) : null}
                 {historyVisibleReasons.map((reason, index) => (
                   <p key={index} className="text-sm text-muted-foreground leading-relaxed">• {reason}</p>
@@ -2401,6 +2406,7 @@ const ApplyGate = () => {
                   </div>
                   );
                 })()}
+                {!historyDecided ? (
                 <div className="space-y-2 pt-1">
                   <div className="flex flex-wrap items-center gap-2">
                     {decisionActions.map((actionItem) => (
@@ -2421,14 +2427,11 @@ const ApplyGate = () => {
                     <p role="alert" className="text-xs font-medium text-destructive">
                       {historySaveError}
                     </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground" aria-live="polite">
-                      {historySavePending
-                        ? "Saving your choice..."
-                        : "Choose what you did. This keeps future recommendations grounded."}
-                    </p>
-                  )}
+                  ) : historySavePending ? (
+                    <p className="text-xs text-muted-foreground" aria-live="polite">Saving your choice…</p>
+                  ) : null}
                 </div>
+                ) : null}
                     </>
                   );
                 })()}

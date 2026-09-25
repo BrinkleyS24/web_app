@@ -4,45 +4,45 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
 <div>
   <div>
     <div
-      class="space-y-6"
+      class="space-y-5"
     >
-      <div>
-        <p
-          class="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
-        >
-          Pre-apply decision brief
-        </p>
-        <h1
-          class="mt-2 text-[28px] font-bold tracking-[-0.025em] text-foreground"
-        >
-          Apply Gate
-        </h1>
-        <p
-          class="text-muted-foreground mt-1 text-sm"
-        >
-          Decide whether to apply, fix first, or skip before you spend time on a posting.
-        </p>
-      </div>
-      <div
-        class="grid items-start gap-3.5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]"
+      <header
+        class="flex flex-wrap items-end justify-between gap-x-6 gap-y-4"
       >
         <div
-          class="glass-card space-y-3 rounded-2xl p-5"
+          class="min-w-0 max-w-3xl"
+        >
+          <p
+            class="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground"
+          >
+            Before you apply
+          </p>
+          <h1
+            class="mt-2 text-[28px] font-bold leading-tight tracking-[-0.025em] text-foreground"
+          >
+            Apply Gate
+          </h1>
+          <p
+            class="mt-1.5 max-w-[68ch] text-[14px] leading-relaxed text-muted-foreground"
+          >
+            Paste a job and get a clear call — apply, fix first, or skip — with the reasons behind it and what to fix before you spend the time.
+          </p>
+        </div>
+      </header>
+      <div
+        class="grid scroll-mt-20 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]"
+      >
+        <div
+          class="rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(11,18,32,0.04)] space-y-3 p-5"
         >
           <div
             class="flex items-center justify-between gap-2"
           >
             <h2
-              class="text-[15px] font-bold tracking-[-0.01em] text-foreground"
+              class="text-[15px] font-semibold tracking-[-0.01em] text-foreground"
             >
-              Job to review
+              Check a role
             </h2>
-            <span
-              class="font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
-            >
-              Resume: 
-              saved
-            </span>
           </div>
           <div
             class="space-y-2"
@@ -51,7 +51,7 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
               class="text-sm font-medium text-foreground"
               for="job-title"
             >
-              Job Title
+              Job title
             </label>
             <input
               class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
@@ -67,7 +67,7 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
               class="text-sm font-medium text-foreground"
               for="company-name"
             >
-              Company Name (optional)
+              Company (optional)
             </label>
             <input
               class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
@@ -145,7 +145,7 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
               class="text-sm font-medium text-foreground"
               for="job-description"
             >
-              Job Description
+              Job description
             </label>
             <textarea
               class="w-full min-h-[120px] rounded-md border border-border bg-background px-3 py-2 text-sm"
@@ -161,23 +161,20 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
             </p>
           </div>
           <button
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3"
-            data-size="default"
-            data-slot="button"
-            data-variant="default"
+            class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            type="button"
           >
-            Get decision
+            Check this role
           </button>
         </div>
         <div
           class="min-w-0"
         >
           <div
-            class="glass-card space-y-3 rounded-2xl p-6"
+            class="rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(11,18,32,0.04)] space-y-3 p-6"
           >
             <div
-              class="-mx-6 -mt-6 mb-1 rounded-t-2xl border-b border-border px-6 py-5"
-              style="background: linear-gradient(180deg, #F2FAF6 0%, var(--card) 100%);"
+              class="-mx-6 -mt-6 mb-1 rounded-t-2xl border-b px-6 py-5 bg-warning/[0.035] border-warning/25"
             >
               <div
                 class="flex items-start justify-between gap-4"
@@ -185,20 +182,11 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
                 <div
                   class="min-w-0"
                 >
-                  <div
-                    class="flex flex-wrap items-center gap-2"
+                  <p
+                    class="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-warning"
                   >
-                    <p
-                      class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-                    >
-                      Decision
-                    </p>
-                    <span
-                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border status-risky"
-                    >
-                      Risky
-                    </span>
-                  </div>
+                    Our call
+                  </p>
                   <h2
                     class="mt-2 text-xl font-bold tracking-[-0.01em] text-foreground"
                   >
@@ -242,22 +230,6 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
               >
                 Automation Engineer
               </p>
-            </div>
-            <div
-              class="flex flex-wrap items-center gap-3 text-xs pt-0.5"
-            >
-              <span
-                class="px-2 py-0.5 rounded bg-muted text-muted-foreground"
-              >
-                Fit label: 
-                High-risk application
-              </span>
-              <span
-                class="px-2 py-0.5 rounded border border-accent/20 bg-accent/10 text-accent"
-              >
-                Recommended move: 
-                Fix before applying
-              </span>
             </div>
             <button
               aria-expanded="false"
@@ -369,9 +341,7 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
               <p
                 aria-live="polite"
                 class="text-xs text-muted-foreground"
-              >
-                Choose what you did. This keeps future recommendations grounded.
-              </p>
+              />
             </div>
           </div>
         </div>

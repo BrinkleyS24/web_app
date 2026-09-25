@@ -16,6 +16,7 @@ const {
   fetchResume,
   fetchResumeVariants,
   fetchVariantScoreboard,
+  recheckApplyGateVerdict,
 } = vi.hoisted(() => ({
   analyzeJobAlignment: vi.fn(),
   fetchApplyGateHistory: vi.fn(),
@@ -23,6 +24,7 @@ const {
   fetchResume: vi.fn(),
   fetchResumeVariants: vi.fn(),
   fetchVariantScoreboard: vi.fn(),
+  recheckApplyGateVerdict: vi.fn(),
 }));
 
 vi.mock("@/components/DashboardLayout", () => ({
@@ -54,6 +56,7 @@ vi.mock("@/lib/emails", async () => {
     fetchResume,
     fetchResumeVariants,
     fetchVariantScoreboard,
+    recheckApplyGateVerdict,
   };
 });
 
@@ -138,15 +141,15 @@ const baseResult = {
 };
 
 async function runAnalyze(options?: { companyName?: string; jobTitle?: string; jobDescription?: string }) {
-  await userEvent.type(screen.getByLabelText("Job Title"), options?.jobTitle || "Automation Engineer");
+  await userEvent.type(screen.getByLabelText("Job title"), options?.jobTitle || "Automation Engineer");
   if (options?.companyName) {
-    await userEvent.type(screen.getByLabelText("Company Name (optional)"), options.companyName);
+    await userEvent.type(screen.getByLabelText("Company (optional)"), options.companyName);
   }
   await userEvent.type(
-    screen.getByLabelText("Job Description"),
+    screen.getByLabelText("Job description"),
     options?.jobDescription || "Requires PLC and controls experience.",
   );
-  await userEvent.click(screen.getByRole("button", { name: /Get decision/i }));
+  await userEvent.click(screen.getByRole("button", { name: /Check this role/i }));
 }
 
 beforeEach(() => {
@@ -169,11 +172,11 @@ describe("ApplyGate current UI", () => {
     renderPage();
 
     expect(screen.queryByLabelText(/Job URL/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Get decision/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Check this role/i })).toBeDisabled();
 
-    await userEvent.type(screen.getByLabelText("Job Description"), "Requires PLC and controls experience.");
+    await userEvent.type(screen.getByLabelText("Job description"), "Requires PLC and controls experience.");
 
-    expect(screen.getByRole("button", { name: /Get decision/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Check this role/i })).toBeEnabled();
   });
 
   test("snapshot: risky verdict renders the current card layout", async () => {
@@ -258,7 +261,8 @@ describe("ApplyGate current UI", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Fix first before applying" })).toBeInTheDocument();
-      expect(screen.getByText("Recommended move: Fix before applying")).toBeInTheDocument();
+      // One decision, stated once: the headline. The "Recommended move" chip repeated it.
+      expect(screen.getByText("Our call")).toBeInTheDocument();
       expect(screen.getByText("This is an aligned role, but the shown tenure needs clearer proof before applying.")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "I'll fix first" })).toBeInTheDocument();
     });
@@ -280,7 +284,6 @@ describe("ApplyGate current UI", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Decision unavailable" })).toBeInTheDocument();
-      expect(screen.getByText("Fit label: Decision unavailable")).toBeInTheDocument();
       expect(screen.getByText("Apply Gate could not produce a consistent decision for this role. Review it manually before acting.")).toBeInTheDocument();
     });
     expect(screen.queryByText("Recommended move: Apply now")).not.toBeInTheDocument();
@@ -404,7 +407,8 @@ describe("ApplyGate current UI", () => {
       expect(screen.getByText("Requirement check")).toBeInTheDocument();
       expect(screen.getByText("Nurse's Aide experience")).toBeInTheDocument();
       expect(screen.getByText(/Apply anyway only if you already meet these requirements/i)).toBeInTheDocument();
-      expect(screen.getAllByText(/Decision confidence:/i).length).toBeGreaterThan(0);
+      // The technical readout ("Decision confidence: …") is gone; the coach line says it in words.
+      expect(screen.queryByText(/Decision confidence:/i)).not.toBeInTheDocument();
     });
   });
 
@@ -563,8 +567,6 @@ describe("ApplyGate current UI", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Apply, but tailor first" })).toBeInTheDocument();
       expect(screen.getByText(primaryReason)).toBeInTheDocument();
-      expect(screen.getByText("Fit label: Stretch aligned")).toBeInTheDocument();
-      expect(screen.getByText("Recommended move: Apply, but tailor first")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Apply, tailored" })).toBeInTheDocument();
     });
     expect(screen.queryByText("Requirement check")).not.toBeInTheDocument();
@@ -607,7 +609,7 @@ describe("ApplyGate current UI", () => {
     await runAnalyze();
 
     await waitFor(() => {
-      expect(screen.getByText("Search memory")).toBeInTheDocument();
+      expect(screen.getByText("Your history with roles like this")).toBeInTheDocument();
     });
     expect(screen.queryByText(/Median response time:/i)).not.toBeInTheDocument();
   });
@@ -649,7 +651,7 @@ describe("ApplyGate current UI", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Skip this. You've tried 8 similar roles and 8 got no response.")).toBeInTheDocument();
-      expect(screen.getByText("Search memory: 8 similar roles - 8 no responses")).toBeInTheDocument();
+      expect(screen.getByText("Your history with roles like this: 8 similar roles - 8 no responses")).toBeInTheDocument();
     });
   });
 
@@ -1040,6 +1042,46 @@ describe("ApplyGate current UI", () => {
     await waitFor(() => {
       expect(screen.queryByText("Fix first before applying")).not.toBeInTheDocument();
     });
+  });
+
+  test("an outdated check says so and re-checks against today's Apply Gate", async () => {
+    // Stored verdicts are snapshots: MongoDB still read "Skip this role" a day after the scoring
+    // bug behind it was fixed (2026-09-25). The card says it is out of date and offers a re-check.
+    fetchApplyGateHistory.mockResolvedValue({
+      success: true,
+      history: [{
+        id: "old-1",
+        job_title: "Software Engineer 3",
+        company_name: "MongoDB",
+        job_url: null,
+        verdict: "not_recommended",
+        score: 40,
+        hard_blocker: false,
+        reasons: JSON.stringify(["Missing preferred skills: C#, Go."]),
+        explanation_payload: { decision: "skip" },
+        fix_suggestion: null,
+        user_action: null,
+        created_at: "2026-08-07T10:00:00.000Z",
+        outdated: true,
+      }],
+    });
+    recheckApplyGateVerdict.mockResolvedValue({
+      ...baseResult,
+      id: "new-1",
+      jobTitle: "Software Engineer 3",
+      companyName: "MongoDB",
+      verdict: "good_fit",
+      explanation: { ...(baseResult as { explanation?: object }).explanation, decision: "apply_now" },
+    });
+    renderPage();
+
+    expect(await screen.findByText(/Checked before Apply Gate's Sep 24 update/)).toBeInTheDocument();
+    // No "Choose what you did" chore on any card.
+    expect(screen.queryByText(/Choose what you did/)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Re-check" }));
+    await waitFor(() => expect(recheckApplyGateVerdict).toHaveBeenCalledWith("old-1"));
+    expect(await screen.findByText("Our call")).toBeInTheDocument();
   });
 
   test("shows persisted company names in history and hides unresolved placeholders", async () => {
