@@ -544,6 +544,8 @@ export interface ResumeGapInsightsResponse {
   distinctRolesEvaluated: number;
   verdictsWithGapData: number;
   gaps: ResumeGap[];
+  /** Checks made before Apply Gate's current scoring, left out of the gaps above. */
+  outdatedVerdictsExcluded?: number;
 }
 
 export async function fetchResumeGaps(): Promise<ResumeGapInsightsResponse> {
