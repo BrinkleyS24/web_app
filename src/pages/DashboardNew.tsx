@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
+import { AskApplendium } from "@/components/AskApplendium";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { FirstMoveCard } from "@/components/FirstMoveCard";
 import { InterviewDebriefCards } from "@/components/InterviewDebriefCards";
@@ -177,6 +178,8 @@ const Dashboard = () => {
         <FirstMoveCard />
 
         <HeroCard answer={answer} loading={answerLoading} heroMove={heroMove} pairedWithClaim={Boolean(answerMove)} />
+
+        <AskApplendium />
 
         <div className="grid items-start gap-5 lg:grid-cols-5">
           <TodayPanel
