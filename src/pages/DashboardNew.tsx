@@ -59,6 +59,7 @@ import {
   type QueueItem,
 } from "@/lib/premiumTaskQueue";
 import { cn } from "@/lib/utils";
+import { STATUS_TONE } from "@/lib/statusTone";
 import { describeVerdictDecision, describeVerdictOutcome } from "@/lib/verdictPresentation";
 import { describeOutcomeSource } from "@/lib/outcomeSource";
 
@@ -534,9 +535,9 @@ function outcomeRows(weekly?: WeeklyHighlightsResponse) {
   if (!weekly) return [];
   const tag = (items: WeeklyHighlightEmail[], label: string, tone: Tone) => items.map((item) => ({ item, label, tone }));
   return [
-    ...tag(weekly.highlights.newOffers, "Offer", "positive"),
-    ...tag(weekly.highlights.newCallbacks, "Interview", "brand"),
-    ...tag(weekly.highlights.newRejections, "Rejected", "risk"),
+    ...tag(weekly.highlights.newOffers, "Offer", STATUS_TONE.offer),
+    ...tag(weekly.highlights.newCallbacks, "Interview", STATUS_TONE.interview),
+    ...tag(weekly.highlights.newRejections, "Rejected", STATUS_TONE.rejected),
   ]
     .sort((a, b) => new Date(b.item.date || 0).getTime() - new Date(a.item.date || 0).getTime())
     .slice(0, 5);

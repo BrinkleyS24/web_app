@@ -23,6 +23,7 @@ import { fetchWeeklyHighlights } from "@/lib/emails";
 import type { WeeklyHighlightEmail, WeeklyHighlightSilent, WeeklyReadout, WeeklyReadoutItem } from "@/lib/emails";
 import { describeOutcomeSource } from "@/lib/outcomeSource";
 import { cn } from "@/lib/utils";
+import { STATUS_TONE } from "@/lib/statusTone";
 
 function formatRelativeDate(dateString: string | null) {
   if (!dateString) return null;
@@ -238,9 +239,9 @@ const WeeklySummary = () => {
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatTile label="Applications sent" value={counts?.applications ?? "–"} hint={deltaHint(counts?.applications, prior?.applications)} loading={loading} />
-          <StatTile label="Replies & interviews" value={counts ? counts.callbacks : "–"} hint={deltaHint(counts?.callbacks, prior?.callbacks)} tone="brand" loading={loading} />
-          <StatTile label="Offers" value={counts?.offers ?? "–"} hint={deltaHint(counts?.offers, prior?.offers)} tone="positive" loading={loading} />
-          <StatTile label="Rejections" value={counts?.rejections ?? "–"} hint={deltaHint(counts?.rejections, prior?.rejections)} tone="risk" loading={loading} />
+          <StatTile label="Replies & interviews" value={counts ? counts.callbacks : "–"} hint={deltaHint(counts?.callbacks, prior?.callbacks)} tone={STATUS_TONE.interview} loading={loading} />
+          <StatTile label="Offers" value={counts?.offers ?? "–"} hint={deltaHint(counts?.offers, prior?.offers)} tone={STATUS_TONE.offer} loading={loading} />
+          <StatTile label="Rejections" value={counts?.rejections ?? "–"} hint={deltaHint(counts?.rejections, prior?.rejections)} tone={STATUS_TONE.rejected} loading={loading} />
         </div>
 
         {!loading && !highlightsQuery.isError && !hasEvents ? (
@@ -264,15 +265,15 @@ const WeeklySummary = () => {
             ) : null}
 
             {h.newCallbacks.length ? (
-              <Panel icon={CheckCircle2} tone="brand" title="Replies and interview moves">
+              <Panel icon={CheckCircle2} tone={STATUS_TONE.interview} title="Replies and interview moves">
                 <ul className="divide-y divide-border">
-                  {h.newCallbacks.map((item, idx) => <EventRow key={`cb-${idx}`} item={item} tone="brand" label="Interview" />)}
+                  {h.newCallbacks.map((item, idx) => <EventRow key={`cb-${idx}`} item={item} tone={STATUS_TONE.interview} label="Interview" />)}
                 </ul>
               </Panel>
             ) : null}
 
             {h.silentThreads.length ? (
-              <Panel icon={Hourglass} tone="attention" title="Waiting on a reply" description="Applications that went quiet — and any where the next move is yours.">
+              <Panel icon={Hourglass} tone={STATUS_TONE.waiting} title="Waiting on a reply" description="Applications that went quiet — and any where the next move is yours.">
                 <ul className="divide-y divide-border">
                   {h.silentThreads.map((item, idx) => <SilentRow key={`silent-${idx}`} item={item} />)}
                 </ul>

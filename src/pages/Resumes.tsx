@@ -20,6 +20,7 @@ import {
   type ResumeHealthFinding,
 } from "@/lib/emails";
 import { cn } from "@/lib/utils";
+import { STATUS_TONE } from "@/lib/statusTone";
 
 const VARIANT_NUDGE_DISMISS_KEY = "variantNudge.dismissed";
 
@@ -40,11 +41,11 @@ function writeVariantNudgeDismissed() {
 }
 
 const OUTCOME_CHIP: Record<VariantBreakdownRow["outcome"], { label: string; tone: Tone }> = {
-  interviewed: { label: "Interviewed", tone: "positive" },
-  offered: { label: "Offered", tone: "positive" },
-  rejected: { label: "Rejected", tone: "risk" },
-  no_response: { label: "No response", tone: "neutral" },
-  pending: { label: "Pending", tone: "upcoming" },
+  interviewed: { label: "Interviewed", tone: STATUS_TONE.interview },
+  offered: { label: "Offered", tone: STATUS_TONE.offer },
+  rejected: { label: "Rejected", tone: STATUS_TONE.rejected },
+  no_response: { label: "No response", tone: STATUS_TONE.waiting },
+  pending: { label: "Pending", tone: STATUS_TONE.applied },
 };
 
 function recordLine(score: VariantScoreRow | undefined) {

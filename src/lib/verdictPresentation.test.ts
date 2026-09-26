@@ -18,7 +18,8 @@ describe("describeVerdictOutcome", () => {
     expect(describeVerdictOutcome({ derived_outcome_label: "rejected", user_action: "applied" }))
       .toEqual({ label: "You applied · Rejected", tone: "risk" });
     expect(describeVerdictOutcome({ derived_outcome_label: "interviewed" }))
-      .toEqual({ label: "You applied · Interview", tone: "positive" });
+      // Interviews are gold on every surface (statusTone.ts), matching the extension and landing page.
+      .toEqual({ label: "You applied · Interview", tone: "attention" });
   });
 
   test("with no inbox evidence, the recorded decision is shown; with neither, nothing", () => {

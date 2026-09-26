@@ -1,5 +1,6 @@
 import type { Tone } from "@/components/premium/tone";
 import type { ApplyGateVerdict } from "@/lib/emails";
+import { STATUS_TONE } from "@/lib/statusTone";
 
 export type VerdictDecisionKey = "apply" | "apply_with_care" | "fix_first" | "skip";
 
@@ -37,11 +38,11 @@ type OutcomeLike = {
 };
 
 const OUTCOMES: Record<string, { label: string; tone: Tone }> = {
-  offered: { label: "Offer", tone: "positive" },
-  interviewed: { label: "Interview", tone: "positive" },
-  rejected: { label: "Rejected", tone: "risk" },
-  no_response: { label: "No reply yet", tone: "neutral" },
-  withdrawn: { label: "Withdrew", tone: "done" },
+  offered: { label: "Offer", tone: STATUS_TONE.offer },
+  interviewed: { label: "Interview", tone: STATUS_TONE.interview },
+  rejected: { label: "Rejected", tone: STATUS_TONE.rejected },
+  no_response: { label: "No reply yet", tone: STATUS_TONE.waiting },
+  withdrawn: { label: "Withdrew", tone: STATUS_TONE.closed },
 };
 
 /**
