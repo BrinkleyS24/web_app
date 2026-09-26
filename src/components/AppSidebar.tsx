@@ -21,6 +21,7 @@ import {
   SidebarMenuItem,
   SidebarHeader,
 } from "@/components/ui/sidebar";
+import { useNavCounts } from "@/hooks/useNavCounts";
 import { useAuth } from "@/lib/AuthContext.jsx";
 
 type NavItem = { title: string; url: string; icon: LucideIcon };
@@ -45,7 +46,7 @@ const linkClass =
 const activeLinkClass =
   "bg-sidebar-accent text-sidebar-accent-foreground font-semibold [&_svg]:text-[#5FD9AE]";
 
-function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
+function NavGroup({ label, items, counts = {} }: { label: string; items: NavItem[]; counts?: Record<string, number> }) {
   return (
     <SidebarGroup className="px-0 py-1">
       <SidebarGroupLabel className="px-2.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-sidebar-muted">
@@ -59,6 +60,14 @@ function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
                 <NavLink to={item.url} className={linkClass} activeClassName={activeLinkClass}>
                   <item.icon className="h-4 w-4 shrink-0 text-[#7C8AA3] transition-colors group-hover:text-white" aria-hidden />
                   <span>{item.title}</span>
+                  {counts[item.url] ? (
+                    <span
+                      className="ml-auto min-w-[20px] rounded-full bg-white/[0.08] px-1.5 py-px text-center text-[11px] font-semibold tabular-nums text-white/80"
+                      aria-label={`${counts[item.url]} ${item.url === "/next-actions" ? "for today" : "need attention"}`}
+                    >
+                      {counts[item.url]}
+                    </span>
+                  ) : null}
                 </NavLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -84,6 +93,7 @@ function initialsFromUser(name?: string | null, email?: string | null) {
 export function AppSidebar() {
   const { user, plan, planLoading } = useAuth();
   const isPremium = plan === "premium";
+  const counts = useNavCounts(isPremium);
   const displayName = user?.displayName || user?.email || "Signed in";
   const initials = initialsFromUser(user?.displayName, user?.email);
 
@@ -101,7 +111,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="px-2.5 py-3">
-        <NavGroup label="Your search" items={searchNav} />
+        <NavGroup label="Your search" items={searchNav} counts={counts} />
         <NavGroup label="Tools" items={toolsNav} />
       </SidebarContent>
 
