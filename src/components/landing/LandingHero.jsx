@@ -10,9 +10,9 @@ const EASE_OUT = [0.16, 1, 0.3, 1];
 // chips filter, search filters, a row opens an inline preview.
 const TILES = [
   { key: "applied", label: "Applied", value: 24, text: "text-white", bg: "bg-white/[0.05]", ring: "ring-white/10" },
-  { key: "interviews", label: "Interviews", value: 6, text: "text-[#F4C770]", bg: "bg-[#F4B740]/[0.10]", ring: "ring-[#F4B740]/20" },
+  { key: "interviews", label: "In interviews", value: 6, text: "text-[#F4C770]", bg: "bg-[#F4B740]/[0.10]", ring: "ring-[#F4B740]/20" },
   { key: "offers", label: "Offers", value: 2, text: "text-[#34E3A8]", bg: "bg-[#34E3A8]/[0.10]", ring: "ring-[#34E3A8]/20" },
-  { key: "rejected", label: "Rejected", value: 15, text: "text-[#F2718C]", bg: "bg-[#F2718C]/[0.08]", ring: "ring-[#F2718C]/20" },
+  { key: "rejected", label: "Closed", value: 15, text: "text-[#F2718C]", bg: "bg-[#F2718C]/[0.08]", ring: "ring-[#F2718C]/20" },
 ];
 
 const STATUS = {
@@ -78,7 +78,7 @@ const CHIPS = [
   { label: "Applied", match: "applied" },
   { label: "Interviews", match: "interview" },
   { label: "Offers", match: "offer" },
-  { label: "Rejected", match: "rejected" },
+  { label: "Closed", match: "rejected" },
 ];
 const STAGE_COLORS = ["#9AA7BD", "#F4C770", "#34E3A8"];
 
