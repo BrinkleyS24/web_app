@@ -276,13 +276,14 @@ function VariantComparison({
         </p>
       ) : null}
       <div className="-mx-1 overflow-x-auto">
-        <table className="w-full min-w-[520px] border-collapse">
+        {/* On a phone the counts step aside and the answer columns stay: version, rate, health. */}
+        <table className="w-full border-collapse sm:min-w-[520px]">
           <thead>
             <tr className="border-b border-border">
               <th scope="col" className={th}>Version</th>
-              <th scope="col" className={cn(th, "text-right")}>Sent</th>
-              <th scope="col" className={cn(th, "text-right")}>With an outcome</th>
-              <th scope="col" className={cn(th, "text-right")}>Interviews</th>
+              <th scope="col" className={cn(th, "hidden text-right sm:table-cell")}>Sent</th>
+              <th scope="col" className={cn(th, "hidden text-right sm:table-cell")}>With an outcome</th>
+              <th scope="col" className={cn(th, "hidden text-right sm:table-cell")}>Interviews</th>
               <th scope="col" className={cn(th, "text-right")}>Interview rate</th>
               <th scope="col" className={th}>Résumé health</th>
             </tr>
@@ -304,9 +305,9 @@ function VariantComparison({
                       {variant.isDefault ? <ToneChip tone="brand">Default</ToneChip> : null}
                     </span>
                   </th>
-                  <td className={cn(td, "text-right text-foreground")}>{score?.sent ?? 0}</td>
-                  <td className={cn(td, "text-right text-foreground")}>{matched}</td>
-                  <td className={cn(td, "text-right text-foreground")}>
+                  <td className={cn(td, "hidden text-right text-foreground sm:table-cell")}>{score?.sent ?? 0}</td>
+                  <td className={cn(td, "hidden text-right text-foreground sm:table-cell")}>{matched}</td>
+                  <td className={cn(td, "hidden text-right text-foreground sm:table-cell")}>
                     {score?.interviewed ?? 0}
                     {score?.offered ? <span className="ml-1 text-muted-foreground">· {score.offered} offer{score.offered === 1 ? "" : "s"}</span> : null}
                   </td>
@@ -323,7 +324,7 @@ function VariantComparison({
                     ) : open === 0 ? (
                       <span className={TONES.positive.text}>Nothing flagged</span>
                     ) : (
-                      <a href={`#resume-${variant.id}`} className={cn("font-medium underline-offset-2 hover:underline", TONES[STATUS_TONE.interview].text)}>
+                      <a href={`#resume-${variant.id}`} className={cn("font-medium underline-offset-2 hover:underline", TONES.attention.text)}>
                         {open} to fix
                       </a>
                     )}

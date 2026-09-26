@@ -214,11 +214,13 @@ const Dashboard = () => {
           <span className="h-px flex-1 bg-border" />
         </div>
         <div className="grid items-start gap-5 lg:grid-cols-5">
-          <div className="space-y-5 lg:col-span-3">
+          {/* min-w-0: a grid column otherwise refuses to shrink below its widest one-line (truncated)
+              row, which pushed this whole column 93px past a 390px screen. */}
+          <div className="min-w-0 space-y-5 lg:col-span-3">
             <SearchStatusPanel loading={metricsQuery.isLoading} metrics={metricsQuery.data} />
             <RecentOutcomesPanel loading={weeklyQuery.isLoading} weekly={weeklyQuery.data} />
           </div>
-          <div className="space-y-5 lg:col-span-2">
+          <div className="min-w-0 space-y-5 lg:col-span-2">
             <RecentChecksPanel
               loading={historyQuery.isLoading}
               history={historyQuery.data?.history || []}
@@ -514,7 +516,7 @@ function StageBar({
           );
         })}
       </div>
-      <ul className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+      <ul className="space-y-1.5">
         {segments.map((segment) => (
           <li key={segment.key} className="flex items-center justify-between gap-2 text-[12.5px]">
             <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
@@ -720,7 +722,7 @@ function PatternsPanel({ alerts }: { alerts: StrategyAlert[] }) {
           <Link
             key={alert.id}
             to={`/strategy-alerts#${encodeURIComponent(alert.id)}`}
-            className="group rounded-xl border border-border bg-muted/30 px-4 py-3.5 transition-colors hover:border-foreground/20 hover:bg-card"
+            className="group block rounded-xl border border-border bg-muted/30 px-4 py-3.5 transition-colors hover:border-foreground/20 hover:bg-card"
           >
             <p className="text-[14px] font-semibold leading-snug text-foreground">{alert.title}</p>
             <p className="mt-1 line-clamp-2 text-[12.5px] leading-relaxed text-muted-foreground">{alert.description}</p>
