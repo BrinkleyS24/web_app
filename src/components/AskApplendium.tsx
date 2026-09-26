@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { ArrowUp, ExternalLink, Loader2, Sparkles } from "lucide-react";
 
 import { ErrorState, ToneChip } from "@/components/premium/PremiumUI";
+import { WhyLine } from "@/components/premium/WhyLine";
 import { BUTTON, CARD, EYEBROW, TONES, type Tone } from "@/components/premium/tone";
 import { ASK_MAX_QUESTION_CHARS, askApplendium, type AskNextStep, type AskResponse, type AskStage } from "@/lib/ask";
 import { buildGmailThreadUrl } from "@/lib/premiumTaskQueue";
@@ -163,6 +164,7 @@ export function AskApplendium() {
                             {app.role ? <span className="font-normal text-muted-foreground"> · {app.role}</span> : null}
                           </p>
                           {detail ? <p className="text-[12px] text-muted-foreground">{detail}</p> : null}
+                          <WhyLine why={app.why} className="mt-1" />
                         </div>
                         <ToneChip tone={look.tone}>{look.label}</ToneChip>
                         {gmailUrl ? (

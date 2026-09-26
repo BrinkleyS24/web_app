@@ -399,6 +399,8 @@ export type RankedAction = {
   /** The role on the application this action is about, when known. */
   roleTitle?: string | null;
   lastMessageSnippet?: string | null;
+  /** What a follow-up stands on, written by the backend (followUpBasis.js), never by the AI. */
+  why?: string | null;
 };
 
 export type RankedActionQueue = {

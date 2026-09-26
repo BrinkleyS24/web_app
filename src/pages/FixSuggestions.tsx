@@ -36,6 +36,7 @@ import {
   ToneChip,
 } from "@/components/premium/PremiumUI";
 import { BUTTON, CARD, EYEBROW, TONES } from "@/components/premium/tone";
+import { WhyLine } from "@/components/premium/WhyLine";
 import { describeActionIdentity, describeActionKind, resolveActionCta } from "@/lib/actionPresentation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -1650,6 +1651,7 @@ const FixSuggestions = () => {
               {identity ? ` · ${identity}` : ""}
               {item.estimatedTime ? ` · ${item.estimatedTime}` : ""}
             </p>
+            <WhyLine why={item.why} className="mt-1" />
             {reason && variant === "today" ? (
               <p className="mt-2 max-w-[72ch] text-[13.5px] leading-relaxed text-foreground/80">{reason}</p>
             ) : null}

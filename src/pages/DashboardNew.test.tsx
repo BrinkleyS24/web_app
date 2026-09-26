@@ -534,6 +534,28 @@ describe("DashboardNew", () => {
     expect(screen.getByText("Prep for the Verisk interview")).toBeInTheDocument();
   });
 
+  test("shows what each follow-up stands on, written by the backend", async () => {
+    const why = "13 days with no reply · Applendium suggests a follow-up on days 10–14 · half of the 129 answers you've had came within 9 days, mostly rejections";
+    fetchRankedActionQueue.mockResolvedValue({
+      success: true,
+      queue: {
+        now: "2026-04-13T12:00:00.000Z",
+        doToday: [
+          { ...QUEUE_ITEM_TEMPLATE, id: "queue-followup-1", logicalKey: "followup:thread-1", dedupeKey: "followup:thread-1:v1", title: "Send follow-up to Acme Health" },
+          { ...QUEUE_ITEM_TEMPLATE, id: "queue-followup-2", logicalKey: "followup:thread-2", dedupeKey: "followup:thread-2:v1", threadId: "thread-2", primaryEntityId: "thread-2", title: "Send follow-up to Portra", company: "Portra", why },
+        ],
+        thisWeek: [], later: [], blocked: [], dismissed: [], expired: [], done: [], emptyState: null, resolvedActions: [],
+      },
+    });
+
+    renderDashboard();
+
+    const line = await screen.findByTestId("why-line");
+    expect(line).toHaveTextContent(`Why: ${why}`);
+    // Only the item that has one; nothing is invented for the other.
+    expect(screen.getAllByTestId("why-line")).toHaveLength(1);
+  });
+
   test("asks about silent interviews in place, and keeps the actions below", async () => {
     fetchStrategyAlerts.mockResolvedValue({
       success: true,

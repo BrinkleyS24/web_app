@@ -34,6 +34,7 @@ import {
   ToneChip,
 } from "@/components/premium/PremiumUI";
 import { BUTTON, CARD, EYEBROW, TONES, type Tone } from "@/components/premium/tone";
+import { WhyLine } from "@/components/premium/WhyLine";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useInboxSync } from "@/hooks/useInboxSync";
 import { describeActionIdentity, resolveActionCta } from "@/lib/actionPresentation";
@@ -285,6 +286,7 @@ function HeroCard({
               <span className="font-medium text-foreground/80">{heroMove.title}</span>
               {moveIdentity ? ` · ${moveIdentity}` : ""}
             </p>
+            <WhyLine why={heroMove.why} className="basis-full" />
           </div>
         ) : null}
       </div>
@@ -349,6 +351,7 @@ function TodayPanel({
                     <span className="font-medium text-foreground/70">{kind}</span>
                     {identity ? ` · ${identity}` : ""}
                   </p>
+                  <WhyLine why={item.why} className="mt-1" />
                 </div>
                 {/* Below the text on a phone, so the title is not squeezed into a narrow column. */}
                 <ActionCtaButton item={item} cta={cta} className={cn(BUTTON.secondary, "ml-12 shrink-0 px-3 py-1.5 text-[12.5px] sm:ml-0")} />

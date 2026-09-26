@@ -21,6 +21,8 @@ export type AskApplication = {
   /** The latest email from the hiring process about this application. */
   lastUpdateOn: string | null;
   nextStep: AskNextStep | null;
+  /** What the next step stands on, written by the backend (followUpBasis.js), never by the AI. */
+  why?: string | null;
   threadId: string | null;
 };
 
