@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
@@ -17,7 +17,7 @@ import {
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { InterviewDebriefCards } from "@/components/InterviewDebriefCards";
 import { EmptyState, ErrorState, LoadingRows, PageHeader, Panel, SectionLabel, ToneChip } from "@/components/premium/PremiumUI";
-import { BUTTON, CARD, EYEBROW, TONES, type Tone } from "@/components/premium/tone";
+import { BUTTON, CARD, TONES, type Tone } from "@/components/premium/tone";
 import { useAuth } from "@/lib/AuthContext.jsx";
 import { fetchResumeGaps, fetchStrategyAlerts, type ResumeGap, type StrategyAlert } from "@/lib/emails";
 import { cn } from "@/lib/utils";
@@ -40,10 +40,17 @@ function alertCta(alert: StrategyAlert): { to: string; label: string } {
   return { to: "/next-actions", label: "See what to do today" };
 }
 
+/**
+ * One alert, said briefly (review, 2026-09-26): what was noticed, the number behind it, and the move
+ * with its button on one line. The full reasoning is one tap away, not a paragraph every time — the
+ * card used to stack an icon, the title, the paragraph, the stat, a boxed "What to do" and a button.
+ */
 function AlertCard({ alert }: { alert: StrategyAlert }) {
   const look = alertLook(alert);
   const cta = alertCta(alert);
   const debriefItems = alert.debrief?.items?.filter((item) => item?.emailId != null) || [];
+  const [expanded, setExpanded] = useState(false);
+  const longDescription = (alert.description || "").length > 180;
 
   return (
     <article id={alert.id} className={cn(CARD, "relative scroll-mt-24 overflow-hidden")}>
@@ -53,33 +60,48 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
           <ToneChip tone={look.tone}>{look.label}</ToneChip>
           {alert.timeframe_label ? <span className="text-[12px] text-muted-foreground">{alert.timeframe_label}</span> : null}
         </div>
-        <div className="mt-3 flex items-start gap-3">
-          <span className={cn("mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg", TONES[look.tone].icon)}>
-            <look.icon className="h-4 w-4" aria-hidden />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-[18px] font-bold leading-snug tracking-[-0.015em] text-foreground">{alert.title}</h2>
-            <p className="mt-2 max-w-[74ch] text-[14px] leading-relaxed text-muted-foreground">{alert.description}</p>
-            {alert.supporting_stat ? (
-              <p className="mt-2 text-[13px] font-semibold text-foreground/80">{alert.supporting_stat}</p>
+        <h2 className="mt-2.5 text-[18px] font-bold leading-snug tracking-[-0.015em] text-foreground">{alert.title}</h2>
+        {alert.supporting_stat ? (
+          <p className="mt-1.5 text-[14px] font-semibold text-foreground/85">{alert.supporting_stat}</p>
+        ) : null}
+        {alert.description ? (
+          <div className="mt-1.5 max-w-[74ch]">
+            <p className={cn("text-[13.5px] leading-relaxed text-muted-foreground", !expanded && longDescription && "line-clamp-2")}>
+              {alert.description}
+            </p>
+            {longDescription ? (
+              <button
+                type="button"
+                onClick={() => setExpanded((open) => !open)}
+                aria-expanded={expanded}
+                className="mt-1 text-[12.5px] font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+              >
+                {expanded ? "Show less" : "Read more"}
+              </button>
             ) : null}
-          </div>
-        </div>
-
-        {alert.recommendation ? (
-          <div className="mt-4 rounded-xl border border-border bg-muted/40 px-4 py-3">
-            <p className={EYEBROW}>What to do</p>
-            <p className="mt-1.5 text-[14px] leading-relaxed text-foreground">{alert.recommendation}</p>
           </div>
         ) : null}
 
         {debriefItems.length > 0 ? (
-          <InterviewDebriefCards items={debriefItems} total={Math.max(alert.debrief?.total ?? 0, debriefItems.length)} />
+          <>
+            {alert.recommendation ? (
+              <p className="mt-4 flex max-w-[74ch] gap-2 text-[14px] leading-relaxed text-foreground">
+                <ArrowRight className={cn("mt-1 h-4 w-4 shrink-0", TONES[look.tone].text)} aria-hidden />
+                {alert.recommendation}
+              </p>
+            ) : null}
+            <InterviewDebriefCards items={debriefItems} total={Math.max(alert.debrief?.total ?? 0, debriefItems.length)} />
+          </>
         ) : (
-          <div className="mt-4">
-            <Link to={cta.to} className={BUTTON.secondary}>
+          <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+            {alert.recommendation ? (
+              <p className="flex max-w-[64ch] gap-2 text-[14px] leading-relaxed text-foreground">
+                <ArrowRight className={cn("mt-1 h-4 w-4 shrink-0", TONES[look.tone].text)} aria-hidden />
+                {alert.recommendation}
+              </p>
+            ) : <span />}
+            <Link to={cta.to} className={cn(BUTTON.secondary, "shrink-0 self-start sm:self-center")}>
               {cta.label}
-              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
             </Link>
           </div>
         )}
