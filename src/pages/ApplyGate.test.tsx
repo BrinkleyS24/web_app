@@ -1078,6 +1078,9 @@ describe("ApplyGate current UI", () => {
     expect(await screen.findByText(/Checked before Apply Gate's Sep 24 update/)).toBeInTheDocument();
     // No "Choose what you did" chore on any card.
     expect(screen.queryByText(/Choose what you did/)).not.toBeInTheDocument();
+    // The old read is folded away until asked for: Re-check is the action on an outdated card.
+    expect(screen.getByText("Show the old read")).toBeVisible();
+    for (const oldLine of screen.getAllByText(/Missing preferred skills: C#, Go\./)) expect(oldLine).not.toBeVisible();
 
     await userEvent.click(screen.getByRole("button", { name: "Re-check" }));
     await waitFor(() => expect(recheckApplyGateVerdict).toHaveBeenCalledWith("old-1"));

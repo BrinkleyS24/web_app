@@ -2375,6 +2375,13 @@ const ApplyGate = () => {
                     ) : null}
                   </div>
                 ) : null}
+                {/* An outdated check's old read folds away (review, 2026-09-26): its red "blocker" boxes and
+                    reasons came from scoring that has since been fixed, and on the founder's account they
+                    contradicted themselves ("Primary blocker: No single hard gap drives this"). Re-check is
+                    the action; the old read stays one tap away. */}
+                {(() => {
+                  const oldRead = (
+                    <>
                 {historyVisibleReasons.map((reason, index) => (
                   <p key={index} className="text-sm text-muted-foreground leading-relaxed">• {reason}</p>
                 ))}
@@ -2432,6 +2439,18 @@ const ApplyGate = () => {
                   ) : null}
                 </div>
                 ) : null}
+                    </>
+                  );
+                  return item.outdated ? (
+                    <details className="group">
+                      <summary className="cursor-pointer list-none text-[12.5px] font-medium text-muted-foreground transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+                        <span className="group-open:hidden">Show the old read</span>
+                        <span className="hidden group-open:inline">Hide the old read</span>
+                      </summary>
+                      <div className="mt-3 space-y-3">{oldRead}</div>
+                    </details>
+                  ) : oldRead;
+                })()}
                     </>
                   );
                 })()}
