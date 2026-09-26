@@ -13,12 +13,13 @@ const FREE_FEATURES = [
   "Pipeline by stage, live from Gmail",
   "Search companies & roles",
   "Thread-linked statuses",
+  "One Apply Gate check a week",
   "Read-only scope, always",
 ];
 
 const PREMIUM_FEATURES = [
   "Everything in Free",
-  "Apply Gate pre-apply briefs",
+  "Apply Gate on every job you look at",
   "Next Actions, with the reason for each",
   "Strategy Alerts on what is and is not working",
   "Weekly search-health summary",
