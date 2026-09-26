@@ -31,7 +31,7 @@ function writeLocal(uid: string | null | undefined, at: number) {
  * automatic sync per visit only when the last sync from any client is over 15 minutes old.
  * After an automatic sync the page's data is refreshed only when new mail actually arrived.
  */
-export function useInboxSync(uid: string | null | undefined) {
+export function useInboxSync(uid: string | null | undefined, { auto = true }: { auto?: boolean } = {}) {
   const enabled = Boolean(uid);
   const queryClient = useQueryClient();
   const statusQuery = useQuery({
@@ -66,12 +66,12 @@ export function useInboxSync(uid: string | null | undefined) {
   );
 
   useEffect(() => {
-    if (!enabled || autoDecided.current || !statusQuery.data) return;
+    if (!auto || !enabled || autoDecided.current || !statusQuery.data) return;
     autoDecided.current = true;
     if (shouldAutoSync({ status: statusQuery.data, lastLocalSyncAt: readLocal(uid) })) {
       void run(true);
     }
-  }, [enabled, run, statusQuery.data, uid]);
+  }, [auto, enabled, run, statusQuery.data, uid]);
 
   const sync = statusQuery.data?.sync;
   const lastCheckedLabel = formatSinceLabel(sync?.lastRunAt);

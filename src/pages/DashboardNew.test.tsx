@@ -583,8 +583,10 @@ describe("DashboardNew", () => {
   });
 
   test("does not sync Gmail when the inbox was checked in the last 15 minutes", async () => {
+    // The "Inbox checked …" line moved to the top bar (AppTopBar); the automatic check stays here.
     renderDashboard();
-    await screen.findByText(/Inbox checked 5 min ago/);
+    await waitFor(() => expect(fetchSyncStatus).toHaveBeenCalled());
+    await screen.findByRole("heading", { name: "You are applying mostly to low-match roles" });
     expect(startEmailSync).not.toHaveBeenCalled();
   });
 

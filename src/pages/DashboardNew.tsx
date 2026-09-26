@@ -11,7 +11,6 @@ import {
   MessageCircleQuestion,
   Minus,
   Radar,
-  RefreshCw,
   ScanSearch,
   Sparkles,
   TrendingDown,
@@ -159,21 +158,6 @@ const Dashboard = () => {
         <PageHeader
           eyebrow={dateLabel}
           title={`${greetingWord}${firstName ? `, ${firstName}` : ""}.`}
-          actions={
-            <div className="flex items-center gap-3">
-              <span className="text-[12px] text-muted-foreground" aria-live="polite">
-                {inbox.isSyncing
-                  ? "Checking your inbox…"
-                  : inbox.lastCheckedLabel
-                    ? `Inbox checked ${inbox.lastCheckedLabel}`
-                    : null}
-              </span>
-              <button type="button" onClick={inbox.syncNow} disabled={inbox.isSyncing} className={BUTTON.secondary}>
-                <RefreshCw className={cn("h-3.5 w-3.5", inbox.isSyncing && "animate-spin")} aria-hidden />
-                Sync now
-              </button>
-            </div>
-          }
         />
 
         {inbox.requiresReconnect ? (
