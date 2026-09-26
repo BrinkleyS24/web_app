@@ -161,6 +161,46 @@ describe("Résumés page", () => {
     expect(screen.getByText(/Pending applications aren't counted in the rate/i)).toBeInTheDocument();
   });
 
+  test("compares versions side by side, with a rate only where the sample supports one", async () => {
+    // Review 2026-09-26: the page promised "see which one gets interviews" and made the user compare
+    // six stacked cards by eye.
+    fetchResumeVariants.mockResolvedValue({
+      success: true,
+      variants: [
+        { id: "A", name: "QA-focused", isDefault: true, createdAt: "", charCount: 1200 },
+        { id: "B", name: "Generic", isDefault: false, createdAt: "", charCount: 1300 },
+      ],
+    });
+    fetchVariantScoreboard.mockResolvedValue({
+      success: true,
+      scoreboard: {
+        minSample: 5,
+        perVariant: [
+          { variantId: "A", name: "QA-focused", sent: 9, matchedToOutcome: 7, interviewed: 3, offered: 1, rejected: 2, noResponse: 1, interviewRate: 42.9, sufficientSample: true },
+          { variantId: "B", name: "Generic", sent: 3, matchedToOutcome: 2, interviewed: 0, offered: 0, rejected: 2, noResponse: 0, interviewRate: null, sufficientSample: false },
+        ],
+      },
+      recommendation: { variantId: "A", name: "QA-focused", interviewRate: 42.9 },
+    });
+    renderPage();
+
+    expect(await screen.findByText("Which version works")).toBeInTheDocument();
+    expect(screen.getByText(/is getting the most interviews/)).toBeInTheDocument();
+    expect(screen.getAllByText("43%")).toHaveLength(2); // the answer line and its row
+    expect(screen.getByText("needs 3 more")).toBeInTheDocument();
+    expect(screen.getByText("Most interviews")).toBeInTheDocument();
+  });
+
+  test("with one version there is nothing to compare, so no table", async () => {
+    fetchResumeVariants.mockResolvedValue({
+      success: true,
+      variants: [{ id: "A", name: "QA-focused", isDefault: true, createdAt: "", charCount: 1200 }],
+    });
+    renderPage();
+    await screen.findByRole("heading", { name: "QA-focused" });
+    expect(screen.queryByText("Which version works")).not.toBeInTheDocument();
+  });
+
   test("creates a new variant from pasted text", async () => {
     fetchResumeVariants.mockResolvedValue({ success: true, variants: [] });
     renderPage();
@@ -215,7 +255,7 @@ describe("Résumés page", () => {
       });
       renderPage();
 
-      await waitFor(() => expect(screen.getByText("My résumé")).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByRole("heading", { name: "My résumé" })).toBeInTheDocument());
       expect(screen.queryByText(/Try a different résumé next time/i)).not.toBeInTheDocument();
     });
 

@@ -18,6 +18,8 @@ import {
   type VariantBreakdownRow,
   type ResumeHealthEntry,
   type ResumeHealthFinding,
+  type ResumeVariant,
+  type VariantRecommendation,
 } from "@/lib/emails";
 import { cn } from "@/lib/utils";
 import { STATUS_TONE } from "@/lib/statusTone";
@@ -229,6 +231,113 @@ function ApplicationsDrilldown({ rows }: { rows: VariantBreakdownRow[] }) {
   );
 }
 
+/**
+ * The page promises "see which one actually gets interviews", and six stacked cards made the user do
+ * the comparing (review, 2026-09-26). This is the comparison: one row per version, the backend's own
+ * recommendation as the answer when it has one, and "needs N more" instead of a rate the sample
+ * cannot support.
+ */
+function VariantComparison({
+  variants,
+  scoreByVariant,
+  openFindingsByVariant,
+  minSample,
+  recommendation,
+}: {
+  variants: ResumeVariant[];
+  scoreByVariant: Map<string, VariantScoreRow>;
+  openFindingsByVariant: Map<string, number | null>;
+  minSample: number | null;
+  recommendation: VariantRecommendation;
+}) {
+  const rows = [...variants].sort((a, b) => {
+    if (a.id === recommendation?.variantId) return -1;
+    if (b.id === recommendation?.variantId) return 1;
+    return (scoreByVariant.get(b.id)?.sent ?? 0) - (scoreByVariant.get(a.id)?.sent ?? 0);
+  });
+  const th = "px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground";
+  const td = "px-3 py-2.5 text-[13px] tabular-nums";
+
+  return (
+    <Panel
+      title="Which version works"
+      description={
+        recommendation
+          ? undefined
+          : minSample
+            ? `A version gets a rate once ${minSample} of its applications have an outcome from your inbox.`
+            : undefined
+      }
+    >
+      {recommendation ? (
+        <p className="mb-3 text-[14px] leading-relaxed text-foreground">
+          <span className="font-semibold">{recommendation.name}</span> is getting the most interviews:{" "}
+          <span className="font-semibold">{Math.round(recommendation.interviewRate)}%</span> of its applications with an outcome.
+        </p>
+      ) : null}
+      <div className="-mx-1 overflow-x-auto">
+        <table className="w-full min-w-[520px] border-collapse">
+          <thead>
+            <tr className="border-b border-border">
+              <th scope="col" className={th}>Version</th>
+              <th scope="col" className={cn(th, "text-right")}>Sent</th>
+              <th scope="col" className={cn(th, "text-right")}>With an outcome</th>
+              <th scope="col" className={cn(th, "text-right")}>Interviews</th>
+              <th scope="col" className={cn(th, "text-right")}>Interview rate</th>
+              <th scope="col" className={th}>Résumé health</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {rows.map((variant) => {
+              const score = scoreByVariant.get(variant.id);
+              const matched = score?.matchedToOutcome ?? 0;
+              const needed = minSample != null ? Math.max(0, minSample - matched) : null;
+              const open = openFindingsByVariant.get(variant.id);
+              return (
+                <tr key={variant.id}>
+                  <th scope="row" className="px-3 py-2.5 text-left">
+                    <a href={`#resume-${variant.id}`} className="text-[13px] font-semibold text-foreground underline-offset-2 hover:underline">
+                      {variant.name}
+                    </a>
+                    <span className="ml-2 inline-flex gap-1.5 align-middle">
+                      {variant.id === recommendation?.variantId ? <ToneChip tone="positive">Most interviews</ToneChip> : null}
+                      {variant.isDefault ? <ToneChip tone="brand">Default</ToneChip> : null}
+                    </span>
+                  </th>
+                  <td className={cn(td, "text-right text-foreground")}>{score?.sent ?? 0}</td>
+                  <td className={cn(td, "text-right text-foreground")}>{matched}</td>
+                  <td className={cn(td, "text-right text-foreground")}>
+                    {score?.interviewed ?? 0}
+                    {score?.offered ? <span className="ml-1 text-muted-foreground">· {score.offered} offer{score.offered === 1 ? "" : "s"}</span> : null}
+                  </td>
+                  <td className={cn(td, "text-right")}>
+                    {score?.sufficientSample && score.interviewRate != null ? (
+                      <span className="font-semibold text-foreground">{Math.round(score.interviewRate)}%</span>
+                    ) : (
+                      <span className="text-[12px] text-muted-foreground">{needed ? `needs ${needed} more` : "—"}</span>
+                    )}
+                  </td>
+                  <td className={cn(td, "text-[12.5px]")}>
+                    {open == null ? (
+                      <span className="text-muted-foreground">—</span>
+                    ) : open === 0 ? (
+                      <span className={TONES.positive.text}>Nothing flagged</span>
+                    ) : (
+                      <a href={`#resume-${variant.id}`} className={cn("font-medium underline-offset-2 hover:underline", TONES[STATUS_TONE.interview].text)}>
+                        {open} to fix
+                      </a>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
+  );
+}
+
 const Resumes = () => {
   const queryClient = useQueryClient();
   const variantsQuery = useQuery({ queryKey: ["resume-variants"], queryFn: fetchResumeVariants });
@@ -332,6 +441,21 @@ const Resumes = () => {
           </div>
         ) : null}
 
+        {variants.length >= 2 ? (
+          <VariantComparison
+            variants={variants}
+            scoreByVariant={scoreByVariant}
+            openFindingsByVariant={
+              new Map(variants.map((v) => {
+                const entry = healthByVariant.get(v.id);
+                return [v.id, entry?.document ? entry.findings.filter((f) => !f.dismissed).length : null];
+              }))
+            }
+            minSample={scoreboardQuery.data?.scoreboard?.minSample ?? null}
+            recommendation={scoreboardQuery.data?.recommendation ?? null}
+          />
+        ) : null}
+
         {adding ? (
           <Panel title="Add a résumé version" description="Paste the text of the version you send. Apply Gate reads this text, not the file.">
             <div className="space-y-3">
@@ -393,7 +517,7 @@ const Resumes = () => {
         ) : (
           <div className="space-y-4">
             {variants.map((v) => (
-              <article key={v.id} className={cn(CARD, "space-y-4 p-5")}>
+              <article key={v.id} id={`resume-${v.id}`} className={cn(CARD, "scroll-mt-24 space-y-4 p-5")}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex min-w-0 flex-1 items-start gap-3">
                     <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg", TONES.brand.icon)}>
