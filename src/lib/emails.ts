@@ -78,6 +78,18 @@ export type MetricsResponse = {
       rejected: number;
       reachedInterview: number;
       reachedOffer: number;
+      /**
+       * Where each application stands now, one bucket each, summing to `applied` — the only
+       * counts that can be drawn as one bar. Absent from backends older than 2026-09-26.
+       */
+      stages?: {
+        waiting: number;
+        quiet: number;
+        interviewing: number;
+        offer: number;
+        rejected: number;
+        closed: number;
+      };
       /** 0-1. The rate to DISPLAY; identical to cohortMetrics.interviewRate unscaled. */
       interviewRate: number | null;
       /** 0-1. Censoring-corrected, used only to pick `focus`. Never show this as "your rate". */

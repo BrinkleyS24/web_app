@@ -598,6 +598,36 @@ describe("DashboardNew", () => {
     await waitFor(() => expect(startEmailSync).toHaveBeenCalledTimes(1));
   });
 
+  test("draws where every application stands as one bar when the backend sends exclusive stages", async () => {
+    // Review 2026-09-26: the rows needed a footnote ("an application can count twice"). Stages are
+    // one bucket per application, so they can be one bar with no caveat.
+    fetchEmailMetrics.mockResolvedValue({
+      success: true,
+      cohortMetrics: { applicationsSent: 20, reachedInterview: 3, reachedOffer: 1, rejectedCohorts: 6, interviewRate: 15 },
+      searchSignals: {
+        funnel: {
+          applied: 20, settled: 16, pending: 4, silent: 7, rejected: 6, reachedInterview: 3, reachedOffer: 1,
+          stages: { waiting: 4, quiet: 7, interviewing: 1, offer: 1, rejected: 6, closed: 1 },
+          interviewRate: 0.15, settledInterviewRate: 0.19, offerRate: 0.33, focus: "offer", basis: "email_cohorts_all_time",
+        },
+        rejectionVelocity: { counts: {}, classified: 0, unknown: 6, medianEligible: false, averageDays: null },
+      },
+    });
+
+    renderDashboard();
+
+    expect(await screen.findByText("Where your 20 applications stand")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Interviewing: 1.*Rejected: 6/ })).toBeInTheDocument();
+    expect(screen.getByText("Closed by you")).toBeInTheDocument();
+    expect(screen.queryByText(/can count twice/)).not.toBeInTheDocument();
+  });
+
+  test("keeps the separate rows when an older backend sends no stages", async () => {
+    renderDashboard();
+    expect(await screen.findByText("Where your applications stand")).toBeInTheDocument();
+    expect(screen.getByText(/can count twice/)).toBeInTheDocument();
+  });
+
   test("shows the First Move card for a cold-start account", async () => {
     fetchResume.mockResolvedValue({ success: true, resumeText: null });
     fetchApplyGateHistory.mockResolvedValue({ success: true, history: [] });

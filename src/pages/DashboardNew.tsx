@@ -207,17 +207,25 @@ const Dashboard = () => {
           <ThisWeekPanel className="lg:col-span-2" loading={weeklyQuery.isLoading} weekly={weeklyQuery.data} />
         </div>
 
-        <SearchStatusPanel loading={metricsQuery.isLoading} metrics={metricsQuery.data} />
-
-        <div className="grid items-start gap-5 lg:grid-cols-2">
-          <RecentOutcomesPanel loading={weeklyQuery.isLoading} weekly={weeklyQuery.data} />
-          <RecentChecksPanel
-            loading={historyQuery.isLoading}
-            history={historyQuery.data?.history || []}
-          />
+        {/* Everything above answers "what now". Below is the detail behind it, in two columns that
+            stack on their own, so a short card never leaves a hole beside a tall one. */}
+        <div className="flex items-center gap-3 pt-3" aria-hidden>
+          <span className="text-[12px] font-semibold text-muted-foreground">More about your search</span>
+          <span className="h-px flex-1 bg-border" />
         </div>
-
-        {patterns.length ? <PatternsPanel alerts={patterns} /> : null}
+        <div className="grid items-start gap-5 lg:grid-cols-5">
+          <div className="space-y-5 lg:col-span-3">
+            <SearchStatusPanel loading={metricsQuery.isLoading} metrics={metricsQuery.data} />
+            <RecentOutcomesPanel loading={weeklyQuery.isLoading} weekly={weeklyQuery.data} />
+          </div>
+          <div className="space-y-5 lg:col-span-2">
+            <RecentChecksPanel
+              loading={historyQuery.isLoading}
+              history={historyQuery.data?.history || []}
+            />
+            {patterns.length ? <PatternsPanel alerts={patterns} /> : null}
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   );
@@ -320,7 +328,6 @@ function TodayPanel({
       icon={ListChecks}
       tone="brand"
       title="Next Actions"
-      description="The most useful things to do next, ranked for you."
       action={<PanelLink to="/next-actions">{more > 0 ? `All actions (${more} more)` : "All actions"}</PanelLink>}
     >
       {loading ? (
@@ -451,6 +458,77 @@ const VELOCITY_ROWS: Array<{ key: string; label: string; tone: Tone }> = [
   { key: "post_interview", label: "After an interview", tone: "upcoming" },
 ];
 
+/** A small section heading inside a panel: sentence case, not another mono all-caps eyebrow. */
+const SUBHEAD = "text-[13px] font-semibold text-foreground";
+
+type Stages = NonNullable<NonNullable<NonNullable<MetricsResponse["searchSignals"]>["funnel"]>["stages"]>;
+
+// Progress first, then open, then settled; colors from the shared status map.
+const STAGE_SEGMENTS: Array<{ key: keyof Stages; label: string; bar: string; dot: string }> = [
+  { key: "offer", label: "Offer", bar: TONES[STATUS_TONE.offer].rail, dot: TONES[STATUS_TONE.offer].rail },
+  { key: "interviewing", label: "Interviewing", bar: TONES[STATUS_TONE.interview].rail, dot: TONES[STATUS_TONE.interview].rail },
+  { key: "waiting", label: "Waiting on a reply", bar: "bg-foreground/35", dot: "bg-foreground/35" },
+  { key: "quiet", label: "Went quiet (30+ days)", bar: "bg-muted-foreground/25", dot: "bg-muted-foreground/25" },
+  { key: "closed", label: "Closed by you", bar: "bg-muted-foreground/15", dot: "bg-muted-foreground/15" },
+  { key: "rejected", label: "Rejected", bar: TONES[STATUS_TONE.rejected].rail, dot: TONES[STATUS_TONE.rejected].rail },
+];
+
+/**
+ * Where every application stands, as one bar. The rows it replaces needed a footnote ("an application
+ * can count twice"); these buckets are exclusive, so the bar is the whole search at a glance and the
+ * interview rate sits above it as the number that matters.
+ */
+function StageBar({
+  stages,
+  applied,
+  reachedInterview,
+  reachedOffer,
+  ratePct,
+}: {
+  stages: Stages;
+  applied: number;
+  reachedInterview: number;
+  reachedOffer: number;
+  ratePct: string | null;
+}) {
+  const segments = STAGE_SEGMENTS.filter((segment) => stages[segment.key] > 0 || segment.key === "offer");
+  const summary = segments.map((segment) => `${segment.label}: ${stages[segment.key]}`).join(", ");
+  return (
+    <div className="space-y-3.5">
+      <p className={SUBHEAD}>Where your {applied} applications stand</p>
+      <p className="text-[13px] leading-relaxed text-muted-foreground">
+        <span className="font-semibold text-foreground">{reachedInterview}</span> reached an interview
+        {ratePct ? ` (${ratePct})` : ""} and <span className="font-semibold text-foreground">{reachedOffer}</span>{" "}
+        {reachedOffer === 1 ? "became an offer" : "became offers"}.
+      </p>
+      <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted" role="img" aria-label={summary}>
+        {segments.map((segment) => {
+          const value = stages[segment.key];
+          if (!value) return null;
+          return (
+            <div
+              key={segment.key}
+              className={cn("h-full border-r border-card last:border-r-0", segment.bar)}
+              style={{ width: `${Math.max((value / applied) * 100, 0.8)}%` }}
+            />
+          );
+        })}
+      </div>
+      <ul className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+        {segments.map((segment) => (
+          <li key={segment.key} className="flex items-center justify-between gap-2 text-[12.5px]">
+            <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
+              <span className={cn("h-2 w-2 shrink-0 rounded-full", segment.dot)} aria-hidden />
+              <span className="truncate">{segment.label}</span>
+            </span>
+            <span className="font-semibold tabular-nums text-foreground">{stages[segment.key]}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function SearchStatusPanel({ loading, metrics }: { loading: boolean; metrics?: MetricsResponse }) {
   const cohort = metrics?.cohortMetrics;
   // The Signal Layer's funnel when the backend sends it; the same all-time cohort counts otherwise.
@@ -470,13 +548,9 @@ function SearchStatusPanel({ loading, metrics }: { loading: boolean; metrics?: M
   const applied = funnel?.applied ?? 0;
   const ratePct = funnel?.interviewRate != null ? `${(funnel.interviewRate * 100).toFixed(1)}%` : null;
 
+  const stages = metrics?.searchSignals?.funnel?.stages;
   return (
-    <Panel
-      icon={CircleDot}
-      tone="neutral"
-      title="How your search is going"
-      description={applied ? `Across all ${applied} applications Applendium has tracked, counted once per application.` : undefined}
-    >
+    <Panel icon={CircleDot} tone="neutral" title="How your search is going">
       {loading ? (
         <LoadingRows rows={3} />
       ) : !funnel || applied === 0 ? (
@@ -488,8 +562,11 @@ function SearchStatusPanel({ loading, metrics }: { loading: boolean; metrics?: M
         />
       ) : (
         <div className="grid gap-x-10 gap-y-6 md:grid-cols-2">
+          {stages ? (
+            <StageBar stages={stages} applied={applied} reachedInterview={funnel.reachedInterview} reachedOffer={funnel.reachedOffer} ratePct={ratePct} />
+          ) : (
           <div className="space-y-3.5">
-            <p className={EYEBROW}>Where your applications stand</p>
+            <p className={SUBHEAD}>Where your applications stand</p>
             {funnel.pending != null ? <BarRow label="Waiting on a reply" value={funnel.pending} of={applied} tone="upcoming" /> : null}
             {funnel.silent != null ? <BarRow label="Went quiet (30+ days)" value={funnel.silent} of={applied} tone="neutral" /> : null}
             <BarRow label="Rejected" value={funnel.rejected} of={applied} tone="risk" />
@@ -499,8 +576,9 @@ function SearchStatusPanel({ loading, metrics }: { loading: boolean; metrics?: M
               An application can count twice — an interview that ended in a rejection is in both rows.
             </p>
           </div>
+          )}
           <div className="space-y-3.5">
-            <p className={EYEBROW}>When rejections arrive</p>
+            <p className={SUBHEAD}>When rejections arrive</p>
             {velocity && velocity.classified >= 5 ? (
               <>
                 {VELOCITY_ROWS.map((row) => (
@@ -554,7 +632,7 @@ function relativeDay(date: string | null) {
 function RecentOutcomesPanel({ loading, weekly }: { loading: boolean; weekly?: WeeklyHighlightsResponse }) {
   const rows = outcomeRows(weekly);
   return (
-    <Panel icon={Inbox} tone="neutral" title="Recent outcomes" description="Replies and decisions from the last 7 days.">
+    <Panel icon={Inbox} tone="neutral" title="Recent outcomes" meta={<span className="text-[12px] text-muted-foreground">Last 7 days</span>}>
       {loading ? (
         <LoadingRows rows={3} />
       ) : rows.length === 0 ? (
@@ -589,7 +667,6 @@ function RecentChecksPanel({ loading, history }: { loading: boolean; history: Ap
       icon={ScanSearch}
       tone="brand"
       title="Recent Apply Gate checks"
-      description="Roles you checked before applying."
       action={<PanelLink to="/apply-gate">Apply Gate</PanelLink>}
     >
       {loading ? (
@@ -635,10 +712,10 @@ function PatternsPanel({ alerts }: { alerts: StrategyAlert[] }) {
     <Panel
       icon={Radar}
       tone="brand"
-      title="Other patterns in your search"
+      title="Other patterns"
       action={<PanelLink to="/strategy-alerts">Strategy Alerts</PanelLink>}
     >
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="space-y-3">
         {alerts.map((alert) => (
           <Link
             key={alert.id}
