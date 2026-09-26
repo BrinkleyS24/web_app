@@ -173,21 +173,19 @@ function EmailRow({ row, onOpen }) {
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-[13px] font-semibold text-white">{row.subject}</p>
-          <p className="truncate text-[11px] text-[#7C8AA3]">{row.from}</p>
+          <p className="truncate text-[13px] font-semibold text-white">{row.company}</p>
+          <p className="truncate text-[12px] text-[#7C8AA3]">{row.role}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {row.unread ? <span className="h-1.5 w-1.5 rounded-full bg-[#34E3A8]" /> : null}
-          <span className="text-[10px] text-[#7C8AA3]">{row.date}</span>
+          <span className="text-[11px] text-[#7C8AA3]">{row.date}</span>
         </div>
       </div>
       <div className="mt-2 flex items-center gap-2 overflow-hidden">
-        <span className={`landingMono shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em] ring-1 ${s.pill}`}>
+        <span className={`landingMono shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] ring-1 ${s.pill}`}>
           {s.label}
         </span>
-        <span className="truncate text-[10px] text-[#98A1B3]">
-          {row.company} · {row.role}
-        </span>
+        <span className="truncate text-[11px] text-[#98A1B3]">{row.subject}</span>
       </div>
       <Stepper status={row.status} />
     </motion.button>
@@ -446,7 +444,7 @@ export default function LandingHero({ chromeHref }) {
                       <div className={`landingDisplay text-[18px] font-bold leading-none ${t.text}`}>
                         <CountUp to={t.value} />
                       </div>
-                      <div className="landingMono mt-1 text-[8px] font-bold uppercase tracking-[0.12em] text-[#7C8AA3]">
+                      <div className="landingMono mt-1 text-[10px] font-bold uppercase leading-tight tracking-[0.1em] text-[#7C8AA3]">
                         {t.label}
                       </div>
                     </button>
@@ -467,26 +465,6 @@ export default function LandingHero({ chromeHref }) {
                   aria-label="Search applications"
                   className="w-full bg-transparent text-[11px] text-white placeholder:text-[#5C6B85] focus:outline-none"
                 />
-              </div>
-
-              <div className="flex gap-1.5 overflow-hidden">
-                {CHIPS.map((c) => {
-                  const active = activeChip === c.label;
-                  return (
-                    <button
-                      key={c.label}
-                      type="button"
-                      onClick={() => selectChip(c.label)}
-                      className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#34E3A8]/50 ${
-                        active
-                          ? "bg-[#0E8C63] text-white"
-                          : "border border-white/10 text-[#9AA7BD] hover:border-white/25 hover:text-white"
-                      }`}
-                    >
-                      {c.label}
-                    </button>
-                  );
-                })}
               </div>
 
               <div className="min-h-[228px]">
