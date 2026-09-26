@@ -20,8 +20,8 @@ import { cn } from "@/lib/utils";
 export const ASK_SUGGESTIONS = [
   "Who hasn't replied in 2 weeks?",
   "What should I follow up on?",
-  "How many applications did I send this month?",
-  "Where do my interviews stand?",
+  "Any assessments waiting on me?",
+  "Why was I rejected?",
 ];
 
 // Labels match the Dashboard's stage bar word for word.
@@ -124,7 +124,7 @@ export function AskApplendium() {
       ) : null}
 
       {asked ? (
-        <div className="mt-4 space-y-3" aria-live="polite">
+        <div className="mt-4 min-w-0 space-y-3" aria-live="polite">
           <p className="text-[12.5px] text-muted-foreground">
             You asked: <span className="font-medium text-foreground/85">{asked}</span>
           </p>
@@ -165,6 +165,7 @@ export function AskApplendium() {
                           </p>
                           {detail ? <p className="text-[12px] text-muted-foreground">{detail}</p> : null}
                           <WhyLine why={app.why} className="mt-1" />
+                          <WhyLine why={app.note} label="From your inbox" testId="note-line" className="mt-1" />
                         </div>
                         <ToneChip tone={look.tone}>{look.label}</ToneChip>
                         {gmailUrl ? (
@@ -179,9 +180,38 @@ export function AskApplendium() {
                 </ul>
               ) : null}
 
+              {result.quotes?.length ? (
+                <div className="space-y-3" data-testid="ask-quotes">
+                  {result.quotes.map((quote) => {
+                    const gmailUrl = buildGmailThreadUrl(quote.threadId);
+                    return (
+                      <figure key={`${quote.ref}-${quote.date}`} className="rounded-xl border border-border bg-muted/30 px-4 py-3">
+                        <figcaption className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-[12.5px] font-semibold text-foreground">
+                            What {quote.company} wrote{shortDate(quote.date) ? ` · ${shortDate(quote.date)}` : ""}
+                          </span>
+                          {gmailUrl ? (
+                            <a href={gmailUrl} target="_blank" rel="noreferrer" className={cn(BUTTON.link, "text-[12.5px]")}>
+                              Open in Gmail
+                              <ExternalLink className="h-3 w-3" aria-hidden />
+                            </a>
+                          ) : null}
+                        </figcaption>
+                        {/* Wraps anywhere: one unbroken URL in a company's footer pushed a phone 104px sideways. */}
+                        <blockquote className="mt-2 border-l-2 border-border pl-3 text-[13.5px] leading-relaxed text-foreground/85 [overflow-wrap:anywhere]">
+                          {quote.passage}
+                        </blockquote>
+                        <WhyLine why={quote.rejectionNote} label="From your inbox" testId="quote-note" className="mt-2" />
+                        <p className="mt-1.5 text-[11.5px] text-muted-foreground">Shown straight from your inbox. The AI didn't read it.</p>
+                      </figure>
+                    );
+                  })}
+                </div>
+              ) : null}
+
               <p className="text-[11.5px] leading-snug text-muted-foreground">
                 {typeof count === "number" ? `Based on ${count} tracked application${count === 1 ? "" : "s"}${since ? ` since ${since}` : ""}. ` : ""}
-                Only company, role, stage and dates are used to answer, never the text of your emails.
+                The AI answers from company, role, stage and dates, never the text of your emails.
               </p>
 
               <div className="flex flex-wrap gap-2">

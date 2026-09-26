@@ -23,6 +23,20 @@ export type AskApplication = {
   nextStep: AskNextStep | null;
   /** What the next step stands on, written by the backend (followUpBasis.js), never by the AI. */
   why?: string | null;
+  /** What the inbox shows about this application (an assessment, a rejection), written by our code. */
+  note?: string | null;
+  threadId: string | null;
+};
+
+/** An email our server showed the member directly. The AI never saw its text. */
+export type AskQuote = {
+  ref: string;
+  company: string;
+  role: string | null;
+  kind: string;
+  date: string | null;
+  passage: string;
+  rejectionNote?: string | null;
   threadId: string | null;
 };
 
@@ -30,6 +44,7 @@ export type AskResponse = {
   success: boolean;
   answer: string;
   applications: AskApplication[];
+  quotes?: AskQuote[];
   basis?: { applications?: number; earliestTrackedOn?: string | null };
 };
 

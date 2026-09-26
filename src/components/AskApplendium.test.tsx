@@ -71,6 +71,30 @@ describe("AskApplendium", () => {
     expect(screen.getByText(/never the text of your emails/)).toBeInTheDocument();
   });
 
+  test("shows an email straight from the inbox, says the AI didn't read it, and notes what it said", async () => {
+    askApplendium.mockResolvedValue({
+      success: true,
+      answer: "Here is what Globex wrote on Sep 20. It gives no reason.",
+      applications: [
+        { ref: "A1", company: "Globex", role: "SDET", stage: "rejected", appliedOn: "2026-09-06", lastUpdateOn: "2026-09-20", nextStep: null, why: null, note: "Rejection gave no reason", threadId: "t-globex" },
+      ],
+      quotes: [
+        { ref: "A1", company: "Globex", role: "SDET", kind: "rejection", date: "2026-09-20", passage: "Hi Sam, we chose another candidate.", rejectionNote: "Rejection gave no reason", threadId: "t-globex" },
+      ],
+      basis: { applications: 5, earliestTrackedOn: "2026-08-07" },
+    });
+    renderAsk();
+
+    await userEvent.type(screen.getByLabelText("Your question"), "What did Globex say?{Enter}");
+
+    const quotes = await screen.findByTestId("ask-quotes");
+    expect(within(quotes).getByText("What Globex wrote · Sep 20")).toBeInTheDocument();
+    expect(within(quotes).getByText("Hi Sam, we chose another candidate.")).toBeInTheDocument();
+    expect(within(quotes).getByText("Shown straight from your inbox. The AI didn't read it.")).toBeInTheDocument();
+    expect(within(quotes).getByRole("link", { name: /Open in Gmail/ })).toHaveAttribute("href", "https://mail.google.com/mail/u/0/#all/t-globex");
+    expect(within(screen.getByTestId("ask-applications")).getByTestId("note-line")).toHaveTextContent("From your inbox: Rejection gave no reason");
+  });
+
   test("a failure says so and offers a retry", async () => {
     askApplendium.mockRejectedValueOnce(new Error("That's 30 questions today. Ask again tomorrow."));
     renderAsk();
