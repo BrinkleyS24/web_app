@@ -8,10 +8,7 @@ import {
   Clock,
   Hourglass,
   Lightbulb,
-  Minus,
   Sparkles,
-  TrendingDown,
-  TrendingUp,
   XCircle,
 } from "lucide-react";
 
@@ -108,14 +105,6 @@ function ReadoutList({ title, icon: Icon, tone, items, glyph }: {
   );
 }
 
-// Direction only, in a neutral color: more rejections "up" must not read as good news.
-function DirectionGlyph({ direction }: { direction?: "up" | "down" | "flat" }) {
-  const cls = "mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground";
-  if (direction === "up") return <TrendingUp className={cls} aria-hidden />;
-  if (direction === "down") return <TrendingDown className={cls} aria-hidden />;
-  return <Minus className={cls} aria-hidden />;
-}
-
 function WeeksRead({ readout }: { readout: WeeklyReadout }) {
   const { headline, confidence, sections } = readout;
   return (
@@ -158,9 +147,10 @@ function WeeksRead({ readout }: { readout: WeeklyReadout }) {
           </div>
         ) : null}
 
-        {sections.whatChanged.length || sections.whatWorked.length || sections.whatDidnt.length ? (
-          <div className="grid gap-5 sm:grid-cols-3">
-            <ReadoutList title="What changed" icon={TrendingUp} tone="neutral" items={sections.whatChanged} glyph={(item) => <DirectionGlyph direction={item.direction} />} />
+        {/* No "What changed" column: it restated the counts the tiles below already show with last
+            week beside each (review, 2026-09-26) — the same numbers three times on one page. */}
+        {sections.whatWorked.length || sections.whatDidnt.length ? (
+          <div className="grid gap-5 sm:grid-cols-2">
             <ReadoutList title="What worked" icon={CheckCircle2} tone="positive" items={sections.whatWorked} glyph={() => <span className="text-success">+</span>} />
             <ReadoutList title="What didn't" icon={XCircle} tone="risk" items={sections.whatDidnt} glyph={() => <span className="text-destructive">–</span>} />
           </div>
