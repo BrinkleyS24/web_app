@@ -72,9 +72,9 @@ import {
   buildOutreachDiagnostics,
   buildUpcomingFollowupWindows,
   describeQueueCount,
-  formatRelativeAge,
   formatSnoozedUntil,
   sourceClasses,
+  splitTodayAndMore,
   type QueueItem,
   type QueueSource,
   type UpcomingFollowupWindow,
@@ -1542,9 +1542,12 @@ const FixSuggestions = () => {
   };
 
   // ── Presentation ─────────────────────────────────────────────────────────────────────────
-  // Founder review, 2026-09-25: "Today" is the three most useful actions; everything else is
-  // under More. Every card names its application and carries the one button that fits the task.
-  const todayItems = filteredSuggestions.slice(0, 3);
+  // Today is the backend's doToday set (every time-sensitive action up to five, otherwise three),
+  // the same set the Dashboard leads with; everything else is under More.
+  const { today: todayItems, more: moreItems, fromBucket: todayFromBucket } = useMemo(
+    () => splitTodayAndMore(filteredSuggestions),
+    [filteredSuggestions],
+  );
   // Held-back repeats are NOT in this list at all, so the note sits at its end rather than under
   // Today, where "11 more are waiting behind these" read as a third count of the same list.
   const heldBackNote = heldBackTotal > 0 ? (
@@ -1553,7 +1556,6 @@ const FixSuggestions = () => {
       repeat itself ({heldBackBreakdown}). As you clear one, the next takes its place.
     </p>
   ) : null;
-  const moreItems = filteredSuggestions.slice(3);
   const moreFiltered = useMemo(
     () => (moreFilter === "all" ? moreItems : moreItems.filter((item) => moreFilterGroup(item) === moreFilter)),
     [moreFilter, moreItems],
@@ -1641,12 +1643,11 @@ const FixSuggestions = () => {
               <h3 className={cn("font-semibold leading-snug tracking-[-0.01em] text-foreground", variant === "today" ? "text-[15px]" : "text-[14px]")}>
                 {item.title}
               </h3>
-              {item.urgency === "high" ? <ToneChip tone="attention">Do today</ToneChip> : null}
+              {variant === "more" && item.urgency === "high" ? <ToneChip tone="attention">Time-sensitive</ToneChip> : null}
             </div>
             <p className="mt-0.5 text-[12.5px] text-muted-foreground">
               <span className="font-medium text-foreground/70">{kind}</span>
               {identity ? ` · ${identity}` : ""}
-              {item.daysAgo != null ? ` · ${formatRelativeAge(item.daysAgo)}` : ""}
               {item.estimatedTime ? ` · ${item.estimatedTime}` : ""}
             </p>
             {reason && variant === "today" ? (
@@ -1779,7 +1780,7 @@ const FixSuggestions = () => {
 
         <section aria-labelledby="today-heading" className="space-y-3">
           <SectionLabel>
-            <span id="today-heading">Today</span>
+            <span id="today-heading">{todayFromBucket ? "Today" : "Up next"}</span>
           </SectionLabel>
           {queueQuery.isLoading ? (
             <div className={cn(CARD, "px-5 py-5")}>

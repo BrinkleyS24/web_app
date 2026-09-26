@@ -646,6 +646,31 @@ describe("Next Actions", () => {
     expect(screen.getByText("Move Backend Engineer - AI Infrastructure out of active focus")).toBeVisible();
   });
 
+  test("Today is the backend's Today set, however many time-sensitive actions it holds", async () => {
+    // Founder's Next Actions, 2026-09-25: a fourth time-sensitive follow-up sat under More with a
+    // "Do today" chip, and every row said "Today" because ranked actions are rebuilt per request.
+    const followup = buildQueueResponse().queue.doToday[0];
+    const urgentOverflow = { ...staleActionFixture(5, "Portra", "Follow up on your Portra application"), urgencyLevel: "high" };
+    fetchRankedActionQueue.mockResolvedValueOnce(
+      buildQueueResponse({
+        doToday: [
+          followup,
+          researchActionFixture(),
+          staleActionFixture(1, "Standard Bots", "Move Associate Quality Engineer - Software (QA) out of active focus"),
+          staleActionFixture(2, "Arbol", "Move Backend Engineer - AI Infrastructure out of active focus"),
+        ],
+        thisWeek: [urgentOverflow],
+      }),
+    );
+
+    renderPage();
+
+    expect(await screen.findByText("4 for today · 1 more")).toBeInTheDocument();
+    expect(screen.queryByText("Do today")).not.toBeInTheDocument();
+    expect(screen.getByText("Time-sensitive")).toBeInTheDocument();
+    expect(screen.queryByText(/ · Today( ·|$)/)).not.toBeInTheDocument();
+  });
+
   test("closes a stale application straight from its card, as a no-response close", async () => {
     const user = userEvent.setup();
     renderPage();

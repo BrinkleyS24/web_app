@@ -1491,6 +1491,22 @@ function mapRankedActionToQueueItem(
   };
 }
 
+/**
+ * "Today" has one meaning on every surface: the backend's doToday bucket (all time-sensitive work
+ * up to five, otherwise the three best picks). Next Actions used to slice the first three rows
+ * instead, so a fourth time-sensitive action sat under More with a "Do today" chip (2026-09-25).
+ * When nothing is in the bucket the first three still lead, so the page never opens empty while
+ * work exists — `fromBucket` tells the caller not to call those "Today".
+ */
+export function splitTodayAndMore<T extends Pick<QueueItem, "id" | "bucket">>(items: T[]) {
+  const today = items.filter((item) => item.bucket === "doToday");
+  if (today.length === 0) {
+    return { today: items.slice(0, 3), more: items.slice(3), fromBucket: false };
+  }
+  const todayIds = new Set(today.map((item) => item.id));
+  return { today, more: items.filter((item) => !todayIds.has(item.id)), fromBucket: true };
+}
+
 export function buildQueueItemsFromRankedQueue(queue?: RankedActionQueue | null) {
   if (!queue) return [] as QueueItem[];
 
