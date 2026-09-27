@@ -71,6 +71,26 @@ describe("AskApplendium", () => {
     expect(screen.getByText(/never the text of your emails/)).toBeInTheDocument();
   });
 
+  test("names a booked interview and an open assessment as what to do, with the date the email gave", async () => {
+    askApplendium.mockResolvedValue({
+      ...ANSWER,
+      answer: "Finish the Kestrel assessment by Mon, Oct 5, and prepare for Quillstone on Tue, Oct 6.",
+      applications: [
+        { ref: "A1", company: "Kestrel", role: "Instructional Designer", stage: "interviewing", appliedOn: "2026-09-15", lastUpdateOn: "2026-09-24", nextStep: "complete_assessment", why: "Asked for an assessment on Thu, Sep 24 · due Mon, Oct 5 (in 2 days)", threadId: "t-k" },
+        { ref: "A2", company: "Quillstone", role: "Curriculum Developer", stage: "interviewing", appliedOn: "2026-09-12", lastUpdateOn: "2026-09-26", nextStep: "prepare_interview", why: "Interview on Tue, Oct 6 at 10:00 AM EDT · in 3 days", threadId: "t-q" },
+      ],
+    });
+    renderAsk();
+
+    await userEvent.type(screen.getByLabelText("Your question"), "What should I do this week?{Enter}");
+
+    const rows = within(await screen.findByTestId("ask-applications")).getAllByRole("listitem");
+    expect(rows[0]).toHaveTextContent("Last update Sep 24 · Finish the assessment");
+    expect(within(rows[0]).getByTestId("why-line")).toHaveTextContent("due Mon, Oct 5 (in 2 days)");
+    expect(rows[1]).toHaveTextContent("Last update Sep 26 · Prepare for the interview");
+    expect(within(rows[1]).getByTestId("why-line")).toHaveTextContent("Interview on Tue, Oct 6 at 10:00 AM EDT");
+  });
+
   test("shows an email straight from the inbox, says the AI didn't read it, and notes what it said", async () => {
     askApplendium.mockResolvedValue({
       success: true,

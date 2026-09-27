@@ -42,6 +42,8 @@ const NEXT_STEP_LABEL: Record<AskNextStep, string> = {
   thank_you: "Send a thank-you",
   interview_follow_up: "Follow up on the interview",
   status_check: "Ask for a status update",
+  complete_assessment: "Finish the assessment",
+  prepare_interview: "Prepare for the interview",
 };
 
 function shortDate(isoDay: string | null | undefined) {

@@ -10,7 +10,10 @@ export type AskNextStep =
   | "follow_up"
   | "thank_you"
   | "interview_follow_up"
-  | "status_check";
+  | "status_check"
+  // Something they owe; these outrank every timing step (backend followUpBasis.COMMITMENT_STEPS).
+  | "complete_assessment"
+  | "prepare_interview";
 
 export type AskApplication = {
   ref: string;
