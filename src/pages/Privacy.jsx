@@ -5,7 +5,7 @@ export default function Privacy() {
     <main className="page page--legal">
       <section className="legal-shell">
         <h1>Privacy Policy</h1>
-        <p className="muted">Effective date: June 30, 2026</p>
+        <p className="muted">Effective date: September 26, 2026</p>
 
         <h2>What Applendium accesses</h2>
         <p>
@@ -45,10 +45,13 @@ export default function Privacy() {
           <li><strong>Supabase</strong> — encrypted database storage of your application data.</li>
           <li><strong>Firebase Authentication</strong> (Google) — account sign-in.</li>
           <li>
-            <strong>OpenAI</strong> — powers AI features. It processes job-search content you provide
-            (such as job postings and your résumé for Apply Gate) and information derived from your emails
-            (for inbox coaching). Data sent through OpenAI's API is used only to generate results for you
-            and is not used to train OpenAI's models.
+            <strong>OpenAI</strong> — powers AI features. It processes content you provide (such as job
+            postings, your résumé with your name and contact details removed, and questions you type into
+            Ask Applendium) and facts derived from your job emails, such as the company, role, application
+            stage and dates, and whether an assessment or a decision arrived (for inbox coaching and Ask
+            Applendium). It never receives the text of your emails: when Ask Applendium shows you an email,
+            it comes straight from your inbox and is not sent to OpenAI. Data sent through OpenAI's API is
+            used only to generate results for you and is not used to train OpenAI's models.
           </li>
           <li><strong>Stripe</strong> — payment processing for premium subscriptions. No Gmail data is shared with Stripe.</li>
         </ul>
