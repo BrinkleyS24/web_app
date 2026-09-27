@@ -115,7 +115,9 @@ const PREMIUM_FEATURES = [
 const PRIVACY_CARDS = [
   { label: "Scope", value: "Read-only Gmail OAuth" },
   { label: "Write access", value: "No send / delete / modify" },
-  { label: "Storage", value: "Data stays on your device" },
+  // Was "Data stays on your device", which contradicted the privacy policy: job emails are stored,
+  // encrypted, on our servers (fixed 2026-09-26).
+  { label: "Storage", value: "Job emails only, encrypted" },
   { label: "Control", value: "Revoke anytime in Google" },
 ];
 
