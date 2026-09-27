@@ -7,17 +7,19 @@ import type { ReactNode } from "react";
 
 import Settings from "./Settings";
 
-const { apiFetch, useAuth, fetchResumeVariants } = vi.hoisted(() => ({
+const { apiFetch, useAuth, fetchResumeVariants, fetchResume, saveResume } = vi.hoisted(() => ({
   apiFetch: vi.fn(),
   useAuth: vi.fn(),
   fetchResumeVariants: vi.fn(),
+  fetchResume: vi.fn(),
+  saveResume: vi.fn(),
 }));
 
 vi.mock("@/components/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock("@/lib/emails", async () => ({ ...(await vi.importActual("@/lib/emails")), fetchResumeVariants }));
+vi.mock("@/lib/emails", async () => ({ ...(await vi.importActual("@/lib/emails")), fetchResumeVariants, fetchResume, saveResume }));
 
 vi.mock("../lib/api.js", () => ({ apiFetch }));
 vi.mock("../lib/AuthContext.jsx", () => ({ useAuth }));
@@ -136,5 +138,34 @@ describe("Settings résumés", () => {
     expect(screen.getByRole("link", { name: /Manage résumés/ })).toHaveAttribute("href", "/resumes");
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.queryByText(/Pre-jection/)).toBeNull();
+  });
+});
+
+describe("Settings résumé for free users", () => {
+  test("a free user can paste a résumé for the weekly free Apply Gate check", async () => {
+    // The extension sends free users here (/settings#resume); the Résumés page is Premium.
+    useAuth.mockReturnValue({ user: { uid: "u2", email: "free@example.com" }, plan: "free", planLoading: false, logout: vi.fn() });
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path === "/api/user/coach-preference") return { success: true, enabled: true, available: false, premium: false };
+      return { subscription: { plan: "free", status: "inactive" } };
+    });
+    fetchResume.mockResolvedValue({ success: true, resumeText: null });
+    saveResume.mockResolvedValue({ success: true });
+    renderPage();
+
+    expect(await screen.findByText("Your résumé")).toBeInTheDocument();
+    expect(screen.getByText(/name, email, phone number and links are removed/)).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Résumé text"), "QA engineer with five years of Playwright and CI experience.");
+    await userEvent.click(screen.getByRole("button", { name: /Save résumé/ }));
+    await waitFor(() => expect(saveResume).toHaveBeenCalledWith("QA engineer with five years of Playwright and CI experience."));
+    expect(fetchResumeVariants).not.toHaveBeenCalled();
+  });
+
+  test("premium users manage résumés on the Résumés page, not here", async () => {
+    mockApi({ coach: { enabled: true, available: true, premium: true } });
+    renderPage();
+    await screen.findByText("QA-focused");
+    expect(screen.queryByText("Your résumé")).toBeNull();
+    expect(fetchResume).not.toHaveBeenCalled();
   });
 });
