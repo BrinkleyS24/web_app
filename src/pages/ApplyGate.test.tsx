@@ -403,7 +403,7 @@ describe("ApplyGate current UI", () => {
     await waitFor(() => {
       expect(screen.getAllByText("Skip this role").length).toBeGreaterThan(0);
       expect(screen.queryByText("I'll fix first")).not.toBeInTheDocument();
-      expect(screen.getByText(/Missing non-negotiable requirements/i)).toBeInTheDocument();
+      expect(screen.getByText(/Must-haves not on your résumé/i)).toBeInTheDocument();
       expect(screen.getByText("Requirement check")).toBeInTheDocument();
       expect(screen.getByText("Nurse's Aide experience")).toBeInTheDocument();
       expect(screen.getByText(/Apply anyway only if you already meet these requirements/i)).toBeInTheDocument();
@@ -571,7 +571,7 @@ describe("ApplyGate current UI", () => {
     });
     expect(screen.queryByText("Requirement check")).not.toBeInTheDocument();
     expect(screen.queryByText("How to improve your odds")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Missing required skills/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Missing required skills|Required skills not on your résumé/i)).not.toBeInTheDocument();
     expect(screen.queryByText("Recommended move: Apply now")).not.toBeInTheDocument();
   });
 

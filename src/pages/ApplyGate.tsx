@@ -301,7 +301,9 @@ function parseHistoryReasons(raw: string | null | undefined) {
 
 // One predicate for "does this sentence describe a deficiency?", shared by the reason picker
 // and the warning banner so the two can never disagree about the same string.
-const RISK_LANGUAGE = /\b(missing|lack|gap|risk|weak|below|limited|mismatch|not shown|insufficient|blocker|stretch|short of|no evidence)\b/i;
+// The backend's coach voice (2026-09-30) says "isn't on your résumé" / "doesn't show" rather
+// than "missing" / "not shown"; both must read as a deficiency here.
+const RISK_LANGUAGE = /\b(missing|lack|gap|risk|weak|below|limited|mismatch|not shown|insufficient|blocker|stretch|short of|no evidence|not on your résumé|isn[’']t on your résumé|doesn[’']t (?:yet )?show|different field|change of field|step up|little of|easy to miss|not get past)\b/i;
 
 function readsAsRisk(text: string | null | undefined) {
   return RISK_LANGUAGE.test(String(text || ""));
@@ -386,14 +388,15 @@ function formatSkillGapSummary(items: string[] | null | undefined, prefix: strin
   return `${prefix}: ${clean.slice(0, maxItems).join(", ")}${clean.length > maxItems ? ", ..." : ""}.`;
 }
 
-function formatRequirementSummary(items: string[] | null | undefined, prefix = "Missing non-negotiable requirements", maxItems = 4) {
+function formatRequirementSummary(items: string[] | null | undefined, prefix = "Must-haves not on your résumé", maxItems = 4) {
   return formatSkillGapSummary(items, prefix, maxItems);
 }
 
 function isGenericStrategicFitNote(note: string) {
   const text = String(note || "").trim().toLowerCase();
   if (!text) return false;
-  return /looks like an? (aligned|adjacent|stretch) move .*responsibility overlap/.test(text);
+  return /^this (?:is the same kind of work|is close to the work|would be a stretch from the work) you[’']ve been doing\.?$/.test(text)
+    || /looks like an? (aligned|adjacent|stretch) move .*responsibility overlap/.test(text);
 }
 
 function universalBlockingLabelsFromResult(result: ApplyGateResult | null | undefined) {
@@ -434,13 +437,13 @@ function structuredWarningAndBullets(
 
   const warning = authorityWarning
     || (hasUniversalHardGate
-    ? `This posting has hard eligibility requirements not shown in your resume: ${universalBlockers.slice(0, 4).join(", ")}.`
+    ? `They require ${universalBlockers.slice(0, 4).join(", ")}, and it isn’t on your résumé.`
     : null)
     || hardBlockers[0]
     || primaryDrivers[0]
-    || formatSkillGapSummary(roleCoreGaps, "Missing core skills for this role")
-    || formatSkillGapSummary(missingRequired, "Missing required skills")
-    || formatSkillGapSummary(missingPreferred, "Missing preferred skills")
+    || formatSkillGapSummary(roleCoreGaps, "Core skills not on your résumé")
+    || formatSkillGapSummary(missingRequired, "Required skills not on your résumé")
+    || formatSkillGapSummary(missingPreferred, "Nice-to-haves not on your résumé")
     || null;
 
   const bullets: string[] = [];
@@ -449,17 +452,17 @@ function structuredWarningAndBullets(
     const missingGateSummary = formatRequirementSummary(universalBlockers);
     if (missingGateSummary) bullets.push(missingGateSummary);
   } else if (hardBlockers.length > 0 && missingRequired.length > 0) {
-    const missingRequiredSummary = formatSkillGapSummary(missingRequired, "Missing required skills");
+    const missingRequiredSummary = formatSkillGapSummary(missingRequired, "Required skills not on your résumé");
     if (missingRequiredSummary) bullets.push(missingRequiredSummary);
   } else if (hardBlockers.length === 0) {
-    const missingRequiredSummary = formatSkillGapSummary(missingRequired, "Missing required skills");
+    const missingRequiredSummary = formatSkillGapSummary(missingRequired, "Required skills not on your résumé");
     if (missingRequiredSummary && missingRequiredSummary !== warning) bullets.push(missingRequiredSummary);
   }
 
-  const roleCoreSummary = formatSkillGapSummary(roleCoreGaps, "Missing core skills for this role");
+  const roleCoreSummary = formatSkillGapSummary(roleCoreGaps, "Core skills not on your résumé");
   if (roleCoreSummary && roleCoreSummary !== warning) bullets.push(roleCoreSummary);
 
-  const missingPreferredSummary = formatSkillGapSummary(missingPreferred, "Missing preferred skills");
+  const missingPreferredSummary = formatSkillGapSummary(missingPreferred, "Nice-to-haves not on your résumé");
   if (missingPreferredSummary && missingPreferredSummary !== warning) bullets.push(missingPreferredSummary);
 
   // Three notes keep the coach line, the experience credit, and the overlap visible together.
@@ -667,7 +670,7 @@ function behavioralNudgeForResult(params: {
     if (params.hardBlocker && params.warning) {
       return `Skip this. ${params.warning}`;
     }
-    return "Skip this. Similar effort is better spent on roles with clearer proof and domain match.";
+    return "Skip this. Your time is better spent on jobs closer to the work you’ve already done.";
   }
 
   if (recommendsFix) {
@@ -733,8 +736,8 @@ function decisionCopyForStatus(status: VerdictStatus, recommendation: string | n
     return {
       title: "Skip this role",
       body: hardBlocker
-        ? "This is not a quick resume tailoring issue unless you already have the required credentials and forgot to list them."
-        : "Similar effort is likely better spent on roles with stronger alignment, unless you have outside context this analysis cannot see.",
+        ? "A résumé change won’t fix this, unless you already have the credential and left it off."
+        : "Your time is likely better spent on jobs that match your background more closely, unless you know something about this one that the posting doesn’t say.",
       toneClass: "border-red-500/30 bg-red-500/10 text-red-700",
     };
   }
@@ -778,8 +781,8 @@ function decisionCopyForStatus(status: VerdictStatus, recommendation: string | n
   return {
     title: recommendation || "Skip this posting",
     body: risk && risk >= 90
-      ? "The blocker stack is high enough that similar effort is probably better spent on a stronger match."
-      : "This role is outside the current high-probability lane. Use the time where the alignment is clearer.",
+      ? "Too many must-haves are missing; your time is better spent on a closer match."
+      : "This one is outside what your résumé shows. Spend your time where the match is clearer.",
     toneClass: "border-red-500/30 bg-red-500/10 text-red-700",
   };
 }
@@ -1289,7 +1292,7 @@ const ApplyGate = () => {
     if (lvl === "high") return "This is a confident read.";
     if (lvl === "medium") return "This is a solid read, with some open questions noted below.";
     return String(type || "").toUpperCase() === "CONFLICTED_SIGNAL"
-      ? "Take this read with a grain of salt: the signals point in different directions on this one."
+      ? "Take this read with a grain of salt: parts of this job fit you well and parts don’t, so it’s a close call."
       : "Take this read with a grain of salt: there isn't much history like this role to lean on yet.";
   };
 
