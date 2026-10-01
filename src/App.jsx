@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Landing from "./pages/Landing.jsx";
 import Privacy from "./pages/Privacy.jsx";
@@ -24,7 +24,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./lib/AuthContext.jsx";
 
-const queryClient = new QueryClient();
+function AccountQueryScope({ children }) {
+  const { user } = useAuth();
+  const accountId = user?.uid || 'signed-out';
+  const queryClient = useMemo(() => new QueryClient(), [accountId]);
+  // Remount local form state too. Late requests retain only their old account's cache.
+  return <QueryClientProvider key={accountId} client={queryClient}>{children}</QueryClientProvider>;
+}
 
 const DASHBOARD_ROUTES = [
   "/admin",
@@ -123,8 +129,8 @@ export default function App() {
     : (isPublicSite ? "container container--full" : "container");
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+    <AuthProvider>
+      <AccountQueryScope>
         <TooltipProvider>
           <Toaster />
           <div className={containerClass}>
@@ -164,9 +170,9 @@ export default function App() {
               <Route
                 path="/resumes"
                 element={
-                  <RequirePremiumUser>
+                  <RequireNonAdminUser>
                     <Resumes />
-                  </RequirePremiumUser>
+                  </RequireNonAdminUser>
                 }
               />
               <Route
@@ -258,7 +264,7 @@ export default function App() {
             </Routes>
           </div>
         </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+      </AccountQueryScope>
+    </AuthProvider>
   );
 }

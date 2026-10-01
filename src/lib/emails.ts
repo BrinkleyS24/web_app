@@ -977,6 +977,13 @@ export type ApplyGateOccupationGrounding = {
 };
 
 export type ApplyGateStrategicDecision = "APPLY" | "APPLY_WITH_STRATEGY" | "FIX_THEN_APPLY" | "SKIP";
+export type ApplyGatePresentation = {
+  version: 1;
+  decision: ApplyGateDisplayDecision;
+  warning: { id: string; kind: "gap" | "blocker"; label: string; text: string } | null;
+  bullets: Array<{ id: string; kind: "gap" | "strength" | "context"; text: string }>;
+  nextStep: string | null;
+};
 export type ApplyGateDisplayDecision = {
   version: number;
   action: ApplyGateStrategicDecision;
@@ -1385,6 +1392,7 @@ export type ApplyGateResult = {
    * instead of a (meaningless) decision. See applyGateService.hasEvaluableProfile.
    */
   insufficientProfile?: boolean;
+  resumeSelectionRequired?: boolean;
   insufficientProfileMessage?: string;
   id?: string | null;
   jobTitle?: string | null;
@@ -1398,6 +1406,7 @@ export type ApplyGateResult = {
    */
   resumeDocument?: {
     variantId: string | null;
+    name?: string | null;
     source: string | null;
     fingerprint: string;
     characters: number;
@@ -1425,6 +1434,8 @@ export type ApplyGateResult = {
   confidence: ApplyGateConfidence;
   reasons: string[];
   explanation?: {
+    presentation?: ApplyGatePresentation | null;
+    resume_document?: ApplyGateResult['resumeDocument'];
     hard_blockers: string[];
     display_decision?: ApplyGateDisplayDecision | null;
     application_risk_score?: number | null;
@@ -1793,11 +1804,15 @@ export type VariantBreakdownRow = {
 export type VariantScoreboard = { perVariant: VariantScoreRow[]; minSample: number };
 export type VariantRecommendation = { variantId: string; name: string; interviewRate: number } | null;
 
+export async function fetchLegacyResumeForReview(): Promise<{ success: boolean; resumeText: string | null }> {
+  return apiFetch("/api/resumes/legacy-review", { method: "GET" });
+}
+
 export async function fetchResumeVariants(): Promise<{ success: boolean; variants: ResumeVariant[] }> {
   return apiFetch("/api/resumes", { method: "GET" });
 }
 
-export async function createResumeVariant(body: { name: string; text: string }): Promise<{ success: boolean; id?: string; error?: string }> {
+export async function createResumeVariant(body: { name: string; text: string; requestId?: string; defaultMode?: "none" | "if_empty" | "replace" }): Promise<{ success: boolean; id?: string; error?: string }> {
   return apiFetch("/api/resumes", { method: "POST", body: JSON.stringify(body) });
 }
 

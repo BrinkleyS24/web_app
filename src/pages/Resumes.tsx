@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronDown, CircleCheck, FileText, Loader2, Plus, Star, Trash2, X } from "lucide-react";
 
@@ -7,6 +7,7 @@ import { EmptyState, ErrorState, LoadingRows, PageHeader, Panel, ToneChip } from
 import { BUTTON, CARD, EYEBROW, TONES, type Tone } from "@/components/premium/tone";
 import {
   fetchResumeVariants,
+  fetchLegacyResumeForReview,
   fetchVariantScoreboard,
   fetchApplicationStats,
   fetchResumeHealth,
@@ -21,6 +22,7 @@ import {
   type ResumeVariant,
   type VariantRecommendation,
 } from "@/lib/emails";
+import { useAuth } from "@/lib/AuthContext.jsx";
 import { cn } from "@/lib/utils";
 import { STATUS_TONE } from "@/lib/statusTone";
 
@@ -341,17 +343,25 @@ function VariantComparison({
 
 const Resumes = () => {
   const queryClient = useQueryClient();
+  const { plan } = useAuth();
+  const premium = plan === "premium";
   const variantsQuery = useQuery({ queryKey: ["resume-variants"], queryFn: fetchResumeVariants });
-  const scoreboardQuery = useQuery({ queryKey: ["variant-scoreboard"], queryFn: () => fetchVariantScoreboard() });
-  const statsQuery = useQuery({ queryKey: ["application-stats"], queryFn: fetchApplicationStats });
-  const healthQuery = useQuery({ queryKey: ["resume-health"], queryFn: fetchResumeHealth });
+  const scoreboardQuery = useQuery({ queryKey: ["variant-scoreboard"], queryFn: () => fetchVariantScoreboard(), enabled: premium });
+  const statsQuery = useQuery({ queryKey: ["application-stats"], queryFn: fetchApplicationStats, enabled: premium });
+  const healthQuery = useQuery({ queryKey: ["resume-health"], queryFn: fetchResumeHealth, enabled: premium });
 
+  const pendingSave = useRef<{ payload: string; requestId: string } | null>(null);
+  const [useAsDefault, setUseAsDefault] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<ResumeVariant | null>(null);
   const [adding, setAdding] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draft, setDraft] = useState("");
   const [nudgeDismissed, setNudgeDismissed] = useState(readVariantNudgeDismissed);
 
   const variants = variantsQuery.data?.variants ?? [];
+  const legacyQuery = useQuery({ queryKey: ['legacy-resume-review'], queryFn: fetchLegacyResumeForReview,
+    enabled: variantsQuery.isSuccess && variants.length === 0 });
+  const beginAdd = () => { pendingSave.current = null; setUseAsDefault(variants.length === 0); setAdding(true); };
   const scoreByVariant = new Map(
     (scoreboardQuery.data?.scoreboard?.perVariant ?? []).map((r) => [r.variantId, r]),
   );
@@ -362,7 +372,7 @@ const Resumes = () => {
   // rejection is the natural moment to suggest trying a different version.
   const rejectedCount = statsQuery.data?.stats?.applications?.rejected ?? 0;
   const showVariantNudge =
-    !nudgeDismissed &&
+    premium && !nudgeDismissed &&
     !variantsQuery.isLoading &&
     !statsQuery.isLoading &&
     variants.length === 1 &&
@@ -378,17 +388,25 @@ const Resumes = () => {
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["resume-variants"] });
+    queryClient.invalidateQueries({ queryKey: ["user-resume"] });
+    queryClient.invalidateQueries({ queryKey: ["legacy-resume-review"] });
     queryClient.invalidateQueries({ queryKey: ["variant-scoreboard"] });
     // A new or edited résumé is a different document, so its findings are recomputed from
     // scratch — there is no stored "resolved" state that could go stale against the text.
     queryClient.invalidateQueries({ queryKey: ["resume-health"] });
   };
   const createMut = useMutation({
-    mutationFn: createResumeVariant,
+    mutationFn: (body: { name: string; text: string }) => {
+      const defaultMode = useAsDefault ? (variants.length === 0 ? 'if_empty' : 'replace') : 'none';
+      const payload = JSON.stringify({ ...body, defaultMode });
+      if (pendingSave.current?.payload !== payload) pendingSave.current = { payload, requestId: crypto.randomUUID() };
+      return createResumeVariant({ ...body, defaultMode, requestId: pendingSave.current.requestId });
+    },
     onSuccess: () => { setDraft(""); setDraftName(""); setAdding(false); invalidate(); },
   });
   const setDefaultMut = useMutation({ mutationFn: setDefaultResumeVariant, onSuccess: invalidate });
-  const archiveMut = useMutation({ mutationFn: archiveResumeVariant, onSuccess: invalidate });
+  const archiveMut = useMutation({ mutationFn: archiveResumeVariant, onSuccess: () => { setArchiveTarget(null); invalidate(); } });
+  const mutationPending = createMut.isPending || archiveMut.isPending || setDefaultMut.isPending;
   const healthMut = useMutation({
     mutationFn: setResumeHealthFinding,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["resume-health"] }),
@@ -404,13 +422,34 @@ const Resumes = () => {
           description="Save the versions you tailor, then see which one actually gets interviews — and which gets auto-rejected."
           actions={
             !adding && variants.length > 0 ? (
-              <button type="button" className={BUTTON.secondary} onClick={() => setAdding(true)}>
+              <button type="button" className={BUTTON.secondary} onClick={beginAdd}>
                 <Plus className="h-4 w-4" aria-hidden /> Add a résumé version
               </button>
             ) : null
           }
         />
 
+        {variants.length > 0 && !variants.some((v) => v.isDefault) ? (
+          <p role="status" className="rounded-xl border border-border p-4 text-sm">No default résumé is set. Choose “Make default” below for extension checks. You can still select a résumé for an individual check.</p>
+        ) : null}
+        {setDefaultMut.isError ? <ErrorState title="The default did not change" detail={setDefaultMut.error.message} /> : null}
+        {archiveMut.isError ? <ErrorState title="The résumé could not be removed" detail={archiveMut.error.message} /> : null}
+        {archiveTarget ? (
+          <Panel title={'Remove ' + archiveTarget.name + '?'}>
+            <p className="mb-3 text-sm">{archiveTarget.isDefault ? 'This is your default. Extension checks will pause until you choose another default. ' : ''}Past checks will keep their recorded résumé reference.</p>
+            <button type="button" className={BUTTON.primary} disabled={mutationPending} onClick={() => archiveMut.mutate(archiveTarget.id)}>Remove résumé</button>
+            <button type="button" className={BUTTON.ghost} disabled={mutationPending} onClick={() => setArchiveTarget(null)}>Cancel</button>
+          </Panel>
+        ) : null}
+        {legacyQuery.isError ? (
+          <p role="alert" className="text-sm">Your previous profile text could not be loaded. You can add a résumé below or <button type="button" className="underline" onClick={() => legacyQuery.refetch()}>try again</button>.</p>
+        ) : null}
+        {!adding && legacyQuery.data?.resumeText ? (
+          <Panel title="Review your previous résumé">
+            <p className="text-sm">You have text saved on your old profile. Review and save it to use it for checks.</p>
+            <button className={BUTTON.secondary} onClick={() => { beginAdd(); setDraft(legacyQuery.data?.resumeText || ''); }}>Review previous résumé</button>
+          </Panel>
+        ) : null}
         {showVariantNudge ? (
           <div className={cn("relative rounded-2xl border p-5", TONES.brand.surface)}>
             <button
@@ -434,7 +473,7 @@ const Resumes = () => {
                 <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
                   Save a second version and Apply Gate will start tracking which one actually gets responses.
                 </p>
-                <button type="button" className={cn(BUTTON.accent, "mt-3")} onClick={() => setAdding(true)}>
+                <button type="button" className={cn(BUTTON.accent, "mt-3")} onClick={beginAdd}>
                   <Plus className="h-3.5 w-3.5" aria-hidden /> Add a résumé version
                 </button>
               </div>
@@ -442,7 +481,7 @@ const Resumes = () => {
           </div>
         ) : null}
 
-        {variants.length >= 2 ? (
+        {premium && variants.length >= 2 ? (
           <VariantComparison
             variants={variants}
             scoreByVariant={scoreByVariant}
@@ -479,12 +518,13 @@ const Resumes = () => {
                   onChange={(e) => setDraft(e.target.value)}
                 />
               </label>
-              {createMut.isError ? <ErrorState title="That version did not save" detail="Nothing was lost — try again." /> : null}
+              {createMut.isError ? <ErrorState title="That version did not save" detail={createMut.error.message} /> : null}
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={useAsDefault} onChange={(e) => setUseAsDefault(e.target.checked)} />Use as my default for job checks</label>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   className={BUTTON.primary}
-                  disabled={draft.trim().length < 20 || createMut.isPending}
+                  disabled={draft.trim().length < 50 || draft.length > 50000 || mutationPending}
                   onClick={() => createMut.mutate({ name: draftName.trim() || "My résumé", text: draft })}
                 >
                   {createMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
@@ -509,7 +549,7 @@ const Resumes = () => {
               title="No résumés saved yet"
               body="Add the version you send most. Apply Gate checks every role against it, and once you save a second version it tracks which one gets responses."
               action={
-                <button type="button" className={BUTTON.primary} onClick={() => setAdding(true)}>
+                <button type="button" className={BUTTON.primary} onClick={beginAdd}>
                   <Plus className="h-3.5 w-3.5" aria-hidden /> Add a résumé version
                 </button>
               }
@@ -529,19 +569,19 @@ const Resumes = () => {
                         <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-foreground">{v.name}</h2>
                         {v.isDefault ? <ToneChip tone="brand">Default</ToneChip> : null}
                       </div>
-                      <p className="mt-0.5 text-[13px] text-muted-foreground">{recordLine(scoreByVariant.get(v.id))}</p>
+                      <p className="mt-0.5 text-[13px] text-muted-foreground">{premium ? recordLine(scoreByVariant.get(v.id)) : (v.isDefault ? "Used for your extension job checks." : "Available to choose as your default.")}</p>
                     </div>
                   </div>
                   <div className="-ml-2 flex shrink-0 items-center gap-1 sm:ml-0">
                     {!v.isDefault ? (
-                      <button type="button" className={BUTTON.ghost} onClick={() => setDefaultMut.mutate(v.id)}>
+                      <button type="button" className={BUTTON.ghost} disabled={mutationPending} onClick={() => setDefaultMut.mutate(v.id)}>
                         <Star className="h-3.5 w-3.5" aria-hidden /> Make default
                       </button>
                     ) : null}
                     <button
                       type="button"
                       className={cn(BUTTON.ghost, "hover:bg-destructive/10 hover:text-destructive")}
-                      onClick={() => archiveMut.mutate(v.id)}
+                      disabled={mutationPending} onClick={() => setArchiveTarget(v)}
                     >
                       <Trash2 className="h-3.5 w-3.5" aria-hidden /> Remove
                     </button>

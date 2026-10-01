@@ -13,6 +13,7 @@ export function useSaveResume() {
     mutationFn: (resumeText: string) => saveResume(resumeText.trim()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user-resume"] });
+      queryClient.invalidateQueries({ queryKey: ["resume-variants"] });
     },
   });
 }

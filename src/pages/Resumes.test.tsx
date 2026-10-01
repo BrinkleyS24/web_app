@@ -8,6 +8,8 @@ import type { ReactNode } from "react";
 import Resumes from "./Resumes";
 
 const {
+  useAuth,
+  fetchLegacyResumeForReview,
   fetchResumeVariants,
   fetchVariantScoreboard,
   fetchApplicationStats,
@@ -16,6 +18,8 @@ const {
   archiveResumeVariant,
   renameResumeVariant,
 } = vi.hoisted(() => ({
+  useAuth: vi.fn(),
+  fetchLegacyResumeForReview: vi.fn(),
   fetchResumeVariants: vi.fn(),
   fetchVariantScoreboard: vi.fn(),
   fetchApplicationStats: vi.fn(),
@@ -25,6 +29,8 @@ const {
   renameResumeVariant: vi.fn(),
 }));
 
+vi.mock("@/lib/AuthContext.jsx", () => ({ useAuth }));
+
 vi.mock("@/components/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
@@ -33,6 +39,7 @@ vi.mock("@/lib/emails", async () => {
   const actual = await vi.importActual("@/lib/emails");
   return {
     ...actual,
+    fetchLegacyResumeForReview,
     fetchResumeVariants,
     fetchVariantScoreboard,
     fetchApplicationStats,
@@ -55,6 +62,8 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  useAuth.mockReturnValue({ plan: "premium" });
+  fetchLegacyResumeForReview.mockResolvedValue({ success: true, resumeText: null });
   fetchVariantScoreboard.mockResolvedValue({ success: true, scoreboard: { minSample: 5, perVariant: [] }, recommendation: null });
   fetchApplicationStats.mockResolvedValue({
     success: true,
@@ -67,7 +76,52 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-afterEach(() => vi.clearAllMocks());
+afterEach(() => { vi.clearAllMocks(); });
+
+test('free users manage a default without making premium requests', async () => {
+  useAuth.mockReturnValue({ plan: 'free' });
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'QA', isDefault: false }] });
+  renderPage();
+  await userEvent.click(await screen.findByRole('button', { name: /Make default/ }));
+  expect(setDefaultResumeVariant).toHaveBeenCalledWith('A', expect.anything());
+  expect(fetchVariantScoreboard).not.toHaveBeenCalled();
+  expect(fetchApplicationStats).not.toHaveBeenCalled();
+});
+
+test('removing the default explains the consequence and waits for confirmation', async () => {
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'QA', isDefault: true }] });
+  renderPage();
+  await userEvent.click(await screen.findByRole('button', { name: /^Remove$/ }));
+  expect(archiveResumeVariant).not.toHaveBeenCalled();
+  expect(screen.getByText(/Extension checks will pause/)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Remove résumé' }));
+  await waitFor(() => expect(archiveResumeVariant).toHaveBeenCalled());
+});
+
+test('a default mutation failure stays visible and leaves the document available', async () => {
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'QA', isDefault: false }] });
+  setDefaultResumeVariant.mockRejectedValueOnce(new Error('Try again later.'));
+  renderPage();
+  await userEvent.click(await screen.findByRole('button', { name: /Make default/ }));
+  expect(await screen.findByText('The default did not change')).toBeInTheDocument();
+  expect(screen.getByText('QA')).toBeInTheDocument();
+});
+
+test('first upload visibly opts into a default and a retry keeps the same request ID', async () => {
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [] });
+  createResumeVariant.mockRejectedValueOnce(new Error('Timed out'));
+  renderPage();
+  await userEvent.click(await screen.findByRole('button', { name: /Add a résumé/ }));
+  expect(screen.getByLabelText('Use as my default for job checks')).toBeChecked();
+  await userEvent.type(screen.getByPlaceholderText(/Paste your résumé/), 'Software testing experience with Python and Playwright over five years.');
+  await userEvent.click(screen.getByRole('button', { name: /^Save$/ }));
+  await screen.findByText('That version did not save');
+  const first = createResumeVariant.mock.calls[0][0];
+  await userEvent.click(screen.getByRole('button', { name: /^Save$/ }));
+  await waitFor(() => expect(createResumeVariant).toHaveBeenCalledTimes(2));
+  expect(createResumeVariant.mock.calls[1][0].requestId).toBe(first.requestId);
+  expect(first.defaultMode).toBe('if_empty');
+});
 
 describe("Résumés page", () => {
   test("lists variants and shows honest thin-data copy below minSample", async () => {
@@ -207,13 +261,13 @@ describe("Résumés page", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: /Add a résumé/i }));
     await userEvent.type(screen.getByPlaceholderText(/Name/i), "Generic");
-    await userEvent.type(screen.getByPlaceholderText(/Paste your résumé/i), "a valid resume body well over twenty characters long");
+    await userEvent.type(screen.getByPlaceholderText(/Paste your résumé/i), "a valid resume body with software testing experience exceeding fifty characters");
     await userEvent.click(screen.getByRole("button", { name: /^Save$/i }));
 
     await waitFor(() => expect(createResumeVariant).toHaveBeenCalled());
     const arg = createResumeVariant.mock.calls[0][0];
     expect(arg.name).toBe("Generic");
-    expect(arg.text).toBe("a valid resume body well over twenty characters long");
+    expect(arg.text).toBe("a valid resume body with software testing experience exceeding fifty characters");
   });
 
   describe("second-variant nudge", () => {

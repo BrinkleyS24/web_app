@@ -68,7 +68,7 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => vi.clearAllMocks());
+afterEach(() => { vi.clearAllMocks(); });
 
 describe("Settings coach voice", () => {
   test("shows the coach as on for a premium user who has never chosen", async () => {
@@ -122,7 +122,7 @@ describe("Settings coach voice", () => {
 
     await screen.findByRole("button", { name: /Upgrade to Premium/ });
     expect(screen.queryByTestId("coach-voice-settings")).toBeNull();
-    expect(fetchResumeVariants).not.toHaveBeenCalled();
+    expect(fetchResumeVariants).toHaveBeenCalled();
   });
 });
 
@@ -142,23 +142,13 @@ describe("Settings résumés", () => {
 });
 
 describe("Settings résumé for free users", () => {
-  test("a free user can paste a résumé for the weekly free Apply Gate check", async () => {
-    // The extension sends free users here (/settings#resume); the Résumés page is Premium.
+  test("free users can reach the shared résumé management page", async () => {
     useAuth.mockReturnValue({ user: { uid: "u2", email: "free@example.com" }, plan: "free", planLoading: false, logout: vi.fn() });
-    apiFetch.mockImplementation(async (path: string) => {
-      if (path === "/api/user/coach-preference") return { success: true, enabled: true, available: false, premium: false };
-      return { subscription: { plan: "free", status: "inactive" } };
-    });
-    fetchResume.mockResolvedValue({ success: true, resumeText: null });
-    saveResume.mockResolvedValue({ success: true });
+    mockApi({ coach: { enabled: true, available: false, premium: false } });
     renderPage();
-
-    expect(await screen.findByText("Your résumé")).toBeInTheDocument();
-    expect(screen.getByText(/name, email, phone number and links are removed/)).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText("Résumé text"), "QA engineer with five years of Playwright and CI experience.");
-    await userEvent.click(screen.getByRole("button", { name: /Save résumé/ }));
-    await waitFor(() => expect(saveResume).toHaveBeenCalledWith("QA engineer with five years of Playwright and CI experience."));
-    expect(fetchResumeVariants).not.toHaveBeenCalled();
+    expect(await screen.findByRole('link', { name: 'Manage résumés' })).toHaveAttribute('href', '/resumes');
+    expect(screen.queryByLabelText('Résumé text')).toBeNull();
+    expect(saveResume).not.toHaveBeenCalled();
   });
 
   test("premium users manage résumés on the Résumés page, not here", async () => {

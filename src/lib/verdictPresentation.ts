@@ -6,7 +6,7 @@ export type VerdictDecisionKey = "apply" | "apply_with_care" | "fix_first" | "sk
 
 type VerdictLike = {
   verdict?: ApplyGateVerdict | string | null;
-  explanation_payload?: { decision?: string | null } | null;
+  explanation_payload?: { decision?: string | null; presentation?: { decision: { action: string; label: string } } | null } | null;
 };
 
 const DECISIONS: Record<VerdictDecisionKey, { label: string; tone: Tone }> = {
@@ -18,6 +18,12 @@ const DECISIONS: Record<VerdictDecisionKey, { label: string; tone: Tone }> = {
 
 /** The one decision a verdict stands for, in plain words. */
 export function describeVerdictDecision(item: VerdictLike): { key: VerdictDecisionKey; label: string; tone: Tone } {
+  const resolved = item?.explanation_payload?.presentation?.decision;
+  const keys: Record<string, VerdictDecisionKey> = { APPLY: "apply", APPLY_WITH_STRATEGY: "apply_with_care", FIX_THEN_APPLY: "fix_first", SKIP: "skip" };
+  if (resolved && keys[resolved.action]) {
+    const key = keys[resolved.action];
+    return { key, ...DECISIONS[key], label: resolved.label };
+  }
   const decision = String(item?.explanation_payload?.decision || "").toLowerCase();
   let key: VerdictDecisionKey;
   if (decision === "apply_now") key = "apply";

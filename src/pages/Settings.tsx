@@ -7,8 +7,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { ErrorState, LoadingRows, PageHeader, Panel, PanelLink, StatTile } from "@/components/premium/PremiumUI";
 import { BUTTON, EYEBROW } from "@/components/premium/tone";
 import { Switch } from "@/components/ui/switch";
-import { deleteResume, fetchResume, fetchResumeVariants } from "@/lib/emails";
-import { useSaveResume } from "@/hooks/useSaveResume";
+import { fetchResumeVariants } from "@/lib/emails";
 import { cn } from "@/lib/utils";
 import {
   CreditCard,
@@ -220,7 +219,7 @@ export default function Settings() {
           </div>
         </Panel>
 
-        {isPremium ? <ResumesSummaryPanel /> : planLoading ? null : <FreeResumePanel />}
+        {planLoading ? null : <ResumesSummaryPanel />}
 
         {isPremium ? (
           <Panel title="Coach voice" icon={MessageSquareText} id="coach-voice">
@@ -353,98 +352,13 @@ export default function Settings() {
  * version an edit here appeared to vanish and never reached Apply Gate (it reads the default
  * version first). This panel only points at the Résumés page and names what Apply Gate uses.
  */
-/**
- * A free user's one résumé, for the weekly free Apply Gate check in the extension (2026-09-26). Free
- * accounts have no saved versions (the Résumés page is Premium), and with none Apply Gate reads this
- * profile field — so for them this box is the right place, not a second copy. On upgrade it becomes
- * their first saved version automatically. The extension links here as /settings#resume.
- */
-function FreeResumePanel() {
-  const queryClient = useQueryClient();
-  const location = useLocation();
-  const sectionRef = useRef<HTMLDivElement | null>(null);
-  const resumeQuery = useQuery({ queryKey: ["user-resume"], queryFn: fetchResume });
-  const saveMutation = useSaveResume();
-  const removeMutation = useMutation({
-    mutationFn: deleteResume,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["user-resume"] }),
-  });
-  const saved = String(resumeQuery.data?.resumeText || "").trim().length >= 20;
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-
-  useEffect(() => {
-    if (location.hash === "#resume") sectionRef.current?.scrollIntoView({ block: "start" });
-  }, [location.hash, resumeQuery.isLoading]);
-
-  const showEditor = editing || (!resumeQuery.isLoading && !saved);
-
-  return (
-    <div id="resume" ref={sectionRef} className="scroll-mt-24">
-      <Panel title="Your résumé" icon={FileText} description="Your free Apply Gate check each week compares the job you are looking at against this.">
-        {resumeQuery.isLoading ? (
-          <LoadingRows rows={1} />
-        ) : showEditor ? (
-          <div className="space-y-3">
-            <textarea
-              rows={10}
-              aria-label="Résumé text"
-              className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              placeholder="Paste your résumé text here (plain text, not a file)"
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-            />
-            <p className="text-[12px] leading-relaxed text-muted-foreground">
-              Your name, email, phone number and links are removed before anything is sent to the AI that writes the explanation.
-            </p>
-            {saveMutation.isError ? <ErrorState title="Your résumé did not save" detail="Nothing was lost — try again." /> : null}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className={BUTTON.primary}
-                disabled={draft.trim().length < 20 || saveMutation.isPending}
-                onClick={() => saveMutation.mutate(draft, { onSuccess: () => { setEditing(false); setDraft(""); } })}
-              >
-                {saveMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
-                Save résumé
-              </button>
-              {saved ? (
-                <button type="button" className={BUTTON.ghost} onClick={() => { setEditing(false); setDraft(""); }}>
-                  Cancel
-                </button>
-              ) : null}
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[13px] text-foreground">Saved. Apply Gate uses it for your weekly free check.</p>
-            <div className="flex items-center gap-1">
-              <button type="button" className={BUTTON.secondary} onClick={() => { setDraft(resumeQuery.data?.resumeText || ""); setEditing(true); }}>
-                Replace
-              </button>
-              <button
-                type="button"
-                className={cn(BUTTON.ghost, "hover:bg-destructive/10 hover:text-destructive")}
-                disabled={removeMutation.isPending}
-                onClick={() => removeMutation.mutate()}
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        )}
-      </Panel>
-    </div>
-  );
-}
-
 function ResumesSummaryPanel() {
   const variantsQuery = useQuery({ queryKey: ["resume-variants"], queryFn: fetchResumeVariants });
   const variants = variantsQuery.data?.variants ?? [];
-  const defaultVariant = variants.find((variant) => variant.isDefault) ?? variants[0] ?? null;
+  const defaultVariant = variants.find((variant) => variant.isDefault) ?? null;
 
   return (
-    <Panel
+    <div id="resume"><Panel
       title="Résumés"
       icon={FileText}
       action={<PanelLink to="/resumes">{variants.length > 0 ? "Manage résumés" : "Add your résumé"}</PanelLink>}
@@ -460,12 +374,13 @@ function ResumesSummaryPanel() {
           {variants.length > 1 ? `, your default of ${variants.length} saved versions.` : ", your saved résumé."} You can
           pick a different version for any single check.
         </p>
+      ) : variants.length > 0 ? (
+        <p className="text-sm">No default résumé is set. Choose one in Résumés before using extension checks.</p>
       ) : (
         <p className="text-[13px] leading-relaxed text-muted-foreground">
-          No résumé saved yet. Apply Gate compares each posting against your résumé, so until you add one its call is
-          based only on your application history.
+          No résumé saved yet. Add one and choose a default before checking a role.
         </p>
       )}
-    </Panel>
+    </Panel></div>
   );
 }

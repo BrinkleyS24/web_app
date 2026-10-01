@@ -17,7 +17,6 @@ globalThis.IntersectionObserver = IntersectionObserverStub;
 
 // Some components read prefers-reduced-motion via matchMedia.
 if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
-  // @ts-expect-error minimal matchMedia stub for jsdom
   window.matchMedia = (query: string) => ({
     matches: false,
     media: query,

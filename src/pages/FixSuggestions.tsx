@@ -1259,7 +1259,8 @@ const FixSuggestions = () => {
   }, [actionStates, activeFollowupSuggestions, storedEmails, upcomingFollowupWindows]);
 
   const hasDueFollowupWindow = upcomingFollowupWindows.some((item) => item.opensInDays <= 0);
-  const followupSuppressionReason = followupQuery.data?.meta?.suppressionReason || "";
+  const followupSuppressionReason = followupQuery.data && 'meta' in followupQuery.data
+    ? followupQuery.data.meta?.suppressionReason || "" : "";
 
   const sourceCounts = useMemo(() => {
     return urgencyFilteredSuggestionPool.reduce<Record<QueueSource, number>>(

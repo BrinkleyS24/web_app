@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ReactNode } from "react";
 
 import ApplyGate from "./ApplyGate";
+import { buildApplyGatePresentation, projectApplyGatePresentation } from "../../../../backend/gmail-job-tracker-be/services/applyGatePresentation.js";
+import { summarizeApplyGateResult } from "../../../job_sort/shared/applyGateCheck.js";
 
 const useAuth = vi.fn();
 
@@ -162,9 +164,111 @@ beforeEach(() => {
   fetchVariantScoreboard.mockResolvedValue({ success: true, scoreboard: { minSample: 5, perVariant: [] }, recommendation: null });
 });
 
+test('a library without a default requires an explicit résumé choice', async () => {
+  fetchResume.mockResolvedValue({ success: true, resumeText: null });
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: Array.from({ length: 9 }, (_, i) => ({
+    id: `resume-${i}`, name: `Résumé ${i}`, isDefault: false,
+  })) });
+  analyzeJobAlignment.mockResolvedValue(baseResult);
+  renderPage();
+  const picker = await screen.findByLabelText('Résumé');
+  expect(picker).toHaveValue('');
+  expect(screen.queryByTestId('apply-gate-resume-required')).not.toBeInTheDocument();
+  await userEvent.type(screen.getByLabelText('Job description'), 'Software testing role with Python and Playwright.');
+  expect(screen.getByRole('button', { name: /Check this role/i })).toBeDisabled();
+  await userEvent.selectOptions(picker, 'resume-4');
+  await userEvent.click(screen.getByRole('button', { name: /Check this role/i }));
+  await waitFor(() => expect(analyzeJobAlignment).toHaveBeenCalledWith(expect.objectContaining({ variantId: 'resume-4' })));
+});
+
+test('a real default is preselected instead of the first résumé in the list', async () => {
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [
+    { id: 'newest', name: 'Newest', isDefault: false },
+    { id: 'default', name: 'My default', isDefault: true },
+  ] });
+  renderPage();
+  await waitFor(() => expect(screen.getByLabelText('Résumé')).toHaveValue('default'));
+});
+
 afterEach(() => {
   vi.clearAllMocks();
   vi.unstubAllEnvs();
+});
+
+describe("one saved Apply Gate presentation on every surface", () => {
+  const canonicalResult = (action = "APPLY_WITH_STRATEGY", facts = {
+    blockingRequirements: ["testing APIs and DBs"],
+    missingRequired: ["Grafana", "JIRA", "Kafka"],
+    matchedSkills: ["Automation", "QA", "Python", "Pytest", "CI/CD"],
+    userYears: 1, requiredYears: 3,
+    coveredAlternative: { options: ["Automation", "QA", "SDET"], covered: "Automation" },
+  }) => {
+    const presentation = buildApplyGatePresentation({
+      decision: { action }, facts,
+      memoryCautions: [{ subtext: "66 similar applications have produced 4 interviews and no offer yet." }],
+    });
+    const projected = projectApplyGatePresentation(presentation);
+    return {
+      ...baseResult,
+      ...projected,
+      // Deliberately stale legacy fields must not override the canonical read.
+      reasons: ["Legacy wording must not appear"],
+      explanation: { ...projected.explanation, decision: "skip", fit_notes: ["Legacy wording must not appear"] },
+      priorHistory: { recommendation: "skip", headline: "Contradictory history headline", examples: [] },
+    };
+  };
+
+  test("current result and saved history show the popup's exact decision, bullets and typed warning", async () => {
+    const result = canonicalResult();
+    const popup = summarizeApplyGateResult(result);
+    analyzeJobAlignment.mockResolvedValue(result);
+    const view = renderPage();
+    await runAnalyze();
+    const current = within(await screen.findByTestId("apply-gate-current-result"));
+    const assertCard = (card: ReturnType<typeof within>) => {
+      expect(card.getByText(popup.headline)).toBeInTheDocument();
+      expect(card.getByText(popup.subtext)).toBeInTheDocument();
+      for (const reason of popup.reasons) expect(card.getByText(`• ${reason}`)).toBeInTheDocument();
+      expect(card.getByText(`${popup.warning.label}: ${popup.warning.text}`)).toBeInTheDocument();
+      expect(card.queryByText(/What's driving this/)).not.toBeInTheDocument();
+      expect(card.queryByText(/Legacy wording/)).not.toBeInTheDocument();
+      expect(card.queryByText(/Contradictory history headline/)).not.toBeInTheDocument();
+      for (const action of popup.actions) expect(card.getByRole("button", { name: action.label })).toBeInTheDocument();
+    };
+    assertCard(current);
+    // The page intentionally hides the active verdict from history. Reopen it to exercise
+    // the persisted history path, just as opening "Full read" from the popup does.
+    view.unmount();
+    fetchApplyGateHistory.mockResolvedValue({ success: true, history: [{
+      id: result.id, job_title: "Software Engineer in Test", company_name: "Roadie",
+      verdict: result.verdict, reasons: JSON.stringify(result.reasons),
+      explanation_payload: result.explanation, created_at: new Date().toISOString(),
+    }] });
+    renderPage();
+    assertCard(within(await screen.findByTestId(`apply-gate-history-${result.id}`)));
+  });
+
+  test("a canonical clean pass never falls back to a stale warning", async () => {
+    const result = canonicalResult("APPLY", { matchedSkills: ["Python"] } as never);
+    analyzeJobAlignment.mockResolvedValue(result);
+    renderPage();
+    await runAnalyze();
+    const card = within(await screen.findByTestId("apply-gate-current-result"));
+    expect(card.getByRole("heading", { name: "Apply now" })).toBeInTheDocument();
+    expect(card.queryByText(/Legacy wording|Primary blocker|Key gap to review/)).not.toBeInTheDocument();
+  });
+
+  test.each(["isn’t on your résumé", "isn't on your résumé", "not on your résumé"])("legacy gap wording ending in %s keeps its warning treatment", async (phrase) => {
+    const gap = `They require testing APIs and DBs, and it ${phrase.startsWith("not ") ? "is " : ""}${phrase}.`;
+    analyzeJobAlignment.mockResolvedValue({
+      ...baseResult, verdict: "potential_fit", reasons: [gap],
+      scoringBreakdown: { ...baseResult.scoringBreakdown, hardBlocker: false, riskFlags: [] },
+      explanation: { decision: "apply_with_caveats", primary_rejection_drivers: [gap], hard_blockers: [], missing_required: [], missing_preferred: [], fit_notes: [] },
+    });
+    renderPage();
+    await runAnalyze();
+    expect(await screen.findByText(`Key gap to review: ${gap}`)).toBeInTheDocument();
+  });
 });
 
 describe("ApplyGate current UI", () => {

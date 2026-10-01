@@ -27,6 +27,7 @@ import {
   type ApplyGateDisplayDecision,
   type ApplyGateRiskTolerance,
   type ApplyGateCalibrationBucket,
+  type ApplyGatePresentation,
 } from "@/lib/emails";
 import { VariantStrategyCard, type VariantDraftDecisions } from "@/components/VariantStrategyCard";
 import { ReferralNudge } from "@/components/ReferralNudge";
@@ -132,6 +133,10 @@ type VerdictStatus = "strong" | "potential" | "risky" | "not-recommended";
 
 function applyGateDisplayDecisionV1Enabled() {
   return String(import.meta.env.VITE_APPLY_GATE_DISPLAY_DECISION_V1 || "false").trim().toLowerCase() === "true";
+}
+
+function usesResolvedDecision(explanation: ApplyGateResult["explanation"] | null | undefined) {
+  return explanation?.presentation?.version === 1 || applyGateDisplayDecisionV1Enabled();
 }
 
 function verdictToStatus(verdict: ApplyGateResult["verdict"]): VerdictStatus {
@@ -303,7 +308,7 @@ function parseHistoryReasons(raw: string | null | undefined) {
 // and the warning banner so the two can never disagree about the same string.
 // The backend's coach voice (2026-09-30) says "isn't on your résumé" / "doesn't show" rather
 // than "missing" / "not shown"; both must read as a deficiency here.
-const RISK_LANGUAGE = /\b(missing|lack|gap|risk|weak|below|limited|mismatch|not shown|insufficient|blocker|stretch|short of|no evidence|not on your résumé|isn[’']t on your résumé|doesn[’']t (?:yet )?show|different field|change of field|step up|little of|easy to miss|not get past)\b/i;
+const RISK_LANGUAGE = /\b(missing|lack|gap|risk|weak|below|limited|mismatch|not shown|insufficient|blocker|stretch|short of|no evidence|not on your résumé|isn[’']t on your résumé|doesn[’']t (?:yet )?show|different field|change of field|step up|little of|easy to miss|not get past)(?![\p{L}\p{N}_])/iu;
 
 function readsAsRisk(text: string | null | undefined) {
   return RISK_LANGUAGE.test(String(text || ""));
@@ -324,7 +329,8 @@ function warningPrefixForStatus(status: VerdictStatus) {
  * labeled that compliment as a gap — the same defect as listing a satisfied requirement as a
  * screening risk. The prefix and the tone now both consult the sentence they are wrapping.
  */
-function warningPresentation(status: VerdictStatus, message: string | null | undefined) {
+function warningPresentation(status: VerdictStatus, message: string | null | undefined, presentation?: ApplyGatePresentation | null) {
+  if (presentation?.warning) return { prefix: presentation.warning.label, isRisk: true };
   if (!readsAsRisk(message)) {
     return { prefix: "What's driving this", isRisk: false } as const;
   }
@@ -410,6 +416,12 @@ function structuredWarningAndBullets(
   explanation: ApplyGateResult["explanation"] | null | undefined,
   universalBlockingLabels: string[] = [],
 ) {
+  if (explanation?.presentation?.version === 1) {
+    return {
+      warning: explanation.presentation.warning?.text || null,
+      bullets: explanation.presentation.bullets.map((point) => point.text),
+    };
+  }
   if (!explanation) {
     return { warning: null as string | null, bullets: [] as string[] };
   }
@@ -840,14 +852,16 @@ function isVerdictStatus(value: string | null | undefined): value is VerdictStat
 }
 
 function displayDecisionFromResult(result: ApplyGateResult | null | undefined): ApplyGateDisplayDecision | null {
-  return result?.displayDecision
+  return result?.explanation?.presentation?.decision
+    || result?.displayDecision
     || result?.explanation?.display_decision
     || result?.explanation?.decision_system?.displayDecision
     || null;
 }
 
 function displayDecisionFromHistory(item: ApplyGateHistoryDisplayItem | null | undefined): ApplyGateDisplayDecision | null {
-  return item?.explanation_payload?.display_decision
+  return item?.explanation_payload?.presentation?.decision
+    || item?.explanation_payload?.display_decision
     || item?.explanation_payload?.decision_system?.displayDecision
     || null;
 }
@@ -1051,6 +1065,7 @@ function buildHistoryDisplayItemFromResult(
     hard_blocker: result.scoringBreakdown?.hardBlocker ?? null,
     reasons: JSON.stringify(result.reasons || []),
     explanation_payload: result.explanation || null,
+    resume_variant_id: result.resumeDocument?.variantId || null,
     fix_suggestion: result.fixSuggestion || null,
     user_action: null,
     created_at: new Date().toISOString(),
@@ -1114,7 +1129,6 @@ const ApplyGate = () => {
   // the only signal was a 9px "Resume: not found" badge, and the form still ran.
   // Refuse the form instead, and offer the paste box right here so the setup
   // cliff is one step, not a trip to another page. (Churn audit 2026-07-26, C5.)
-  const needsResume = resumeQuery.isSuccess && !hasResume;
   const [resumePaste, setResumePaste] = useState("");
   const MIN_RESUME_CHARS = 200;
   const resumePasteLength = resumePaste.trim().length;
@@ -1136,9 +1150,11 @@ const ApplyGate = () => {
     staleTime: 60_000,
   });
   const variants = variantsQuery.data?.variants ?? [];
+  const needsResume = resumeQuery.isSuccess && !hasResume && variantsQuery.isSuccess && variants.length === 0;
   useEffect(() => {
     if (!variantId && variants.length > 0) {
-      setVariantId((variants.find((v) => v.isDefault) ?? variants[0]).id);
+      const defaultVariant = variants.find((v) => v.isDefault);
+      if (defaultVariant) setVariantId(defaultVariant.id);
     }
   }, [variants, variantId]);
 
@@ -1262,7 +1278,8 @@ const ApplyGate = () => {
   // hardened extraction (SSRF-guarded, redirect-validated, size-capped) and
   // returns an honest 400 when it can't extract a usable description.
   const jobUrlLooksFetchable = /^https?:\/\/\S+\.\S+/i.test(jobUrl.trim());
-  const canAnalyze = (jobDescription.trim().length > 0 || jobUrlLooksFetchable) && !needsResume;
+  const canAnalyze = (jobDescription.trim().length > 0 || jobUrlLooksFetchable) && !needsResume
+    && !variantsQuery.isLoading && !variantsQuery.isError && (variants.length === 0 || variants.some((v) => v.id === variantId));
 
   // ── Coach-voice translation ─────────────────────────────────────────
   // The backend's structured levels (bands, confidence) are model-card
@@ -1297,9 +1314,9 @@ const ApplyGate = () => {
   };
 
   const handleAnalyze = useCallback(() => {
-    if (!jobDescription.trim() && !jobUrlLooksFetchable) return;
+    if (!canAnalyze) return;
     analyzeMutation.mutate();
-  }, [analyzeMutation, jobDescription, jobUrlLooksFetchable]);
+  }, [analyzeMutation, canAnalyze]);
 
   const markVerdictActionInCache = useCallback(
     (verdictId: string, action: ApplyGateAction) => {
@@ -1323,7 +1340,7 @@ const ApplyGate = () => {
       const targetUrl = (result?.jobUrl || "").trim();
       if (result?.id) {
         const displayDecision = displayDecisionFromResult(result);
-        const useDisplayDecision = applyGateDisplayDecisionV1Enabled() && Boolean(displayDecision);
+        const useDisplayDecision = usesResolvedDecision(result.explanation) && Boolean(displayDecision);
         const status = useDisplayDecision ? statusFromDisplayDecision(displayDecision) : verdictToStatus(result.verdict);
         const risk = resultApplicationRiskPercent(result, status);
         const roleCompany = splitRoleAndCompany(
@@ -1416,7 +1433,7 @@ const ApplyGate = () => {
   const handleHistoryAction = useCallback(
     async (item: ApplyGateHistoryDisplayItem, action: ApplyGateAction) => {
       const displayDecision = displayDecisionFromHistory(item);
-      const useDisplayDecision = applyGateDisplayDecisionV1Enabled() && Boolean(displayDecision);
+      const useDisplayDecision = usesResolvedDecision(item.explanation_payload) && Boolean(displayDecision);
       const status = useDisplayDecision ? statusFromDisplayDecision(displayDecision) : verdictToStatus(item.verdict);
       const risk = historyApplicationRiskPercent(item, status);
       const roleCompany = splitRoleAndCompany(item.job_title, item.company_name, item.job_url || null);
@@ -1470,10 +1487,10 @@ const ApplyGate = () => {
 
   const currentDisplayDecision = displayDecisionFromResult(result);
   const currentDisplayDecisionMissing = Boolean(
-    applyGateDisplayDecisionV1Enabled() && result && !currentDisplayDecision,
+    usesResolvedDecision(result?.explanation) && result && !currentDisplayDecision,
   );
   const currentUsesDisplayDecision = Boolean(
-    applyGateDisplayDecisionV1Enabled() && currentDisplayDecision,
+    usesResolvedDecision(result?.explanation) && currentDisplayDecision,
   );
   const currentStatus = result
     ? (currentDisplayDecisionMissing ? "risky" : (currentUsesDisplayDecision ? statusFromDisplayDecision(currentDisplayDecision) : verdictToStatus(result.verdict)))
@@ -1497,12 +1514,12 @@ const ApplyGate = () => {
   const currentHasUniversalHardGate = currentUniversalBlockingLabels.length > 0;
   const structuredCurrent = structuredWarningAndBullets(result?.explanation, currentUniversalBlockingLabels);
   const fallbackCurrentMostLikelyReason = pickWarningReason(hardBlockers.length > 0 ? hardBlockers : (result?.reasons || []));
-  const currentMostLikelyReason = structuredCurrent.warning || fallbackCurrentMostLikelyReason;
+  const currentMostLikelyReason = result?.explanation?.presentation ? structuredCurrent.warning : structuredCurrent.warning || fallbackCurrentMostLikelyReason;
   const fallbackCurrentBulletReasons = (result?.reasons || [])
     .filter((entry) => entry && entry !== fallbackCurrentMostLikelyReason)
     .slice(0, 2)
     .map((entry) => truncateReason(entry, 160));
-  const currentVisibleReasonsBase = structuredCurrent.bullets.length > 0
+  const currentVisibleReasonsBase = result?.explanation?.presentation ? structuredCurrent.bullets : structuredCurrent.bullets.length > 0
     ? structuredCurrent.bullets.map((entry) => truncateReason(entry, 160))
     : (fallbackCurrentBulletReasons.length > 0
       ? fallbackCurrentBulletReasons
@@ -1578,9 +1595,9 @@ const ApplyGate = () => {
     ))
     .slice(0, 6);
   const currentWarningFull = currentMostLikelyReason ? String(currentMostLikelyReason).trim() : null;
-  const currentWarningCanExpand = Boolean(currentWarningFull && currentWarningFull.length > 150);
+  const currentWarningCanExpand = Boolean(!result?.explanation?.presentation && currentWarningFull && currentWarningFull.length > 150);
   const currentWarning = currentWarningFull
-    ? (isCurrentWarningExpanded ? currentWarningFull : warningText(currentWarningFull, 150))
+    ? (result?.explanation?.presentation || isCurrentWarningExpanded ? currentWarningFull : warningText(currentWarningFull, 150))
     : null;
   const currentDecisionCopy = currentDisplayDecisionMissing
     ? safeDegradedDecisionCopy()
@@ -1747,15 +1764,20 @@ const ApplyGate = () => {
                 value={variantId}
                 onChange={(e) => setVariantId(e.target.value)}
               >
+                <option value="" disabled>Choose a résumé</option>
                 {variants.map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.name}{v.isDefault ? " (default)" : ""}
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-muted-foreground">Which saved résumé to evaluate — and record as sent if you apply.</p>
+              <p className="text-xs text-muted-foreground">{!variantId
+                ? 'No default résumé is set. Choose which one to check against this role.'
+                : 'Which saved résumé to evaluate — and record as sent if you apply.'}</p>
             </div>
           ) : null}
+          {variantsQuery.isError ? <p role="alert" className="text-sm">Your résumés could not be loaded. <button type="button" className="underline" onClick={() => variantsQuery.refetch()}>Try again</button></p> : null}
+          {variantId && variantsQuery.isSuccess && !variants.some((v) => v.id === variantId) ? <p role="alert" className="text-sm">The selected résumé is no longer available. Choose another résumé.</p> : null}
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground" htmlFor="risk-tolerance">Apply style</label>
             <select
@@ -1806,21 +1828,28 @@ const ApplyGate = () => {
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" aria-hidden="true" />
                   <div>
                     <h2 className="text-[15px] font-bold tracking-[-0.01em] text-foreground">
-                      Add your résumé to get a verdict
+                      {result.resumeSelectionRequired ? 'Choose a résumé to get a verdict' : 'Add your résumé to get a verdict'}
                     </h2>
                     <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                       {result.insufficientProfileMessage
                         || "We couldn't read your résumé or application history, so there's nothing to evaluate this role against. Add your résumé and run it again."}
                     </p>
                     <p className="mt-2 text-xs text-muted-foreground">
-                      Paste your résumé in the panel above, then re-run the analysis.
+                      {result.resumeSelectionRequired
+                        ? 'Choose a résumé above, or set a default on the Résumés page, then try again.'
+                        : 'Paste your résumé in the panel above, then re-run the analysis.'}
                     </p>
                   </div>
                 </div>
               </div>
             ) : result ? (
               <>
-              <div className={cn(CARD, "space-y-3 p-6")}>
+              <div data-testid="apply-gate-current-result" className={cn(CARD, "space-y-3 p-6")}>
+            <p className="text-xs text-muted-foreground">{result.resumeDocument?.name
+              ? `Checked against: ${result.resumeDocument.name}`
+              : result.resumeDocument?.variantId
+                ? `Checked against: ${variants.find((v) => v.id === result.resumeDocument?.variantId)?.name || 'a previously saved résumé'}`
+                : 'Saved check · résumé not identified'}</p>
             {currentDecisionCopy && (
               <div
                 className={cn(
@@ -1876,7 +1905,9 @@ const ApplyGate = () => {
               </div>
             )}
 
-            {result.priorHistory ? (
+            {/* New reads include history in the canonical decision. The legacy history panel
+                contains its own recommendation and must not introduce a second call. */}
+            {!result.explanation?.presentation && result.priorHistory ? (
               <div
                 className={`rounded-xl border px-4 py-3 ${
                   result.priorHistory.recommendation === "skip"
@@ -2078,10 +2109,10 @@ const ApplyGate = () => {
               ))}
             </div>
 
-            {(!currentIsCompressedDecision && currentStatus !== "strong" && currentWarning) && (() => {
+            {(!currentIsCompressedDecision && (result?.explanation?.presentation || currentStatus !== "strong") && currentWarning) && (() => {
               // Classify the FULL sentence, not the truncated one, so an ellipsis can never
               // change whether this reads as a risk.
-              const presentation = warningPresentation(currentStatus || "risky", currentWarningFull);
+              const presentation = warningPresentation(currentStatus || "risky", currentWarningFull, result?.explanation?.presentation);
               return (
                 <div
                   className={presentation.isRisk
@@ -2288,14 +2319,14 @@ const ApplyGate = () => {
           <div className="space-y-3">
             <p className={EYEBROW}>Roles you checked</p>
             {history.slice(0, 5).map((item) => (
-              <div key={item.id} className={cn(CARD, "space-y-3 p-5")}>
+              <div key={item.id} data-testid={`apply-gate-history-${item.id}`} className={cn(CARD, "space-y-3 p-5")}>
                 {(() => {
                   const displayDecision = displayDecisionFromHistory(item);
                   const displayDecisionMissing = Boolean(
-                    applyGateDisplayDecisionV1Enabled() && !displayDecision,
+                    usesResolvedDecision(item.explanation_payload) && !displayDecision,
                   );
                   const usesDisplayDecision = Boolean(
-                    applyGateDisplayDecisionV1Enabled() && displayDecision,
+                    usesResolvedDecision(item.explanation_payload) && displayDecision,
                   );
                   const status = displayDecisionMissing
                     ? "risky"
@@ -2305,18 +2336,18 @@ const ApplyGate = () => {
                   const reasons = parseHistoryReasons(item.reasons);
                   const structuredHistory = structuredWarningAndBullets(item.explanation_payload);
                   const fallbackMostLikelyReason = pickWarningReason(reasons);
-                  const mostLikelyReason = structuredHistory.warning || fallbackMostLikelyReason;
+                  const mostLikelyReason = item.explanation_payload?.presentation ? structuredHistory.warning : structuredHistory.warning || fallbackMostLikelyReason;
                   const warningFull = mostLikelyReason ? String(mostLikelyReason).trim() : null;
                   const isHistoryWarningExpanded = Boolean(expandedHistoryWarnings[item.id]);
-                  const warningCanExpand = Boolean(warningFull && warningFull.length > 150);
+                  const warningCanExpand = Boolean(!item.explanation_payload?.presentation && warningFull && warningFull.length > 150);
                   const warning = warningFull
-                    ? (isHistoryWarningExpanded ? warningFull : warningText(warningFull, 150))
+                    ? (item.explanation_payload?.presentation || isHistoryWarningExpanded ? warningFull : warningText(warningFull, 150))
                     : null;
                   const bulletReasons = reasons
                     .filter((entry) => entry && entry !== fallbackMostLikelyReason)
                     .slice(0, 2)
                     .map((entry) => truncateReason(entry, 160));
-                  const visibleReasons = structuredHistory.bullets.length > 0
+                  const visibleReasons = item.explanation_payload?.presentation ? structuredHistory.bullets : structuredHistory.bullets.length > 0
                     ? structuredHistory.bullets.map((entry) => truncateReason(entry, 160))
                     : (bulletReasons.length > 0
                       ? bulletReasons
@@ -2360,6 +2391,16 @@ const ApplyGate = () => {
                   </div>
                   <ToneChip tone={item.outdated ? "neutral" : historyDecision.tone}>{historyDecision.label}</ToneChip>
                 </div>
+                <p className="text-xs text-muted-foreground">{item.explanation_payload?.resume_document || item.resume_variant_id
+                  ? `Checked against: ${item.explanation_payload?.resume_document?.name
+                    || variants.find((v) => v.id === (item.resume_variant_id || item.explanation_payload?.resume_document?.variantId))?.name || 'a previously saved résumé'}${['legacy', 'seeded_from_legacy'].includes(item.explanation_payload?.resume_document?.source || '') ? ' (from your old profile)' : ''}`
+                  : 'Saved check · résumé not identified'}</p>
+                {item.explanation_payload?.presentation ? (
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold">{decisionCopy.title}</p>
+                    <p className="text-sm leading-relaxed text-muted-foreground">{decisionCopy.body}</p>
+                  </div>
+                ) : null}
                 {item.outdated ? (
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3">
                     <p className="text-[13px] leading-snug text-muted-foreground">
@@ -2388,8 +2429,8 @@ const ApplyGate = () => {
                 {historyVisibleReasons.map((reason, index) => (
                   <p key={index} className="text-sm text-muted-foreground leading-relaxed">• {reason}</p>
                 ))}
-                {!displayDecisionMissing && status !== "strong" && warning && (() => {
-                  const presentation = warningPresentation(status, warningFull);
+                {!displayDecisionMissing && (item.explanation_payload?.presentation || status !== "strong") && warning && (() => {
+                  const presentation = warningPresentation(status, warningFull, item.explanation_payload?.presentation);
                   return (
                   <div
                     className={presentation.isRisk
