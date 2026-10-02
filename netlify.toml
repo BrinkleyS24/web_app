@@ -1,0 +1,2 @@
+[build.environment]
+VITE_API_BASE_URL = "https://applendium-backend-277330820484.us-central1.run.app"
