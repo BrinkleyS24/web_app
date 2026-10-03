@@ -123,7 +123,7 @@ export function AppSidebar() {
 
         {!isPremium && !planLoading ? (
           <NavLink
-            to="/upgrade"
+            to="/upgrade?source=web_sidebar"
             className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-[#0E8C63] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#10B981]"
             activeClassName="opacity-90"
           >

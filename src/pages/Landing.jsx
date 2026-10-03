@@ -231,7 +231,7 @@ export default function Landing() {
               Support
             </a>
             <Link
-              to="/upgrade"
+              to="/upgrade?source=landing"
               className="text-sm font-semibold text-[#0B1220] transition-colors hover:text-[#0E8C63]"
             >
               Sign in
@@ -290,7 +290,7 @@ export default function Landing() {
                 Support
               </a>
               <Link
-                to="/upgrade"
+                to="/upgrade?source=landing"
                 className="text-base font-semibold text-[#0B1220]"
                 onClick={closeMobileMenu}
               >
@@ -478,7 +478,7 @@ export default function Landing() {
               </div>
               <Magnetic className="inline-block shrink-0">
                 <Link
-                  to="/upgrade"
+                  to="/upgrade?source=landing"
                   className="inline-flex items-center gap-2.5 rounded-[12px] bg-gradient-to-b from-[#16A874] to-[#0E8C63] px-6 py-[15px] text-base font-semibold text-white shadow-[0_10px_40px_-10px_rgba(14,140,99,0.8)] ring-1 ring-inset ring-white/15"
                 >
                   Explore Premium
@@ -536,7 +536,7 @@ export default function Landing() {
                     </div>
                     <Magnetic className="shrink-0">
                       <Link
-                        to="/upgrade"
+                        to="/upgrade?source=landing"
                         className="inline-flex items-center gap-2 rounded-[11px] bg-white px-4 py-2.5 text-sm font-semibold text-[#0B1220] transition-colors hover:bg-[#E9FBF3]"
                       >
                         Start Premium
@@ -688,7 +688,7 @@ export default function Landing() {
                 </a>
               </Magnetic>
               <Link
-                to="/upgrade"
+                to="/upgrade?source=landing"
                 className="inline-flex items-center justify-center rounded-[12px] border border-white/15 bg-white/[0.03] px-6 py-[14px] text-base font-semibold text-white/90 transition-colors hover:border-white/30 hover:bg-white/[0.06]"
               >
                 Start Premium

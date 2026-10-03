@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertCircle, ArrowRight, Chrome, RefreshCw } from "lucide-react";
 import AuthButton from "../components/AuthButton.jsx";
 import { useAuth } from "../lib/AuthContext.jsx";
 import { getApiBaseUrl } from "../lib/api.js";
-import { startPremiumCheckout, fetchPremiumPrice, formatPremiumPrice } from "../lib/premiumCheckout.js";
+import { startPremiumCheckout, fetchPremiumPrice, formatPremiumPrice, readUpgradeSource } from "../lib/premiumCheckout.js";
+import { trackFunnel } from "../lib/funnel.js";
 import usePageMetadata from "../lib/usePageMetadata.js";
 import LandingFounding from "../components/landing/LandingFounding.jsx";
 import { CHROME_WEB_STORE_URL, FOUNDING_CHECKOUT_URL } from "../lib/publicSiteConfig.js";
@@ -55,6 +56,8 @@ export default function Upgrade() {
   const [checkoutError, setCheckoutError] = useState("");
   const [signOutBusy, setSignOutBusy] = useState(false);
   const [premiumPrice, setPremiumPrice] = useState(null);
+  const [billingPlan, setBillingPlan] = useState("monthly");
+  const viewTracked = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -65,9 +68,32 @@ export default function Upgrade() {
       active = false;
     };
   }, []);
-  const formattedPrice = formatPremiumPrice(premiumPrice);
+  const quarterlyPrice = premiumPrice?.quarterly || null;
+  const selectedPlan = quarterlyPrice ? billingPlan : "monthly";
+  const formattedPrice = formatPremiumPrice(selectedPlan === "quarterly" ? quarterlyPrice : premiumPrice);
+  // Founding copy below always quotes the monthly price.
+  const monthlyFormattedPrice = formatPremiumPrice(premiumPrice);
+  const quarterlySavings = quarterlyPrice && premiumPrice?.unitAmount
+    ? Math.round((1 - quarterlyPrice.unitAmount / (premiumPrice.unitAmount * (quarterlyPrice.intervalCount || 3))) * 100)
+    : 0;
+  const quarterlyPerMonth = quarterlyPrice
+    ? formatPremiumPrice({ ...quarterlyPrice, unitAmount: Math.round(quarterlyPrice.unitAmount / (quarterlyPrice.intervalCount || 3)), intervalCount: 1 })
+    : null;
   const isPremium = plan === "premium";
   const authReady = !loading && !planLoading;
+  const upgradeSource = readUpgradeSource() || "direct";
+
+  useEffect(() => {
+    if (!authReady || viewTracked.current) return;
+    viewTracked.current = true;
+    trackFunnel("upgrade_view", { source: upgradeSource, signedIn: Boolean(user), premium: plan === "premium" });
+  }, [authReady, upgradeSource, user, plan]);
+
+  function choosePlan(next) {
+    if (next === billingPlan) return;
+    setBillingPlan(next);
+    trackFunnel("upgrade_plan", { plan: next, source: upgradeSource });
+  }
   // The founding seat is a one-time Payment Link fulfilled by hand, and the manual
   // grant path only works on accounts with no stripe_customer_id. Offering it to a
   // live subscriber would sell a second, unreconcilable entitlement -- so hide it
@@ -110,9 +136,11 @@ export default function Upgrade() {
   async function handleCheckout() {
     setCheckoutError("");
     setCheckoutBusy(true);
+    trackFunnel("upgrade_click", { source: upgradeSource, plan: selectedPlan });
     try {
-      await startPremiumCheckout();
+      await startPremiumCheckout({ plan: selectedPlan });
     } catch (error) {
+      trackFunnel("checkout_error", { source: upgradeSource, plan: selectedPlan });
       setCheckoutError(error instanceof Error ? error.message : "Unable to start checkout.");
       setCheckoutBusy(false);
     }
@@ -205,6 +233,28 @@ export default function Upgrade() {
 
             <div className="relative overflow-hidden rounded-[18px] bg-[#0B1220] p-8">
               <h2 className="text-lg font-bold text-white">Premium</h2>
+              {quarterlyPrice && !isPremium ? (
+                <div role="radiogroup" aria-label="Billing" className="mt-4 inline-flex rounded-[10px] border border-[#1C2A42] bg-[#0E1726] p-1" data-testid="billing-plan-toggle">
+                  {[
+                    ["monthly", "Monthly"],
+                    ["quarterly", quarterlySavings > 0 ? `Quarterly · save ${quarterlySavings}%` : "Quarterly"],
+                  ].map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={selectedPlan === value}
+                      data-testid={`billing-plan-${value}`}
+                      onClick={() => choosePlan(value)}
+                      className={`rounded-[8px] px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
+                        selectedPlan === value ? "bg-[#0E8C63] text-white" : "text-[#98A1B3] hover:text-white"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               {formattedPrice ? (
                 <p className="mt-3.5 text-[38px] font-bold tracking-[-0.03em] text-white">
                   {formattedPrice.amount}
@@ -218,8 +268,10 @@ export default function Upgrade() {
                   <span className="ml-2 text-base font-semibold text-[#98A1B3]">at checkout</span>
                 </p>
               )}
-              <p className="mt-1 text-[13px] text-[#98A1B3]">
-                cancel anytime
+              <p className="mt-1 text-[13px] text-[#98A1B3]" data-testid="billing-plan-note">
+                {selectedPlan === "quarterly" && quarterlyPerMonth
+                  ? `about ${quarterlyPerMonth.amount}/mo · billed every 3 months · cancel anytime`
+                  : "cancel anytime"}
               </p>
               <div className="mt-6 grid gap-3 border-t border-[#1C2A42] pt-[22px]">
                 {PREMIUM_FEATURES.map((feature) => (
@@ -280,6 +332,12 @@ export default function Upgrade() {
               ) : null}
             </div>
           </div>
+
+          {selectedPlan === "quarterly" && authReady && !isPremium ? (
+            <p className="mt-4 text-center text-xs text-[#5C6470]" data-testid="quarterly-promo-note">
+              Have a founder code? It applies to the monthly plan.
+            </p>
+          ) : null}
 
           {checkoutError ? (
             <p
@@ -366,7 +424,7 @@ export default function Upgrade() {
           </p>
         </section>
 
-        {showFounding ? <LandingFounding priceLabel={formattedPrice} /> : null}
+        {showFounding ? <LandingFounding priceLabel={monthlyFormattedPrice} /> : null}
       </main>
     </div>
   );

@@ -4,6 +4,7 @@ import Landing from "./pages/Landing.jsx";
 import Privacy from "./pages/Privacy.jsx";
 import Terms from "./pages/Terms.jsx";
 import Upgrade from "./pages/Upgrade.jsx";
+import { gateSource } from "./lib/funnel.js";
 import Dashboard from "./pages/DashboardNew.tsx";
 import PaymentSuccess from "./pages/PaymentSuccess.tsx";
 import PaymentCancel from "./pages/PaymentCancel.tsx";
@@ -75,11 +76,14 @@ function RequireNonAdminUser({ children }) {
 
 function RequirePremiumUser({ children }) {
   const { user, loading, bridgeDone, plan, planLoading, planError, adminEmail } = useAuth();
+  const location = useLocation();
+  // Which Premium page turned this visitor away, so the Upgrade page can attribute the wall.
+  const upgradeHref = `/upgrade?source=${gateSource(location.pathname)}`;
 
   // See RequireNonAdminUser: hold the loading state until auth has settled so a
   // premium user isn't redirected to /upgrade during the auth-restore window.
   if (loading || planLoading || (!user && !bridgeDone)) return <LoadingScreen />;
-  if (!user) return <Navigate to="/upgrade" replace />;
+  if (!user) return <Navigate to={upgradeHref} replace />;
   if (adminEmail) return <Navigate to="/admin/review" replace />;
 
   if (planError && plan !== "premium") {
@@ -94,7 +98,7 @@ function RequirePremiumUser({ children }) {
   }
 
   if (plan !== "premium") {
-    return <Navigate to="/upgrade" replace />;
+    return <Navigate to={upgradeHref} replace />;
   }
 
   return children;

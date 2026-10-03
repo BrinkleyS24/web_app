@@ -4,6 +4,7 @@ import { CheckCircle2, Chrome, Clock3 } from "lucide-react";
 import { useAuth } from "../lib/AuthContext.jsx";
 import { apiFetch } from "../lib/api.js";
 import usePageMetadata from "../lib/usePageMetadata.js";
+import { trackFunnel } from "../lib/funnel.js";
 import { CHROME_WEB_STORE_URL } from "../lib/publicSiteConfig.js";
 import { premiumUpdatesHref } from "../lib/premiumLaunchContent.js";
 
@@ -11,6 +12,9 @@ const MAX_STATUS_ATTEMPTS = 8;
 const STATUS_POLL_MS = 1500;
 
 export default function PaymentSuccess() {
+  useEffect(() => {
+    trackFunnel("checkout_success");
+  }, []);
   const { user, loading, plan, planLoading } = useAuth();
   const chromeHref = CHROME_WEB_STORE_URL || premiumUpdatesHref;
   const [attempt, setAttempt] = useState(0);

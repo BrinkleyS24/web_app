@@ -366,7 +366,7 @@ export default function LandingHero({ chromeHref }) {
               </a>
             </Magnetic>
             <Link
-              to="/upgrade"
+              to="/upgrade?source=landing_hero"
               className="inline-flex items-center justify-center gap-2 rounded-[12px] border border-white/15
                 bg-white/[0.03] px-5 py-[14px] text-base font-semibold text-white/90
                 transition-colors hover:border-white/30 hover:bg-white/[0.06]"

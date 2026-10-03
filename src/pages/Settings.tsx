@@ -328,7 +328,7 @@ export default function Settings() {
                   Premium is active. Billing for this account is not managed through Stripe, so there is no billing portal.
                 </p>
               ) : (
-                <button type="button" className={BUTTON.primary} onClick={() => navigate("/upgrade")}>
+                <button type="button" className={BUTTON.primary} onClick={() => navigate("/upgrade?source=web_settings")}>
                   <Crown className="h-3.5 w-3.5" aria-hidden />
                   Upgrade to Premium
                 </button>

@@ -11,11 +11,11 @@ export function readUpgradeSource(search = typeof window !== "undefined" ? windo
   return value && UPGRADE_SOURCE_PATTERN.test(value) ? value : null;
 }
 
-export async function createPremiumCheckoutSession({ source = null } = {}) {
+export async function createPremiumCheckoutSession({ source = null, plan = "monthly" } = {}) {
   const response = await apiFetch("/api/subscriptions/create-checkout-session", {
     method: "POST",
     body: {
-      plan: "premium",
+      plan: plan === "quarterly" ? "quarterly" : "premium",
       ...(source ? { source } : {}),
     },
     timeoutMs: 30000,
@@ -29,8 +29,8 @@ export async function createPremiumCheckoutSession({ source = null } = {}) {
   return url;
 }
 
-export async function startPremiumCheckout({ source = readUpgradeSource() } = {}) {
-  const url = await createPremiumCheckoutSession({ source });
+export async function startPremiumCheckout({ source = readUpgradeSource(), plan = "monthly" } = {}) {
+  const url = await createPremiumCheckoutSession({ source, plan });
   window.location.assign(url);
 }
 
@@ -43,11 +43,16 @@ export async function fetchPremiumPrice() {
   try {
     const resp = await apiFetch("/api/subscriptions/price", { method: "GET", timeoutMs: 8000 });
     if (!resp?.success || typeof resp.unitAmount !== "number") return null;
+    const q = resp.quarterly;
     return {
       unitAmount: resp.unitAmount,
       currency: resp.currency || "usd",
       interval: resp.interval || null,
       intervalCount: resp.intervalCount || 1,
+      // Older backends do not send it; the page then offers monthly only.
+      quarterly: q && typeof q.unitAmount === "number"
+        ? { unitAmount: q.unitAmount, currency: q.currency || resp.currency || "usd", interval: q.interval || null, intervalCount: q.intervalCount || 1 }
+        : null,
     };
   } catch {
     return null;
@@ -72,6 +77,9 @@ export function formatPremiumPrice(price) {
   } catch {
     amount = `$${value}`;
   }
-  const suffix = price.interval === "month" ? "/mo" : price.interval === "year" ? "/yr" : "";
+  const count = Number(price.intervalCount) || 1;
+  const suffix = price.interval === "month"
+    ? (count === 1 ? "/mo" : `/${count} mo`)
+    : price.interval === "year" ? "/yr" : "";
   return { amount, suffix };
 }

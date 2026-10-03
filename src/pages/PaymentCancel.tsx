@@ -1,11 +1,15 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Clock3, Chrome } from "lucide-react";
 import usePageMetadata from "../lib/usePageMetadata.js";
+import { trackFunnel } from "../lib/funnel.js";
 import { CHROME_WEB_STORE_URL } from "../lib/publicSiteConfig.js";
 import { premiumUpdatesHref } from "../lib/premiumLaunchContent.js";
 
 export default function PaymentCancel() {
+  useEffect(() => {
+    trackFunnel("checkout_cancel");
+  }, []);
   const chromeHref = CHROME_WEB_STORE_URL || premiumUpdatesHref;
 
   usePageMetadata({
@@ -51,7 +55,7 @@ export default function PaymentCancel() {
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
                 className="landingButtonDark inline-flex items-center justify-center rounded-md bg-[#111111] px-6 py-3.5 font-bold text-white hover:bg-[#10B981]"
-                to="/upgrade"
+                to="/upgrade?source=payment_cancel"
               >
                 Return to Premium
               </Link>
