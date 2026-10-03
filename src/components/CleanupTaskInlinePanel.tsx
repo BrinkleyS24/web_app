@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Link2, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,6 +28,8 @@ type CleanupTaskInlinePanelProps = {
   task: QueueItem;
   storedEmails: StoredEmail[];
   onRefresh: () => Promise<unknown>;
+  loading?: boolean;
+  loadError?: string | null;
 };
 
 type DraftMap = Record<string, { company: string; position: string }>;
@@ -69,7 +71,7 @@ function RowMeta({ email }: { email: StoredEmail }) {
   );
 }
 
-export function CleanupTaskInlinePanel({ task, storedEmails, onRefresh }: CleanupTaskInlinePanelProps) {
+export function CleanupTaskInlinePanel({ task, storedEmails, onRefresh, loading = false, loadError = null }: CleanupTaskInlinePanelProps) {
   const isStructuredTask = task.actionType === "cleanup_structured_fields";
   const candidates = useMemo(
     () =>
@@ -81,12 +83,14 @@ export function CleanupTaskInlinePanel({ task, storedEmails, onRefresh }: Cleanu
   const visibleCandidates = useMemo(() => candidates.slice(0, MAX_VISIBLE_ROWS), [candidates]);
   const [drafts, setDrafts] = useState<DraftMap>(() => buildInitialDrafts(visibleCandidates));
   const [busyKey, setBusyKey] = useState<string>("");
+  const saving = useRef(false);
 
   useEffect(() => {
     setDrafts(buildInitialDrafts(visibleCandidates));
   }, [visibleCandidates]);
 
   async function handleStructuredSave(email: StoredEmail) {
+    if (saving.current) return;
     const emailKey = String(email.id);
     const draft = drafts[emailKey] || {
       company: String(email.company_name || "").trim(),
@@ -104,52 +108,79 @@ export function CleanupTaskInlinePanel({ task, storedEmails, onRefresh }: Cleanu
       return;
     }
 
+    saving.current = true;
     setBusyKey(emailKey);
+    let savedFields = false;
+    let linked = false;
 
     try {
       if (companyChanged) {
         await updateEmailCompany({ emailId: email.id, companyName: nextCompany });
+        savedFields = true;
       }
       if (positionChanged) {
         await updateEmailPosition({ emailId: email.id, position: nextPosition });
+        savedFields = true;
       }
       if ((nextCompany || currentCompany) && (nextPosition || currentPosition)) {
-        await linkRoleEmails({ emailId: email.id }).catch(() => undefined);
+        const result = await linkRoleEmails({ emailId: email.id });
+        if (!result.success || Number(result.failed || 0) > 0 || !(Number(result.relinked) > 0)) {
+          throw new Error("Some application links could not be confirmed. Refresh and review the remaining emails.");
+        }
+        linked = true;
       }
       await onRefresh();
-      toast.success("Thread details updated in place.");
+      toast.success(linked ? "Details saved and application links updated." : "Details saved. A company and role are still needed to link this email.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to save thread details.");
+      const detail = error instanceof Error ? error.message : "Unable to save thread details.";
+      toast.error(linked ? "Changes saved, but the updated view could not load. Refresh to check the result." : `${savedFields ? "Some details were saved. " : ""}${detail}`);
     } finally {
       setBusyKey("");
+      saving.current = false;
     }
   }
 
   async function handleLink(email: StoredEmail) {
+    if (saving.current) return;
     const emailKey = String(email.id);
     if (!hasLinkableFields(email)) {
       toast.error("This thread still needs a company and role before it can be linked.");
       return;
     }
 
+    saving.current = true;
     setBusyKey(emailKey);
+    let linked = false;
 
     try {
       const result = await linkRoleEmails({ emailId: email.id });
+      if (!result.success || Number(result.failed || 0) > 0 || !(Number(result.relinked) > 0)) {
+        throw new Error("Some application links could not be confirmed. Refresh and review the remaining emails.");
+      }
+      linked = true;
       await onRefresh();
       const relinked = Number(result?.relinked || 0);
       toast.success(relinked > 1 ? `Linked ${relinked} related emails.` : "Application journey linked.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to link this thread.");
+      toast.error(linked ? "Links updated, but the updated view could not load. Refresh to check the result." : error instanceof Error ? error.message : "Unable to link this thread.");
     } finally {
       setBusyKey("");
+      saving.current = false;
     }
   }
 
+  if (loading) return <p role="status" className="mt-4 text-sm text-muted-foreground">Loading the emails needed to check these links…</p>;
+  if (loadError) return (
+    <div role="alert" className="mt-4 space-y-2 text-sm">
+      <p>{loadError}</p>
+      <Button size="sm" onClick={() => void onRefresh().catch(() => toast.error("Unable to refresh. Please try again."))}>Retry loading emails</Button>
+    </div>
+  );
+
   if (candidates.length === 0) {
     return (
-      <div className="mt-4 rounded-xl border border-success/20 bg-success/5 p-4 text-sm text-success">
-        This cleanup task is already clear. The queue should drop it on the next refresh.
+      <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+        No matching emails are visible in the loaded records. Refresh the queue to check whether this task still applies.
       </div>
     );
   }
@@ -200,7 +231,7 @@ export function CleanupTaskInlinePanel({ task, storedEmails, onRefresh }: Cleanu
                       }));
                     }}
                     placeholder="Company"
-                    disabled={rowBusy}
+                    disabled={Boolean(busyKey)}
                   />
                   <Input
                     value={draft.position}
@@ -215,12 +246,12 @@ export function CleanupTaskInlinePanel({ task, storedEmails, onRefresh }: Cleanu
                       }));
                     }}
                     placeholder="Role / title"
-                    disabled={rowBusy}
+                    disabled={Boolean(busyKey)}
                   />
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" disabled={rowBusy} onClick={() => handleStructuredSave(email)}>
+                  <Button size="sm" disabled={Boolean(busyKey)} onClick={() => handleStructuredSave(email)}>
                     {rowBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                     Save and relink
                   </Button>
@@ -244,7 +275,7 @@ export function CleanupTaskInlinePanel({ task, storedEmails, onRefresh }: Cleanu
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" disabled={rowBusy || !canLink} onClick={() => handleLink(email)}>
+                <Button size="sm" disabled={Boolean(busyKey) || !canLink} onClick={() => handleLink(email)}>
                   {rowBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
                   Link journey
                 </Button>

@@ -622,7 +622,7 @@ function getSourceCheckChecklist(item: QueueItem) {
   ];
 }
 
-function SourceCheckSection({ item }: { item: QueueItem }) {
+function SourceCheckSection({ item, gmailUrl }: { item: QueueItem; gmailUrl: string | null }) {
   const parsed = parseSourceEvidence(item.evidence || []);
   const decisionRows = getDecisionSourceRows(item);
   // Promote a "Role: …" evidence entry to its own structured row instead of
@@ -673,6 +673,11 @@ function SourceCheckSection({ item }: { item: QueueItem }) {
         <p className="text-sm leading-6 text-muted-foreground">
           {getSourceCheckPurpose(item)}
         </p>
+        {gmailUrl ? (
+          <a href={gmailUrl} target="_blank" rel="noreferrer" className="text-sm font-medium text-accent underline">
+            Read the source conversation in Gmail
+          </a>
+        ) : null}
 
         {rows.length || fallbackRows.length ? (
           <div className="grid gap-2 sm:grid-cols-2">
@@ -1653,6 +1658,11 @@ const FixSuggestions = () => {
               {item.estimatedTime ? ` · ${item.estimatedTime}` : ""}
             </p>
             <WhyLine why={item.why} className="mt-1" />
+            {item.threadId && !item.applicationId && item.source !== "cleanup" ? (
+              <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">
+                Application link not confirmed. This action uses the email conversation; updates on other threads may be missing.
+              </p>
+            ) : null}
             {reason && variant === "today" ? (
               <p className="mt-2 max-w-[72ch] text-[13.5px] leading-relaxed text-foreground/80">{reason}</p>
             ) : null}
@@ -1751,14 +1761,20 @@ const FixSuggestions = () => {
                 </ol>
               </div>
             ) : null}
-            <SourceCheckSection item={item} />
+            <SourceCheckSection item={item} gmailUrl={gmailUrl} />
           </div>
         ) : null}
 
         {canDraft && draftOpen ? <div className="mt-4">{renderDraftPanel(item)}</div> : null}
         {isInlineCleanupIntent(item.intent) && inlineOpen ? (
           <div className="mt-3">
-            <CleanupTaskInlinePanel task={item} storedEmails={storedEmails} onRefresh={() => invalidateSuggestionQueries(queryClient)} />
+            <CleanupTaskInlinePanel
+              task={item}
+              storedEmails={storedEmails}
+              loading={storedEmailsQuery.isLoading}
+              loadError={storedEmailsQuery.data?.success === false ? "The emails needed to check these links could not be loaded." : null}
+              onRefresh={() => invalidateSuggestionQueries(queryClient)}
+            />
           </div>
         ) : null}
       </article>

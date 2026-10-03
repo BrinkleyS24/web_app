@@ -443,6 +443,19 @@ function researchActionFixture() {
 }
 
 describe("Next Actions", () => {
+  test("discloses an unconfirmed application link and gives access to the source conversation", async () => {
+    const response = buildQueueResponse();
+    const action = { ...response.queue.doToday[0], applicationId: null };
+    fetchRankedActionQueue.mockResolvedValue(buildQueueResponse({ doToday: [action], thisWeek: [] }));
+    renderPage();
+    expect(await screen.findByText(/Application link not confirmed/)).toBeVisible();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "More options" }));
+    await user.click(screen.getByRole("menuitem", { name: "Why this, and how" }));
+    await user.click(screen.getByText("Source check"));
+    expect(screen.getByRole("link", { name: "Read the source conversation in Gmail" })).toHaveAttribute("href", expect.stringContaining("mail.google.com"));
+  });
+
   test("shows today's actions with the application named and a button that fits each", async () => {
     renderPage();
 
