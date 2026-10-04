@@ -19,7 +19,7 @@ export type QueueItem = {
   logicalKey?: string;
   dedupeKey?: string;
   status?: "open" | "blocked" | "done" | "dismissed" | "expired";
-  bucket?: "doToday" | "thisWeek" | "later" | "blocked";
+  bucket?: "doToday" | "thisWeek" | "later" | "blocked" | "cleanup";
   source: QueueSource;
   urgency: QueueUrgency;
   title: string;
@@ -1436,7 +1436,7 @@ function buildRankedDescription(action: RankedAction) {
 function mapRankedActionToQueueItem(
   action: RankedAction,
   blockerMap: Map<string, RankedAction>,
-  bucket: "doToday" | "thisWeek" | "later" | "blocked",
+  bucket: "doToday" | "thisWeek" | "later" | "blocked" | "cleanup",
 ): QueueItem {
   const source = requireRankedSource(action);
   const intent = requireRankedIntent(action);
@@ -1521,6 +1521,17 @@ export function buildQueueItemsFromRankedQueue(queue?: RankedActionQueue | null)
     ...(queue.blocked || []).map((action) => mapRankedActionToQueueItem(action, blockerMap, "blocked")),
     ...(queue.later || []).map((action) => mapRankedActionToQueueItem(action, blockerMap, "later")),
   ];
+}
+
+/**
+ * Housekeeping from the backend's separate cleanup list. Deliberately NOT part of
+ * buildQueueItemsFromRankedQueue: every count of "your actions" (the Dashboard badge, this page's
+ * header) is built from that function and should mean advice only.
+ */
+export function buildCleanupItemsFromRankedQueue(queue?: RankedActionQueue | null) {
+  if (!queue?.cleanup?.length) return [] as QueueItem[];
+  const blockerMap = new Map((queue.resolvedActions || []).map((action) => [action.logicalKey, action]));
+  return queue.cleanup.map((action) => mapRankedActionToQueueItem(action, blockerMap, "cleanup"));
 }
 
 export function buildRankedQueueStats(queue?: RankedActionQueue | null) {

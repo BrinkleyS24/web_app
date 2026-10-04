@@ -19,6 +19,7 @@ import {
   MoreHorizontal,
   PauseCircle,
   ShieldAlert,
+  Wrench,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -37,6 +38,7 @@ import {
 } from "@/components/premium/PremiumUI";
 import { BUTTON, CARD, EYEBROW, TONES } from "@/components/premium/tone";
 import { WhyLine } from "@/components/premium/WhyLine";
+import { WeekInReview } from "@/components/premium/WeekInReview";
 import { describeActionIdentity, describeActionKind, resolveActionCta } from "@/lib/actionPresentation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -68,6 +70,7 @@ import {
   buildActionKey,
   buildDashboardMoveQueue,
   buildQueueItemsFromRankedQueue,
+  buildCleanupItemsFromRankedQueue,
   buildRankedQueueStats,
   buildGmailThreadUrl,
   buildOutreachDiagnostics,
@@ -1573,6 +1576,13 @@ const FixSuggestions = () => {
     return counts;
   }, [moreItems]);
   const moreEntries = useMemo(() => buildDisplayQueueEntries(moreFiltered), [moreFiltered]);
+  // Housekeeping lives in its own collapsed list (2026-10-04): it keeps counts accurate but does
+  // not move the search forward, so it no longer competes with real actions for attention.
+  const tidyItems = useMemo(() => buildCleanupItemsFromRankedQueue(rankedQueue), [rankedQueue]);
+  const tidyEntries = useMemo(() => buildDisplayQueueEntries(tidyItems), [tidyItems]);
+  const tidyOverflow = rankedQueue?.cleanupOverflowCount || 0;
+  const tidyTotal = tidyItems.length + tidyOverflow;
+  const [showTidy, setShowTidy] = useState(false);
 
   // Deep links from the Dashboard (/next-actions#<id>) land on the card and open what the button
   // promised: the draft for a follow-up, the plan for interview prep.
@@ -1781,6 +1791,35 @@ const FixSuggestions = () => {
     );
   };
 
+  // One renderer for More and Tidy, so a group of close-outs reads the same in both.
+  const renderEntry = (entry: ReturnType<typeof buildDisplayQueueEntries>[number]) =>
+    entry.type === "item" ? (
+      renderCard(entry.item, "more")
+    ) : (
+      <details key={entry.key} className="group px-1 py-3.5">
+        <summary className="flex cursor-pointer list-none items-center gap-3.5 [&::-webkit-details-marker]:hidden">
+          <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg", TONES.done.icon)}>
+            <Layers3 className="h-4 w-4" aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[14px] font-semibold text-foreground">
+              Close out {entry.items.length} quiet applications
+            </span>
+            <span className="block text-[12.5px] text-muted-foreground">
+              No reply in a long time. Clear them in one pass so they stop crowding the list.
+            </span>
+          </span>
+          <span className={cn(BUTTON.secondary, "px-3 py-1.5 text-[12.5px]")}>
+            <span className="group-open:hidden">Review</span>
+            <span className="hidden group-open:inline">Hide</span>
+          </span>
+        </summary>
+        <div className="mt-2 divide-y divide-border pl-[50px]">
+          {entry.items.map((item) => renderCard(item, "more"))}
+        </div>
+      </details>
+    );
+
   return (
     <DashboardLayout>
       <div className="space-y-5">
@@ -1827,6 +1866,10 @@ const FixSuggestions = () => {
           {moreItems.length === 0 ? heldBackNote : null}
         </section>
 
+        {/* The week in review, folded in from the old Weekly Summary page (2026-10-04): context for
+            the actions above, collapsed to its headline and four counts. */}
+        <WeekInReview />
+
         {moreItems.length > 0 ? (
           <Panel
             title="More"
@@ -1853,36 +1896,44 @@ const FixSuggestions = () => {
               ))}
             </div>
             <div className="divide-y divide-border">
-              {moreEntries.map((entry) =>
-                entry.type === "item" ? (
-                  renderCard(entry.item, "more")
-                ) : (
-                  <details key={entry.key} className="group px-1 py-3.5">
-                    <summary className="flex cursor-pointer list-none items-center gap-3.5 [&::-webkit-details-marker]:hidden">
-                      <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg", TONES.done.icon)}>
-                        <Layers3 className="h-4 w-4" aria-hidden />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[14px] font-semibold text-foreground">
-                          Close out {entry.items.length} quiet applications
-                        </span>
-                        <span className="block text-[12.5px] text-muted-foreground">
-                          No reply in a long time. Clear them in one pass so they stop crowding the list.
-                        </span>
-                      </span>
-                      <span className={cn(BUTTON.secondary, "px-3 py-1.5 text-[12.5px]")}>
-                        <span className="group-open:hidden">Review</span>
-                        <span className="hidden group-open:inline">Hide</span>
-                      </span>
-                    </summary>
-                    <div className="mt-2 divide-y divide-border pl-[50px]">
-                      {entry.items.map((item) => renderCard(item, "more"))}
-                    </div>
-                  </details>
-                ),
-              )}
+              {moreEntries.map(renderEntry)}
             </div>
             {heldBackNote ? <div className="mt-3 border-t border-border pt-3">{heldBackNote}</div> : null}
+          </Panel>
+        ) : null}
+
+        {!queueQuery.isLoading && !queueError && tidyTotal > 0 ? (
+          <Panel
+            icon={Wrench}
+            tone="done"
+            title="Tidy your tracker"
+            description="Housekeeping that keeps your counts right. It doesn't move your search forward, so it stays out of your actions."
+            meta={<span className="text-[12px] text-muted-foreground">{tidyTotal}</span>}
+            action={
+              <button
+                type="button"
+                data-testid="tidy-toggle"
+                aria-expanded={showTidy}
+                onClick={() => setShowTidy((open) => !open)}
+                className={cn(BUTTON.secondary, "px-3 py-1.5 text-[12.5px]")}
+              >
+                {showTidy ? "Hide" : "Show"}
+              </button>
+            }
+            bodyClassName={showTidy ? undefined : "hidden"}
+          >
+            {showTidy ? (
+              <>
+                <div className="divide-y divide-border" data-testid="tidy-list">
+                  {tidyEntries.map(renderEntry)}
+                </div>
+                {tidyOverflow > 0 ? (
+                  <p className="mt-3 border-t border-border pt-3 text-[12.5px] text-muted-foreground">
+                    {tidyOverflow} more {tidyOverflow === 1 ? "appears" : "appear"} as you clear these.
+                  </p>
+                ) : null}
+              </>
+            ) : null}
           </Panel>
         ) : null}
 

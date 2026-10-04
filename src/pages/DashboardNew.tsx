@@ -402,7 +402,7 @@ function ThisWeekPanel({
       tone="upcoming"
       title="This week"
       description={weekly?.readout?.headline || "The last 7 days against the 7 before."}
-      action={<PanelLink to="/weekly-summary">Summary</PanelLink>}
+      action={<PanelLink to="/next-actions#this-week">Details</PanelLink>}
     >
       {loading ? (
         <LoadingRows rows={3} />

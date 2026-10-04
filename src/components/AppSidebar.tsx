@@ -1,6 +1,5 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  CalendarRange,
   Crown,
   FileText,
   LayoutDashboard,
@@ -33,7 +32,6 @@ const searchNav: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Next Actions", url: "/next-actions", icon: ListChecks },
   { title: "Strategy Alerts", url: "/strategy-alerts", icon: Radar },
-  { title: "Weekly Summary", url: "/weekly-summary", icon: CalendarRange },
 ];
 
 const toolsNav: NavItem[] = [

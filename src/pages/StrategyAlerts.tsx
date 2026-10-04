@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Compass,
   FileText,
+  FlaskConical,
   MessageCircleQuestion,
   Radar,
   TrendingUp,
@@ -17,7 +18,7 @@ import {
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { InterviewDebriefCards } from "@/components/InterviewDebriefCards";
 import { EmptyState, ErrorState, LoadingRows, PageHeader, Panel, SectionLabel, ToneChip } from "@/components/premium/PremiumUI";
-import { BUTTON, CARD, TONES, type Tone } from "@/components/premium/tone";
+import { BUTTON, CARD, EYEBROW, TONES, type Tone } from "@/components/premium/tone";
 import { useAuth } from "@/lib/AuthContext.jsx";
 import { fetchResumeGaps, fetchStrategyAlerts, type ResumeGap, type StrategyAlert } from "@/lib/emails";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,9 @@ import { cn } from "@/lib/utils";
 const isPlaceholder = (alert: StrategyAlert) => String(alert?.id || "").endsWith("coverage-gap");
 
 function alertLook(alert: StrategyAlert): { tone: Tone; label: string; icon: LucideIcon } {
+  if (alert.kind === "experiment") {
+    return { tone: "brand", label: alert.experiment?.status === "measured" ? "Experiment result" : "Experiment running", icon: FlaskConical };
+  }
   if (alert.kind === "commitment") return { tone: "upcoming", label: "Coming up", icon: CalendarClock };
   if (alert.debrief?.items?.length) return { tone: "attention", label: "Needs your input", icon: MessageCircleQuestion };
   if (alert.severity === "positive") return { tone: "positive", label: "Keep doing this", icon: CheckCircle2 };
@@ -34,6 +38,8 @@ function alertLook(alert: StrategyAlert): { tone: Tone; label: string; icon: Luc
 }
 
 function alertCta(alert: StrategyAlert): { to: string; label: string } {
+  // You run an experiment by applying, so the next step is the next role.
+  if (alert.kind === "experiment") return { to: "/apply-gate", label: "Check your next role" };
   if (alert.kind === "fit") return { to: "/apply-gate", label: "Check your next role" };
   if (alert.kind === "commitment") return { to: "/next-actions", label: "Open the prep card" };
   if (alert.kind === "focus") return { to: "/next-actions", label: "See focused actions" };
@@ -105,6 +111,27 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
             </Link>
           </div>
         )}
+
+        {/* The finding's experiment: one change to try, measured on the next applications. */}
+        {alert.kind !== "experiment" && alert.experiment?.status === "not_started" ? (
+          <div className={cn("mt-4 rounded-xl border px-4 py-3", TONES.brand.surface)} data-testid="experiment-offer">
+            <p className={cn("flex items-center gap-1.5", EYEBROW, TONES.brand.text)}>
+              <FlaskConical className="h-3.5 w-3.5" aria-hidden />
+              Try it and see
+            </p>
+            <p className="mt-1 text-[13.5px] leading-snug text-foreground">{alert.experiment.ask}</p>
+            {alert.experiment.howItWorks ? (
+              <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">{alert.experiment.howItWorks}</p>
+            ) : null}
+            <Link to="/next-actions" className={cn(BUTTON.secondary, "mt-2.5 inline-flex px-3 py-1.5 text-[12.5px]")}>
+              Start in Next Actions
+            </Link>
+          </div>
+        ) : alert.kind !== "experiment" && alert.experiment?.status === "started" ? (
+          <p className="mt-3 text-[12.5px] text-muted-foreground">
+            You are trying this now. Its progress is under Your experiments at the top of this page.
+          </p>
+        ) : null}
       </div>
     </article>
   );
@@ -186,8 +213,11 @@ const StrategyAlerts = () => {
   // honest floor, shown in the empty state instead of as a card of its own.
   const alerts = useMemo(() => allAlerts.filter((alert) => !isPlaceholder(alert)), [allAlerts]);
   const floor = useMemo(() => allAlerts.find(isPlaceholder) || null, [allAlerts]);
-  const attention = alerts.filter((alert) => alert.severity !== "positive");
-  const working = alerts.filter((alert) => alert.severity === "positive");
+  // Experiments lead: the user chose to run them, and each reports on what happened since.
+  const experiments = alerts.filter((alert) => alert.kind === "experiment");
+  const findings = alerts.filter((alert) => alert.kind !== "experiment");
+  const attention = findings.filter((alert) => alert.severity !== "positive");
+  const working = findings.filter((alert) => alert.severity === "positive");
 
   useEffect(() => {
     const id = decodeURIComponent((location.hash || "").replace(/^#/, ""));
@@ -232,6 +262,14 @@ const StrategyAlerts = () => {
           </div>
         ) : (
           <>
+            {experiments.length ? (
+              <section className="space-y-3" aria-label="Your experiments">
+                <SectionLabel>Your experiments</SectionLabel>
+                {experiments.map((alert) => (
+                  <AlertCard key={alert.id} alert={alert} />
+                ))}
+              </section>
+            ) : null}
             {attention.length ? (
               <section className="space-y-3" aria-label="Needs attention">
                 <SectionLabel>Needs attention</SectionLabel>

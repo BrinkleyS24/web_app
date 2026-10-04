@@ -147,4 +147,56 @@ describe("StrategyAlerts", () => {
     expect(await screen.findByRole("heading", { name: "Strategy Alerts" })).toBeInTheDocument();
     expect(fetchStrategyAlerts).not.toHaveBeenCalled();
   });
+
+  test("a finding offers one change to try, and how starting it works", async () => {
+    fetchStrategyAlerts.mockResolvedValue({
+      success: true,
+      alerts: [{
+        id: "performance-rejection-velocity-auto_screen",
+        kind: "performance",
+        severity: "high",
+        title: "Several rejections arrived soon after you applied",
+        description: "6 of 6 timed rejections arrived within 3 days of applying.",
+        recommendation: "Before your next application, check screening questions.",
+        supporting_stat: "100% of your timed rejections arrived this way",
+        experiment: {
+          key: "screening-questions",
+          ask: "For your next 5 applications, read the screening questions as carefully as the posting before you submit.",
+          howItWorks: "Mark \"Try it: screening questions first on your next 5 applications\" done in Next Actions when you start.",
+          withinDays: 3,
+          status: "not_started",
+        },
+      }],
+    });
+    renderPage();
+    const offer = await screen.findByTestId("experiment-offer");
+    expect(offer).toHaveTextContent("Try it and see");
+    expect(offer).toHaveTextContent("For your next 5 applications");
+    expect(screen.getByRole("link", { name: "Start in Next Actions" })).toHaveAttribute("href", "/next-actions");
+  });
+
+  test("a running experiment leads the page in its own section, with its progress", async () => {
+    fetchStrategyAlerts.mockResolvedValue({
+      success: true,
+      alerts: [lowMatch, {
+        id: "experiment-screening-questions",
+        kind: "experiment",
+        severity: "low",
+        title: "Your experiment: screening questions first",
+        description: "You started on Sep 24. The result appears once 5 applications sent since then are at least 3 days old.",
+        recommendation: "For your next 5 applications, read the screening questions as carefully as the posting before you submit.",
+        supporting_stat: "2 of 5 applications so far",
+        timeframe_label: "Started Sep 24",
+        experiment: { key: "screening-questions", status: "running" },
+      }],
+    });
+    renderPage();
+    const section = await screen.findByRole("region", { name: "Your experiments" });
+    expect(section).toHaveTextContent("Your experiment: screening questions first");
+    expect(section).toHaveTextContent("2 of 5 applications so far");
+    expect(section).toHaveTextContent("Experiment running");
+    // Not mixed into the findings that need attention.
+    expect(screen.getByRole("region", { name: "Needs attention" })).not.toHaveTextContent("Your experiment");
+  });
 });
+

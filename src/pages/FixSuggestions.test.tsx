@@ -20,6 +20,7 @@ const {
   fetchRankedActionQueue,
   fetchStoredEmails,
   fetchSuggestionActionStates,
+  fetchWeeklyHighlights,
   dismissQueueAction,
   generateSuggestionDraft,
   recordQueueActionImpression,
@@ -31,6 +32,7 @@ const {
   fetchRankedActionQueue: vi.fn(),
   fetchStoredEmails: vi.fn(),
   fetchSuggestionActionStates: vi.fn(),
+  fetchWeeklyHighlights: vi.fn(),
   dismissQueueAction: vi.fn(),
   generateSuggestionDraft: vi.fn(),
   recordQueueActionImpression: vi.fn(),
@@ -66,6 +68,7 @@ vi.mock("@/lib/emails", async () => {
     fetchRankedActionQueue,
     fetchStoredEmails,
     fetchSuggestionActionStates,
+    fetchWeeklyHighlights,
     dismissQueueAction,
     generateSuggestionDraft,
     recordQueueActionImpression,
@@ -160,7 +163,7 @@ const storedEmails = [
   },
 ];
 
-function buildQueueResponse(overrides: Partial<Record<"doToday" | "thisWeek" | "later" | "blocked" | "dismissed" | "done" | "expired", unknown[]>> = {}) {
+function buildQueueResponse(overrides: Partial<Record<"doToday" | "thisWeek" | "later" | "blocked" | "dismissed" | "done" | "expired" | "cleanup", unknown[]>> & { cleanupOverflowCount?: number } = {}) {
   const followupAction = {
     id: "queue-followup-1",
     logicalKey: "followup:wf-thread",
@@ -272,6 +275,7 @@ function buildQueueResponse(overrides: Partial<Record<"doToday" | "thisWeek" | "
         ...((overrides.blocked as typeof base.queue.blocked | undefined) || base.queue.blocked),
         ...((overrides.later as typeof base.queue.later | undefined) || base.queue.later),
         ...((overrides.dismissed as typeof base.queue.dismissed | undefined) || base.queue.dismissed),
+        ...((overrides.cleanup as typeof base.queue.doToday | undefined) || []),
       ],
     },
   };
@@ -321,6 +325,16 @@ beforeEach(() => {
   });
 
   fetchRankedActionQueue.mockResolvedValue(buildQueueResponse());
+
+  // The week card (folded in from Weekly Summary) loads on this page too.
+  fetchWeeklyHighlights.mockResolvedValue({
+    success: true,
+    timeframe: "last_7_days",
+    counts: { applications: 3, callbacks: 1, interviews: 1, offers: 0, rejections: 2 },
+    priorCounts: { applications: 4, callbacks: 0, interviews: 0, offers: 0, rejections: 1 },
+    readout: null,
+    highlights: { newApplications: [], newCallbacks: [], newOffers: [], newRejections: [], silentThreads: [], topRejectionTheme: null },
+  });
 
   fetchStoredEmails.mockResolvedValue({
     success: true,
@@ -657,6 +671,38 @@ describe("Next Actions", () => {
 
     await user.click(screen.getByText("Close out 3 quiet applications"));
     expect(screen.getByText("Move Backend Engineer - AI Infrastructure out of active focus")).toBeVisible();
+  });
+
+  test("housekeeping stays out of the actions, in a collapsed Tidy your tracker list", async () => {
+    // 2026-10-04: 6 of the founder's 17 open cards were chores (fix data, close out quiet roles).
+    // The backend now returns them separately; they must not count as actions or take Today slots.
+    const user = userEvent.setup();
+    const followup = buildQueueResponse().queue.doToday[0];
+    fetchRankedActionQueue.mockResolvedValueOnce(
+      buildQueueResponse({
+        doToday: [followup],
+        thisWeek: [],
+        cleanup: [
+          staleActionFixture(1, "Standard Bots", "Move Associate Quality Engineer - Software (QA) out of active focus"),
+          staleActionFixture(2, "Arbol", "Move Backend Engineer - AI Infrastructure out of active focus"),
+        ],
+        cleanupOverflowCount: 1,
+      }),
+    );
+
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "Send thank-you note to Wells Fargo" })).toBeInTheDocument();
+    expect(screen.getByText("1 for today")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Tidy your tracker" })).toBeInTheDocument();
+    // Collapsed until asked for.
+    expect(screen.queryByTestId("tidy-list")).toBeNull();
+    expect(screen.queryByText("Close out 2 quiet applications")).toBeNull();
+
+    await user.click(screen.getByTestId("tidy-toggle"));
+    expect(screen.getByTestId("tidy-list")).toBeInTheDocument();
+    expect(screen.getByText("Close out 2 quiet applications")).toBeVisible();
+    expect(screen.getByText("1 more appears as you clear these.")).toBeInTheDocument();
   });
 
   test("Today is the backend's Today set, however many time-sensitive actions it holds", async () => {

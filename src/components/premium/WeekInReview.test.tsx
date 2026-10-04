@@ -1,25 +1,22 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import type { ReactNode } from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import WeeklySummary from "./WeeklySummary";
+import { WeekInReview } from "./WeekInReview";
 
 const fetchWeeklyHighlights = vi.hoisted(() => vi.fn());
 
-vi.mock("@/components/DashboardLayout", () => ({
-  DashboardLayout: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-}));
 vi.mock("@/lib/AuthContext.jsx", () => ({ useAuth: () => ({ user: { uid: "u1" }, loading: false }) }));
 vi.mock("@/lib/emails", async () => ({ ...(await vi.importActual("@/lib/emails")), fetchWeeklyHighlights }));
 
-function renderPage() {
+function renderPage({ open = true, entry = "/next-actions" }: { open?: boolean; entry?: string } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[entry]}>
       <QueryClientProvider client={client}>
-        <WeeklySummary />
+        <WeekInReview defaultOpen={open} />
       </QueryClientProvider>
     </MemoryRouter>,
   );
@@ -61,10 +58,10 @@ beforeEach(() => {
   });
 });
 
-describe("WeeklySummary", () => {
+describe("WeekInReview (the Weekly Summary, folded into Next Actions)", () => {
   test("leads with the week's read and what to do next", async () => {
     renderPage();
-    expect(await screen.findByRole("heading", { name: "1 interview move this week, alongside 7 new applications." })).toBeInTheDocument();
+    expect(await screen.findByText("1 interview move this week, alongside 7 new applications.")).toBeInTheDocument();
     expect(screen.getByText("Finish the CodeSignal assessment if the link still works, or close it out.")).toBeInTheDocument();
     expect(screen.getByText("12 last week")).toBeInTheDocument();
   });
@@ -80,5 +77,22 @@ describe("WeeklySummary", () => {
     renderPage();
     expect(await screen.findByText("“Stacey Brinkley: 30 min meeting”")).toBeInTheDocument();
     expect(screen.queryByText(/Unknown company/)).not.toBeInTheDocument();
+  });
+
+  test("collapsed by default: the headline and four counts, details on request", async () => {
+    const user = userEvent.setup();
+    renderPage({ open: false });
+    expect(await screen.findByText("1 interview move this week, alongside 7 new applications.")).toBeInTheDocument();
+    expect(screen.getByTestId("week-counts")).toHaveTextContent("Applications sent7");
+    expect(screen.queryByTestId("week-details")).toBeNull();
+
+    await user.click(screen.getByTestId("week-toggle"));
+    expect(screen.getByTestId("week-details")).toBeInTheDocument();
+    expect(screen.getByText("Waiting on you")).toBeInTheDocument();
+  });
+
+  test("an old /weekly-summary link lands here opened", async () => {
+    renderPage({ open: false, entry: "/next-actions#this-week" });
+    expect(await screen.findByTestId("week-details")).toBeInTheDocument();
   });
 });

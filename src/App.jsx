@@ -12,7 +12,6 @@ import ApplyGate from "./pages/ApplyGate.tsx";
 import Resumes from "./pages/Resumes.tsx";
 import FixSuggestions from "./pages/FixSuggestions.tsx";
 import StrategyAlerts from "./pages/StrategyAlerts.tsx";
-import WeeklySummary from "./pages/WeeklySummary.tsx";
 import Settings from "./pages/Settings.tsx";
 import AdminAnalytics from "./pages/AdminAnalytics.tsx";
 import AdminDebug from "./pages/AdminDebug.tsx";
@@ -200,14 +199,8 @@ export default function App() {
                   </RequirePremiumUser>
                 }
               />
-              <Route
-                path="/weekly-summary"
-                element={
-                  <RequirePremiumUser>
-                    <WeeklySummary />
-                  </RequirePremiumUser>
-                }
-              />
+              {/* Folded into Next Actions (2026-10-04); old links and emails land on the week card. */}
+              <Route path="/weekly-summary" element={<Navigate to="/next-actions#this-week" replace />} />
               <Route
                 path="/settings"
                 element={

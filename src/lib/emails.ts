@@ -197,13 +197,25 @@ export type StrategyAlert = {
    * `commitment` is the odd one out, deliberately: the other four classify a READ of the search,
    * this one carries something the user owes somebody on a particular day.
    */
-  kind: "performance" | "fit" | "focus" | "execution" | "commitment";
+  kind: "performance" | "fit" | "focus" | "execution" | "commitment" | "experiment";
   severity: "high" | "medium" | "low" | "positive";
   title: string;
   description: string;
   recommendation?: string | null;
   supporting_stat?: string | null;
   timeframe_label?: string | null;
+  /**
+   * A measured experiment (2026-10-04). On a finding: the one change offered and how starting it
+   * works (status not_started/started). On a `kind: "experiment"` card: its progress or result.
+   */
+  experiment?: {
+    key: string;
+    name?: string;
+    ask?: string;
+    withinDays?: number;
+    howItWorks?: string;
+    status: "not_started" | "started" | "running" | "measured";
+  } | null;
   /**
    * Present only on the interview-debrief alert. An alert that asks a question has to carry
    * the things it is asking about, or the surface has to re-derive them and we are back to
@@ -420,6 +432,10 @@ export type RankedActionQueue = {
   // lost — each is promoted as soon as one of the surfaced actions ahead of it is completed.
   heldBackSimilarActions?: { intent: string | null; intentLabel: string; count: number }[];
   heldBackSimilarCount?: number;
+  // Housekeeping (fix missing data, link emails, close out quiet roles). Kept out of the advice
+  // lanes since 2026-10-04 and shown in its own collapsed "Tidy your tracker" list.
+  cleanup?: RankedAction[];
+  cleanupOverflowCount?: number;
   resolvedActions?: RankedAction[];
 };
 
