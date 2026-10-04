@@ -799,51 +799,54 @@ function decisionCopyForStatus(status: VerdictStatus, recommendation: string | n
   };
 }
 
+// Asked, not commanded: "Apply now" beside a posting read as "this applies for you" (2026-10-04).
+const DECISION_QUESTION = "Are you applying? Your answer helps Apply Gate learn your search.";
+
 function decisionActionsForStatus(status: VerdictStatus, recommendation: string | null = null, _hardBlocker = false): DecisionAction[] {
   const recommendsSkip = recommendation?.toLowerCase().includes("skip") === true;
   const recommendsFix = recommendation?.toLowerCase().includes("fix") === true;
 
   if (recommendsSkip) {
     return [
-      { action: "skipped", label: "Skip this role", variant: "destructive" },
-      { action: "applied", label: "Apply anyway", variant: "outline" },
+      { action: "skipped", label: "Not applying", variant: "destructive" },
+      { action: "applied", label: "Applying anyway", variant: "outline" },
     ];
   }
 
   if (recommendsFix && status !== "strong") {
     return [
-      { action: "fixed", label: "I'll fix first", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
-      { action: "applied", label: "Apply anyway", variant: "outline" },
-      { action: "skipped", label: "Skip role", variant: "ghost", className: "text-muted-foreground" },
+      { action: "fixed", label: "Fixing résumé first", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
+      { action: "applied", label: "Applying anyway", variant: "outline" },
+      { action: "skipped", label: "Not applying", variant: "ghost", className: "text-muted-foreground" },
     ];
   }
 
   if (status === "strong") {
     return [
-      { action: "applied", label: "Apply now", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
-      { action: "skipped", label: "Skip anyway", variant: "ghost", className: "text-muted-foreground" },
+      { action: "applied", label: "I'm applying", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
+      { action: "skipped", label: "Not applying", variant: "ghost", className: "text-muted-foreground" },
     ];
   }
 
   if (status === "potential") {
     return [
-      { action: "applied", label: "Apply, tailored", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
-      { action: "fixed", label: "Fix first", variant: "outline" },
-      { action: "skipped", label: "Skip role", variant: "ghost", className: "text-muted-foreground" },
+      { action: "applied", label: "I'm applying", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
+      { action: "fixed", label: "Fixing résumé first", variant: "outline" },
+      { action: "skipped", label: "Not applying", variant: "ghost", className: "text-muted-foreground" },
     ];
   }
 
   if (status === "risky") {
     return [
-      { action: "fixed", label: "I'll fix first", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
-      { action: "applied", label: "Apply anyway", variant: "outline" },
-      { action: "skipped", label: "Skip role", variant: "ghost", className: "text-muted-foreground" },
+      { action: "fixed", label: "Fixing résumé first", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
+      { action: "applied", label: "Applying anyway", variant: "outline" },
+      { action: "skipped", label: "Not applying", variant: "ghost", className: "text-muted-foreground" },
     ];
   }
 
   return [
-    { action: "skipped", label: "Skip this role", variant: "destructive" },
-    { action: "applied", label: "Apply anyway", variant: "outline" },
+    { action: "skipped", label: "Not applying", variant: "destructive" },
+    { action: "applied", label: "Applying anyway", variant: "outline" },
   ];
 }
 
@@ -896,27 +899,27 @@ function decisionCopyForDisplayDecision(displayDecision: ApplyGateDisplayDecisio
 function decisionActionsForDisplayDecision(displayDecision: ApplyGateDisplayDecision): DecisionAction[] {
   if (displayDecision.action === "APPLY") {
     return [
-      { action: "applied", label: "Apply now", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
-      { action: "skipped", label: "Skip anyway", variant: "ghost", className: "text-muted-foreground" },
+      { action: "applied", label: "I'm applying", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
+      { action: "skipped", label: "Not applying", variant: "ghost", className: "text-muted-foreground" },
     ];
   }
   if (displayDecision.action === "APPLY_WITH_STRATEGY") {
     return [
-      { action: "applied", label: "Apply, tailored", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
-      { action: "fixed", label: "Fix first", variant: "outline" },
-      { action: "skipped", label: "Skip role", variant: "ghost", className: "text-muted-foreground" },
+      { action: "applied", label: "I'm applying", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
+      { action: "fixed", label: "Fixing résumé first", variant: "outline" },
+      { action: "skipped", label: "Not applying", variant: "ghost", className: "text-muted-foreground" },
     ];
   }
   if (displayDecision.action === "FIX_THEN_APPLY") {
     return [
-      { action: "fixed", label: "I'll fix first", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
-      { action: "applied", label: "Apply anyway", variant: "outline" },
-      { action: "skipped", label: "Skip role", variant: "ghost", className: "text-muted-foreground" },
+      { action: "fixed", label: "Fixing résumé first", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
+      { action: "applied", label: "Applying anyway", variant: "outline" },
+      { action: "skipped", label: "Not applying", variant: "ghost", className: "text-muted-foreground" },
     ];
   }
   return [
-    { action: "skipped", label: "Skip this role", variant: "destructive" },
-    { action: "applied", label: "Apply anyway", variant: "outline" },
+    { action: "skipped", label: "Not applying", variant: "destructive" },
+    { action: "applied", label: "Applying anyway", variant: "outline" },
   ];
 }
 
@@ -2250,6 +2253,9 @@ const ApplyGate = () => {
               </div>
             ) : (
               <div className="space-y-2 pt-1">
+                {currentDecisionActions.length ? (
+                  <p data-testid="apply-gate-question" className="text-xs text-muted-foreground">{DECISION_QUESTION}</p>
+                ) : null}
                 <div className="flex flex-wrap items-center gap-2">
                   {currentDecisionActions.map((item) => (
                     <Button
@@ -2459,6 +2465,9 @@ const ApplyGate = () => {
                 })()}
                 {!historyDecided ? (
                 <div className="space-y-2 pt-1">
+                  {decisionActions.length ? (
+                    <p className="text-xs text-muted-foreground">{DECISION_QUESTION}</p>
+                  ) : null}
                   <div className="flex flex-wrap items-center gap-2">
                     {decisionActions.map((actionItem) => (
                       <Button

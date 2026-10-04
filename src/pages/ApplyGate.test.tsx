@@ -292,7 +292,7 @@ describe("ApplyGate current UI", () => {
     await waitFor(() => {
       expect(screen.getByText("Automation Engineer")).toBeInTheDocument();
       expect(screen.getByText("Fix first before applying")).toBeInTheDocument();
-      expect(screen.getByText("I'll fix first")).toBeInTheDocument();
+      expect(screen.getByText("Fixing résumé first")).toBeInTheDocument();
     });
 
     expect(container).toMatchSnapshot();
@@ -368,7 +368,7 @@ describe("ApplyGate current UI", () => {
       // One decision, stated once: the headline. The "Recommended move" chip repeated it.
       expect(screen.getByText("Our call")).toBeInTheDocument();
       expect(screen.getByText("This is an aligned role, but the shown tenure needs clearer proof before applying.")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "I'll fix first" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Fixing résumé first" })).toBeInTheDocument();
     });
     expect(screen.queryByText("Recommended move: Skip this posting")).not.toBeInTheDocument();
   });
@@ -391,7 +391,7 @@ describe("ApplyGate current UI", () => {
       expect(screen.getByText("Apply Gate could not produce a consistent decision for this role. Review it manually before acting.")).toBeInTheDocument();
     });
     expect(screen.queryByText("Recommended move: Apply now")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Apply now" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "I'm applying" })).not.toBeInTheDocument();
   });
 
   test("leads with skip when backend marks a risky hard-gate role as skip", async () => {
@@ -506,7 +506,7 @@ describe("ApplyGate current UI", () => {
 
     await waitFor(() => {
       expect(screen.getAllByText("Skip this role").length).toBeGreaterThan(0);
-      expect(screen.queryByText("I'll fix first")).not.toBeInTheDocument();
+      expect(screen.queryByText("Fixing résumé first")).not.toBeInTheDocument();
       expect(screen.getByText(/Must-haves not on your résumé/i)).toBeInTheDocument();
       expect(screen.getByText("Requirement check")).toBeInTheDocument();
       expect(screen.getByText("Nurse's Aide experience")).toBeInTheDocument();
@@ -671,7 +671,7 @@ describe("ApplyGate current UI", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Apply, but tailor first" })).toBeInTheDocument();
       expect(screen.getByText(primaryReason)).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Apply, tailored" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "I'm applying" })).toBeInTheDocument();
     });
     expect(screen.queryByText("Requirement check")).not.toBeInTheDocument();
     expect(screen.queryByText("How to improve your odds")).not.toBeInTheDocument();
@@ -1011,7 +1011,7 @@ describe("ApplyGate current UI", () => {
     renderPage();
 
     await runAnalyze({ companyName: "Acme Robotics" });
-    await userEvent.click(await screen.findByRole("button", { name: "I'll fix first" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Fixing résumé first" }));
 
     await waitFor(() => {
       expect(updateApplyGateAction).toHaveBeenCalledWith(
@@ -1049,7 +1049,7 @@ describe("ApplyGate current UI", () => {
     renderPage();
 
     await runAnalyze({ companyName: "Acme Robotics" });
-    await userEvent.click(await screen.findByRole("button", { name: "I'll fix first" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Fixing résumé first" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Choice not saved. Try again.");
     expect(screen.getByRole("heading", { name: "Fix first before applying" })).toBeInTheDocument();
@@ -1077,7 +1077,7 @@ describe("ApplyGate current UI", () => {
     renderPage();
 
     await runAnalyze();
-    await userEvent.click(await screen.findByRole("button", { name: "Apply anyway" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Applying anyway" }));
 
     await waitFor(() => {
       expect(updateApplyGateAction).toHaveBeenCalledWith(
@@ -1131,7 +1131,7 @@ describe("ApplyGate current UI", () => {
     renderPage();
 
     await runAnalyze();
-    await userEvent.click(await screen.findByRole("button", { name: "I'll fix first" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Fixing résumé first" }));
 
     await waitFor(() => {
       expect(screen.getByText("Saved — tailor before you send.")).toBeInTheDocument();
@@ -1139,7 +1139,7 @@ describe("ApplyGate current UI", () => {
     });
     // The decision is still on screen (not silently dismissed), and the action buttons are gone.
     expect(screen.getByText("Fix first before applying")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "I'll fix first" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Fixing résumé first" })).not.toBeInTheDocument();
 
     // "Review another role" clears the card.
     await userEvent.click(screen.getByRole("button", { name: "Review another role" }));
