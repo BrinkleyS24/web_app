@@ -1,3 +1,4 @@
+import { apiDateMs, parseApiDate } from "@/lib/apiDate";
 import { getEmailCompany, getEmailTitle } from "@/lib/emailFormatting";
 import { splitRoleAndCompany } from "@/lib/applyGateDisplay";
 import type {
@@ -476,7 +477,7 @@ function buildThreadIdentityMap(emails: StoredEmail[]) {
 
   for (const [threadId, threadEmails] of grouped.entries()) {
     const sorted = [...threadEmails].sort(
-      (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(),
+      (a, b) => apiDateMs(b.date) - apiDateMs(a.date),
     );
     const company = sorted.find((email) => String(email.company_name || "").trim())?.company_name || null;
     const role = sorted.find((email) => String(email.position || "").trim())?.position || null;
@@ -539,8 +540,8 @@ export function getCleanupUnlinkedCandidates(emails: StoredEmail[]) {
 
 function daysSince(value?: string | null) {
   if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
+  const date = parseApiDate(value);
+  if (!date) return null;
   const diffMs = Date.now() - date.getTime();
   return Math.max(0, Math.floor(diffMs / 86_400_000));
 }
@@ -739,7 +740,7 @@ function buildStaleQueue(emails: StoredEmail[]): QueueItem[] {
 
   for (const [threadId, threadEmails] of grouped.entries()) {
     const sorted = [...threadEmails].sort(
-      (a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime(),
+      (a, b) => apiDateMs(a.date) - apiDateMs(b.date),
     );
     const latest = sorted[sorted.length - 1];
     if (!latest) continue;
@@ -1020,8 +1021,8 @@ export function formatRelativeAge(daysAgo?: number | null) {
 
 export function formatSnoozedUntil(value?: string | null) {
   if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
+  const date = parseApiDate(value);
+  if (!date) return null;
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
@@ -1085,7 +1086,7 @@ export function buildUpcomingFollowupWindows(params: {
 
   for (const [threadId, threadEmails] of grouped.entries()) {
     const sorted = [...threadEmails].sort(
-      (a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime(),
+      (a, b) => apiDateMs(a.date) - apiDateMs(b.date),
     );
     const latest = sorted[sorted.length - 1];
     if (!latest) continue;
@@ -1267,7 +1268,7 @@ export function buildOutreachDiagnostics(params: {
 
   for (const [, threadEmails] of grouped.entries()) {
     const sorted = [...threadEmails].sort(
-      (a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime(),
+      (a, b) => apiDateMs(a.date) - apiDateMs(b.date),
     );
     const latest = sorted[sorted.length - 1];
     if (!latest) continue;

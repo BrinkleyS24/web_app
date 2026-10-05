@@ -61,6 +61,7 @@ import {
 } from "@/lib/premiumTaskQueue";
 import { cn } from "@/lib/utils";
 import { STATUS_TONE } from "@/lib/statusTone";
+import { apiDateMs, parseApiDate } from "@/lib/apiDate";
 import { describeVerdictDecision, describeVerdictOutcome } from "@/lib/verdictPresentation";
 import { describeOutcomeSource } from "@/lib/outcomeSource";
 
@@ -609,13 +610,15 @@ function outcomeRows(weekly?: WeeklyHighlightsResponse) {
     ...tag(weekly.highlights.newCallbacks, "Interview", STATUS_TONE.interview),
     ...tag(weekly.highlights.newRejections, "Rejected", STATUS_TONE.rejected),
   ]
-    .sort((a, b) => new Date(b.item.date || 0).getTime() - new Date(a.item.date || 0).getTime())
+    .sort((a, b) => apiDateMs(b.item.date) - apiDateMs(a.item.date))
     .slice(0, 5);
 }
 
 function relativeDay(date: string | null) {
   if (!date) return null;
-  const days = Math.floor((Date.now() - new Date(date).getTime()) / 86_400_000);
+  const parsed = parseApiDate(date);
+  if (!parsed) return null;
+  const days = Math.floor((Date.now() - parsed.getTime()) / 86_400_000);
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";
   return `${days} days ago`;

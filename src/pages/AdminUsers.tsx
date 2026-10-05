@@ -20,6 +20,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { apiFetch } from "@/lib/api";
+import { parseApiDate } from "@/lib/apiDate";
 
 type AdminUserRow = {
   id: string;
@@ -84,8 +85,8 @@ type IgnoredEmailRecoveryJob = {
 
 function formatDateTime(value?: string | null) {
   if (!value) return "--";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "--";
+  const date = parseApiDate(value);
+  if (!date) return "--";
   return date.toLocaleString();
 }
 

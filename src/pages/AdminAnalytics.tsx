@@ -6,6 +6,7 @@ import { AdminLayout } from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext.jsx";
+import { parseApiDate } from "@/lib/apiDate";
 
 type CounterEntry = {
   key: string;
@@ -54,8 +55,8 @@ type DashboardPayload = {
 
 function formatDateTime(value?: string | null) {
   if (!value) return "--";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "--";
+  const date = parseApiDate(value);
+  if (!date) return "--";
   return date.toLocaleString();
 }
 

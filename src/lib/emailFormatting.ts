@@ -1,4 +1,5 @@
 import type { StoredEmail } from "@/lib/emails";
+import { parseApiDate } from "@/lib/apiDate";
 
 export function getEmailCompany(email: StoredEmail) {
   return email.company_name || "Unknown company";
@@ -16,7 +17,7 @@ export function getEmailCategoryLabel(email: StoredEmail) {
 
 export function formatEmailDate(dateValue?: string | null) {
   if (!dateValue) return "";
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return "";
+  const date = parseApiDate(dateValue);
+  if (!date) return "";
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }

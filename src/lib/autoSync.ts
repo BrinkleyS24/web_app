@@ -1,4 +1,5 @@
 import type { SyncStatusResponse } from "@/lib/emails";
+import { parseApiDate } from "@/lib/apiDate";
 
 /**
  * How stale the inbox may be before opening the Dashboard checks it. The Dashboard used to start a
@@ -23,7 +24,7 @@ export function shouldAutoSync({
   if (status.sync.inProgress) return false;
   if (status.gmailAuth?.requiresReconnect) return false;
 
-  const lastRun = status.sync.lastRunAt ? new Date(status.sync.lastRunAt).getTime() : NaN;
+  const lastRun = parseApiDate(status.sync.lastRunAt)?.getTime() ?? NaN;
   if (Number.isFinite(lastRun)) return now - lastRun > thresholdMs;
 
   // The backend records run times once its migration has run; until then, this browser's own last
@@ -33,7 +34,7 @@ export function shouldAutoSync({
 
 /** "just now", "4 min ago", "2 hr ago", "Sep 24". */
 export function formatSinceLabel(iso: string | null | undefined, now = Date.now()): string | null {
-  const ts = iso ? new Date(iso).getTime() : NaN;
+  const ts = parseApiDate(iso)?.getTime() ?? NaN;
   if (!Number.isFinite(ts)) return null;
   const minutes = Math.max(0, Math.round((now - ts) / 60_000));
   if (minutes < 1) return "just now";

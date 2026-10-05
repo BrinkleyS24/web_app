@@ -20,6 +20,7 @@ import type { WeeklyHighlightEmail, WeeklyHighlightSilent, WeeklyReadout, Weekly
 import { describeOutcomeSource } from "@/lib/outcomeSource";
 import { cn } from "@/lib/utils";
 import { STATUS_TONE } from "@/lib/statusTone";
+import { parseApiDate } from "@/lib/apiDate";
 
 /**
  * The week in review, folded into Next Actions (2026-10-04). It used to be its own Weekly Summary
@@ -32,8 +33,8 @@ export const WEEK_ANCHOR = "this-week";
 
 function formatRelativeDate(dateString: string | null) {
   if (!dateString) return null;
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return null;
+  const date = parseApiDate(dateString);
+  if (!date) return null;
   const days = Math.floor((Date.now() - date.getTime()) / 86_400_000);
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";

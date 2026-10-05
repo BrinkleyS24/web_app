@@ -17,6 +17,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { apiFetch } from "@/lib/api";
+import { parseApiDate } from "@/lib/apiDate";
 
 type ReviewFilterStatus = "all" | "pending" | "approved" | "processed" | "rejected" | "undone";
 type ReviewActionStatus = "pending" | "approved" | "rejected";
@@ -91,8 +92,8 @@ function truncateText(value?: string | null, max = 280) {
 
 function formatDateTime(value?: string | null) {
   if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+  const date = parseApiDate(value);
+  if (!date) return "—";
   return date.toLocaleString();
 }
 
