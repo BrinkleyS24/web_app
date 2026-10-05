@@ -884,7 +884,8 @@ export async function startEmailSync(options: {
   fullRefresh?: boolean;
   fetchOnlyQuota?: boolean;
 } = {}): Promise<{ success: boolean; newEmailsCount?: number }> {
-  return apiFetch("/api/emails", {
+  // `source=web` labels the usage event (backend services/activityLog.js) as a website sync.
+  return apiFetch("/api/emails?source=web", {
     method: "POST",
     body: JSON.stringify(options),
   });

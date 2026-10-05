@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Landing from "./pages/Landing.jsx";
 import Privacy from "./pages/Privacy.jsx";
+import Goodbye from "./pages/Goodbye.jsx";
 import Terms from "./pages/Terms.jsx";
 import Upgrade from "./pages/Upgrade.jsx";
 import { gateSource } from "./lib/funnel.js";
@@ -126,7 +127,7 @@ export default function App() {
   );
   const isPayment = location.pathname.startsWith("/payment");
   const isUpgrade = location.pathname === "/upgrade";
-  const isPublicSite = location.pathname === "/" || location.pathname === "/privacy" || location.pathname === "/terms" || location.pathname === "/support";
+  const isPublicSite = location.pathname === "/" || location.pathname === "/privacy" || location.pathname === "/terms" || location.pathname === "/support" || location.pathname === "/goodbye";
   const containerClass = (isDashboard || isPayment || isUpgrade)
     ? "container container--full"
     : (isPublicSite ? "container container--full" : "container");
@@ -141,6 +142,8 @@ export default function App() {
               <Route path="/" element={<Landing />} />
               <Route path="/app" element={<Navigate to="/upgrade" replace />} />
               <Route path="/privacy" element={<Privacy />} />
+              {/* Opened by Chrome when the extension is removed (ext 2.1.7). Public: no account needed. */}
+              <Route path="/goodbye" element={<Goodbye />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/upgrade" element={<Upgrade />} />
               <Route path="/support" element={<Navigate to="/#support" replace />} />

@@ -3,6 +3,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth, firebaseConfigured } from "./firebase.js";
 import { signInFromExtensionBridge, signOutFromExtensionBridge } from "./extensionBridge.js";
 import { apiFetch } from "./api.js";
+import { reportWebOpen } from "./activity";
 
 const AUTH_STATE_PUSH = "APPLENDIUM_AUTH_STATE_PUSH";
 const EXTENSION_READY = "APPLENDIUM_EXTENSION_READY";
@@ -179,6 +180,12 @@ export function AuthProvider({ children }) {
     });
     return () => unsub();
   }, [isLocalDevBypass]);
+
+  // One usage event per browser session for a signed-in visitor (lib/activity.ts), so the
+  // activity report can tell a web user from one who has gone quiet.
+  useEffect(() => {
+    if (user && !isLocalDevBypass) reportWebOpen();
+  }, [user, isLocalDevBypass]);
 
   useEffect(() => {
     if (isLocalDevBypass) return undefined;

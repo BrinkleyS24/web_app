@@ -5,7 +5,7 @@ export default function Privacy() {
     <main className="page page--legal">
       <section className="legal-shell">
         <h1>Privacy Policy</h1>
-        <p className="muted">Effective date: September 26, 2026</p>
+        <p className="muted">Effective date: October 5, 2026</p>
 
         <h2>What Applendium accesses</h2>
         <p>
@@ -19,6 +19,16 @@ export default function Privacy() {
           Gmail data is used only to provide and improve user-facing job tracking features inside
           Applendium. We do not sell Gmail data, use it for advertising, or allow humans to read it
           except when required for security, abuse prevention, support you request, or legal compliance.
+        </p>
+
+        <h2>Usage information</h2>
+        <p>
+          To keep Applendium working and to improve it, we record basic usage events: when the extension
+          syncs, when you open the extension or the website, and which plan you are on. These records are
+          tied to a coded version of your account ID (never your name or email address), contain no email
+          content, and are kept for about 30 days. If you remove the extension, Chrome opens a short optional page asking why;
+          if you answer, your answer is recorded the same way. Our website also uses Umami, a cookie-free
+          analytics service, to count page visits and upgrade clicks.
         </p>
 
         <h2>Google API Limited Use</h2>
