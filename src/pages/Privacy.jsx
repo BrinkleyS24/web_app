@@ -46,7 +46,7 @@ export default function Privacy() {
           <li><strong>Firebase Authentication</strong> (Google) — account sign-in.</li>
           <li>
             <strong>OpenAI</strong> — powers AI features. It processes content you provide (such as job
-            postings, your résumé with your name and contact details removed, and questions you type into
+            postings, your resume with your name and contact details removed, and questions you type into
             Ask Applendium) and facts derived from your job emails, such as the company, role, application
             stage and dates, and whether an assessment or a decision arrived (for inbox coaching and Ask
             Applendium). It never receives the text of your emails: when Ask Applendium shows you an email,

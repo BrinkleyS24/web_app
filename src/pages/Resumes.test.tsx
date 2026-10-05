@@ -94,7 +94,7 @@ test('removing the default explains the consequence and waits for confirmation',
   await userEvent.click(await screen.findByRole('button', { name: /^Remove$/ }));
   expect(archiveResumeVariant).not.toHaveBeenCalled();
   expect(screen.getByText(/Extension checks will pause/)).toBeInTheDocument();
-  await userEvent.click(screen.getByRole('button', { name: 'Remove résumé' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Remove resume' }));
   await waitFor(() => expect(archiveResumeVariant).toHaveBeenCalled());
 });
 
@@ -111,9 +111,9 @@ test('first upload visibly opts into a default and a retry keeps the same reques
   fetchResumeVariants.mockResolvedValue({ success: true, variants: [] });
   createResumeVariant.mockRejectedValueOnce(new Error('Timed out'));
   renderPage();
-  await userEvent.click(await screen.findByRole('button', { name: /Add a résumé/ }));
+  await userEvent.click(await screen.findByRole('button', { name: /Add a resume/ }));
   expect(screen.getByLabelText('Use as my default for job checks')).toBeChecked();
-  await userEvent.type(screen.getByPlaceholderText(/Paste your résumé/), 'Software testing experience with Python and Playwright over five years.');
+  await userEvent.type(screen.getByPlaceholderText(/Paste your resume/), 'Software testing experience with Python and Playwright over five years.');
   await userEvent.click(screen.getByRole('button', { name: /^Save$/ }));
   await screen.findByText('That version did not save');
   const first = createResumeVariant.mock.calls[0][0];
@@ -123,7 +123,7 @@ test('first upload visibly opts into a default and a retry keeps the same reques
   expect(first.defaultMode).toBe('if_empty');
 });
 
-describe("Résumés page", () => {
+describe("Resumes page", () => {
   test("lists variants and shows honest thin-data copy below minSample", async () => {
     fetchResumeVariants.mockResolvedValue({
       success: true,
@@ -145,7 +145,7 @@ describe("Résumés page", () => {
     });
   });
 
-  test("never shows a character count next to a résumé", async () => {
+  test("never shows a character count next to a resume", async () => {
     // Founder review, 2026-09-25: "(1200+ chars)" is a storage detail, not something a job seeker acts on.
     fetchResumeVariants.mockResolvedValue({
       success: true,
@@ -259,9 +259,9 @@ describe("Résumés page", () => {
     fetchResumeVariants.mockResolvedValue({ success: true, variants: [] });
     renderPage();
 
-    await userEvent.click(await screen.findByRole("button", { name: /Add a résumé/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /Add a resume/i }));
     await userEvent.type(screen.getByPlaceholderText(/Name/i), "Generic");
-    await userEvent.type(screen.getByPlaceholderText(/Paste your résumé/i), "a valid resume body with software testing experience exceeding fifty characters");
+    await userEvent.type(screen.getByPlaceholderText(/Paste your resume/i), "a valid resume body with software testing experience exceeding fifty characters");
     await userEvent.click(screen.getByRole("button", { name: /^Save$/i }));
 
     await waitFor(() => expect(createResumeVariant).toHaveBeenCalled());
@@ -274,7 +274,7 @@ describe("Résumés page", () => {
     beforeEach(() => {
       fetchResumeVariants.mockResolvedValue({
         success: true,
-        variants: [{ id: "A", name: "My résumé", isDefault: true, createdAt: "", charCount: 1200 }],
+        variants: [{ id: "A", name: "My resume", isDefault: true, createdAt: "", charCount: 1200 }],
       });
     });
 
@@ -285,21 +285,21 @@ describe("Résumés page", () => {
       });
       renderPage();
 
-      expect(await screen.findByText(/You've had 2 rejections\. Try a different résumé next time\./i)).toBeInTheDocument();
+      expect(await screen.findByText(/You've had 2 rejections\. Try a different resume next time\./i)).toBeInTheDocument();
     });
 
     test("stays hidden with zero rejections", async () => {
       renderPage();
 
-      await waitFor(() => expect(screen.getByText("My résumé")).toBeInTheDocument());
-      expect(screen.queryByText(/Try a different résumé next time/i)).not.toBeInTheDocument();
+      await waitFor(() => expect(screen.getByText("My resume")).toBeInTheDocument());
+      expect(screen.queryByText(/Try a different resume next time/i)).not.toBeInTheDocument();
     });
 
     test("stays hidden once a second variant already exists", async () => {
       fetchResumeVariants.mockResolvedValue({
         success: true,
         variants: [
-          { id: "A", name: "My résumé", isDefault: true, createdAt: "", charCount: 1200 },
+          { id: "A", name: "My resume", isDefault: true, createdAt: "", charCount: 1200 },
           { id: "B", name: "QA-focused", isDefault: false, createdAt: "", charCount: 1300 },
         ],
       });
@@ -309,8 +309,8 @@ describe("Résumés page", () => {
       });
       renderPage();
 
-      await waitFor(() => expect(screen.getByRole("heading", { name: "My résumé" })).toBeInTheDocument());
-      expect(screen.queryByText(/Try a different résumé next time/i)).not.toBeInTheDocument();
+      await waitFor(() => expect(screen.getByRole("heading", { name: "My resume" })).toBeInTheDocument());
+      expect(screen.queryByText(/Try a different resume next time/i)).not.toBeInTheDocument();
     });
 
     test("dismiss hides it and the dismissal survives a fresh mount", async () => {
@@ -320,14 +320,14 @@ describe("Résumés page", () => {
       });
       renderPage();
 
-      const nudge = await screen.findByText(/You've had a rejection\. Try a different résumé next time\./i);
+      const nudge = await screen.findByText(/You've had a rejection\. Try a different resume next time\./i);
       expect(nudge).toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: /Dismiss/i }));
-      expect(screen.queryByText(/Try a different résumé next time/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Try a different resume next time/i)).not.toBeInTheDocument();
 
       renderPage();
-      await waitFor(() => expect(screen.getByText("My résumé")).toBeInTheDocument());
-      expect(screen.queryByText(/Try a different résumé next time/i)).not.toBeInTheDocument();
+      await waitFor(() => expect(screen.getByText("My resume")).toBeInTheDocument());
+      expect(screen.queryByText(/Try a different resume next time/i)).not.toBeInTheDocument();
     });
 
     test("clicking the nudge's CTA opens the add-variant form", async () => {
@@ -337,8 +337,8 @@ describe("Résumés page", () => {
       });
       renderPage();
 
-      await screen.findByText(/You've had a rejection\. Try a different résumé next time\./i);
-      const [nudgeCta] = screen.getAllByRole("button", { name: /Add a résumé version/i });
+      await screen.findByText(/You've had a rejection\. Try a different resume next time\./i);
+      const [nudgeCta] = screen.getAllByRole("button", { name: /Add a resume version/i });
       await userEvent.click(nudgeCta);
       expect(screen.getByPlaceholderText(/Name/i)).toBeInTheDocument();
     });

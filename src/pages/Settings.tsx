@@ -199,7 +199,7 @@ export default function Settings() {
   return (
     <DashboardLayout>
       <div className="max-w-3xl space-y-5">
-        <PageHeader title="Settings" description="Your account, résumés, coach voice and billing." />
+        <PageHeader title="Settings" description="Your account, resumes, coach voice and billing." />
 
         <Panel title="Account" icon={User}>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -347,10 +347,10 @@ export default function Settings() {
 }
 
 /**
- * Résumés live in one place. Settings used to embed a second résumé editor that wrote to the
+ * Resumes live in one place. Settings used to embed a second resume editor that wrote to the
  * legacy profile field while reading back the default version, so once a user had any saved
  * version an edit here appeared to vanish and never reached Apply Gate (it reads the default
- * version first). This panel only points at the Résumés page and names what Apply Gate uses.
+ * version first). This panel only points at the Resumes page and names what Apply Gate uses.
  */
 function ResumesSummaryPanel() {
   const variantsQuery = useQuery({ queryKey: ["resume-variants"], queryFn: fetchResumeVariants });
@@ -359,26 +359,26 @@ function ResumesSummaryPanel() {
 
   return (
     <div id="resume"><Panel
-      title="Résumés"
+      title="Resumes"
       icon={FileText}
-      action={<PanelLink to="/resumes">{variants.length > 0 ? "Manage résumés" : "Add your résumé"}</PanelLink>}
+      action={<PanelLink to="/resumes">{variants.length > 0 ? "Manage resumes" : "Add your resume"}</PanelLink>}
     >
       {variantsQuery.isLoading ? (
         <LoadingRows rows={1} />
       ) : variantsQuery.isError ? (
-        <ErrorState title="Your résumés did not load" onRetry={() => variantsQuery.refetch()} />
+        <ErrorState title="Your resumes did not load" onRetry={() => variantsQuery.refetch()} />
       ) : defaultVariant ? (
         <p className="text-[13px] leading-relaxed text-muted-foreground">
           Apply Gate checks roles against{" "}
           <span className="font-semibold text-foreground">{defaultVariant.name}</span>
-          {variants.length > 1 ? `, your default of ${variants.length} saved versions.` : ", your saved résumé."} You can
+          {variants.length > 1 ? `, your default of ${variants.length} saved versions.` : ", your saved resume."} You can
           pick a different version for any single check.
         </p>
       ) : variants.length > 0 ? (
-        <p className="text-sm">No default résumé is set. Choose one in Résumés before using extension checks.</p>
+        <p className="text-sm">No default resume is set. Choose one in Resumes before using extension checks.</p>
       ) : (
         <p className="text-[13px] leading-relaxed text-muted-foreground">
-          No résumé saved yet. Add one and choose a default before checking a role.
+          No resume saved yet. Add one and choose a default before checking a role.
         </p>
       )}
     </Panel></div>

@@ -164,14 +164,14 @@ beforeEach(() => {
   fetchVariantScoreboard.mockResolvedValue({ success: true, scoreboard: { minSample: 5, perVariant: [] }, recommendation: null });
 });
 
-test('a library without a default requires an explicit résumé choice', async () => {
+test('a library without a default requires an explicit resume choice', async () => {
   fetchResume.mockResolvedValue({ success: true, resumeText: null });
   fetchResumeVariants.mockResolvedValue({ success: true, variants: Array.from({ length: 9 }, (_, i) => ({
-    id: `resume-${i}`, name: `Résumé ${i}`, isDefault: false,
+    id: `resume-${i}`, name: `Resume ${i}`, isDefault: false,
   })) });
   analyzeJobAlignment.mockResolvedValue(baseResult);
   renderPage();
-  const picker = await screen.findByLabelText('Résumé');
+  const picker = await screen.findByLabelText('Resume');
   expect(picker).toHaveValue('');
   expect(screen.queryByTestId('apply-gate-resume-required')).not.toBeInTheDocument();
   await userEvent.type(screen.getByLabelText('Job description'), 'Software testing role with Python and Playwright.');
@@ -181,13 +181,13 @@ test('a library without a default requires an explicit résumé choice', async (
   await waitFor(() => expect(analyzeJobAlignment).toHaveBeenCalledWith(expect.objectContaining({ variantId: 'resume-4' })));
 });
 
-test('a real default is preselected instead of the first résumé in the list', async () => {
+test('a real default is preselected instead of the first resume in the list', async () => {
   fetchResumeVariants.mockResolvedValue({ success: true, variants: [
     { id: 'newest', name: 'Newest', isDefault: false },
     { id: 'default', name: 'My default', isDefault: true },
   ] });
   renderPage();
-  await waitFor(() => expect(screen.getByLabelText('Résumé')).toHaveValue('default'));
+  await waitFor(() => expect(screen.getByLabelText('Resume')).toHaveValue('default'));
 });
 
 afterEach(() => {
@@ -258,7 +258,7 @@ describe("one saved Apply Gate presentation on every surface", () => {
     expect(card.queryByText(/Legacy wording|Primary blocker|Key gap to review/)).not.toBeInTheDocument();
   });
 
-  test.each(["isn’t on your résumé", "isn't on your résumé", "not on your résumé"])("legacy gap wording ending in %s keeps its warning treatment", async (phrase) => {
+  test.each(["isn’t on your resume", "isn't on your resume", "not on your resume"])("legacy gap wording ending in %s keeps its warning treatment", async (phrase) => {
     const gap = `They require testing APIs and DBs, and it ${phrase.startsWith("not ") ? "is " : ""}${phrase}.`;
     analyzeJobAlignment.mockResolvedValue({
       ...baseResult, verdict: "potential_fit", reasons: [gap],
@@ -292,7 +292,7 @@ describe("ApplyGate current UI", () => {
     await waitFor(() => {
       expect(screen.getByText("Automation Engineer")).toBeInTheDocument();
       expect(screen.getByText("Fix first before applying")).toBeInTheDocument();
-      expect(screen.getByText("Fixing résumé first")).toBeInTheDocument();
+      expect(screen.getByText("Fixing resume first")).toBeInTheDocument();
     });
 
     expect(container).toMatchSnapshot();
@@ -368,7 +368,7 @@ describe("ApplyGate current UI", () => {
       // One decision, stated once: the headline. The "Recommended move" chip repeated it.
       expect(screen.getByText("Our call")).toBeInTheDocument();
       expect(screen.getByText("This is an aligned role, but the shown tenure needs clearer proof before applying.")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Fixing résumé first" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Fixing resume first" })).toBeInTheDocument();
     });
     expect(screen.queryByText("Recommended move: Skip this posting")).not.toBeInTheDocument();
   });
@@ -506,8 +506,8 @@ describe("ApplyGate current UI", () => {
 
     await waitFor(() => {
       expect(screen.getAllByText("Skip this role").length).toBeGreaterThan(0);
-      expect(screen.queryByText("Fixing résumé first")).not.toBeInTheDocument();
-      expect(screen.getByText(/Must-haves not on your résumé/i)).toBeInTheDocument();
+      expect(screen.queryByText("Fixing resume first")).not.toBeInTheDocument();
+      expect(screen.getByText(/Must-haves not on your resume/i)).toBeInTheDocument();
       expect(screen.getByText("Requirement check")).toBeInTheDocument();
       expect(screen.getByText("Nurse's Aide experience")).toBeInTheDocument();
       expect(screen.getByText(/Apply anyway only if you already meet these requirements/i)).toBeInTheDocument();
@@ -675,7 +675,7 @@ describe("ApplyGate current UI", () => {
     });
     expect(screen.queryByText("Requirement check")).not.toBeInTheDocument();
     expect(screen.queryByText("How to improve your odds")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Missing required skills|Required skills not on your résumé/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Missing required skills|Required skills not on your resume/i)).not.toBeInTheDocument();
     expect(screen.queryByText("Recommended move: Apply now")).not.toBeInTheDocument();
   });
 
@@ -1011,7 +1011,7 @@ describe("ApplyGate current UI", () => {
     renderPage();
 
     await runAnalyze({ companyName: "Acme Robotics" });
-    await userEvent.click(await screen.findByRole("button", { name: "Fixing résumé first" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Fixing resume first" }));
 
     await waitFor(() => {
       expect(updateApplyGateAction).toHaveBeenCalledWith(
@@ -1049,7 +1049,7 @@ describe("ApplyGate current UI", () => {
     renderPage();
 
     await runAnalyze({ companyName: "Acme Robotics" });
-    await userEvent.click(await screen.findByRole("button", { name: "Fixing résumé first" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Fixing resume first" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Choice not saved. Try again.");
     expect(screen.getByRole("heading", { name: "Fix first before applying" })).toBeInTheDocument();
@@ -1100,12 +1100,12 @@ describe("ApplyGate current UI", () => {
     });
   });
 
-  test("renders an honest 'add your résumé' state instead of a verdict when the profile is empty", async () => {
+  test("renders an honest 'add your resume' state instead of a verdict when the profile is empty", async () => {
     analyzeJobAlignment.mockResolvedValue({
       success: true,
       insufficientProfile: true,
       insufficientProfileMessage:
-        "We couldn't read your résumé or application history, so there's nothing to evaluate this role against. Add your résumé above and run it again.",
+        "We couldn't read your resume or application history, so there's nothing to evaluate this role against. Add your resume above and run it again.",
       jobTitle: "QA Engineer",
       companyName: "Pennant Services",
       verdict: null,
@@ -1116,7 +1116,7 @@ describe("ApplyGate current UI", () => {
     await runAnalyze({ jobTitle: "QA Engineer" });
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Add your résumé to get a verdict" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Add your resume to get a verdict" })).toBeInTheDocument();
       expect(screen.getByText(/nothing to evaluate this role against/i)).toBeInTheDocument();
     });
 
@@ -1131,7 +1131,7 @@ describe("ApplyGate current UI", () => {
     renderPage();
 
     await runAnalyze();
-    await userEvent.click(await screen.findByRole("button", { name: "Fixing résumé first" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Fixing resume first" }));
 
     await waitFor(() => {
       expect(screen.getByText("Saved — tailor before you send.")).toBeInTheDocument();
@@ -1139,7 +1139,7 @@ describe("ApplyGate current UI", () => {
     });
     // The decision is still on screen (not silently dismissed), and the action buttons are gone.
     expect(screen.getByText("Fix first before applying")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Fixing résumé first" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Fixing resume first" })).not.toBeInTheDocument();
 
     // "Review another role" clears the card.
     await userEvent.click(screen.getByRole("button", { name: "Review another role" }));
@@ -1235,7 +1235,7 @@ describe("ApplyGate current UI", () => {
     });
   });
 
-  test("passes the chosen résumé variantId to analyze", async () => {
+  test("passes the chosen resume variantId to analyze", async () => {
     fetchResumeVariants.mockResolvedValue({
       success: true,
       variants: [
@@ -1246,7 +1246,7 @@ describe("ApplyGate current UI", () => {
     analyzeJobAlignment.mockResolvedValue(baseResult);
     renderPage();
 
-    await userEvent.selectOptions(await screen.findByLabelText(/Résumé/i), "B");
+    await userEvent.selectOptions(await screen.findByLabelText(/Resume/i), "B");
     await runAnalyze();
 
     await waitFor(() =>

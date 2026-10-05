@@ -36,7 +36,7 @@ const searchNav: NavItem[] = [
 
 const toolsNav: NavItem[] = [
   { title: "Apply Gate", url: "/apply-gate", icon: ScanSearch },
-  { title: "Résumés", url: "/resumes", icon: FileText },
+  { title: "Resumes", url: "/resumes", icon: FileText },
 ];
 
 const linkClass =

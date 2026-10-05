@@ -1046,7 +1046,7 @@ const FixSuggestions = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   // All actions, in the backend's ranked order. The old default was an inbox-only lane that hid
-  // Apply Gate, résumé and close-out work behind a toggle.
+  // Apply Gate, resume and close-out work behind a toggle.
   const [queueView, setQueueView] = useState<QueueView>("all");
   const [moreFilter, setMoreFilter] = useState<MoreFilter>("all");
   const [expandedDetailsId, setExpandedDetailsId] = useState<string>("");
@@ -1193,7 +1193,7 @@ const FixSuggestions = () => {
   const storedEmails = (storedEmailsQuery.data?.emails || []) as StoredEmail[];
   const rankedQueue = (queueQuery.data?.queue || null) as RankedActionQueue | null;
   // The same list the Dashboard counts: open, not blocked, one row per action. Blocked rows were
-  // "Apply to X" waiting on "Tailor résumé for X", which is already its own row, so each role
+  // "Apply to X" waiting on "Tailor resume for X", which is already its own row, so each role
   // appeared twice (founder's queue, 2026-09-25: 7 blocked rows, one role duplicated) and this page
   // said "22 more" where the Dashboard said "14 more". A blocked step appears once its blocker is done.
   const combinedSuggestions = useMemo(
@@ -1974,7 +1974,7 @@ const MORE_FILTERS: Array<{ value: MoreFilter; label: string }> = [
   { value: "outreach", label: "Outreach" },
   { value: "interviews", label: "Interviews" },
   { value: "closeouts", label: "Close-outs" },
-  { value: "tools", label: "Résumé & Apply Gate" },
+  { value: "tools", label: "Resume & Apply Gate" },
   { value: "data", label: "Data fixes" },
 ];
 
@@ -1982,7 +1982,7 @@ function moreFilterGroup(item: QueueItem): Exclude<MoreFilter, "all"> {
   const kind = describeActionKind(item);
   if (kind === "Interview prep" || kind === "Assessment") return "interviews";
   if (kind === "Close-out") return "closeouts";
-  if (kind === "Résumé" || kind === "Apply Gate") return "tools";
+  if (kind === "Resume" || kind === "Apply Gate") return "tools";
   if (kind === "Data fix") return "data";
   return "outreach";
 }

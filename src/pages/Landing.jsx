@@ -103,7 +103,7 @@ const PREMIUM_FEATURES = [
     body: "Patterns across your applications — what is working, what keeps failing — and what to do about each.",
   },
   {
-    title: "Résumé versions",
+    title: "Resume versions",
     body: "Save the versions you tailor and see which one actually gets interviews, from the replies in your inbox.",
   },
   {
@@ -558,7 +558,7 @@ export default function Landing() {
                   </div>
                 </TiltCard>
 
-                {/* Strategy Alerts / Résumé versions / Weekly Summary */}
+                {/* Strategy Alerts / Resume versions / Weekly Summary */}
                 {[2, 3, 4].map((i) => (
                   <TiltCard key={PREMIUM_FEATURES[i].title} className="h-full rounded-2xl lg:col-span-2">
                     <div className="flex h-full flex-col justify-center rounded-2xl border border-white/10 bg-[#0E1726]/70 p-6 backdrop-blur-sm">

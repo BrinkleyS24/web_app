@@ -126,8 +126,8 @@ describe("Settings coach voice", () => {
   });
 });
 
-describe("Settings résumés", () => {
-  test("points at the Résumés page instead of a second editor, and names the version Apply Gate uses", async () => {
+describe("Settings resumes", () => {
+  test("points at the Resumes page instead of a second editor, and names the version Apply Gate uses", async () => {
     // The old box wrote to a legacy field while reading back the default version, so edits there
     // appeared to vanish once any version existed.
     mockApi({ coach: { enabled: true, available: true, premium: true } });
@@ -135,27 +135,27 @@ describe("Settings résumés", () => {
 
     expect(await screen.findByText("QA-focused")).toBeInTheDocument();
     expect(screen.getByText(/your default of 2 saved versions/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Manage résumés/ })).toHaveAttribute("href", "/resumes");
+    expect(screen.getByRole("link", { name: /Manage resumes/ })).toHaveAttribute("href", "/resumes");
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.queryByText(/Pre-jection/)).toBeNull();
   });
 });
 
-describe("Settings résumé for free users", () => {
-  test("free users can reach the shared résumé management page", async () => {
+describe("Settings resume for free users", () => {
+  test("free users can reach the shared resume management page", async () => {
     useAuth.mockReturnValue({ user: { uid: "u2", email: "free@example.com" }, plan: "free", planLoading: false, logout: vi.fn() });
     mockApi({ coach: { enabled: true, available: false, premium: false } });
     renderPage();
-    expect(await screen.findByRole('link', { name: 'Manage résumés' })).toHaveAttribute('href', '/resumes');
-    expect(screen.queryByLabelText('Résumé text')).toBeNull();
+    expect(await screen.findByRole('link', { name: 'Manage resumes' })).toHaveAttribute('href', '/resumes');
+    expect(screen.queryByLabelText('Resume text')).toBeNull();
     expect(saveResume).not.toHaveBeenCalled();
   });
 
-  test("premium users manage résumés on the Résumés page, not here", async () => {
+  test("premium users manage resumes on the Resumes page, not here", async () => {
     mockApi({ coach: { enabled: true, available: true, premium: true } });
     renderPage();
     await screen.findByText("QA-focused");
-    expect(screen.queryByText("Your résumé")).toBeNull();
+    expect(screen.queryByText("Your resume")).toBeNull();
     expect(fetchResume).not.toHaveBeenCalled();
   });
 });

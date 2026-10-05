@@ -55,9 +55,9 @@ describe("resolveActionCta", () => {
       .toEqual({ kind: "gmail", label: "Open assessment email", href: GMAIL });
   });
 
-  test("résumé and role work go to the tool that does it", () => {
+  test("resume and role work go to the tool that does it", () => {
     expect(resolveActionCta(item({ source: "resume", actionType: "resume_proof_gap", hasDraft: false }), null))
-      .toEqual({ kind: "route", label: "Update your résumé", href: "/resumes" });
+      .toEqual({ kind: "route", label: "Update your resume", href: "/resumes" });
     // The label follows where the button goes.
     expect(resolveActionCta(item({ source: "resume", actionType: "tailor_resume", hasDraft: false, routeHref: "/apply-gate" }), null))
       .toEqual({ kind: "route", label: "Tailor in Apply Gate", href: "/apply-gate" });

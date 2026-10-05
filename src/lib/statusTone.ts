@@ -6,7 +6,7 @@ import type { Tone } from "@/components/premium/tone";
  * The palette is the one the brand already publishes — the extension popup, the landing-page hero
  * and the store screenshots: interviews gold, offers green, rejections red, everything waiting or
  * settled neutral. Before this map the web app painted interviews brand-teal on the Weekly Summary
- * and Dashboard but green on Apply Gate and Résumés, and "waiting on a reply" was blue on the
+ * and Dashboard but green on Apply Gate and Resumes, and "waiting on a reply" was blue on the
  * Dashboard and amber on the Weekly Summary (review, 2026-09-26). On the light web theme gold is
  * the shared `--warning` token, the same one the popup's light fallback uses.
  *

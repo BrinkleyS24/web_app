@@ -1,10 +1,10 @@
-# Résumé Variants + Outcome Attribution — Implementation Plan
+# Resume Variants + Outcome Attribution — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Turn the résumé from one static blob into versioned, outcome-tagged variants — Apply Gate records which variant was sent at apply-time, the existing inbox-outcome pipeline attributes interview/offer/rejection back to the variant, and a scoreboard + apply-time guidance steer users onto the résumé that converts.
+**Goal:** Turn the resume from one static blob into versioned, outcome-tagged variants — Apply Gate records which variant was sent at apply-time, the existing inbox-outcome pipeline attributes interview/offer/rejection back to the variant, and a scoreboard + apply-time guidance steer users onto the resume that converts.
 
-**Architecture:** A new `resume_variants` table (encrypted text, RLS) holds named variants; `apply_gate_verdicts` gains a `resume_variant_id` column (the verdict insert is schema-drift-tolerant, so backend ships before the migration). The scoreboard is a pure function that mirrors `buildVerdictCalibration` — joining applied verdicts to email-cohort outcomes via the same `cohortKeyForRole`/`buildCohortOutcomeMap` so numbers never drift from Outcome Memory. Frontend adds a Résumés page, a variant picker in Apply Gate, and an apply-time guidance line.
+**Architecture:** A new `resume_variants` table (encrypted text, RLS) holds named variants; `apply_gate_verdicts` gains a `resume_variant_id` column (the verdict insert is schema-drift-tolerant, so backend ships before the migration). The scoreboard is a pure function that mirrors `buildVerdictCalibration` — joining applied verdicts to email-cohort outcomes via the same `cohortKeyForRole`/`buildCohortOutcomeMap` so numbers never drift from Outcome Memory. Frontend adds a Resumes page, a variant picker in Apply Gate, and an apply-time guidance line.
 
 **Tech Stack:** Backend `backend/gmail-job-tracker-be` (Node ESM, Jest via `node --experimental-vm-modules node_modules/jest/bin/jest.js`, Supabase). Frontend `frontend/web` (Vite + React 18 + TS, TanStack Query, vitest + testing-library). Spec: `frontend/web/docs/superpowers/specs/2026-06-22-resume-variant-outcome-attribution-design.md`.
 
@@ -13,7 +13,7 @@
 - v1 = track-first / Approach B. NO AI generation, NO verdict rejection-% integration, NO PDF upload. (Spec §7.)
 - Attribution captured at Apply-Gate apply-time only (the existing apply-action hook). (Spec §2.)
 - New public Supabase tables ship with **RLS enabled, user-scoped, no anon policies** (the project invariant).
-- Résumé text is **encrypted at rest** using the existing `encryptResumeText` / `_resumeTextForClient` helpers in `services/profileService.js`. Cap stored text at 50000 chars (matches `saveResume`).
+- Resume text is **encrypted at rest** using the existing `encryptResumeText` / `_resumeTextForClient` helpers in `services/profileService.js`. Cap stored text at 50000 chars (matches `saveResume`).
 - Premium routes are guarded by `verifyFirebaseToken, requirePremiumPlan` and must fail closed.
 - Honesty-when-thin: any per-variant claim is suppressed below `minSample` matched outcomes (default 5), mirroring `buildVerdictCalibration`'s `sufficientSample`.
 - Backend test runner: `node --experimental-vm-modules node_modules/jest/bin/jest.js <path>`. Pure-logic services live in `services/`, tests in `tests/services/`.
@@ -33,13 +33,13 @@
 - [ ] **Step 1: Write the migration SQL**
 
 ```sql
--- Named, tailored résumé variants. resume_text is encrypted at rest by the app
+-- Named, tailored resume variants. resume_text is encrypted at rest by the app
 -- (services/profileService.js encryptResumeText), same as users.resume_text.
 -- Written/read only by the backend service role; RLS enabled with NO anon policies.
 CREATE TABLE IF NOT EXISTS public.resume_variants (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     text NOT NULL,
-  name        text NOT NULL DEFAULT 'My résumé',
+  name        text NOT NULL DEFAULT 'My resume',
   resume_text text,
   is_default  boolean NOT NULL DEFAULT false,
   created_at  timestamptz NOT NULL DEFAULT now(),
@@ -77,7 +77,7 @@ git commit -m "feat(resumes): migration for resume_variants table (RLS, one-defa
 - [ ] **Step 1: Write the migration SQL**
 
 ```sql
--- Links each Apply Gate verdict to the résumé variant it was analyzed against, so
+-- Links each Apply Gate verdict to the resume variant it was analyzed against, so
 -- outcomes (interview/offer/rejection) can attribute back to a variant.
 -- The verdict insert (_insertApplyGateVerdict) is schema-drift-tolerant: it drops
 -- unknown columns and retries, so the backend may deploy BEFORE this is applied.
@@ -98,7 +98,7 @@ git commit -m "feat(resumes): add apply_gate_verdicts.resume_variant_id for attr
 
 ---
 
-## Phase 2 — Variant store service + résumé resolution
+## Phase 2 — Variant store service + resume resolution
 
 ### Task 3: `resumeVariantService` CRUD
 
@@ -212,7 +212,7 @@ export async function createVariant(userId, { name, text }) {
   const isDefault = existing.length === 0;
   const { data, error } = await supabase
     .from('resume_variants')
-    .insert({ user_id: userId, name: (name || 'My résumé').slice(0, 120), resume_text: encryptResumeText(String(text || '').slice(0, MAX_CHARS)), is_default: isDefault })
+    .insert({ user_id: userId, name: (name || 'My resume').slice(0, 120), resume_text: encryptResumeText(String(text || '').slice(0, MAX_CHARS)), is_default: isDefault })
     .select('id').single();
   if (error) throw new Error(`create variant failed: ${error.message}`);
   return { id: data.id };
@@ -251,7 +251,7 @@ git add backend/gmail-job-tracker-be/services/resumeVariantService.js backend/gm
 git commit -m "feat(resumes): resumeVariantService CRUD (encrypted, owner-scoped, default handling)"
 ```
 
-### Task 4: Résumé resolution — variant-aware `getResume`
+### Task 4: Resume resolution — variant-aware `getResume`
 
 **Files:**
 - Modify: `backend/gmail-job-tracker-be/services/profileService.js` (`getResume`)
@@ -330,9 +330,9 @@ git commit -m "feat(resumes): variant-aware getResume (chosen -> default -> lega
 
 ```js
 import { buildBackfillRows } from '../../scripts/backfillResumeVariants.mjs';
-test('seeds one default "My résumé" variant per user with résumé text', () => {
+test('seeds one default "My resume" variant per user with resume text', () => {
   const rows = buildBackfillRows([{ id: 'u1', resume_text: 'enc:body' }, { id: 'u2', resume_text: null }]);
-  expect(rows).toEqual([{ user_id: 'u1', name: 'My résumé', resume_text: 'enc:body', is_default: true }]);
+  expect(rows).toEqual([{ user_id: 'u1', name: 'My resume', resume_text: 'enc:body', is_default: true }]);
 });
 ```
 
@@ -344,7 +344,7 @@ test('seeds one default "My résumé" variant per user with résumé text', () =
 export function buildBackfillRows(users = []) {
   return (users || [])
     .filter((u) => u && u.id && u.resume_text)
-    .map((u) => ({ user_id: u.id, name: 'My résumé', resume_text: u.resume_text, is_default: true }));
+    .map((u) => ({ user_id: u.id, name: 'My resume', resume_text: u.resume_text, is_default: true }));
 }
 
 // Runner (only when invoked directly): SELECT id, resume_text FROM users WHERE resume_text IS NOT NULL,
@@ -364,7 +364,7 @@ git commit -m "feat(resumes): backfill default variant from users.resume_text"
 
 ## Phase 3 — Variant CRUD routes + apply-time attribution
 
-### Task 6: Résumé-variant routes
+### Task 6: Resume-variant routes
 
 **Files:**
 - Create: `backend/gmail-job-tracker-be/routes/resumeRoutes.js`
@@ -396,7 +396,7 @@ router.get('/', async (req, res) => {
 });
 router.post('/', async (req, res) => {
   const { name, text } = req.body || {};
-  if (!text || String(text).trim().length < 20) return res.status(400).json({ success: false, error: 'Résumé text too short.' });
+  if (!text || String(text).trim().length < 20) return res.status(400).json({ success: false, error: 'Resume text too short.' });
   const { id } = await variants.createVariant(req.user.uid, { name, text });
   res.json({ success: true, id });
 });
@@ -421,7 +421,7 @@ export default router;
 
 ```bash
 git add backend/gmail-job-tracker-be/routes/resumeRoutes.js backend/gmail-job-tracker-be/tests/routes/resumeRoutes.test.js
-git commit -m "feat(resumes): premium-gated CRUD routes for résumé variants"
+git commit -m "feat(resumes): premium-gated CRUD routes for resume variants"
 ```
 
 ### Task 7: Persist `resume_variant_id` on the verdict
@@ -434,7 +434,7 @@ git commit -m "feat(resumes): premium-gated CRUD routes for résumé variants"
 
 **Interfaces:**
 - Consumes: `getResume(userId, { variantId })` (Task 4).
-- Produces: `analyzeJob(userId, jobTitle, jobDescription, jobUrl, companyName, options)` where `options.variantId` (a) selects the résumé and (b) is written to the persisted verdict's `resume_variant_id`.
+- Produces: `analyzeJob(userId, jobTitle, jobDescription, jobUrl, companyName, options)` where `options.variantId` (a) selects the resume and (b) is written to the persisted verdict's `resume_variant_id`.
 
 - [ ] **Step 1: Write the failing test** — mock `getEnrichedProfile`/`getResume` so the chosen variant's text flows in; assert the verdict-insert payload includes `resume_variant_id: 'v1'` when `options.variantId='v1'`. (Spy the `_insertApplyGateVerdict` payload or the supabase `.from('apply_gate_verdicts').insert` arg.)
 
@@ -553,7 +553,7 @@ export function buildVariantScoreboard(verdicts = [], cohorts = new Map(), varia
   const rate = (n, d) => (d > 0 ? Number(((n / d) * 100).toFixed(1)) : null);
   const perVariant = [...byVariant.entries()].map(([variantId, e]) => ({
     variantId,
-    name: variantNames[variantId] || 'Résumé',
+    name: variantNames[variantId] || 'Resume',
     sent: e.sent,
     matchedToOutcome: e.matched,
     interviewed: e.interviewed,
@@ -593,7 +593,7 @@ git add backend/gmail-job-tracker-be/services/resumeVariantScoreboardService.js 
 git commit -m "feat(resumes): pure variant scoreboard mirroring verdict calibration"
 ```
 
-### Task 9: Scoreboard route + recommendation, on the existing résumé routes
+### Task 9: Scoreboard route + recommendation, on the existing resume routes
 
 **Files:**
 - Modify: `backend/gmail-job-tracker-be/routes/resumeRoutes.js` (add `GET /api/resumes/scoreboard`)
@@ -656,7 +656,7 @@ export function recommendVariantForRole(role, variantNames = {}, perVariantFamil
     if (stat.token !== targetToken || stat.matched < minSample) continue;
     const interviewRate = Number(((stat.interviewed / stat.matched) * 100).toFixed(1));
     if (!best || interviewRate > best.interviewRate) {
-      best = { variantId, name: variantNames[variantId] || 'Résumé', interviewRate };
+      best = { variantId, name: variantNames[variantId] || 'Resume', interviewRate };
     }
   }
   return best;
@@ -739,10 +739,10 @@ Add `variantId?: string` to the `analyzeJobAlignment` params type and include it
 
 ```bash
 git add frontend/web/src/lib/emails.ts
-git commit -m "feat(resumes): web API client for résumé variants + scoreboard"
+git commit -m "feat(resumes): web API client for resume variants + scoreboard"
 ```
 
-### Task 11: Résumés page (list + CRUD + scoreboard)
+### Task 11: Resumes page (list + CRUD + scoreboard)
 
 **Files:**
 - Create: `frontend/web/src/pages/Resumes.tsx`
@@ -768,7 +768,7 @@ test('lists variants with their record and honest thin-data copy', async () => {
 
 - [ ] **Step 2: Run to verify it fails** — `cd frontend/web && npx vitest run src/pages/Resumes.test.tsx` → FAIL.
 
-- [ ] **Step 3: Implement `Resumes.tsx`** — a `DashboardLayout` page: list variants (name, default badge, charCount), a paste-textarea "Add variant" (≥20 chars, reuse the `ResumePrompt` textarea pattern), rename/set-default/archive actions, and per-variant record (`sent / interviewed / offered / rejected / noResponse`) — or, when `!sufficientSample`, the line `Only {matchedToOutcome} applications through this résumé — not enough to call it yet.` Wire CRUD via `useMutation` invalidating `["resume-variants"]` and `["variant-scoreboard"]`.
+- [ ] **Step 3: Implement `Resumes.tsx`** — a `DashboardLayout` page: list variants (name, default badge, charCount), a paste-textarea "Add variant" (≥20 chars, reuse the `ResumePrompt` textarea pattern), rename/set-default/archive actions, and per-variant record (`sent / interviewed / offered / rejected / noResponse`) — or, when `!sufficientSample`, the line `Only {matchedToOutcome} applications through this resume — not enough to call it yet.` Wire CRUD via `useMutation` invalidating `["resume-variants"]` and `["variant-scoreboard"]`.
 
 - [ ] **Step 4: Run tests to verify they pass** — Expected: PASS.
 
@@ -778,7 +778,7 @@ test('lists variants with their record and honest thin-data copy', async () => {
 
 ```bash
 git add frontend/web/src/pages/Resumes.tsx frontend/web/src/pages/Resumes.test.tsx frontend/web/src/<router-and-nav-files>
-git commit -m "feat(resumes): Résumés page — variants, CRUD, per-variant scoreboard"
+git commit -m "feat(resumes): Resumes page — variants, CRUD, per-variant scoreboard"
 ```
 
 ### Task 12: Variant picker + apply-time guidance in Apply Gate
@@ -797,7 +797,7 @@ test('passes the chosen variantId to analyze', async () => {
   fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'QA-focused', isDefault: true, createdAt: '', charCount: 1200 }, { id: 'B', name: 'Generic', isDefault: false, createdAt: '', charCount: 1100 }] });
   analyzeJobAlignment.mockResolvedValue(baseResult);
   renderPage();
-  await userEvent.selectOptions(await screen.findByLabelText(/Résumé/i), 'B');
+  await userEvent.selectOptions(await screen.findByLabelText(/Resume/i), 'B');
   await runAnalyze();
   await waitFor(() => expect(analyzeJobAlignment).toHaveBeenCalledWith(expect.objectContaining({ variantId: 'B' })));
 });
@@ -813,7 +813,7 @@ test('shows apply-time guidance when a variant out-performs', async () => {
 
 - [ ] **Step 2: Run to verify they fail** — FAIL.
 
-- [ ] **Step 3: Implement** — add a `useQuery(["resume-variants"], fetchResumeVariants)`; a `<select id="resume-variant" aria-label="Résumé">` above "Get decision" (default = the `isDefault` variant, persisted in state); include `variantId` in the `analyzeJobAlignment({...})` call; after a verdict, `useQuery(["variant-scoreboard", jobTitle], () => fetchVariantScoreboard(jobTitle))` and render the `recommendation` as a line in the verdict (hidden when null). Reuse the existing `analyzeMutation`/state patterns. Update the baseResult-path mocks (`fetchResumeVariants`, `fetchVariantScoreboard`) in the test `beforeEach` so existing tests keep passing.
+- [ ] **Step 3: Implement** — add a `useQuery(["resume-variants"], fetchResumeVariants)`; a `<select id="resume-variant" aria-label="Resume">` above "Get decision" (default = the `isDefault` variant, persisted in state); include `variantId` in the `analyzeJobAlignment({...})` call; after a verdict, `useQuery(["variant-scoreboard", jobTitle], () => fetchVariantScoreboard(jobTitle))` and render the `recommendation` as a line in the verdict (hidden when null). Reuse the existing `analyzeMutation`/state patterns. Update the baseResult-path mocks (`fetchResumeVariants`, `fetchVariantScoreboard`) in the test `beforeEach` so existing tests keep passing.
 
 - [ ] **Step 4: Run the full ApplyGate suite** — `npx vitest run src/pages/ApplyGate.test.tsx` (update the snapshot with `-u` if the picker changes it). Expected: PASS.
 
@@ -830,7 +830,7 @@ git commit -m "feat(resumes): Apply Gate variant picker + apply-time guidance"
 
 ## Self-review (completed by plan author)
 
-- **Spec coverage:** §Data model → Tasks 1,2,5; §Components backend → Tasks 3,6,8,9; §résumé resolution → Task 4; §attribution → Task 7; §Frontend surfaces → Tasks 10,11,12; §honesty-when-thin → Tasks 8,9,11,12; §testing → every task's TDD steps; §migration → Tasks 1,5. No uncovered requirement.
+- **Spec coverage:** §Data model → Tasks 1,2,5; §Components backend → Tasks 3,6,8,9; §resume resolution → Task 4; §attribution → Task 7; §Frontend surfaces → Tasks 10,11,12; §honesty-when-thin → Tasks 8,9,11,12; §testing → every task's TDD steps; §migration → Tasks 1,5. No uncovered requirement.
 - **Placeholder scan:** all code steps carry real code; the one deferred detail (route `perVariantFamilyStats` aggregation) has its construction described against Task 8 data — fold it into Task 9 Step 4 during implementation.
 - **Type consistency:** `getResume(userId, {variantId})`, `analyzeJob(..., options.variantId)`, `buildVariantScoreboard(verdicts, cohorts, variantNames, {minSample})`, `recommendVariantForRole(role, variantNames, perVariantFamilyStats, {minSample})`, cohort shape `{interviewed, offered, rejected}`, and the `VariantScoreRow` fields are consistent across backend and frontend tasks.
 

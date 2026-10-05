@@ -24,7 +24,7 @@ function gapTypeBadgeClass(type: VariantStrategyGap["type"]): string {
 
 function gapHumanLine(type: VariantStrategyGap["type"], location: VariantStrategyGap["location"]): string {
   if (type === "buried") {
-    const loc = location === "none" ? "your résumé" : `your ${location}`;
+    const loc = location === "none" ? "your resume" : `your ${location}`;
     return `Shows up only in ${loc} — surface it`;
   }
   if (type === "reframe") {
@@ -36,7 +36,7 @@ function gapHumanLine(type: VariantStrategyGap["type"], location: VariantStrateg
 /**
  * The one sentence that stops this card from reading as a contradiction.
  *
- * This card picks the best-suited résumé for the role, which is often NOT the one the verdict above
+ * This card picks the best-suited resume for the role, which is often NOT the one the verdict above
  * it was computed from. When that happens a requirement the verdict counted as covered can show up
  * here as a gap, and until now nothing on screen explained how both could be true. Returns null
  * unless we can name both documents — "different from something we can't identify" is worse than
@@ -57,11 +57,11 @@ export function variantStrategyDocumentNote(strategy: VariantStrategy): string |
 /**
  * The short chip beside the name, and the reason under it.
  *
- * The card used to print a résumé name under a "Résumé strategy" heading and stop. A user who had
+ * The card used to print a resume name under a "Resume strategy" heading and stop. A user who had
  * selected a different document for the run read that as "it analysed the wrong file" — reasonable,
  * because nothing on screen said this was a *recommendation*, and the computed reason was thrown
  * away. Worse, the pick is often a tie: measured on a real QA posting, all six of one user's
- * résumés covered all three must-haves, so the winner was decided purely by the default flag. A
+ * resumes covered all three must-haves, so the winner was decided purely by the default flag. A
  * tie-break dressed as a finding is the thing to avoid here, so it gets its own label.
  */
 export function variantStrategyPickLabel(strategy: VariantStrategy): string {
@@ -73,7 +73,7 @@ export function variantStrategyPickLabel(strategy: VariantStrategy): string {
 /**
  * What to say when the gap analysis came back clean.
  *
- * An empty gap list has two causes that mean opposite things: the résumé covers everything, or we
+ * An empty gap list has two causes that mean opposite things: the resume covers everything, or we
  * never read a requirement to check it against. Rendering nothing for both left an empty panel that
  * still spoke — the same defect as the verdict tiles. Returns null when there ARE gaps to show.
  */
@@ -120,7 +120,7 @@ export function VariantStrategyCard({ strategy, onDraftDecisionsChange }: Varian
       {/* Header */}
       <div>
         <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-          Résumé strategy
+          Resume strategy
         </p>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <h3 className="text-[15px] font-bold tracking-[-0.01em] text-foreground">

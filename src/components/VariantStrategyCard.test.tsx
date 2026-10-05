@@ -53,7 +53,7 @@ const outcomeStrategy: VariantStrategy = {
     outcomeBand: { kind: "stronger", sampleSize: 5, comparison: "roles like this" },
   },
   alternatives: [],
-  basisLabel: "Based on your 5 applications with this résumé to roles like this",
+  basisLabel: "Based on your 5 applications with this resume to roles like this",
   gaps: [],
 };
 
@@ -140,7 +140,7 @@ describe("VariantStrategyCard", () => {
     const { container } = render(<VariantStrategyCard strategy={outcomeStrategy} />);
     expect(screen.getByText(/Learning from your 5 outcomes/i)).toBeInTheDocument();
     expect(
-      screen.getByText("Based on your 5 applications with this résumé to roles like this"),
+      screen.getByText("Based on your 5 applications with this resume to roles like this"),
     ).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/%/);
   });
@@ -186,10 +186,10 @@ describe("VariantStrategyCard", () => {
 });
 
 /**
- * This card and the verdict above it can read two different résumés — that is by design, since
+ * This card and the verdict above it can read two different resumes — that is by design, since
  * recommending a better-suited document for the role is the card's whole job. What was NOT by design
  * is doing it silently: a requirement the verdict counted as covered could appear here as a gap,
- * leaving the user to reconcile two confident, contradictory readings of "my résumé".
+ * leaving the user to reconcile two confident, contradictory readings of "my resume".
  */
 describe("variantStrategyDocumentNote", () => {
   const twoDocuments: VariantStrategy = {
@@ -199,7 +199,7 @@ describe("variantStrategyDocumentNote", () => {
     analyzedDifferentDocument: true,
   };
 
-  test("names both documents when the card read a different résumé than the verdict scored", () => {
+  test("names both documents when the card read a different resume than the verdict scored", () => {
     expect(variantStrategyDocumentNote(twoDocuments)).toBe(
       "These gaps are from QA-Focused. The verdict above was scored on General, so the two can disagree.",
     );
@@ -244,11 +244,11 @@ describe("variantStrategyDocumentNote", () => {
 });
 
 /**
- * Naming a résumé under a "Résumé strategy" heading is a recommendation, and the card never said so.
+ * Naming a resume under a "Resume strategy" heading is a recommendation, and the card never said so.
  *
  * The founder ran a real QA posting, saw a document he had not selected, and asked why we analysed
  * the wrong one. We hadn't — we had recommended one. And the recommendation was a six-way tie
- * (every résumé covered all three must-haves), decided by the default flag, presented with the same
+ * (every resume covered all three must-haves), decided by the default flag, presented with the same
  * confidence a genuine winner would get.
  */
 describe("variantStrategyPickLabel", () => {
@@ -295,7 +295,7 @@ describe("variantStrategyNoGapsNote", () => {
     ).toBe("Nothing to fix on New-Resume for this posting — send it as it is.");
   });
 
-  test("an empty gap list with NO requirements read is not reported as a clean résumé", () => {
+  test("an empty gap list with NO requirements read is not reported as a clean resume", () => {
     // Two causes, opposite meanings, identical empty list. Calling the second one clean would be
     // the product congratulating a user on a check it never ran.
     const note = variantStrategyNoGapsNote({

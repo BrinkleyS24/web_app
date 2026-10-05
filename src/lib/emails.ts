@@ -1365,7 +1365,7 @@ export type ApplyGateScoringBreakdown = {
 };
 
 // ── Variant Strategy ──────────────────────────────────────────────────
-/** `before` is null for a reframe — there is no existing résumé line to replace. */
+/** `before` is null for a reframe — there is no existing resume line to replace. */
 export type VariantStrategyGapDraft = { target: "summary" | "bullet"; before: string | null; after: string };
 export type VariantStrategyGap = {
   type: "missing" | "buried" | "reframe";
@@ -1381,15 +1381,15 @@ export type VariantStrategy = {
   gaps: VariantStrategyGap[];
   basisLabel: string;   // e.g. "Based on this role's requirements"
   /**
-   * True when every résumé scored the same coverage and the pick fell through to the default flag.
+   * True when every resume scored the same coverage and the pick fell through to the default flag.
    * The card must not present a tie-break as a finding — that is what made a user ask why it had
-   * "analysed a résumé he didn't use", when in fact all six of his covered the posting equally.
+   * "analysed a resume he didn't use", when in fact all six of his covered the posting equally.
    */
   isTieBreak?: boolean;
   /** How many variants finished level at the top. Only meaningful when isTieBreak. */
   tiedCount?: number;
   /**
-   * Which document these gaps were actually read out of. The card enumerates every saved résumé and
+   * Which document these gaps were actually read out of. The card enumerates every saved resume and
    * recommends one, so it is frequently a different file than the verdict above it scored — and a
    * requirement the verdict counted as covered can then appear here as a gap. Naming both is the
    * difference between a second opinion and a contradiction.
@@ -1403,8 +1403,8 @@ export type VariantStrategy = {
 export type ApplyGateResult = {
   success: boolean;
   /**
-   * Set when the backend had no usable profile (no résumé text + no history) and
-   * refused to render a verdict. The UI shows an honest "add your résumé" state
+   * Set when the backend had no usable profile (no resume text + no history) and
+   * refused to render a verdict. The UI shows an honest "add your resume" state
    * instead of a (meaningless) decision. See applyGateService.hasEvaluableProfile.
    */
   insufficientProfile?: boolean;
@@ -1415,10 +1415,10 @@ export type ApplyGateResult = {
   companyName?: string | null;
   jobUrl?: string | null;
   /**
-   * Which résumé this verdict was actually computed from. A verdict is advice about one specific
+   * Which resume this verdict was actually computed from. A verdict is advice about one specific
    * document, and Apply Gate once scored a variant the user had not chosen — reporting a gap the
-   * selected résumé did not contain, with nothing on screen able to reveal it. Fingerprint only:
-   * résumé text is encrypted at rest.
+   * selected resume did not contain, with nothing on screen able to reveal it. Fingerprint only:
+   * resume text is encrypted at rest.
    */
   resumeDocument?: {
     variantId: string | null;
@@ -1700,7 +1700,7 @@ export async function deleteResume(): Promise<{ success: boolean }> {
   return apiFetch("/api/emails/profile/resume", { method: "DELETE" });
 }
 
-// ── Résumé variants + outcome scoreboard ─────────────────────────────
+// ── Resume variants + outcome scoreboard ─────────────────────────────
 export type ResumeVariant = {
   id: string;
   name: string;
@@ -1755,9 +1755,9 @@ export async function archiveResumeVariant(id: string): Promise<{ success: boole
   return apiFetch(`/api/resumes/${id}`, { method: "DELETE" });
 }
 
-// ── Résumé health ────────────────────────────────────────────────────
+// ── Resume health ────────────────────────────────────────────────────
 // Findings about a document, not about a posting. They used to be mixed into every Apply Gate
-// verdict, where — being derived from the résumé alone — they came out identical on every run.
+// verdict, where — being derived from the resume alone — they came out identical on every run.
 export type ResumeHealthFinding = {
   key: string;
   title: string;
@@ -1771,7 +1771,7 @@ export type ResumeHealthEntry = {
   variantId: string | null;
   name: string;
   isDefault: boolean;
-  /** Hash + length only; résumé text is encrypted at rest and never leaves the backend. */
+  /** Hash + length only; resume text is encrypted at rest and never leaves the backend. */
   document: { variantId: string | null; source: string | null; fingerprint: string; characters: number } | null;
   findings: ResumeHealthFinding[];
   openCount: number;

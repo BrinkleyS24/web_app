@@ -34,14 +34,14 @@ import { ReferralNudge } from "@/components/ReferralNudge";
 
 const APPLY_GATE_STAGES = [
   "Reading the job description",
-  "Matching against your résumé",
+  "Matching against your resume",
   "Scoring fit & rejection risk",
   "Writing your decision brief",
 ];
 
 // The premium verdict is a single ~30s backend call (no streaming), so this
 // shows staged, time-estimated progress instead of a 30s blank spinner — the
-// difference between "is this broken?" and "it's working through my résumé".
+// difference between "is this broken?" and "it's working through my resume".
 function ApplyGateProgress() {
   const reduceMotion =
     typeof window !== "undefined" &&
@@ -67,7 +67,7 @@ function ApplyGateProgress() {
     <div className="glass-card rounded-2xl p-8" role="status" aria-live="polite" aria-busy="true">
       <p className="text-sm font-semibold">Checking this role…</p>
       <p className="mt-1 text-xs leading-5 text-muted-foreground">
-        The full premium read takes about half a minute — your résumé, the posting, and your past
+        The full premium read takes about half a minute — your resume, the posting, and your past
         outcomes are all in play.
       </p>
       <div className="mt-5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -306,9 +306,9 @@ function parseHistoryReasons(raw: string | null | undefined) {
 
 // One predicate for "does this sentence describe a deficiency?", shared by the reason picker
 // and the warning banner so the two can never disagree about the same string.
-// The backend's coach voice (2026-09-30) says "isn't on your résumé" / "doesn't show" rather
+// The backend's coach voice (2026-09-30) says "isn't on your resume" / "doesn't show" rather
 // than "missing" / "not shown"; both must read as a deficiency here.
-const RISK_LANGUAGE = /\b(missing|lack|gap|risk|weak|below|limited|mismatch|not shown|insufficient|blocker|stretch|short of|no evidence|not on your résumé|isn[’']t on your résumé|doesn[’']t (?:yet )?show|different field|change of field|step up|little of|easy to miss|not get past)(?![\p{L}\p{N}_])/iu;
+const RISK_LANGUAGE = /\b(missing|lack|gap|risk|weak|below|limited|mismatch|not shown|insufficient|blocker|stretch|short of|no evidence|not on your resume|isn[’']t on your resume|doesn[’']t (?:yet )?show|different field|change of field|step up|little of|easy to miss|not get past)(?![\p{L}\p{N}_])/iu;
 
 function readsAsRisk(text: string | null | undefined) {
   return RISK_LANGUAGE.test(String(text || ""));
@@ -394,7 +394,7 @@ function formatSkillGapSummary(items: string[] | null | undefined, prefix: strin
   return `${prefix}: ${clean.slice(0, maxItems).join(", ")}${clean.length > maxItems ? ", ..." : ""}.`;
 }
 
-function formatRequirementSummary(items: string[] | null | undefined, prefix = "Must-haves not on your résumé", maxItems = 4) {
+function formatRequirementSummary(items: string[] | null | undefined, prefix = "Must-haves not on your resume", maxItems = 4) {
   return formatSkillGapSummary(items, prefix, maxItems);
 }
 
@@ -449,13 +449,13 @@ function structuredWarningAndBullets(
 
   const warning = authorityWarning
     || (hasUniversalHardGate
-    ? `They require ${universalBlockers.slice(0, 4).join(", ")}, and it isn’t on your résumé.`
+    ? `They require ${universalBlockers.slice(0, 4).join(", ")}, and it isn’t on your resume.`
     : null)
     || hardBlockers[0]
     || primaryDrivers[0]
-    || formatSkillGapSummary(roleCoreGaps, "Core skills not on your résumé")
-    || formatSkillGapSummary(missingRequired, "Required skills not on your résumé")
-    || formatSkillGapSummary(missingPreferred, "Nice-to-haves not on your résumé")
+    || formatSkillGapSummary(roleCoreGaps, "Core skills not on your resume")
+    || formatSkillGapSummary(missingRequired, "Required skills not on your resume")
+    || formatSkillGapSummary(missingPreferred, "Nice-to-haves not on your resume")
     || null;
 
   const bullets: string[] = [];
@@ -464,17 +464,17 @@ function structuredWarningAndBullets(
     const missingGateSummary = formatRequirementSummary(universalBlockers);
     if (missingGateSummary) bullets.push(missingGateSummary);
   } else if (hardBlockers.length > 0 && missingRequired.length > 0) {
-    const missingRequiredSummary = formatSkillGapSummary(missingRequired, "Required skills not on your résumé");
+    const missingRequiredSummary = formatSkillGapSummary(missingRequired, "Required skills not on your resume");
     if (missingRequiredSummary) bullets.push(missingRequiredSummary);
   } else if (hardBlockers.length === 0) {
-    const missingRequiredSummary = formatSkillGapSummary(missingRequired, "Required skills not on your résumé");
+    const missingRequiredSummary = formatSkillGapSummary(missingRequired, "Required skills not on your resume");
     if (missingRequiredSummary && missingRequiredSummary !== warning) bullets.push(missingRequiredSummary);
   }
 
-  const roleCoreSummary = formatSkillGapSummary(roleCoreGaps, "Core skills not on your résumé");
+  const roleCoreSummary = formatSkillGapSummary(roleCoreGaps, "Core skills not on your resume");
   if (roleCoreSummary && roleCoreSummary !== warning) bullets.push(roleCoreSummary);
 
-  const missingPreferredSummary = formatSkillGapSummary(missingPreferred, "Nice-to-haves not on your résumé");
+  const missingPreferredSummary = formatSkillGapSummary(missingPreferred, "Nice-to-haves not on your resume");
   if (missingPreferredSummary && missingPreferredSummary !== warning) bullets.push(missingPreferredSummary);
 
   // Three notes keep the coach line, the experience credit, and the overlap visible together.
@@ -748,7 +748,7 @@ function decisionCopyForStatus(status: VerdictStatus, recommendation: string | n
     return {
       title: "Skip this role",
       body: hardBlocker
-        ? "A résumé change won’t fix this, unless you already have the credential and left it off."
+        ? "A resume change won’t fix this, unless you already have the credential and left it off."
         : "Your time is likely better spent on jobs that match your background more closely, unless you know something about this one that the posting doesn’t say.",
       toneClass: "border-red-500/30 bg-red-500/10 text-red-700",
     };
@@ -794,7 +794,7 @@ function decisionCopyForStatus(status: VerdictStatus, recommendation: string | n
     title: recommendation || "Skip this posting",
     body: risk && risk >= 90
       ? "Too many must-haves are missing; your time is better spent on a closer match."
-      : "This one is outside what your résumé shows. Spend your time where the match is clearer.",
+      : "This one is outside what your resume shows. Spend your time where the match is clearer.",
     toneClass: "border-red-500/30 bg-red-500/10 text-red-700",
   };
 }
@@ -815,7 +815,7 @@ function decisionActionsForStatus(status: VerdictStatus, recommendation: string 
 
   if (recommendsFix && status !== "strong") {
     return [
-      { action: "fixed", label: "Fixing résumé first", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
+      { action: "fixed", label: "Fixing resume first", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
       { action: "applied", label: "Applying anyway", variant: "outline" },
       { action: "skipped", label: "Not applying", variant: "ghost", className: "text-muted-foreground" },
     ];
@@ -831,14 +831,14 @@ function decisionActionsForStatus(status: VerdictStatus, recommendation: string 
   if (status === "potential") {
     return [
       { action: "applied", label: "I'm applying", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
-      { action: "fixed", label: "Fixing résumé first", variant: "outline" },
+      { action: "fixed", label: "Fixing resume first", variant: "outline" },
       { action: "skipped", label: "Not applying", variant: "ghost", className: "text-muted-foreground" },
     ];
   }
 
   if (status === "risky") {
     return [
-      { action: "fixed", label: "Fixing résumé first", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
+      { action: "fixed", label: "Fixing resume first", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
       { action: "applied", label: "Applying anyway", variant: "outline" },
       { action: "skipped", label: "Not applying", variant: "ghost", className: "text-muted-foreground" },
     ];
@@ -906,13 +906,13 @@ function decisionActionsForDisplayDecision(displayDecision: ApplyGateDisplayDeci
   if (displayDecision.action === "APPLY_WITH_STRATEGY") {
     return [
       { action: "applied", label: "I'm applying", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
-      { action: "fixed", label: "Fixing résumé first", variant: "outline" },
+      { action: "fixed", label: "Fixing resume first", variant: "outline" },
       { action: "skipped", label: "Not applying", variant: "ghost", className: "text-muted-foreground" },
     ];
   }
   if (displayDecision.action === "FIX_THEN_APPLY") {
     return [
-      { action: "fixed", label: "Fixing résumé first", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
+      { action: "fixed", label: "Fixing resume first", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
       { action: "applied", label: "Applying anyway", variant: "outline" },
       { action: "skipped", label: "Not applying", variant: "ghost", className: "text-muted-foreground" },
     ];
@@ -1127,7 +1127,7 @@ const ApplyGate = () => {
   const hasResume = Boolean(resumeQuery.data?.resumeText && resumeQuery.data.resumeText.trim().length > 20);
 
   // Apply Gate compares a posting against the user's actual experience, so with
-  // no résumé on file there is nothing to compare and the score is guesswork.
+  // no resume on file there is nothing to compare and the score is guesswork.
   // A real premium account tracked 85 applications and never got past this:
   // the only signal was a 9px "Resume: not found" badge, and the form still ran.
   // Refuse the form instead, and offer the paste box right here so the setup
@@ -1144,7 +1144,7 @@ const ApplyGate = () => {
     },
   });
 
-  // Résumé variants: pick which one to run the gate against; the choice rides
+  // Resume variants: pick which one to run the gate against; the choice rides
   // analyze → verdict → apply so the outcome attributes back to that variant.
   const variantsQuery = useQuery({
     queryKey: ["resume-variants"],
@@ -1172,7 +1172,7 @@ const ApplyGate = () => {
   });
   const variantRecommendation = guidanceQuery.data?.recommendation ?? null;
 
-  // Résumé-level findings deliberately do NOT appear in the verdict — they are the same on every
+  // Resume-level findings deliberately do NOT appear in the verdict — they are the same on every
   // run, so putting them there is what made the advice read as boilerplate. All that crosses over
   // is a count, outside the verdict card, pointing at the page that owns them. A count is not
   // advice: it cannot repeat itself into meaninglessness, and without it the new surface would be
@@ -1294,11 +1294,11 @@ const ApplyGate = () => {
     if (!ats && !human) return null;
     if (ats === "low") {
       return human === "high"
-        ? "A recruiter's quick scan: your résumé may not surface in the search yet, but when a human actually reads it, you compete well. Getting seen is the battle."
-        : "A recruiter's quick scan: your résumé may not surface in the search yet, and it won't stand out on a fast read. Both need work before this is worth the hour.";
+        ? "A recruiter's quick scan: your resume may not surface in the search yet, but when a human actually reads it, you compete well. Getting seen is the battle."
+        : "A recruiter's quick scan: your resume may not surface in the search yet, and it won't stand out on a fast read. Both need work before this is worth the hour.";
     }
     if (human === "low") {
-      return "A recruiter's quick scan: your résumé probably passes the search, but it won't stand out when a human reads it yet.";
+      return "A recruiter's quick scan: your resume probably passes the search, but it won't stand out when a human reads it yet.";
     }
     if (ats === "high" && human === "high") {
       return "A recruiter's quick scan: you clear the search and you stand out on the read. Strong screening position.";
@@ -1675,7 +1675,7 @@ const ApplyGate = () => {
           {needsResume ? (
           <div className="space-y-3" data-testid="apply-gate-resume-required">
             <div className="rounded-xl border border-border bg-muted/40 p-4">
-              <p className="text-sm font-semibold text-foreground">Add your résumé to unlock Apply Gate</p>
+              <p className="text-sm font-semibold text-foreground">Add your resume to unlock Apply Gate</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Every verdict compares a posting against your actual experience. With nothing on file
                 there is nothing to compare, so a score would be guesswork. Paste it once and it is
@@ -1683,16 +1683,16 @@ const ApplyGate = () => {
               </p>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground" htmlFor="resume-paste">Your résumé</label>
+              <label className="text-sm font-medium text-foreground" htmlFor="resume-paste">Your resume</label>
               <textarea
                 id="resume-paste"
                 className="w-full min-h-[200px] rounded-md border border-border bg-background px-3 py-2 text-sm"
                 value={resumePaste}
                 onChange={(e) => setResumePaste(e.target.value)}
-                placeholder="Paste the full text of your résumé. Plain text is fine — formatting does not matter."
+                placeholder="Paste the full text of your resume. Plain text is fine — formatting does not matter."
               />
               <p className="text-xs text-muted-foreground">
-                Select all in your résumé document and paste here. Layout is ignored; only the wording is read.
+                Select all in your resume document and paste here. Layout is ignored; only the wording is read.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -1700,18 +1700,18 @@ const ApplyGate = () => {
                 onClick={() => saveResumeMutation.mutate(resumePaste.trim())}
                 disabled={saveResumeMutation.isPending || resumePasteLength < MIN_RESUME_CHARS}
               >
-                {saveResumeMutation.isPending ? "Saving..." : "Save résumé"}
+                {saveResumeMutation.isPending ? "Saving..." : "Save resume"}
               </Button>
               <a
                 href="/resumes"
                 className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
               >
-                Manage résumés
+                Manage resumes
               </a>
             </div>
             {resumePasteLength > 0 && resumePasteLength < MIN_RESUME_CHARS ? (
               <p className="text-xs text-muted-foreground">
-                That is shorter than a résumé usually runs ({resumePasteLength} of {MIN_RESUME_CHARS} characters).
+                That is shorter than a resume usually runs ({resumePasteLength} of {MIN_RESUME_CHARS} characters).
                 Paste the whole thing so the gaps it finds are real.
               </p>
             ) : null}
@@ -1719,7 +1719,7 @@ const ApplyGate = () => {
               <p className="text-xs text-destructive">
                 {saveResumeMutation.error instanceof Error
                   ? saveResumeMutation.error.message
-                  : "Could not save your résumé. Try again."}
+                  : "Could not save your resume. Try again."}
               </p>
             ) : null}
           </div>
@@ -1760,14 +1760,14 @@ const ApplyGate = () => {
           </div>
           {variants.length > 0 ? (
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground" htmlFor="resume-variant">Résumé</label>
+              <label className="text-sm font-medium text-foreground" htmlFor="resume-variant">Resume</label>
               <select
                 id="resume-variant"
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
                 value={variantId}
                 onChange={(e) => setVariantId(e.target.value)}
               >
-                <option value="" disabled>Choose a résumé</option>
+                <option value="" disabled>Choose a resume</option>
                 {variants.map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.name}{v.isDefault ? " (default)" : ""}
@@ -1775,12 +1775,12 @@ const ApplyGate = () => {
                 ))}
               </select>
               <p className="text-xs text-muted-foreground">{!variantId
-                ? 'No default résumé is set. Choose which one to check against this role.'
-                : 'Which saved résumé to evaluate — and record as sent if you apply.'}</p>
+                ? 'No default resume is set. Choose which one to check against this role.'
+                : 'Which saved resume to evaluate — and record as sent if you apply.'}</p>
             </div>
           ) : null}
-          {variantsQuery.isError ? <p role="alert" className="text-sm">Your résumés could not be loaded. <button type="button" className="underline" onClick={() => variantsQuery.refetch()}>Try again</button></p> : null}
-          {variantId && variantsQuery.isSuccess && !variants.some((v) => v.id === variantId) ? <p role="alert" className="text-sm">The selected résumé is no longer available. Choose another résumé.</p> : null}
+          {variantsQuery.isError ? <p role="alert" className="text-sm">Your resumes could not be loaded. <button type="button" className="underline" onClick={() => variantsQuery.refetch()}>Try again</button></p> : null}
+          {variantId && variantsQuery.isSuccess && !variants.some((v) => v.id === variantId) ? <p role="alert" className="text-sm">The selected resume is no longer available. Choose another resume.</p> : null}
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground" htmlFor="risk-tolerance">Apply style</label>
             <select
@@ -1831,16 +1831,16 @@ const ApplyGate = () => {
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" aria-hidden="true" />
                   <div>
                     <h2 className="text-[15px] font-bold tracking-[-0.01em] text-foreground">
-                      {result.resumeSelectionRequired ? 'Choose a résumé to get a verdict' : 'Add your résumé to get a verdict'}
+                      {result.resumeSelectionRequired ? 'Choose a resume to get a verdict' : 'Add your resume to get a verdict'}
                     </h2>
                     <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                       {result.insufficientProfileMessage
-                        || "We couldn't read your résumé or application history, so there's nothing to evaluate this role against. Add your résumé and run it again."}
+                        || "We couldn't read your resume or application history, so there's nothing to evaluate this role against. Add your resume and run it again."}
                     </p>
                     <p className="mt-2 text-xs text-muted-foreground">
                       {result.resumeSelectionRequired
-                        ? 'Choose a résumé above, or set a default on the Résumés page, then try again.'
-                        : 'Paste your résumé in the panel above, then re-run the analysis.'}
+                        ? 'Choose a resume above, or set a default on the Resumes page, then try again.'
+                        : 'Paste your resume in the panel above, then re-run the analysis.'}
                     </p>
                   </div>
                 </div>
@@ -1851,8 +1851,8 @@ const ApplyGate = () => {
             <p className="text-xs text-muted-foreground">{result.resumeDocument?.name
               ? `Checked against: ${result.resumeDocument.name}`
               : result.resumeDocument?.variantId
-                ? `Checked against: ${variants.find((v) => v.id === result.resumeDocument?.variantId)?.name || 'a previously saved résumé'}`
-                : 'Saved check · résumé not identified'}</p>
+                ? `Checked against: ${variants.find((v) => v.id === result.resumeDocument?.variantId)?.name || 'a previously saved resume'}`
+                : 'Saved check · resume not identified'}</p>
             {currentDecisionCopy && (
               <div
                 className={cn(
@@ -2282,7 +2282,7 @@ const ApplyGate = () => {
                       : currentDisplayDecisionMissing
                       ? "This call could not load cleanly. Run the check again before deciding."
                       : currentHasUniversalHardGate
-                      ? "Apply anyway only if you already meet these requirements and your résumé is missing the proof."
+                      ? "Apply anyway only if you already meet these requirements and your resume is missing the proof."
                       : null}
                   </p>
                 )}
@@ -2296,10 +2296,10 @@ const ApplyGate = () => {
                 >
                   <span className="font-medium text-foreground">
                     {resumeHealthOpenCount === 1
-                      ? "1 open check on this résumé"
-                      : `${resumeHealthOpenCount} open checks on this résumé`}
+                      ? "1 open check on this resume"
+                      : `${resumeHealthOpenCount} open checks on this resume`}
                   </span>{" "}
-                  — about the document, not this job. Review on Résumés.
+                  — about the document, not this job. Review on Resumes.
                 </a>
               ) : null}
               {result.variantStrategy ? (
@@ -2314,7 +2314,7 @@ const ApplyGate = () => {
                 <EmptyState
                   icon={ScanSearch}
                   title="Check a role before you apply"
-                  body="Paste the job description (or a public link) and pick a résumé. You get a clear call, what could get you rejected, and what to fix first."
+                  body="Paste the job description (or a public link) and pick a resume. You get a clear call, what could get you rejected, and what to fix first."
                 />
               </div>
             )}
@@ -2399,8 +2399,8 @@ const ApplyGate = () => {
                 </div>
                 <p className="text-xs text-muted-foreground">{item.explanation_payload?.resume_document || item.resume_variant_id
                   ? `Checked against: ${item.explanation_payload?.resume_document?.name
-                    || variants.find((v) => v.id === (item.resume_variant_id || item.explanation_payload?.resume_document?.variantId))?.name || 'a previously saved résumé'}${['legacy', 'seeded_from_legacy'].includes(item.explanation_payload?.resume_document?.source || '') ? ' (from your old profile)' : ''}`
-                  : 'Saved check · résumé not identified'}</p>
+                    || variants.find((v) => v.id === (item.resume_variant_id || item.explanation_payload?.resume_document?.variantId))?.name || 'a previously saved resume'}${['legacy', 'seeded_from_legacy'].includes(item.explanation_payload?.resume_document?.source || '') ? ' (from your old profile)' : ''}`
+                  : 'Saved check · resume not identified'}</p>
                 {item.explanation_payload?.presentation ? (
                   <div className="space-y-1">
                     <p className="text-sm font-semibold">{decisionCopy.title}</p>

@@ -4,7 +4,7 @@
  *
  * Every card used to offer "Generate draft" (founder review, 2026-09-25) — including research
  * cards, where there is nothing to send. The button now matches the task: follow-ups draft the
- * email, research opens a search, networking finds people, prep opens the plan, résumé and role
+ * email, research opens a search, networking finds people, prep opens the plan, resume and role
  * work go to the tool that does them.
  */
 import type { QueueItem } from "@/lib/premiumTaskQueue";
@@ -80,7 +80,7 @@ export function resolveActionCta(item: QueueItem, gmailUrl: string | null): Acti
   if (RESUME_TYPES.has(type) || intent === "TAILOR_RESUME" || item.source === "resume") {
     // The label follows the destination: tailoring for one posting happens in Apply Gate.
     const href = item.routeHref || "/resumes";
-    return { kind: "route", label: href.startsWith("/apply-gate") ? "Tailor in Apply Gate" : "Update your résumé", href };
+    return { kind: "route", label: href.startsWith("/apply-gate") ? "Tailor in Apply Gate" : "Update your resume", href };
   }
 
   if (APPLY_GATE_TYPES.has(type) || intent === "FIX_TARGETING" || intent === "APPLY_TO_ROLE" || item.source === "apply_gate") {
@@ -121,7 +121,7 @@ export function describeActionKind(item: QueueItem): string {
   if (type === "thank_you") return "Thank-you";
   if (type === "reply") return "Reply";
   if (type === "status_check") return "Status check";
-  if (RESUME_TYPES.has(type) || item.source === "resume") return "Résumé";
+  if (RESUME_TYPES.has(type) || item.source === "resume") return "Resume";
   if (APPLY_GATE_TYPES.has(type) || item.source === "apply_gate") return "Apply Gate";
   return "Follow-up";
 }

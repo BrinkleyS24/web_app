@@ -143,7 +143,7 @@ function SkillGapsPanel({ gaps, outdatedExcluded }: { gaps: ResumeGap[]; outdate
       icon={FileText}
       tone="brand"
       title="Skills that keep coming up"
-      description="Requirements from roles you checked in Apply Gate that your résumé does not show yet — each seen in two or more roles."
+      description="Requirements from roles you checked in Apply Gate that your resume does not show yet — each seen in two or more roles."
     >
       {gaps.length === 0 ? (
         <EmptyState

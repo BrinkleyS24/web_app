@@ -1,7 +1,7 @@
 /**
  * The two empty states of a health panel are opposites and must never render the same.
  *
- * "We checked this résumé and found nothing" is a result. "We have no résumé to check" is the
+ * "We checked this resume and found nothing" is a result. "We have no resume to check" is the
  * absence of one. Collapsing them gives a user a clean bill of health we never established —
  * the same right-censoring mistake that put "No response 0" on the Apply Gate memory panel.
  */
@@ -31,21 +31,21 @@ const entry = (over: Partial<ResumeHealthEntry> = {}): ResumeHealthEntry => ({
 });
 
 describe("resumeHealthHeadline", () => {
-  test("renders nothing at all when there is no résumé to check", () => {
+  test("renders nothing at all when there is no resume to check", () => {
     expect(resumeHealthHeadline(undefined)).toBeNull();
     expect(resumeHealthHeadline(null)).toBeNull();
     // A row with no readable document is the same case: unchecked, not clean.
     expect(resumeHealthHeadline(entry({ document: null }))).toBeNull();
   });
 
-  test("a checked résumé with nothing wrong says so", () => {
+  test("a checked resume with nothing wrong says so", () => {
     expect(resumeHealthHeadline(entry())).toEqual({
       clean: true,
       text: "Nothing flagged on this version.",
     });
   });
 
-  test("a résumé whose only findings are dismissed reads as clean", () => {
+  test("a resume whose only findings are dismissed reads as clean", () => {
     const dismissedOnly = entry({ findings: [finding({ dismissed: true })] });
     expect(resumeHealthHeadline(dismissedOnly)?.clean).toBe(true);
   });

@@ -27,7 +27,7 @@ const KIND_VISUALS: Record<string, { icon: LucideIcon; tone: Tone }> = {
   "Data fix": { icon: Wrench, tone: "neutral" },
   Research: { icon: Search, tone: "neutral" },
   Networking: { icon: Users, tone: "neutral" },
-  "Résumé": { icon: FileText, tone: "brand" },
+  "Resume": { icon: FileText, tone: "brand" },
   "Apply Gate": { icon: ScanSearch, tone: "brand" },
 };
 

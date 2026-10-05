@@ -177,7 +177,7 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
             <p
               class="text-xs text-muted-foreground"
             >
-              Saved check · résumé not identified
+              Saved check · resume not identified
             </p>
             <div
               class="-mx-6 -mt-6 mb-1 rounded-t-2xl border-b px-6 py-5 bg-warning/[0.035] border-warning/25"
@@ -331,7 +331,7 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
                   data-slot="button"
                   data-variant="default"
                 >
-                  Fixing résumé first
+                  Fixing resume first
                 </button>
                 <button
                   class="inline-flex items-center justify-center whitespace-nowrap font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5 text-xs h-8"

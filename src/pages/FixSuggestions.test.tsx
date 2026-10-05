@@ -625,7 +625,7 @@ describe("Next Actions", () => {
   });
 
   test("a step waiting on another action is not listed as its own row", async () => {
-    // Founder's queue, 2026-09-25: 7 blocked "Apply to X" rows sat under their own "Tailor résumé
+    // Founder's queue, 2026-09-25: 7 blocked "Apply to X" rows sat under their own "Tailor resume
     // for X" rows, one role twice, and this page counted 22 where the Dashboard counted 14.
     const base = buildQueueResponse().queue.doToday[0] as Record<string, unknown>;
     fetchRankedActionQueue.mockResolvedValue(buildQueueResponse({

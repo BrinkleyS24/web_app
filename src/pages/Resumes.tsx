@@ -55,13 +55,13 @@ const OUTCOME_CHIP: Record<VariantBreakdownRow["outcome"], { label: string; tone
 function recordLine(score: VariantScoreRow | undefined) {
   const sent = score?.sent ?? 0;
   if (sent === 0) {
-    return "No applications through this résumé yet — pick it in Apply Gate when you apply.";
+    return "No applications through this resume yet — pick it in Apply Gate when you apply.";
   }
   // The headline count is the real number of applications sent through this
-  // résumé (sent), NOT matchedToOutcome. matchedToOutcome only counts the
+  // resume (sent), NOT matchedToOutcome. matchedToOutcome only counts the
   // applications we've since been able to attribute an inbox outcome to, so
   // showing it as "applications" undercounts (5 applies could read as "1").
-  const sentLabel = `${sent} application${sent === 1 ? "" : "s"} through this résumé`;
+  const sentLabel = `${sent} application${sent === 1 ? "" : "s"} through this resume`;
   if (!score || !score.sufficientSample) {
     const matched = score?.matchedToOutcome ?? 0;
     if (matched === 0) {
@@ -74,10 +74,10 @@ function recordLine(score: VariantScoreRow | undefined) {
 }
 
 /**
- * One line answering "is this résumé in good shape?" before any list of findings.
+ * One line answering "is this resume in good shape?" before any list of findings.
  *
  * Exported for its own test: the interesting cases are the two empty ones, which read very
- * differently. Nothing flagged means we checked and found nothing. No résumé to check means we
+ * differently. Nothing flagged means we checked and found nothing. No resume to check means we
  * have not looked — and a health panel that renders those identically is claiming a clean bill
  * of health it never established.
  */
@@ -287,7 +287,7 @@ function VariantComparison({
               <th scope="col" className={cn(th, "hidden text-right sm:table-cell")}>With an outcome</th>
               <th scope="col" className={cn(th, "hidden text-right sm:table-cell")}>Interviews</th>
               <th scope="col" className={cn(th, "text-right")}>Interview rate</th>
-              <th scope="col" className={th}>Résumé health</th>
+              <th scope="col" className={th}>Resume health</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -367,7 +367,7 @@ const Resumes = () => {
   );
   const breakdown = scoreboardQuery.data?.breakdown ?? {};
 
-  // Nudge toward a second variant: with only one résumé on file, Apply Gate has
+  // Nudge toward a second variant: with only one resume on file, Apply Gate has
   // nothing to compare and the outcome-steering guidance can never fire. A
   // rejection is the natural moment to suggest trying a different version.
   const rejectedCount = statsQuery.data?.stats?.applications?.rejected ?? 0;
@@ -391,7 +391,7 @@ const Resumes = () => {
     queryClient.invalidateQueries({ queryKey: ["user-resume"] });
     queryClient.invalidateQueries({ queryKey: ["legacy-resume-review"] });
     queryClient.invalidateQueries({ queryKey: ["variant-scoreboard"] });
-    // A new or edited résumé is a different document, so its findings are recomputed from
+    // A new or edited resume is a different document, so its findings are recomputed from
     // scratch — there is no stored "resolved" state that could go stale against the text.
     queryClient.invalidateQueries({ queryKey: ["resume-health"] });
   };
@@ -417,37 +417,37 @@ const Resumes = () => {
     <DashboardLayout>
       <div className="max-w-4xl space-y-6">
         <PageHeader
-          eyebrow="Your résumé library"
-          title="Résumés"
+          eyebrow="Your resume library"
+          title="Resumes"
           description="Save the versions you tailor, then see which one actually gets interviews — and which gets auto-rejected."
           actions={
             !adding && variants.length > 0 ? (
               <button type="button" className={BUTTON.secondary} onClick={beginAdd}>
-                <Plus className="h-4 w-4" aria-hidden /> Add a résumé version
+                <Plus className="h-4 w-4" aria-hidden /> Add a resume version
               </button>
             ) : null
           }
         />
 
         {variants.length > 0 && !variants.some((v) => v.isDefault) ? (
-          <p role="status" className="rounded-xl border border-border p-4 text-sm">No default résumé is set. Choose “Make default” below for extension checks. You can still select a résumé for an individual check.</p>
+          <p role="status" className="rounded-xl border border-border p-4 text-sm">No default resume is set. Choose “Make default” below for extension checks. You can still select a resume for an individual check.</p>
         ) : null}
         {setDefaultMut.isError ? <ErrorState title="The default did not change" detail={setDefaultMut.error.message} /> : null}
-        {archiveMut.isError ? <ErrorState title="The résumé could not be removed" detail={archiveMut.error.message} /> : null}
+        {archiveMut.isError ? <ErrorState title="The resume could not be removed" detail={archiveMut.error.message} /> : null}
         {archiveTarget ? (
           <Panel title={'Remove ' + archiveTarget.name + '?'}>
-            <p className="mb-3 text-sm">{archiveTarget.isDefault ? 'This is your default. Extension checks will pause until you choose another default. ' : ''}Past checks will keep their recorded résumé reference.</p>
-            <button type="button" className={BUTTON.primary} disabled={mutationPending} onClick={() => archiveMut.mutate(archiveTarget.id)}>Remove résumé</button>
+            <p className="mb-3 text-sm">{archiveTarget.isDefault ? 'This is your default. Extension checks will pause until you choose another default. ' : ''}Past checks will keep their recorded resume reference.</p>
+            <button type="button" className={BUTTON.primary} disabled={mutationPending} onClick={() => archiveMut.mutate(archiveTarget.id)}>Remove resume</button>
             <button type="button" className={BUTTON.ghost} disabled={mutationPending} onClick={() => setArchiveTarget(null)}>Cancel</button>
           </Panel>
         ) : null}
         {legacyQuery.isError ? (
-          <p role="alert" className="text-sm">Your previous profile text could not be loaded. You can add a résumé below or <button type="button" className="underline" onClick={() => legacyQuery.refetch()}>try again</button>.</p>
+          <p role="alert" className="text-sm">Your previous profile text could not be loaded. You can add a resume below or <button type="button" className="underline" onClick={() => legacyQuery.refetch()}>try again</button>.</p>
         ) : null}
         {!adding && legacyQuery.data?.resumeText ? (
-          <Panel title="Review your previous résumé">
+          <Panel title="Review your previous resume">
             <p className="text-sm">You have text saved on your old profile. Review and save it to use it for checks.</p>
-            <button className={BUTTON.secondary} onClick={() => { beginAdd(); setDraft(legacyQuery.data?.resumeText || ''); }}>Review previous résumé</button>
+            <button className={BUTTON.secondary} onClick={() => { beginAdd(); setDraft(legacyQuery.data?.resumeText || ''); }}>Review previous resume</button>
           </Panel>
         ) : null}
         {showVariantNudge ? (
@@ -467,14 +467,14 @@ const Resumes = () => {
               <div>
                 <p className="text-[14px] font-semibold leading-snug text-foreground">
                   {rejectedCount === 1
-                    ? "You've had a rejection. Try a different résumé next time."
-                    : `You've had ${rejectedCount} rejections. Try a different résumé next time.`}
+                    ? "You've had a rejection. Try a different resume next time."
+                    : `You've had ${rejectedCount} rejections. Try a different resume next time.`}
                 </p>
                 <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
                   Save a second version and Apply Gate will start tracking which one actually gets responses.
                 </p>
                 <button type="button" className={cn(BUTTON.accent, "mt-3")} onClick={beginAdd}>
-                  <Plus className="h-3.5 w-3.5" aria-hidden /> Add a résumé version
+                  <Plus className="h-3.5 w-3.5" aria-hidden /> Add a resume version
                 </button>
               </div>
             </div>
@@ -497,7 +497,7 @@ const Resumes = () => {
         ) : null}
 
         {adding ? (
-          <Panel title="Add a résumé version" description="Paste the text of the version you send. Apply Gate reads this text, not the file.">
+          <Panel title="Add a resume version" description="Paste the text of the version you send. Apply Gate reads this text, not the file.">
             <div className="space-y-3">
               <label className="block">
                 <span className={EYEBROW}>Name</span>
@@ -509,11 +509,11 @@ const Resumes = () => {
                 />
               </label>
               <label className="block">
-                <span className={EYEBROW}>Résumé text</span>
+                <span className={EYEBROW}>Resume text</span>
                 <textarea
                   rows={12}
                   className="mt-1.5 w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Paste your résumé text here… (plain text, not a file)"
+                  placeholder="Paste your resume text here… (plain text, not a file)"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                 />
@@ -525,7 +525,7 @@ const Resumes = () => {
                   type="button"
                   className={BUTTON.primary}
                   disabled={draft.trim().length < 50 || draft.length > 50000 || mutationPending}
-                  onClick={() => createMut.mutate({ name: draftName.trim() || "My résumé", text: draft })}
+                  onClick={() => createMut.mutate({ name: draftName.trim() || "My resume", text: draft })}
                 >
                   {createMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                   Save
@@ -541,16 +541,16 @@ const Resumes = () => {
             <LoadingRows rows={2} />
           </Panel>
         ) : variantsQuery.isError ? (
-          <ErrorState title="Your résumés did not load" onRetry={() => variantsQuery.refetch()} />
+          <ErrorState title="Your resumes did not load" onRetry={() => variantsQuery.refetch()} />
         ) : variants.length === 0 ? (
           adding ? null : (
             <EmptyState
               icon={FileText}
-              title="No résumés saved yet"
+              title="No resumes saved yet"
               body="Add the version you send most. Apply Gate checks every role against it, and once you save a second version it tracks which one gets responses."
               action={
                 <button type="button" className={BUTTON.primary} onClick={beginAdd}>
-                  <Plus className="h-3.5 w-3.5" aria-hidden /> Add a résumé version
+                  <Plus className="h-3.5 w-3.5" aria-hidden /> Add a resume version
                 </button>
               }
             />
