@@ -641,9 +641,35 @@ describe("DashboardNew", () => {
     renderDashboard();
 
     expect(await screen.findByText("Where your 20 applications stand")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /Interviewing: 1.*Rejected: 6/ })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Interview outcome unknown: 1.*Rejected: 6/ })).toBeInTheDocument();
     expect(screen.getByText("Closed by you")).toBeInTheDocument();
     expect(screen.queryByText(/can count twice/)).not.toBeInTheDocument();
+    // Both interview counts are defined where they are shown, with their source.
+    expect(screen.getByText(/counts every application that got one, whatever happened next/)).toBeInTheDocument();
+    expect(screen.getByText(/Counted from your inbox and applications you added\./)).toBeInTheDocument();
+  });
+
+  test("an old interview with no word since is not counted as still interviewing (Codex audit, 2026-10-06)", async () => {
+    fetchEmailMetrics.mockResolvedValue({
+      success: true,
+      cohortMetrics: { applicationsSent: 20, reachedInterview: 9, reachedOffer: 0, rejectedCohorts: 6, interviewRate: 45 },
+      searchSignals: {
+        funnel: {
+          applied: 20, settled: 16, pending: 4, silent: 1, rejected: 6, reachedInterview: 9, reachedOffer: 0,
+          stages: { waiting: 4, quiet: 1, interviewing: 7, offer: 0, rejected: 6, closed: 2 },
+          stagesV2: { waiting: 4, quiet: 1, interviewing: 2, interviewQuiet: 5, offer: 0, rejected: 6, closed: 2 },
+          fromAnswers: 3,
+          interviewRate: 0.45, settledInterviewRate: 0.56, offerRate: 0, focus: "interview", basis: "email_cohorts_all_time",
+        },
+        rejectionVelocity: { counts: {}, classified: 0, unknown: 6, medianEligible: false, averageDays: null },
+      },
+    });
+
+    renderDashboard();
+
+    expect(await screen.findByText("Where your 20 applications stand")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Still interviewing: 2, No word since the interview \(30\+ days\): 5/ })).toBeInTheDocument();
+    expect(screen.getByText(/Counted from your inbox and applications you added, plus 3 endings you told us about\./)).toBeInTheDocument();
   });
 
   test("keeps the separate rows when an older backend sends no stages", async () => {

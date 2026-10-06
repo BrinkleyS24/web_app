@@ -292,7 +292,7 @@ describe("variantStrategyNoGapsNote", () => {
         recommended: { ...strategy.recommended, requiredCount: 3 },
         analyzedVariant: { variantId: "variant-a", name: "New-Resume", isDefault: true },
       }),
-    ).toBe("Nothing to fix on New-Resume for this posting — send it as it is.");
+    ).toBe("No resume changes identified for New-Resume in this check. Review the eligibility and next step above.");
   });
 
   test("an empty gap list with NO requirements read is not reported as a clean resume", () => {
@@ -313,6 +313,27 @@ describe("variantStrategyNoGapsNote", () => {
         strategy={{ ...strategy, gaps: [], recommended: { ...strategy.recommended, requiredCount: 3 } }}
       />,
     );
-    expect(screen.getByText(/Nothing to fix on QA-Focused/)).toBeInTheDocument();
+    expect(screen.getByText(/No resume changes identified for QA-Focused/)).toBeInTheDocument();
+  });
+
+  test("renders the final backend wording and the pending eligibility note together", () => {
+    const pending: VariantStrategy = {
+      ...strategy, gaps: [], recommended: { ...strategy.recommended, requiredCount: 3 },
+      noGapsNote: "No resume edits for this posting.",
+      pendingCredentialNote: "A resume edit can't settle your pending RN license. Only the employer can say when it must be issued.",
+    };
+    render(<VariantStrategyCard strategy={pending} />);
+    expect(screen.getByText(pending.noGapsNote!)).toBeInTheDocument();
+    expect(screen.getByText(pending.pendingCredentialNote!)).toBeInTheDocument();
+    expect(screen.queryByText(/send it as it is/i)).not.toBeInTheDocument();
+  });
+
+  test("an explicit null closing note is not replaced by local advice", () => {
+    expect(variantStrategyNoGapsNote({ ...strategy, gaps: [], noGapsNote: null })).toBeNull();
+  });
+
+  test("Apply-now wording only appears when the backend supplies it", () => {
+    const note = "Nothing to fix on QA-Focused for this posting — send it as it is.";
+    expect(variantStrategyNoGapsNote({ ...strategy, gaps: [], noGapsNote: note })).toBe(note);
   });
 });

@@ -60,7 +60,7 @@ export default function Goodbye() {
               Want it deleted instead? <Link to="/support" className="underline underline-offset-2">Ask us</Link> and we'll remove it.
             </p>
             {CHROME_WEB_STORE_URL ? (
-              <a href={CHROME_WEB_STORE_URL} className="font-semibold text-[#0E8C63] underline underline-offset-4">
+              <a href={CHROME_WEB_STORE_URL} className="font-semibold text-[#0A7A55] underline underline-offset-4">
                 Changed your mind? Add Applendium back to Chrome
               </a>
             ) : null}
@@ -114,7 +114,7 @@ export default function Goodbye() {
             <button
               type="submit"
               disabled={!reason || state === "sending"}
-              className="self-start rounded-xl bg-[#0E8C63] px-5 py-3 text-[15px] font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
+              className="self-start rounded-xl bg-[#0A7A55] px-5 py-3 text-[15px] font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
             >
               {state === "sending" ? "Sending…" : "Send"}
             </button>

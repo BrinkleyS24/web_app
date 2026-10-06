@@ -459,7 +459,8 @@ type Stages = NonNullable<NonNullable<NonNullable<MetricsResponse["searchSignals
 // Progress first, then open, then settled; colors from the shared status map.
 const STAGE_SEGMENTS: Array<{ key: keyof Stages; label: string; bar: string; dot: string }> = [
   { key: "offer", label: "Offer", bar: TONES[STATUS_TONE.offer].rail, dot: TONES[STATUS_TONE.offer].rail },
-  { key: "interviewing", label: "Interviewing", bar: TONES[STATUS_TONE.interview].rail, dot: TONES[STATUS_TONE.interview].rail },
+  { key: "interviewing", label: "Still interviewing", bar: TONES[STATUS_TONE.interview].rail, dot: TONES[STATUS_TONE.interview].rail },
+  { key: "interviewQuiet", label: "No word since the interview (30+ days)", bar: `${TONES[STATUS_TONE.interview].rail} opacity-40`, dot: `${TONES[STATUS_TONE.interview].rail} opacity-40` },
   { key: "waiting", label: "Waiting on a reply", bar: "bg-foreground/35", dot: "bg-foreground/35" },
   { key: "quiet", label: "Went quiet (30+ days)", bar: "bg-muted-foreground/25", dot: "bg-muted-foreground/25" },
   { key: "closed", label: "Closed by you", bar: "bg-muted-foreground/15", dot: "bg-muted-foreground/15" },
@@ -477,15 +478,20 @@ function StageBar({
   reachedInterview,
   reachedOffer,
   ratePct,
+  fromAnswers,
 }: {
   stages: Stages;
   applied: number;
   reachedInterview: number;
   reachedOffer: number;
   ratePct: string | null;
+  fromAnswers?: number;
 }) {
-  const segments = STAGE_SEGMENTS.filter((segment) => stages[segment.key] > 0 || segment.key === "offer");
-  const summary = segments.map((segment) => `${segment.label}: ${stages[segment.key]}`).join(", ");
+  const count = (key: keyof Stages) => stages[key] ?? 0;
+  const hasQuietBreakdown = typeof stages.interviewQuiet === "number";
+  const label = (segment: (typeof STAGE_SEGMENTS)[number]) => segment.key === "interviewing" && !hasQuietBreakdown ? "Interview outcome unknown" : segment.label;
+  const segments = STAGE_SEGMENTS.filter((segment) => count(segment.key) > 0 || segment.key === "offer");
+  const summary = segments.map((segment) => `${label(segment)}: ${count(segment.key)}`).join(", ");
   return (
     <div className="space-y-3.5">
       <p className={SUBHEAD}>Where your {applied} applications stand</p>
@@ -496,7 +502,7 @@ function StageBar({
       </p>
       <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted" role="img" aria-label={summary}>
         {segments.map((segment) => {
-          const value = stages[segment.key];
+          const value = count(segment.key);
           if (!value) return null;
           return (
             <div
@@ -512,12 +518,23 @@ function StageBar({
           <li key={segment.key} className="flex items-center justify-between gap-2 text-[12.5px]">
             <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
               <span className={cn("h-2 w-2 shrink-0 rounded-full", segment.dot)} aria-hidden />
-              <span className="truncate">{segment.label}</span>
+              <span className="truncate">{label(segment)}</span>
             </span>
-            <span className="font-semibold tabular-nums text-foreground">{stages[segment.key]}</span>
+            <span className="font-semibold tabular-nums text-foreground">{count(segment.key)}</span>
           </li>
         ))}
       </ul>
+      {/* Two interview counts that can differ, each named, and where the bar's counts come from
+          (Codex audit + founder, 2026-10-06). */}
+      <p className="text-[11.5px] leading-snug text-muted-foreground">
+        &ldquo;Reached an interview&rdquo; counts every application that got one, whatever happened next.
+        {hasQuietBreakdown
+          ? "“Still interviewing” counts those with no decision and an email in the last 30 days. "
+          : "“Interview outcome unknown” means no decision is recorded; this result does not separate recent updates from older silence. "}
+        {fromAnswers
+          ? `Counted from your inbox and applications you added, plus ${fromAnswers} ${fromAnswers === 1 ? "ending" : "endings"} you told us about.`
+          : "Counted from your inbox and applications you added."}
+      </p>
     </div>
   );
 }
@@ -541,7 +558,7 @@ function SearchStatusPanel({ loading, metrics }: { loading: boolean; metrics?: M
   const applied = funnel?.applied ?? 0;
   const ratePct = funnel?.interviewRate != null ? `${(funnel.interviewRate * 100).toFixed(1)}%` : null;
 
-  const stages = metrics?.searchSignals?.funnel?.stages;
+  const stages = metrics?.searchSignals?.funnel?.stagesV2 ?? metrics?.searchSignals?.funnel?.stages;
   return (
     <Panel icon={CircleDot} tone="neutral" title="How your search is going">
       {loading ? (
@@ -556,7 +573,14 @@ function SearchStatusPanel({ loading, metrics }: { loading: boolean; metrics?: M
       ) : (
         <div className="grid gap-x-10 gap-y-6 md:grid-cols-2">
           {stages ? (
-            <StageBar stages={stages} applied={applied} reachedInterview={funnel.reachedInterview} reachedOffer={funnel.reachedOffer} ratePct={ratePct} />
+            <StageBar
+              stages={stages}
+              applied={applied}
+              reachedInterview={funnel.reachedInterview}
+              reachedOffer={funnel.reachedOffer}
+              ratePct={ratePct}
+              fromAnswers={metrics?.searchSignals?.funnel?.fromAnswers}
+            />
           ) : (
           <div className="space-y-3.5">
             <p className={SUBHEAD}>Where your applications stand</p>

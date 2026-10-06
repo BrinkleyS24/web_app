@@ -79,11 +79,13 @@ export function variantStrategyPickLabel(strategy: VariantStrategy): string {
  */
 export function variantStrategyNoGapsNote(strategy: VariantStrategy): string | null {
   if (strategy.gaps.length > 0) return null;
+  if (strategy.noGapsNote !== undefined) return strategy.noGapsNote;
   const name = strategy.analyzedVariant?.name ?? strategy.recommended.name;
   if (strategy.recommended.requiredCount === 0) {
     return `We couldn't read specific requirements from this posting, so there's nothing to check ${name} against — not a clean bill of health.`;
   }
-  return `Nothing to fix on ${name} for this posting — send it as it is.`;
+  // Older results do not carry the final decision here. Do not invent permission to apply.
+  return `No resume changes identified for ${name} in this check. Review the eligibility and next step above.`;
 }
 
 export function VariantStrategyCard({ strategy, onDraftDecisionsChange }: VariantStrategyCardProps) {
@@ -150,6 +152,11 @@ export function VariantStrategyCard({ strategy, onDraftDecisionsChange }: Varian
         {documentNote ? (
           <p className="mt-2 rounded-md border border-warning/25 bg-warning/5 px-2.5 py-1.5 text-[11px] leading-relaxed text-muted-foreground">
             {documentNote}
+          </p>
+        ) : null}
+        {strategy.pendingCredentialNote ? (
+          <p className="mt-2 rounded-md border border-warning/25 bg-warning/5 px-2.5 py-2 text-xs leading-relaxed text-foreground">
+            {strategy.pendingCredentialNote}
           </p>
         ) : null}
       </div>

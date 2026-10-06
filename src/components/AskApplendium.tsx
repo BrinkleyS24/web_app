@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { ArrowUp, ExternalLink, Loader2, Sparkles } from "lucide-react";
 
 import { ErrorState, ToneChip } from "@/components/premium/PremiumUI";
@@ -28,7 +29,8 @@ export const ASK_SUGGESTIONS = [
 const STAGE_LOOK: Record<AskStage, { label: string; tone: Tone }> = {
   waiting: { label: "Waiting on a reply", tone: STATUS_TONE.waiting },
   quiet: { label: "Went quiet", tone: STATUS_TONE.closed },
-  interviewing: { label: "Interviewing", tone: STATUS_TONE.interview },
+  interviewing: { label: "Still interviewing", tone: STATUS_TONE.interview },
+  interview_quiet: { label: "No word since the interview", tone: STATUS_TONE.closed },
   offer: { label: "Offer", tone: STATUS_TONE.offer },
   rejected: { label: "Rejected", tone: STATUS_TONE.rejected },
   closed: { label: "Closed by you", tone: STATUS_TONE.closed },
@@ -86,7 +88,7 @@ export function AskApplendium() {
         </h2>
       </div>
       <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
-        Ask anything about your search. The answer comes from the applications Applendium tracked for you.
+        Ask about your tracked applications, replies and next steps. To choose a resume for a role, I’ll take you to Apply Gate.
       </p>
 
       <form onSubmit={onSubmit} className="mt-3 flex items-center gap-2">
@@ -148,10 +150,16 @@ export function AskApplendium() {
                 {result.answer}
               </p>
 
+              {result.handoff && ["apply_gate", "resumes"].includes(result.handoff.kind) ? (
+                <Link to={result.handoff.kind === "resumes" ? "/resumes" : "/apply-gate"} className={BUTTON.primary}>
+                  {result.handoff.label}
+                </Link>
+              ) : null}
+
               {result.applications.length ? (
                 <ul className="divide-y divide-border rounded-xl border border-border" data-testid="ask-applications">
                   {result.applications.map((app) => {
-                    const look = STAGE_LOOK[app.stage] || STAGE_LOOK.waiting;
+                    const look = STAGE_LOOK[app.interviewQuiet ? "interview_quiet" : app.stage] || STAGE_LOOK.waiting;
                     const gmailUrl = buildGmailThreadUrl(app.threadId);
                     const last = shortDate(app.lastUpdateOn);
                     const step = app.nextStep ? NEXT_STEP_LABEL[app.nextStep] : null;
@@ -213,7 +221,9 @@ export function AskApplendium() {
 
               <p className="text-[11.5px] leading-snug text-muted-foreground">
                 {typeof count === "number" ? `Based on ${count} tracked application${count === 1 ? "" : "s"}${since ? ` since ${since}` : ""}. ` : ""}
-                The AI answers from company, role, stage and dates, never the text of your emails.
+                {result.handoff
+                  ? "This handoff uses your saved resume list. No resume content was sent to AI."
+                  : "The AI answers from company, role, stage and dates, never the text of your emails."}
               </p>
 
               <div className="flex flex-wrap gap-2">

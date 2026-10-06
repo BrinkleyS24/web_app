@@ -22,13 +22,13 @@
   --secondary-foreground: #3D4450;
   --muted: #F4F5F1;
   --muted-foreground: #5C6470; /* darkened from #79808B for WCAG AA on paper/card */
-  --accent: #0E8C63;
+  --accent: #0A7A55; /* darkened from #0E8C63 (4.24:1) for WCAG AA text: 5.35:1 on white */
   --accent-foreground: #FFFFFF;
   --destructive: #B3261E;
   --destructive-foreground: #FFFFFF;
   --warning: #B45309;
   --warning-foreground: #7C3A06;
-  --success: #0E8C63;
+  --success: #0A7A55;
   --success-foreground: #FFFFFF;
   /* "Upcoming" — calendar items. A calm ink-blue so a date reads as scheduled, not as a warning. */
   --info: #3656A6;
@@ -188,7 +188,7 @@ a:not([class]) {
 }
 
 ::selection {
-  background: #0E8C63;
+  background: #0A7A55;
   color: #fff;
 }
 

@@ -20,7 +20,7 @@ export type ToneStyle = {
 
 export const TONES: Record<Tone, ToneStyle> = {
   attention: {
-    chip: "bg-warning/10 text-warning ring-1 ring-inset ring-warning/20",
+    chip: "bg-warning/10 text-warning-foreground dark:text-warning ring-1 ring-inset ring-warning/20",
     icon: "bg-warning/10 text-warning",
     rail: "bg-warning",
     text: "text-warning",

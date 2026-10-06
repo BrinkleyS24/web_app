@@ -40,7 +40,7 @@ function BrandHeader() {
           href={CHROME_WEB_STORE_URL}
           target="_blank"
           rel="noreferrer"
-          className="landingButtonDark inline-flex items-center gap-2 rounded-lg bg-[#0B1220] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E8C63]"
+          className="landingButtonDark inline-flex items-center gap-2 rounded-lg bg-[#0B1220] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0A7A55]"
         >
           <Chrome className="h-4 w-4" />
           Add to Chrome
@@ -163,7 +163,7 @@ export default function Upgrade() {
   }
 
   const premiumCtaClass =
-    "landingButtonDark inline-flex w-full items-center justify-center gap-2 rounded-[10px] bg-[#0E8C63] px-6 py-[13px] text-[14.5px] font-semibold text-white transition-colors hover:bg-[#10B981] disabled:cursor-not-allowed disabled:opacity-70";
+    "landingButtonDark inline-flex w-full items-center justify-center gap-2 rounded-[10px] bg-[#0A7A55] px-6 py-[13px] text-[14.5px] font-semibold text-white transition-colors hover:bg-[#10B981] disabled:cursor-not-allowed disabled:opacity-70";
 
   return (
     <div className="landingPage min-h-screen bg-[#FAFAF8] text-[#0B1220]">
@@ -172,7 +172,7 @@ export default function Upgrade() {
       <main>
         <section className={`mx-auto max-w-[980px] px-6 pt-20 md:px-8 ${showFounding ? "pb-16" : "pb-24"}`}>
           <div className="text-center">
-            <p className="landingMono text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0E8C63]">
+            <p className="landingMono text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0A7A55]">
               Premium
             </p>
             <h1 className="landingDisplay mx-auto mt-5 max-w-[20ch] text-[38px] font-bold leading-[1.04] tracking-[-0.035em] md:text-[52px]">
@@ -190,7 +190,7 @@ export default function Upgrade() {
               className="mt-10 flex flex-col items-start gap-3 rounded-[14px] border border-[#D9EDE4] bg-[#EAF5F0] px-5 py-4 transition-colors hover:border-[#0E8C63] sm:flex-row sm:items-center sm:justify-between sm:gap-6"
             >
               <div className="min-w-0">
-                <p className="landingMono text-[10px] font-bold uppercase tracking-[0.16em] text-[#0E8C63]">
+                <p className="landingMono text-[10px] font-bold uppercase tracking-[0.16em] text-[#0A7A55]">
                   Founding members &middot; 20 seats
                 </p>
                 <p className="mt-1.5 text-[15px] leading-[1.55] text-[#0B1220]">
@@ -201,7 +201,7 @@ export default function Upgrade() {
                   </span>
                 </p>
               </div>
-              <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[14px] font-semibold text-[#0E8C63]">
+              <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[14px] font-semibold text-[#0A7A55]">
                 See the offer
                 <ArrowRight className="h-4 w-4" />
               </span>
@@ -247,7 +247,7 @@ export default function Upgrade() {
                       data-testid={`billing-plan-${value}`}
                       onClick={() => choosePlan(value)}
                       className={`rounded-[8px] px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
-                        selectedPlan === value ? "bg-[#0E8C63] text-white" : "text-[#98A1B3] hover:text-white"
+                        selectedPlan === value ? "bg-[#0A7A55] text-white" : "text-[#98A1B3] hover:text-white"
                       }`}
                     >
                       {label}
@@ -371,7 +371,7 @@ export default function Upgrade() {
                     </button>
                     <button
                       type="button"
-                      className="landingButtonDark inline-flex items-center justify-center rounded-lg bg-[#0B1220] px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#0E8C63] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="landingButtonDark inline-flex items-center justify-center rounded-lg bg-[#0B1220] px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#0A7A55] disabled:cursor-not-allowed disabled:opacity-60"
                       onClick={handleSignOut}
                       disabled={signOutBusy}
                     >
@@ -417,7 +417,7 @@ export default function Upgrade() {
             Questions?{" "}
             <a
               href="mailto:support@applendium.com?subject=Applendium%20Premium"
-              className="font-semibold text-[#0B1220] transition-colors hover:text-[#0E8C63]"
+              className="font-semibold text-[#0B1220] transition-colors hover:text-[#0A7A55]"
             >
               support@applendium.com
             </a>

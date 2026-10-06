@@ -12,7 +12,7 @@ const task = { id: "cleanup:application-links", actionType: "cleanup_application
 const emails = [{ id: "1", thread_id: "t1", category: "Interviewed", date: new Date().toISOString(), company_name: "Acme", position: "Engineer", applicationId: null }];
 
 describe("application link repair", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => { vi.resetAllMocks(); });
 
   test("reports partial link failure without claiming the application is linked", async () => {
     mocks.link.mockResolvedValue({ success: true, relinked: 1, failed: 1 });

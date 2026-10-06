@@ -1,7 +1,7 @@
 import { apiFetch } from "@/lib/api";
 
 /** Where an application stands now — the same buckets as the Dashboard's stage bar. */
-export type AskStage = "waiting" | "quiet" | "interviewing" | "offer" | "rejected" | "closed";
+export type AskStage = "waiting" | "quiet" | "interviewing" | "interview_quiet" | "offer" | "rejected" | "closed";
 
 /** What is due now, computed by the backend with the Today list's follow-up timing. */
 export type AskNextStep =
@@ -20,6 +20,7 @@ export type AskApplication = {
   company: string;
   role: string | null;
   stage: AskStage;
+  interviewQuiet?: boolean;
   appliedOn: string | null;
   /** The latest email from the hiring process about this application. */
   lastUpdateOn: string | null;
@@ -48,6 +49,7 @@ export type AskResponse = {
   answer: string;
   applications: AskApplication[];
   quotes?: AskQuote[];
+  handoff?: { kind: "apply_gate" | "resumes"; label: string };
   basis?: { applications?: number; earliestTrackedOn?: string | null };
 };
 

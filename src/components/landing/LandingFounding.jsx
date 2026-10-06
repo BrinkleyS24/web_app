@@ -22,7 +22,7 @@ export default function LandingFounding({ priceLabel }) {
       <div className="mx-auto max-w-[1180px] px-6 py-[88px] md:px-8">
         <div className="grid grid-cols-1 items-start gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
           <Reveal>
-            <p className="landingMono text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0E8C63]">
+            <p className="landingMono text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0A7A55]">
               Founding members
             </p>
             <h2 className="landingDisplay mt-4 max-w-[18ch] text-[32px] font-bold leading-[1.08] tracking-[-0.03em] md:text-[40px]">
@@ -44,7 +44,7 @@ export default function LandingFounding({ priceLabel }) {
                 </span>
               </p>
               <p className="rounded-[12px] border border-[#D9EDE4] bg-[#EAF5F0] p-4 text-[15px] text-[#0B1220]">
-                <span className="landingMono block text-[10px] font-bold uppercase tracking-[0.16em] text-[#0E8C63]">
+                <span className="landingMono block text-[10px] font-bold uppercase tracking-[0.16em] text-[#0A7A55]">
                   Where the money goes
                 </span>
                 <span className="mt-1.5 block">
@@ -73,7 +73,7 @@ export default function LandingFounding({ priceLabel }) {
                       </span>
                     </p>
                   </div>
-                  <span className="landingMono rounded-full bg-[#EAF5F0] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#0E8C63]">
+                  <span className="landingMono rounded-full bg-[#EAF5F0] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#0A7A55]">
                     20 seats total
                   </span>
                 </div>
@@ -86,7 +86,7 @@ export default function LandingFounding({ priceLabel }) {
                 <ul className="space-y-3.5">
                   {FOUNDING_INCLUDES.map((item) => (
                     <li key={item} className="flex gap-3 text-[14.5px] leading-[1.55] text-[#5C6470]">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#0E8C63]" />
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#0A7A55]" />
                       <span>{item}</span>
                     </li>
                   ))}
@@ -112,7 +112,7 @@ export default function LandingFounding({ priceLabel }) {
                   first?{" "}
                   <a
                     href="mailto:support@applendium.com?subject=Founding%20seat"
-                    className="font-semibold text-[#0B1220] underline decoration-[#D8DAD3] underline-offset-2 hover:text-[#0E8C63]"
+                    className="font-semibold text-[#0B1220] underline decoration-[#D8DAD3] underline-offset-2 hover:text-[#0A7A55]"
                   >
                     support@applendium.com
                   </a>

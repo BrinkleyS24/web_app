@@ -85,11 +85,18 @@ export type MetricsResponse = {
       stages?: {
         waiting: number;
         quiet: number;
+        /** An interview, no decision, and an email in the last 30 days. */
         interviewing: number;
+        /** An interview, no decision, and no email for 30+ days. Absent before 2026-10-06. */
+        interviewQuiet?: number;
         offer: number;
         rejected: number;
         closed: number;
       };
+      /** Separate quiet interviews; legacy stages retains its original six-bucket partition. */
+      stagesV2?: NonNullable<NonNullable<MetricsResponse["searchSignals"]>["funnel"]>["stages"];
+      /** Applications whose stage rests on the member's own answer, not an email. Absent before 2026-10-06. */
+      fromAnswers?: number;
       /** 0-1. The rate to DISPLAY; identical to cohortMetrics.interviewRate unscaled. */
       interviewRate: number | null;
       /** 0-1. Censoring-corrected, used only to pick `focus`. Never show this as "your rate". */
@@ -1381,6 +1388,9 @@ export type VariantStrategy = {
   alternatives: { variantId: string; name: string; contentMatch: { coverage: number | null; matchedCount: number; requiredCount: number; missing: string[] } }[];
   gaps: VariantStrategyGap[];
   basisLabel: string;   // e.g. "Based on this role's requirements"
+  /** Final analysis wording. Null explicitly means there is no closing note. */
+  noGapsNote?: string | null;
+  pendingCredentialNote?: string | null;
   /**
    * True when every resume scored the same coverage and the pick fell through to the default flag.
    * The card must not present a tie-break as a finding — that is what made a user ask why it had

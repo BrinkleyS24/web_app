@@ -232,7 +232,7 @@ export default function Landing() {
             </a>
             <Link
               to="/upgrade?source=landing"
-              className="text-sm font-semibold text-[#0B1220] transition-colors hover:text-[#0E8C63]"
+              className="text-sm font-semibold text-[#0B1220] transition-colors hover:text-[#0A7A55]"
             >
               Sign in
             </Link>
@@ -240,7 +240,7 @@ export default function Landing() {
               href={chromeHref}
               target="_blank"
               rel="noreferrer"
-              className="landingButtonDark inline-flex items-center gap-2 rounded-lg bg-[#0B1220] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0E8C63]"
+              className="landingButtonDark inline-flex items-center gap-2 rounded-lg bg-[#0B1220] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0A7A55]"
               data-testid="header-install-button"
             >
               <Chrome className="h-4 w-4" />
@@ -384,7 +384,7 @@ export default function Landing() {
                   className={`border-t border-[#E9EAE5] py-[22px] ${index === PROBLEM_FAILURES.length - 1 ? "border-b" : ""}`}
                 >
                   <div className="flex items-baseline gap-4">
-                    <span className="landingMono text-xs font-bold text-[#0E8C63]">
+                    <span className="landingMono text-xs font-bold text-[#0A7A55]">
                       {item.number}
                     </span>
                     <div>
@@ -414,7 +414,7 @@ export default function Landing() {
                   key={step.step}
                   className="rounded-2xl border border-[#E5E7E3] bg-white p-7"
                 >
-                  <span className="landingMono text-[13px] font-bold text-[#0E8C63]">
+                  <span className="landingMono text-[13px] font-bold text-[#0A7A55]">
                     {step.step}
                   </span>
                   <h3 className="mt-3.5 text-[19px] font-bold tracking-[-0.01em]">{step.title}</h3>
@@ -445,7 +445,7 @@ export default function Landing() {
                   key={feature.tag}
                   className={`flex gap-[18px] border-t border-[#E9EAE5] py-[26px] ${index === FREE_FEATURES.length - 1 ? "border-b" : ""}`}
                 >
-                  <span className="landingMono h-fit shrink-0 rounded-md bg-[#EAF5F0] px-2 py-[5px] text-[10px] font-bold tracking-[0.1em] text-[#0E8C63]">
+                  <span className="landingMono h-fit shrink-0 rounded-md bg-[#EAF5F0] px-2 py-[5px] text-[10px] font-bold tracking-[0.1em] text-[#0A7A55]">
                     {feature.tag}
                   </span>
                   <div>
@@ -601,7 +601,7 @@ export default function Landing() {
                   key={card.label}
                   className="rounded-[14px] border border-[#E5E7E3] bg-white p-[22px]"
                 >
-                  <span className="landingMono text-[10px] font-bold uppercase tracking-[0.14em] text-[#0E8C63]">
+                  <span className="landingMono text-[10px] font-bold uppercase tracking-[0.14em] text-[#0A7A55]">
                     {card.label}
                   </span>
                   <p className="mt-2.5 text-[14.5px] font-semibold text-[#0B1220]">{card.value}</p>
@@ -637,7 +637,7 @@ export default function Landing() {
                 </p>
                 <a
                   href="mailto:support@applendium.com?subject=Applendium%20Support"
-                  className="landingButtonDark mt-5 inline-flex items-center justify-center rounded-lg bg-[#0B1220] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0E8C63]"
+                  className="landingButtonDark mt-5 inline-flex items-center justify-center rounded-lg bg-[#0B1220] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0A7A55]"
                 >
                   Email support
                 </a>
@@ -742,7 +742,7 @@ export default function Landing() {
             </a>
             <a
               href={premiumUpdatesHref}
-              className="text-[13px] font-semibold text-[#0B1220] transition-colors hover:text-[#0E8C63]"
+              className="text-[13px] font-semibold text-[#0B1220] transition-colors hover:text-[#0A7A55]"
               data-testid="footer-email-cta"
             >
               support@applendium.com

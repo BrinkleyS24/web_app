@@ -163,7 +163,7 @@ const storedEmails = [
   },
 ];
 
-function buildQueueResponse(overrides: Partial<Record<"doToday" | "thisWeek" | "later" | "blocked" | "dismissed" | "done" | "expired" | "cleanup", unknown[]>> & { cleanupOverflowCount?: number } = {}) {
+function buildQueueResponse(overrides: Partial<Record<"doToday" | "thisWeek" | "later" | "blocked" | "dismissed" | "done" | "expired" | "cleanup", object[]>> & { cleanupOverflowCount?: number } = {}) {
   const followupAction = {
     id: "queue-followup-1",
     logicalKey: "followup:wf-thread",
@@ -767,7 +767,7 @@ describe("Next Actions", () => {
       );
     });
 
-    expect(await screen.findByText("Outreach Copilot")).toBeInTheDocument();
+    expect(await screen.findByText("Your draft")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Hide draft" })).toBeInTheDocument();
     expect(screen.getByLabelText("Preset")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy subject + body" })).toBeInTheDocument();
@@ -779,7 +779,7 @@ describe("Next Actions", () => {
     renderPage();
 
     await user.click(await screen.findByRole("button", { name: "Draft thank-you note" }));
-    await user.click(await screen.findByText("Report draft issue"));
+    await user.click(await screen.findByText("Something wrong with this draft?"));
     await user.click(await screen.findByTestId("copilot-feedback-wrong_grounding"));
 
     await waitFor(() => {
@@ -794,7 +794,7 @@ describe("Next Actions", () => {
         expect.anything(),
       );
     });
-    expect(await screen.findByText("Latest feedback saved: Wrong grounding")).toBeInTheDocument();
+    expect(await screen.findByText("Latest feedback saved: Wrong facts")).toBeInTheDocument();
   });
 
   test("a link from the Dashboard opens the draft it promised", async () => {

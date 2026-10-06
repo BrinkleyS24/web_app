@@ -166,7 +166,7 @@ function getPrimaryActionLabel(
 ) {
   if (kind === "cleanup") return getCleanupPrimaryLabel(item.intent, inlineOpen);
   if (kind === "close") return "Close application";
-  if (kind === "draft") return draftOpen ? "Hide copilot" : draft ? "Show copilot" : "Generate draft";
+  if (kind === "draft") return draftOpen ? "Hide draft" : draft ? "Show draft" : "Generate draft";
   if (kind === "gmail") return "Open Gmail";
   if (kind === "route") return item.routeLabel || "Open workspace";
   if (kind === "complete") return isGmailHandledCandidate(item) ? "Already handled" : "Mark done";
@@ -292,8 +292,8 @@ const draftToneOptions: DraftToneOption[] = [
 const draftFeedbackOptions: DraftFeedbackOption[] = [
   { value: "helpful", label: "Helpful" },
   { value: "too_generic", label: "Too generic" },
-  { value: "wrong_recipient", label: "Wrong recipient" },
-  { value: "wrong_grounding", label: "Wrong grounding" },
+  { value: "wrong_recipient", label: "Wrong person" },
+  { value: "wrong_grounding", label: "Wrong facts" },
   { value: "wrong_tone", label: "Wrong tone" },
 ];
 
@@ -765,10 +765,10 @@ function SuggestionDraftPanel({
         <div>
           <div className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4 text-primary" />
-            <p className="text-sm font-semibold text-foreground">Outreach Copilot</p>
+            <p className="text-sm font-semibold text-foreground">Your draft</p>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Draft, verify the send path, then copy into Gmail.
+            Check who it goes to, then copy it into Gmail.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -789,9 +789,9 @@ function SuggestionDraftPanel({
       {isGenerating ? (
         <p className="mt-4 text-sm text-muted-foreground">Generating draft...</p>
       ) : draft ? (
-        <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_280px]">
           <div className="min-w-0 space-y-3">
-            <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">
               <div className="rounded-2xl border border-border/70 bg-background/80 p-3">
                 <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground" htmlFor={`draft-tone-${draftKey}`}>
                   Preset
@@ -812,7 +812,7 @@ function SuggestionDraftPanel({
 
               <div className="min-w-0 rounded-2xl border border-border/70 bg-background/80 p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Subject</p>
-                <p className="mt-2 truncate text-sm font-medium text-foreground" title={draft.subject}>
+                <p className="mt-2 text-sm font-medium text-foreground [overflow-wrap:anywhere]" data-testid="draft-subject">
                   {draft.subject}
                 </p>
               </div>
@@ -853,12 +853,12 @@ function SuggestionDraftPanel({
 
             <details className="group rounded-2xl border border-border/70 bg-background/70">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
-                <span>{submittedFeedback ? `Feedback saved: ${feedbackLabel}` : "Report draft issue"}</span>
+                <span>{submittedFeedback ? `Feedback saved: ${feedbackLabel}` : "Something wrong with this draft?"}</span>
                 <ChevronsUpDown className="h-3.5 w-3.5" />
               </summary>
               <div className="border-t border-border/70 px-3 py-3">
                 <p className="text-xs leading-5 text-muted-foreground">
-                  Mark the failure mode when this draft misses. This builds the live copilot regression bank.
+                  What was wrong with it? Your answer helps improve future drafts.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                 {draftFeedbackOptions.map((option) => {
@@ -887,7 +887,7 @@ function SuggestionDraftPanel({
             </details>
           </div>
 
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3">
             <div className="rounded-2xl border border-border/70 bg-background/80 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">How to send</p>
               <p className="mt-2 text-sm font-medium text-foreground">
@@ -897,12 +897,12 @@ function SuggestionDraftPanel({
                 {draft.sendStrategyDescription || "Double-check who this goes to before you act."}
               </p>
               {draft.recipient ? (
-                <p className="mt-2 truncate rounded-xl bg-muted/60 px-3 py-2 text-xs text-muted-foreground" title={draft.recipient}>
+                <p className="mt-2 rounded-xl bg-muted/60 px-3 py-2 text-xs text-muted-foreground [overflow-wrap:anywhere]" data-testid="draft-recipient">
                   Suggested reply contact: {draft.recipient}
                 </p>
               ) : null}
               {draft.latestSender && draft.latestSender !== draft.recipient ? (
-                <p className="mt-2 truncate rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground" title={draft.latestSender}>
+                <p className="mt-2 rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground [overflow-wrap:anywhere]" data-testid="draft-latest-sender">
                   Latest sender in conversation: {draft.latestSender}
                 </p>
               ) : null}
@@ -927,7 +927,7 @@ function SuggestionDraftPanel({
               {draft.evidence?.length ? (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {draft.evidence.map((entry) => (
-                    <span key={entry} className="max-w-full truncate rounded-full bg-muted/70 px-2.5 py-1 text-[11px] text-muted-foreground" title={entry}>
+                    <span key={entry} className="max-w-full rounded-lg bg-muted/70 px-2.5 py-1 text-[11px] text-muted-foreground [overflow-wrap:anywhere]">
                       {entry}
                     </span>
                   ))}
@@ -936,7 +936,7 @@ function SuggestionDraftPanel({
               {draft.threadPreview ? (
                 <div className="mt-2 rounded-xl border border-border/70 bg-card/70 p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Preview</p>
-                  <p className="mt-1 max-h-24 overflow-hidden text-xs leading-5 text-muted-foreground">{draft.threadPreview}</p>
+                  <p className="mt-1 max-h-24 overflow-y-auto text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]">{draft.threadPreview}</p>
                 </div>
               ) : null}
             </div>

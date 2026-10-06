@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -14,7 +15,7 @@ function renderAsk() {
   const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <AskApplendium />
+      <MemoryRouter><AskApplendium /></MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -31,6 +32,30 @@ const ANSWER = {
 
 describe("AskApplendium", () => {
   beforeEach(() => askApplendium.mockReset());
+
+  test("a resume-selection answer has a working Apply Gate handoff and accurate privacy copy", async () => {
+    askApplendium.mockResolvedValue({ success: true, answer: "I need the posting to compare your saved resumes.", applications: [], handoff: { kind: "apply_gate", label: "Compare resumes in Apply Gate" } });
+    renderAsk();
+    await userEvent.type(screen.getByLabelText("Your question"), "Which resume should I use?{Enter}");
+    expect(await screen.findByRole("link", { name: "Compare resumes in Apply Gate" })).toHaveAttribute("href", "/apply-gate");
+    expect(screen.getByText(/No resume content was sent to AI/)).toBeInTheDocument();
+    expect(screen.queryByText(/Based on 0 tracked applications/)).not.toBeInTheDocument();
+  });
+
+  test("no saved resumes sends the member to the resume workspace", async () => {
+    askApplendium.mockResolvedValue({ success: true, answer: "Save a resume first.", applications: [], handoff: { kind: "resumes", label: "Add a resume" } });
+    renderAsk();
+    await userEvent.type(screen.getByLabelText("Your question"), "Which CV is best?{Enter}");
+    expect(await screen.findByRole("link", { name: "Add a resume" })).toHaveAttribute("href", "/resumes");
+  });
+
+  test("the additive quiet-interview marker overrides the legacy stage label", async () => {
+    askApplendium.mockResolvedValue({ ...ANSWER, applications: [{ ...ANSWER.applications[0], stage: "interviewing", interviewQuiet: true }] });
+    renderAsk();
+    await userEvent.click(screen.getByRole("button", { name: ASK_SUGGESTIONS[0] }));
+    expect(await screen.findByText("No word since the interview")).toBeInTheDocument();
+    expect(screen.queryByText("Still interviewing")).not.toBeInTheDocument();
+  });
 
   test("offers starting questions and asks one on click", async () => {
     askApplendium.mockResolvedValue(ANSWER);
