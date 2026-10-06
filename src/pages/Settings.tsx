@@ -41,10 +41,14 @@ type CoachPreference = {
 
 type SubscriptionResponse = {
   subscription?: SubscriptionStatus;
+  // The plan limit as the extension counts it (backend services/quotaPayload.js): applications,
+  // 500 in a rolling 30 days on Free, no limit (null) on Premium.
   quotaData?: {
-    monthlyProcessed?: number;
-    limit?: number;
-    lastReset?: string;
+    unit?: string;
+    trackedApplications?: number | null;
+    monthlyProcessed?: number | null;
+    limit?: number | null;
+    windowDays?: number | null;
   };
 };
 
@@ -166,8 +170,10 @@ export default function Settings() {
     : isPremium;
   const statusLabel = subscription?.status || (subLoading ? "loading" : isPremium ? "active" : "inactive");
   const renewalDate = formatDate(subscription?.current_period_end);
-  const monthlyLimit = subStatus?.quotaData?.limit ?? (isPremium ? 10000 : 500);
-  const monthlyProcessed = subStatus?.quotaData?.monthlyProcessed ?? 0;
+  const quota = subStatus?.quotaData;
+  const trackedApplications = quota?.trackedApplications ?? quota?.monthlyProcessed ?? null;
+  const quotaLimit = isPremium ? null : quota?.limit ?? 500;
+  const quotaWindowDays = quota?.windowDays ?? 30;
   const billingPortalAvailable = Boolean(subscription?.billingPortalAvailable);
   // Premium granted outside Stripe (founder, comped) has no renewal, no cancellation and no card on
   // file, so those boxes and the Stripe line only appear when Stripe actually bills this account.
@@ -277,7 +283,7 @@ export default function Settings() {
                 value={planLoading ? "…" : isPremium ? "Premium" : "Free"}
                 hint={
                   isPremium
-                    ? "Next Actions, Strategy Alerts, the weekly summary and Apply Gate."
+                    ? "Next Actions, Strategy Alerts and Apply Gate."
                     : "The Chrome extension stays free. Premium adds the coach workspace."
                 }
               />
@@ -289,12 +295,12 @@ export default function Settings() {
                 loading={subLoading && !subStatus}
               />
               <StatTile
-                label="Emails checked"
-                value={Number(monthlyProcessed).toLocaleString()}
+                label={isPremium ? "Applications tracked" : "Applications this period"}
+                value={trackedApplications == null ? "—" : Number(trackedApplications).toLocaleString()}
                 hint={
-                  Number.isFinite(monthlyLimit)
-                    ? `of ${Number(monthlyLimit).toLocaleString()} this period`
-                    : "this period"
+                  quotaLimit == null
+                    ? "No limit on Premium."
+                    : `of ${Number(quotaLimit).toLocaleString()} in the last ${quotaWindowDays} days`
                 }
                 loading={subLoading && !subStatus}
               />

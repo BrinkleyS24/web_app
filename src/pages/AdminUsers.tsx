@@ -445,7 +445,7 @@ export default function AdminUsers() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      <div>{user.emailsProcessed} processed</div>
+                      <div>{user.emailsProcessed.toLocaleString()} job emails</div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{formatDateTime(user.lastEmailSyncAt)}</td>
                     <td className="px-4 py-3">

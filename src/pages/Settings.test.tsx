@@ -126,6 +126,44 @@ describe("Settings coach voice", () => {
   });
 });
 
+// 2026-10-05: this tile read "Emails checked: 1 of 100" for a free user with 30 applications on
+// screen. The limit counts applications (500 in a rolling 30 days on Free, none on Premium).
+describe("Settings plan usage", () => {
+  test("a free user sees applications this period against the 500 limit", async () => {
+    useAuth.mockReturnValue({ user: { uid: "u2", email: "free@example.com" }, plan: "free", planLoading: false, logout: vi.fn() });
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path === "/api/user/coach-preference") return { success: true, enabled: false, available: false, premium: false };
+      return {
+        subscription: { plan: "free", status: "inactive" },
+        quotaData: { unit: "applications", trackedApplications: 30, monthlyProcessed: 30, limit: 500, windowDays: 30 },
+      };
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("Applications this period")).toBeInTheDocument();
+    expect(screen.getByText("30")).toBeInTheDocument();
+    expect(screen.getByText("of 500 in the last 30 days")).toBeInTheDocument();
+    expect(screen.queryByText("Emails checked")).toBeNull();
+  });
+
+  test("a premium user sees applications tracked and no limit", async () => {
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path === "/api/user/coach-preference") return { success: true, enabled: true, available: true, premium: true };
+      return {
+        subscription: { plan: "premium", status: "active" },
+        quotaData: { unit: "applications", trackedApplications: 496, monthlyProcessed: 496, limit: null, windowDays: null },
+      };
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("Applications tracked")).toBeInTheDocument();
+    expect(screen.getByText("496")).toBeInTheDocument();
+    expect(screen.getByText("No limit on Premium.")).toBeInTheDocument();
+  });
+});
+
 describe("Settings resumes", () => {
   test("points at the Resumes page instead of a second editor, and names the version Apply Gate uses", async () => {
     // The old box wrote to a legacy field while reading back the default version, so edits there
