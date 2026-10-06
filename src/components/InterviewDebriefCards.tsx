@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2 } from "lucide-react";
+import { ApiRequestError } from "@/lib/api.js";
 
 import {
   recordInterviewDebrief,
@@ -48,6 +49,8 @@ export function InterviewDebriefCards({
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [answeredCount, setAnsweredCount] = useState(0);
+  const [alreadyResolvedCount, setAlreadyResolvedCount] = useState(0);
+  const saving = useRef(false);
 
   const remaining = useMemo(() => items.filter((item) => !handled.has(item.key)), [items, handled]);
   const current = remaining[0] || null;
@@ -61,6 +64,7 @@ export function InterviewDebriefCards({
   };
 
   const handle = async (item: InterviewDebriefItem, outcome: Outcome) => {
+    if (saving.current) return;
     setError(null);
 
     if (outcome === "live") {
@@ -70,30 +74,52 @@ export function InterviewDebriefCards({
       return;
     }
 
+    saving.current = true;
     setPending(item.key);
     try {
-      await recordInterviewDebrief({ emailId: item.emailId, answer: outcome });
+      const result = await recordInterviewDebrief({ emailId: item.emailId, answer: outcome });
+      if (result?.success !== true) throw new Error("Save was not confirmed");
       const next = new Set(handled).add(item.key);
       setHandled(next);
-      setAnsweredCount((count) => count + 1);
+      if (result.recorded === false) setAlreadyResolvedCount((count) => count + 1);
+      else setAnsweredCount((count) => count + 1);
       if (next.size >= items.length) refreshDependentViews();
-    } catch {
+    } catch (failure) {
       // The card stays. A silent failure here would look like the answer was accepted and
       // then have the same question reappear tomorrow, which is worse than never asking.
-      setError("That did not save. Check your connection and try again.");
+      if (failure instanceof ApiRequestError && failure.status === 401) {
+        setError("That did not save. Your sign-in has expired. Sign in again, then retry.");
+      } else if (failure instanceof ApiRequestError && failure.status === 404) {
+        setError("That did not save. This email or its application is no longer available. Refresh this page, then retry.");
+      } else if (failure instanceof ApiRequestError && failure.status === 409) {
+        const code = failure.payload?.code;
+        setError(code === "APPLICATION_LINK_BUSY"
+          ? "That did not save. Your jobs are being updated. Wait a moment, then try again."
+          : code === "APPLICATION_LINK_LIMIT"
+            ? "That did not save. This role needs an application link, but your tracking limit is reached. Review your plan or retry after the limit resets."
+            : code === "APPLICATION_LINK_REVIEW_REQUIRED"
+              ? "That did not save. I could not link this email to one application safely. Open the matching role in the extension to check its company and job title."
+              : "That did not save. This role changed while saving. Refresh this page, then retry.");
+      } else if (failure instanceof ApiRequestError && (failure.status ?? 0) >= 500) {
+        setError("That did not save. Applendium could not save your answer. Try again in a moment.");
+      } else {
+        setError("That did not save. Check your connection and try again.");
+      }
     } finally {
+      saving.current = false;
       setPending(null);
     }
   };
 
   if (!current) {
-    if (answeredCount === 0) return null;
+    if (answeredCount === 0 && alreadyResolvedCount === 0) return null;
     return (
       <div className="mt-5 flex items-start gap-2 rounded-xl border border-accent/30 bg-accent/5 px-4 py-3 text-[13px] leading-relaxed text-foreground/80">
         <Check className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
         <span>
-          {answeredCount} recorded. Your next read uses {answeredCount === 1 ? "it" : "them"} — reload
-          when you want the updated one.
+          {answeredCount > 0
+            ? `${answeredCount} recorded. Your next read uses ${answeredCount === 1 ? "it" : "them"} — reload when you want the updated one.`
+            : "These roles already have tracked outcomes. Refresh to see the updated read."}
         </span>
       </div>
     );

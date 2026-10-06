@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { InterviewDebriefCards } from "./InterviewDebriefCards";
 import { INTERVIEW_DEBRIEF_ANSWERS } from "@/lib/emails";
+import { ApiRequestError } from "@/lib/api.js";
 
 const { recordInterviewDebrief } = vi.hoisted(() => ({ recordInterviewDebrief: vi.fn() }));
 
@@ -128,6 +129,51 @@ describe("InterviewDebriefCards", () => {
     await user.click(screen.getByRole("button", { name: "Rejected" }));
 
     expect(await screen.findByText(/2 recorded/)).toBeInTheDocument();
+  });
+  test.each([
+    [401, undefined, /Your sign-in has expired/],
+    [404, undefined, /email or its application is no longer available/],
+    [409, "APPLICATION_LINK_BUSY", /Your jobs are being updated/],
+    [409, "APPLICATION_LINK_REVIEW_REQUIRED", /could not link this email to one application safely/],
+    [409, "APPLICATION_LINK_LIMIT", /tracking limit is reached/],
+    [500, undefined, /Applendium could not save/],
+  ])("explains a %s save failure without blaming the connection", async (status, code, message) => {
+    recordInterviewDebrief.mockRejectedValue(new ApiRequestError("save failed", { status, payload: { code } }));
+    const user = userEvent.setup();
+    renderCards();
+    await user.click(screen.getByRole("button", { name: "Rejected" }));
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.getByText("Verisk · Software Engineer in Test")).toBeInTheDocument();
+    expect(screen.queryByText(/Check your connection/)).not.toBeInTheDocument();
+  });
+  test("a malformed successful response never dismisses the card", async () => {
+    recordInterviewDebrief.mockResolvedValue({ success: false });
+    const user = userEvent.setup();
+    renderCards();
+    await user.click(screen.getByRole("button", { name: "Rejected" }));
+    expect(await screen.findByText(/That did not save/)).toBeInTheDocument();
+    expect(screen.getByText("Verisk · Software Engineer in Test")).toBeInTheDocument();
+  });
+  test("an inbox outcome arriving before the answer is not claimed as a new answer", async () => {
+    recordInterviewDebrief.mockResolvedValue({ success: true, recorded: false });
+    const user = userEvent.setup();
+    renderCards();
+    await user.click(screen.getByRole("button", { name: "Rejected" }));
+    await screen.findByText("Onebrief · QA Engineer");
+    await user.click(screen.getByRole("button", { name: "Never heard back" }));
+    expect(await screen.findByText(/already have tracked outcomes/)).toBeInTheDocument();
+    expect(screen.queryByText(/recorded/)).not.toBeInTheDocument();
+  });
+  test("rapid taps cannot submit two competing answers", async () => {
+    let finish!: (value: { success: boolean }) => void;
+    recordInterviewDebrief.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    renderCards();
+    fireEvent.click(screen.getByRole("button", { name: "Rejected" }));
+    fireEvent.click(screen.getByRole("button", { name: "Never heard back" }));
+    expect(recordInterviewDebrief).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Still live" })).toBeDisabled();
+    finish({ success: true });
+    expect(await screen.findByText("Onebrief · QA Engineer")).toBeInTheDocument();
   });
 
   test("dismissing every card without answering leaves no false confirmation", async () => {

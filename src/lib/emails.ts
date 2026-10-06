@@ -266,7 +266,7 @@ export type InterviewDebriefAnswer = keyof typeof INTERVIEW_DEBRIEF_ANSWERS;
 export async function recordInterviewDebrief(params: {
   emailId: number;
   answer: InterviewDebriefAnswer;
-}): Promise<{ success: boolean; message?: string }> {
+}): Promise<{ success: boolean; message?: string; recorded?: boolean }> {
   return closeApplication({
     emailId: params.emailId,
     reason: INTERVIEW_DEBRIEF_ANSWERS[params.answer].reason,
@@ -860,7 +860,7 @@ export async function closeApplication(params: {
   applicationId?: string | number | null;
   emailId?: string | number | null;
   reason?: string | null;
-}): Promise<{ success: boolean; application?: unknown; message?: string }> {
+}): Promise<{ success: boolean; application?: unknown; message?: string; recorded?: boolean }> {
   const payload = {
     ...(params.reason ? { reason: params.reason } : {}),
     ...(params.emailId ? { emailId: params.emailId } : {}),
