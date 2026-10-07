@@ -1,6 +1,6 @@
 # Action context and editable outreach
 
-Status: implementation and local verification complete; staged and public authenticated draft acceptance passed. Backend is live at 100% latest traffic; web publication is pending.
+Status: implemented, committed, pushed and verified live on October 6, 2026 (ET). Backend is live at 100% latest traffic and the new web features are published.
 
 ## Implementation and dependencies
 
@@ -32,10 +32,19 @@ The existing queue completion endpoint is a state record, not a transactional Gm
 
 - Full web regression suite: 336 tests passed; TypeScript and production environment/token/build checks passed. The final optional-ID regression covers unlinked draft generation and feedback payloads: missing numeric IDs are omitted, rather than serialized as invalid nulls.
 - Backend affected and shared queue/request validation regressions: 179 tests passed.
-- Six browser cases passed, including edited copy bytes, tool navigation with job context, explicit completion and returning to preserved edits at 390 and 1280 pixels, plus existing grounded draft feedback, contrast and overflow checks at 320 and 390 pixels.
+- Six browser cases passed against local browser builds with mocked synthetic APIs, including edited copy bytes, tool navigation with job context, explicit completion and returning to preserved edits at 390 and 1280 pixels, plus existing grounded draft feedback, contrast and overflow checks at 320 and 390 pixels. This is distinct from the real signed-in backend acceptance below; no claim of testing the founder's actual mailbox or every production browser journey.
 - Staged signed-in synthetic Premium acceptance: owner-current linked and unlinked drafts, corrected company/role metadata, missing-link refusal, changed version/wrong selector refusal, partial-reference validation, newly terminal evidence refusal, legacy compatibility and fixture cleanup passed. Drafting did not close the application. Three successful synthetic draft requests took 356–745 ms; this is acceptance timing, not a production load benchmark.
 - Backend source commit: `20d94c4`. Candidate revision: `applendium-backend-workspace-20d94c4`; immutable image digest `17a3792a2a62132710f187df0a6be401b57817ca08d456e59872ce1c49e8ee3e`. Runtime settings, both existing outcome flags and Firebase secret version 2 were preserved; candidate had zero production traffic during verification. No schema migration or dependency changes.
 - The same signed-in draft acceptance passed on the public backend after promotion. The staged outcome regression also passed all 14 checks, including whole-journey repair, first-answer replay, stale/reopened/reassigned rejection, foreign owner denial, authoritative offer precedence, count/strategy parity, legacy free-client compatibility and fixture cleanup. Public health, auth rejection and CORS smoke passed; the temporary tag was removed. No real customer records were used and no email was sent.
 - Private release receipts and sanitized acceptance scripts: root `.codex_tmp/action-workspace-release-20261006`. Runtime snapshots/credentials must not be committed or published.
 
 Roll back a faulty web workflow with a reviewed web revert while retaining the backend draft guard. Do not route reference-bearing clients to an old backend that strips their logical/version fields: a backend rollback must retain validation and fail closed for those requests. Before publication, a failed candidate remains at zero traffic and the existing public release continues serving.
+
+## Live release receipt
+
+- Web implementation commit: `fd64369`. Published entry `/assets/index-BJgwylJT.js` contains action context, editable signature/copy, retention disclosure and the current production backend URL, without the local authentication-bypass marker. The published bundle is not byte-identical to the local build; marker verification is not a byte-parity claim.
+- Backend: `applendium-backend-workspace-20d94c4`, 100% latest traffic, temporary tag removed. All three job images match the immutable digest; runtime configuration and Firebase version 2 are unchanged. No jobs were executed.
+- Final log check at `2026-10-07T02:55:39Z`: zero error-level entries and zero HTTP 5xx entries observed for this revision (query limit 100). This is a release check, not long-term monitoring or a load result.
+- No database migration, credential rotation, dependency update, new model/Gmail call or external message send was introduced by this release.
+
+Still open: atomic close-plus-queue completion, substantial interview preparation, a complete resume workspace and reload/cross-device draft persistence. The completed context/outreach milestones do not establish an A grade for all Premium workflows.
