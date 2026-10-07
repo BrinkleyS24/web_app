@@ -45,14 +45,19 @@ export function InterviewDebriefCards({
   total: number;
 }) {
   const queryClient = useQueryClient();
+  // Background refetches may change the source, never the batch under the user's finger.
+  // An explicit page refresh loads a new batch after a stale-view response.
+  const [batch] = useState(items);
+  const [batchTotal] = useState(total);
   const [handled, setHandled] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [requiresRefresh, setRequiresRefresh] = useState(false);
   const [answeredCount, setAnsweredCount] = useState(0);
   const [alreadyResolvedCount, setAlreadyResolvedCount] = useState(0);
   const saving = useRef(false);
 
-  const remaining = useMemo(() => items.filter((item) => !handled.has(item.key)), [items, handled]);
+  const remaining = useMemo(() => batch.filter((item) => !handled.has(item.key)), [batch, handled]);
   const current = remaining[0] || null;
 
   // Only refetch once the local stack is empty. Invalidating on every tap would re-render the
@@ -64,35 +69,38 @@ export function InterviewDebriefCards({
   };
 
   const handle = async (item: InterviewDebriefItem, outcome: Outcome) => {
-    if (saving.current) return;
+    if (saving.current || requiresRefresh || item.actionReference === null) return;
     setError(null);
 
     if (outcome === "live") {
       const next = new Set(handled).add(item.key);
       setHandled(next);
-      if (next.size >= items.length) refreshDependentViews();
+      if (next.size >= batch.length) refreshDependentViews();
       return;
     }
 
     saving.current = true;
     setPending(item.key);
     try {
-      const result = await recordInterviewDebrief({ emailId: item.emailId, answer: outcome });
+      const result = await recordInterviewDebrief({ emailId: item.emailId, answer: outcome,
+        ...(item.actionReference !== undefined && item.actionReference !== null ? { actionReference: item.actionReference } : {}) });
       if (result?.success !== true) throw new Error("Save was not confirmed");
       const next = new Set(handled).add(item.key);
       setHandled(next);
       if (result.recorded === false) setAlreadyResolvedCount((count) => count + 1);
       else setAnsweredCount((count) => count + 1);
-      if (next.size >= items.length) refreshDependentViews();
+      if (next.size >= batch.length) refreshDependentViews();
     } catch (failure) {
       // The card stays. A silent failure here would look like the answer was accepted and
       // then have the same question reappear tomorrow, which is worse than never asking.
       if (failure instanceof ApiRequestError && failure.status === 401) {
         setError("That did not save. Your sign-in has expired. Sign in again, then retry.");
       } else if (failure instanceof ApiRequestError && failure.status === 404) {
+        setRequiresRefresh(true);
         setError("That did not save. This email or its application is no longer available. Refresh this page, then retry.");
       } else if (failure instanceof ApiRequestError && failure.status === 409) {
         const code = failure.payload?.code;
+        if (code === "APPLICATION_CHANGED") setRequiresRefresh(true);
         setError(code === "APPLICATION_LINK_BUSY"
           ? "That did not save. Your jobs are being updated. Wait a moment, then try again."
           : code === "APPLICATION_LINK_LIMIT"
@@ -100,6 +108,9 @@ export function InterviewDebriefCards({
             : code === "APPLICATION_LINK_REVIEW_REQUIRED"
               ? "That did not save. I could not link this email to one application safely. Open the matching role in the extension to check its company and job title."
               : "That did not save. This role changed while saving. Refresh this page, then retry.");
+      } else if (failure instanceof ApiRequestError && failure.payload?.code === "APPLICATION_ACTION_UNAVAILABLE") {
+        setRequiresRefresh(true);
+        setError("That did not save. Refresh this page to load the current role before retrying.");
       } else if (failure instanceof ApiRequestError && (failure.status ?? 0) >= 500) {
         setError("That did not save. Applendium could not save your answer. Try again in a moment.");
       } else {
@@ -125,7 +136,7 @@ export function InterviewDebriefCards({
     );
   }
 
-  const stillToGo = Math.max(total - answeredCount - 1, 0);
+  const stillToGo = Math.max(batchTotal - answeredCount - 1, 0);
   const minutes = Math.max(1, Math.round(((stillToGo + 1) * SECONDS_PER_CARD) / 60));
   const isPending = pending === current.key;
 
@@ -143,7 +154,7 @@ export function InterviewDebriefCards({
             <button
               key={choice.outcome}
               type="button"
-              disabled={isPending}
+              disabled={isPending || requiresRefresh || current.actionReference === null}
               onClick={() => handle(current, choice.outcome)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[12.5px] font-semibold text-foreground transition-colors hover:border-primary hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -153,8 +164,11 @@ export function InterviewDebriefCards({
           ))}
         </div>
       </div>
-      {error ? (
-        <p className="mt-2 text-[12px] font-semibold leading-snug text-destructive">{error}</p>
+      {error || current.actionReference === null ? (
+        <div className="mt-2" role="alert">
+          <p className="text-[12px] font-semibold leading-snug text-destructive">{error || "I could not identify this application safely. Review the role in the extension before recording its outcome."}</p>
+          {requiresRefresh ? <button type="button" onClick={() => window.location.reload()} className="mt-2 rounded-lg border border-border bg-card px-3 py-1.5 text-[12.5px] font-semibold text-foreground">Refresh page</button> : null}
+        </div>
       ) : (
         <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
           {stillToGo > 0 ? `${stillToGo} more · about ${minutes} minute${minutes === 1 ? "" : "s"}` : "Last one."}

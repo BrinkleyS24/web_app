@@ -205,3 +205,45 @@ describe("InterviewDebriefCards", () => {
     expect(INTERVIEW_DEBRIEF_ANSWERS.withdrew.reason).toBe("Withdrew - interview debrief");
   });
 });
+
+describe('displayed batch identity', () => {
+  test('background updates do not replace the role or reference under the user', async () => {
+    const queryClient=new QueryClient({defaultOptions:{queries:{retry:false}}});
+    const actionReference='j1.101.42.'+'a'.repeat(64);
+    const original=[{...items[0],actionReference}];
+    const view=render(<QueryClientProvider client={queryClient}><InterviewDebriefCards items={original} total={1}/></QueryClientProvider>);
+    view.rerender(<QueryClientProvider client={queryClient}><InterviewDebriefCards items={[{...items[1],actionReference:'j1.102.43.'+'b'.repeat(64)}]} total={1}/></QueryClientProvider>);
+    expect(screen.getByText(items[0].label)).toBeInTheDocument();
+    expect(screen.queryByText(items[1].label)).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button',{name:'Rejected'}));
+    expect(recordInterviewDebrief).toHaveBeenCalledWith({emailId:101,answer:'rejected',actionReference});
+  });
+  test.each([[409,'APPLICATION_CHANGED'],[503,'APPLICATION_ACTION_UNAVAILABLE']])('a %s stale/unavailable action retains its card and requires refresh',async(status,code)=>{
+    recordInterviewDebrief.mockRejectedValue(new ApiRequestError('changed',{status,payload:{code}}));
+    renderCards();
+    await userEvent.setup().click(screen.getByRole('button',{name:'Rejected'}));
+    expect(await screen.findByRole('button',{name:'Refresh page'})).toBeInTheDocument();
+    expect(screen.getByText(items[0].label)).toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'Rejected'})).toBeDisabled();
+    expect(screen.queryByText(/recorded/)).not.toBeInTheDocument();
+  });
+  test('a retry after network failure keeps its original reference',async()=>{
+    const actionReference='j1.101.42.'+'a'.repeat(64);
+    const client=new QueryClient();
+    recordInterviewDebrief.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({success:true,recorded:true});
+    render(<QueryClientProvider client={client}><InterviewDebriefCards items={[{...items[0],actionReference}]} total={1}/></QueryClientProvider>);
+    const user=userEvent.setup();
+    await user.click(screen.getByRole('button',{name:'Rejected'}));
+    await screen.findByText(/Check your connection/);
+    await user.click(screen.getByRole('button',{name:'Rejected'}));
+    expect(recordInterviewDebrief.mock.calls[0]).toEqual(recordInterviewDebrief.mock.calls[1]);
+    expect(recordInterviewDebrief.mock.calls[1][0].actionReference).toBe(actionReference);
+  });
+  test('explicitly unsafe history cannot submit an unguarded answer',()=>{
+    const client=new QueryClient();
+    render(<QueryClientProvider client={client}><InterviewDebriefCards items={[{...items[0],actionReference:null}]} total={1}/></QueryClientProvider>);
+    expect(screen.getByRole('button',{name:'Rejected'})).toBeDisabled();
+    expect(screen.getByText(/could not identify this application safely/)).toBeInTheDocument();
+    expect(recordInterviewDebrief).not.toHaveBeenCalled();
+  });
+});
