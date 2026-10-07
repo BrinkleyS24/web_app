@@ -18,7 +18,7 @@ export function actionToolHref(href: string, item: Pick<QueueItem, "logicalKey" 
   if (!href.startsWith("/") || href.startsWith("//")) return href;
   const target = new URL(href, "https://applendium.com");
   if (target.origin !== "https://applendium.com"
-    || !["/apply-gate", "/resumes"].includes(target.pathname)) return href;
+    || !["/apply-gate", "/resumes", "/interview-prep"].includes(target.pathname)) return href;
   target.searchParams.set("action", item.logicalKey!);
   target.searchParams.set("version", item.dedupeKey!);
   return `${target.pathname}${target.search}${target.hash}`;

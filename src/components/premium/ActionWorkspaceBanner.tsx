@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext.jsx";
 import { readActionContext } from "@/lib/actionWorkspace";
 import { completeQueueAction } from "@/lib/emails";
 import { useWorkspaceAction } from "@/hooks/useWorkspaceAction";
+import { fetchInterviewSource } from "@/lib/interviewPrep";
 import { BUTTON, CARD, EYEBROW } from "./tone";
 import { cn } from "@/lib/utils";
 
@@ -12,33 +13,35 @@ export function ActionWorkspaceBanner() {
   const location = useLocation();
   const { user } = useAuth();
   const context = readActionContext(location.search);
-  if (!user || !["/apply-gate", "/resumes"].includes(location.pathname)
+  if (!user || !["/apply-gate", "/resumes", "/interview-prep"].includes(location.pathname)
     || !new URLSearchParams(location.search).has("action")) return null;
   if (!context) return <section className={cn(CARD, "mb-5 p-4")} aria-label="Action context">
     <p>This action link is incomplete. Open the task again from Next Actions.</p>
     <Link to="/next-actions" className={cn(BUTTON.secondary, "mt-3")}>Back to Next Actions</Link>
   </section>;
-  return <ResolvedActionContext key={`${user.uid}:${context.logicalKey}:${context.dedupeKey}`} {...context} ownerId={user.uid} />;
+  return <ResolvedActionContext key={`${user.uid}:${context.logicalKey}:${context.dedupeKey}`} {...context} ownerId={user.uid} interview={location.pathname==="/interview-prep"} />;
 }
 
-function ResolvedActionContext({ logicalKey, dedupeKey, ownerId }: { logicalKey: string; dedupeKey: string; ownerId: string }) {
+function ResolvedActionContext({ logicalKey, dedupeKey, ownerId, interview }: { logicalKey: string; dedupeKey: string; ownerId: string; interview: boolean }) {
   const client = useQueryClient();
   const [pending, setPending] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const submitting = useRef(false);
   const { queue, action } = useWorkspaceAction(logicalKey, ownerId);
+  const interviewSource = useQuery({queryKey:["interview-prep","source",ownerId,logicalKey,dedupeKey],queryFn:()=>fetchInterviewSource({logicalKey,dedupeKey}),enabled:interview,retry:false,staleTime:0});
   const status = action?.effectiveStatus || action?.status;
   const changed = action && action.dedupeKey !== dedupeKey;
   const done = saved || status === "done" && !changed;
-  const canComplete = Boolean(action && !changed && status === "open" && !queue.isError && !queue.isFetching && !done);
+  const canComplete = Boolean(action && !changed && status === "open" && !queue.isError && !queue.isFetching && !done
+    && (!interview || interviewSource.data && !interviewSource.isError && !interviewSource.isFetching));
   const returnHref = action ? `/next-actions#${encodeURIComponent(action.id)}` : "/next-actions";
 
   async function complete() {
     if (!canComplete || submitting.current) return;
     submitting.current = true; setPending(true); setError("");
     try {
-      const result = await completeQueueAction({ logicalKey, dedupeKey });
+      const result = await completeQueueAction({ logicalKey, dedupeKey, ...(interview ? {sourceVersion:interviewSource.data!.sourceVersion}: {}) });
       if (!result.success || result.state !== "completed") throw new Error("The task was not confirmed as saved. Retry or review it in Next Actions.");
       setSaved(true);
       // A failed refresh cannot undo a confirmed write or turn it into a failed-save message.

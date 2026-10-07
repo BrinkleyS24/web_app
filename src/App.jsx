@@ -12,6 +12,7 @@ import PaymentCancel from "./pages/PaymentCancel.tsx";
 import ApplyGate from "./pages/ApplyGate.tsx";
 import Resumes from "./pages/Resumes.tsx";
 import FixSuggestions from "./pages/FixSuggestions.tsx";
+import InterviewPrep from "./pages/InterviewPrep.tsx";
 import StrategyAlerts from "./pages/StrategyAlerts.tsx";
 import Settings from "./pages/Settings.tsx";
 import AdminAnalytics from "./pages/AdminAnalytics.tsx";
@@ -39,6 +40,7 @@ const DASHBOARD_ROUTES = [
   "/apply-gate",
   "/resumes",
   "/next-actions",
+  "/interview-prep",
   "/fix-suggestions",
   "/outcome-memory",
   "/strategy-alerts",
@@ -189,6 +191,7 @@ export default function App() {
                   </RequirePremiumUser>
                 }
               />
+              <Route path="/interview-prep" element={<RequirePremiumUser><InterviewPrep /></RequirePremiumUser>} />
               {/* Old URLs stay valid. Next Actions used to live at /fix-suggestions, and Outcome
                   Memory's one current finding (skill gaps across checked roles) now lives on
                   Strategy Alerts, so bookmarks and old links land somewhere real. */}

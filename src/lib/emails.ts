@@ -746,6 +746,7 @@ export async function recordQueueActionImpression(params: {
 export async function completeQueueAction(params: {
   logicalKey: string;
   dedupeKey?: string;
+  sourceVersion?: string;
 }): Promise<QueueActionMutationResponse> {
   return apiFetch("/api/suggestions/queue/actions/complete", {
     method: "POST",

@@ -6,9 +6,10 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ActionWorkspaceBanner } from "./ActionWorkspaceBanner";
 import { ActionCtaButton } from "./ActionPieces";
 import type { QueueItem } from "@/lib/premiumTaskQueue";
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), queue: vi.fn(), complete: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), queue: vi.fn(), complete: vi.fn(), source:vi.fn() }));
 vi.mock("@/lib/AuthContext.jsx", () => ({ useAuth: () => mocks.auth() }));
 vi.mock("@/lib/emails", () => ({ fetchRankedActionQueue: (...args: unknown[]) => mocks.queue(...args), completeQueueAction: (...args: unknown[]) => mocks.complete(...args) }));
+vi.mock("@/lib/interviewPrep",()=>({fetchInterviewSource:(...args:unknown[])=>mocks.source(...args)}));
 const key = "0123456789abcdef", version = "fedcba9876543210";
 const item = { id: "action-card", logicalKey: key, dedupeKey: version, company: "Example Health", roleTitle: "Receptionist", title: "Show your front-desk experience", whyNow: "The posting asks for scheduling experience.", evidence: ["Scheduling appears in the posting."], effectiveStatus: "open", status: "open", createdAt: "2026-10-06T00:00:00Z" };
 const response = (overrides = {}) => ({success:true,queue:{resolvedActions:[{...item,...overrides}]}});
@@ -16,7 +17,7 @@ function setup(path = `/resumes?action=${key}&version=${version}`) {
   const client = new QueryClient({ defaultOptions: {queries:{retry:false},mutations:{retry:false}} });
   return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><ActionWorkspaceBanner /></MemoryRouter></QueryClientProvider>);
 }
-beforeEach(() => { vi.clearAllMocks(); mocks.auth.mockReturnValue({user:{uid:"owner"}}); mocks.queue.mockResolvedValue(response()); mocks.complete.mockResolvedValue({success:true,state:"completed"}); });
+beforeEach(() => { vi.clearAllMocks(); mocks.auth.mockReturnValue({user:{uid:"owner"}}); mocks.queue.mockResolvedValue(response()); mocks.complete.mockResolvedValue({success:true,state:"completed"}); mocks.source.mockResolvedValue({sourceVersion:"a".repeat(64)}); });
 describe("action workspace", () => {
   test("actual tool navigation keeps the exact task, shows evidence and does not complete it", async () => {
     const client = new QueryClient({defaultOptions:{queries:{retry:false}}});
@@ -67,4 +68,6 @@ describe("action workspace", () => {
   });
   test("ordinary tool visits make no queue request", () => { setup("/resumes"); expect(mocks.queue).not.toHaveBeenCalled(); });
   test("malformed and duplicate keys are refused before fetching", () => { setup(`/apply-gate?action=${key}&action=${key}&version=${version}`); expect(screen.getByText(/link is incomplete/)).toBeInTheDocument(); expect(mocks.queue).not.toHaveBeenCalled(); });
+  test("interview completion sends the verified invitation version",async()=>{setup(`/interview-prep?action=${key}&version=${version}`);await userEvent.click(await screen.findByRole("button",{name:"I've finished this task"}));await screen.findByText(/Task marked done/);expect(mocks.complete).toHaveBeenCalledWith({logicalKey:key,dedupeKey:version,sourceVersion:"a".repeat(64)});});
+  test("unavailable interview source cannot mark preparation done",async()=>{mocks.source.mockRejectedValue(new Error("Cancelled"));setup(`/interview-prep?action=${key}&version=${version}`);await waitFor(()=>expect(mocks.source).toHaveBeenCalled());await waitFor(()=>expect(screen.queryByText(/Loading the job/)).not.toBeInTheDocument());expect(screen.queryByRole("button",{name:"I've finished this task"})).not.toBeInTheDocument();expect(mocks.complete).not.toHaveBeenCalled();});
 });

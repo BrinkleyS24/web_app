@@ -54,6 +54,10 @@ describe("resolveActionCta", () => {
     expect(resolveActionCta(item({ actionType: "complete_assessment", intent: "COMPLETE_ASSESSMENT" }), GMAIL))
       .toEqual({ kind: "gmail", label: "Open assessment email", href: GMAIL });
   });
+  test("versioned interview tasks open the grounded preparation workspace",()=>{
+    expect(resolveActionCta(item({actionType:"prepare_interview",intent:"PREP_INTERVIEW",logicalKey:"0123456789abcdef",dedupeKey:"fedcba9876543210"}),GMAIL))
+      .toEqual({kind:"route",label:"Prepare for interview",href:"/interview-prep"});
+  });
 
   test("resume and role work go to the tool that does it", () => {
     expect(resolveActionCta(item({ source: "resume", actionType: "resume_proof_gap", hasDraft: false }), null))

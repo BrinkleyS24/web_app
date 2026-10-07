@@ -71,7 +71,10 @@ export function resolveActionCta(item: QueueItem, gmailUrl: string | null): Acti
     }
   }
 
-  if (PREP_TYPES.has(type) || intent === "PREP_INTERVIEW") return { kind: "prep", label: "See prep plan" };
+  if (PREP_TYPES.has(type) || intent === "PREP_INTERVIEW") {
+    if (/^[a-f0-9]{16}$/.test(item.logicalKey || "") && /^[a-f0-9]{16}$/.test(item.dedupeKey || "")) return { kind: "route", label: "Prepare for interview", href: "/interview-prep" };
+    return { kind: "prep", label: "See prep plan" };
+  }
 
   if ((type === "complete_assessment" || intent === "COMPLETE_ASSESSMENT") && gmailUrl) {
     return { kind: "gmail", label: "Open assessment email", href: gmailUrl };
