@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { Link, MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ReactNode } from "react";
@@ -62,7 +62,7 @@ vi.mock("@/lib/emails", async () => {
   };
 });
 
-function renderPage() {
+function renderPage(entry='/') {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -71,7 +71,7 @@ function renderPage() {
   });
 
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[entry]}>
       <QueryClientProvider client={queryClient}>
         <ApplyGate />
       </QueryClientProvider>
@@ -162,6 +162,32 @@ beforeEach(() => {
   updateApplyGateAction.mockResolvedValue({ success: true });
   fetchResumeVariants.mockResolvedValue({ success: true, variants: [] });
   fetchVariantScoreboard.mockResolvedValue({ success: true, scoreboard: { minSample: 5, perVariant: [] }, recommendation: null });
+});
+
+test('an explicit workspace handoff selects its exact version over another default', async()=>{
+  const id='aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+  fetchResumeVariants.mockResolvedValue({success:true,variants:[{id:'another-default',name:'Default',isDefault:true},{id,name:'Revised',isDefault:false}]});
+  analyzeJobAlignment.mockResolvedValue(baseResult);renderPage(`/apply-gate?resume=${id}`);
+  expect(await screen.findByLabelText('Resume')).toHaveValue(id);
+  await userEvent.type(screen.getByLabelText('Job description'),'Receptionist role managing appointments and records.');
+  await userEvent.click(screen.getByRole('button',{name:/Check this role/i}));
+  await waitFor(()=>expect(analyzeJobAlignment).toHaveBeenCalledWith(expect.objectContaining({variantId:id})));
+});
+test('an empty handoff added during navigation clears a previously chosen default',async()=>{
+  fetchResumeVariants.mockResolvedValue({success:true,variants:[{id:'another-default',name:'Default',isDefault:true}]});
+  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+  render(<MemoryRouter initialEntries={['/apply-gate']}><QueryClientProvider client={client}><Link to="/apply-gate?resume=">Incomplete resume link</Link><ApplyGate/></QueryClientProvider></MemoryRouter>);
+  await waitFor(()=>expect(screen.getByLabelText('Resume')).toHaveValue('another-default'));
+  await userEvent.type(screen.getByLabelText('Job description'),'Receptionist role managing appointments and records.');
+  await userEvent.click(screen.getByRole('link',{name:'Incomplete resume link'}));
+  await waitFor(()=>expect(screen.getByLabelText('Resume')).toHaveValue(''));
+  expect(screen.getByRole('button',{name:/Check this role/i})).toBeDisabled();expect(screen.getByText(/no default was substituted/)).toBeInTheDocument();
+});
+test.each(['resume=bad','resume=aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee&resume=aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee','resume=aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'])('bad or unavailable handoff never substitutes the default: %s',async query=>{
+  fetchResumeVariants.mockResolvedValue({success:true,variants:[{id:'another-default',name:'Default',isDefault:true}]});renderPage(`/apply-gate?${query}`);
+  await screen.findByLabelText('Resume');await userEvent.type(screen.getByLabelText('Job description'),'Receptionist role managing appointments and records.');
+  expect(screen.getByRole('button',{name:/Check this role/i})).toBeDisabled();expect(screen.getByText(/no default was substituted/)).toBeInTheDocument();expect(analyzeJobAlignment).not.toHaveBeenCalled();
+  await userEvent.selectOptions(screen.getByLabelText('Resume'),'another-default');expect(screen.getByRole('button',{name:/Check this role/i})).toBeEnabled();
 });
 
 test('a library without a default requires an explicit resume choice', async () => {

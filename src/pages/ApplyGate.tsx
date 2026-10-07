@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { readResumeChoice, resumeToolHref, RESUME_ID } from "@/lib/resumeWorkspace";
+import { useDraftSession } from "@/hooks/useDraftSession";
 import { readActionContext } from "@/lib/actionWorkspace";
 import { useWorkspaceAction } from "@/hooks/useWorkspaceAction";
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -1098,18 +1100,31 @@ function actionConfirmationCopy(action: ApplyGateAction): { title: string; body:
   };
 }
 
+type CheckForm = {jobTitle:string;companyName:string;jobDescription:string;jobUrl:string;variantId:string;riskTolerance:ApplyGateRiskTolerance};
 const ApplyGate = () => {
+  const {user}=useAuth();const location=useLocation();const context=readActionContext(location.search);
+  return <ApplyGateWorkspace key={`${user?.uid||'signed-out'}:${context?`${context.logicalKey}:${context.dedupeKey}`:'standalone'}`} />;
+};
+
+const ApplyGateWorkspace = () => {
   const { user } = useAuth();
   const location = useLocation();
   const actionContext = readActionContext(location.search);
+  const choice=readResumeChoice(location.search);
+  const formKey=actionContext?`${actionContext.logicalKey}:${actionContext.dedupeKey}`:'standalone';
+  const [forms,updateForms]=useDraftSession<CheckForm>('apply-gate-form');
+  const remembered=forms[formKey];
   const workspace = useWorkspaceAction(actionContext?.logicalKey, user?.uid);
   const seededTask = useRef("");
-  const [jobTitle, setJobTitle] = useState("");
-  const [companyName, setCompanyName] = useState("");
-  const [jobDescription, setJobDescription] = useState("");
-  const [jobUrl, setJobUrl] = useState("");
-  const [variantId, setVariantId] = useState("");
-  const [riskTolerance, setRiskTolerance] = useState<ApplyGateRiskTolerance>("balanced");
+  const [jobTitle, setJobTitle] = useState(remembered?.jobTitle||"");
+  const [companyName, setCompanyName] = useState(remembered?.companyName||"");
+  const [jobDescription, setJobDescription] = useState(remembered?.jobDescription||"");
+  const [jobUrl, setJobUrl] = useState(remembered?.jobUrl||"");
+  const [variantId, setVariantId] = useState(choice.present?choice.id||'':remembered?.variantId||"");
+  const [riskTolerance, setRiskTolerance] = useState<ApplyGateRiskTolerance>(remembered?.riskTolerance||"balanced");
+  const choiceSignature=new URLSearchParams(location.search).getAll('resume').join('|');
+  useEffect(()=>{if(choice.present)setVariantId(choice.id||'');},[choice.present,choiceSignature]);
+  useEffect(()=>{updateForms(current=>({...current,[formKey]:{jobTitle,companyName,jobDescription,jobUrl,variantId,riskTolerance}}));},[jobTitle,companyName,jobDescription,jobUrl,variantId,riskTolerance,formKey]);
   const [result, setResult] = useState<ApplyGateResult | null>(null);
   useEffect(() => {
     const action = workspace.action;
@@ -1177,11 +1192,11 @@ const ApplyGate = () => {
   const variants = variantsQuery.data?.variants ?? [];
   const needsResume = resumeQuery.isSuccess && !hasResume && variantsQuery.isSuccess && variants.length === 0;
   useEffect(() => {
-    if (!variantId && variants.length > 0) {
+    if (!choice.present && !variantId && variants.length > 0) {
       const defaultVariant = variants.find((v) => v.isDefault);
       if (defaultVariant) setVariantId(defaultVariant.id);
     }
-  }, [variants, variantId]);
+  }, [variants, variantId, choice.present]);
 
   // Apply-time guidance: once a verdict exists, surface which saved variant has the
   // best track record for roles like this one. Honest — null below the sample floor.
@@ -1304,7 +1319,7 @@ const ApplyGate = () => {
   // returns an honest 400 when it can't extract a usable description.
   const jobUrlLooksFetchable = /^https?:\/\/\S+\.\S+/i.test(jobUrl.trim());
   const canAnalyze = (jobDescription.trim().length > 0 || jobUrlLooksFetchable) && !needsResume
-    && !variantsQuery.isLoading && !variantsQuery.isError && (variants.length === 0 || variants.some((v) => v.id === variantId));
+    && !variantsQuery.isLoading && !variantsQuery.isError && (variants.length === 0 && !choice.present || variants.some((v) => v.id === variantId));
 
   // ── Coach-voice translation ─────────────────────────────────────────
   // The backend's structured levels (bands, confidence) are model-card
@@ -1694,6 +1709,8 @@ const ApplyGate = () => {
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-foreground">Check a role</h2>
           </div>
+          {choice.present&&!choice.id&&!variants.some(v=>v.id===variantId)?<p role="alert" className="text-sm">This resume link is incomplete. Choose an available version; no default was substituted.</p>:null}
+          {choice.id&&variantsQuery.isSuccess&&!variants.some(v=>v.id===variantId)?<p role="alert" className="text-sm">The linked resume is no longer available. Choose another version; no default was substituted.</p>:null}
           {needsResume ? (
           <div className="space-y-3" data-testid="apply-gate-resume-required">
             <div className="rounded-xl border border-border bg-muted/40 p-4">
@@ -1799,6 +1816,8 @@ const ApplyGate = () => {
               <p className="text-xs text-muted-foreground">{!variantId
                 ? 'No default resume is set. Choose which one to check against this role.'
                 : 'Which saved resume to evaluate — and record as sent if you apply.'}</p>
+              {RESUME_ID.test(variantId)&&variants.some(v=>v.id===variantId)?<Link className="inline-block text-sm font-medium underline" to={resumeToolHref('/resumes',variantId,location.search)}>View or edit this version</Link>:null}
+              <p className="text-xs text-muted-foreground">The posting stays in this tab while you manage versions. Reloading or signing out clears unsaved inputs. Saving edits does not recheck the role automatically.</p>
             </div>
           ) : null}
           {variantsQuery.isError ? <p role="alert" className="text-sm">Your resumes could not be loaded. <button type="button" className="underline" onClick={() => variantsQuery.refetch()}>Try again</button></p> : null}

@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronDown, CircleCheck, FileText, Loader2, Plus, Star, Trash2, X } from "lucide-react";
 
@@ -25,6 +26,8 @@ import {
 import { useAuth } from "@/lib/AuthContext.jsx";
 import { cn } from "@/lib/utils";
 import { STATUS_TONE } from "@/lib/statusTone";
+import { ResumeEditor, ResumeTextComparison } from "@/components/ResumeEditor";
+import { readResumeChoice, resumeToolHref, RESUME_ID } from "@/lib/resumeWorkspace";
 
 const VARIANT_NUDGE_DISMISS_KEY = "variantNudge.dismissed";
 
@@ -343,7 +346,13 @@ function VariantComparison({
 
 const Resumes = () => {
   const queryClient = useQueryClient();
-  const { plan } = useAuth();
+  const { plan, user } = useAuth();
+  const location = useLocation();
+  const requested = readResumeChoice(location.search);
+  const [editorId, setEditorId] = useState<string | null>(requested.id);
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+  const requestedSignature=new URLSearchParams(location.search).getAll('resume').join('|');
+  useEffect(()=>{if(requested.present)setEditorId(requested.id);},[requested.present,requestedSignature]);
   const premium = plan === "premium";
   const variantsQuery = useQuery({ queryKey: ["resume-variants"], queryFn: fetchResumeVariants });
   const scoreboardQuery = useQuery({ queryKey: ["variant-scoreboard"], queryFn: () => fetchVariantScoreboard(), enabled: premium });
@@ -394,6 +403,10 @@ const Resumes = () => {
     // A new or edited resume is a different document, so its findings are recomputed from
     // scratch — there is no stored "resolved" state that could go stale against the text.
     queryClient.invalidateQueries({ queryKey: ["resume-health"] });
+    if (user?.uid) {
+      queryClient.invalidateQueries({ queryKey: ["interview-prep", "resumes", user.uid] });
+      queryClient.invalidateQueries({ queryKey: ["resume-document", user.uid] });
+    }
   };
   const createMut = useMutation({
     mutationFn: (body: { name: string; text: string }) => {
@@ -415,11 +428,11 @@ const Resumes = () => {
 
   return (
     <DashboardLayout>
-      <div className="max-w-4xl space-y-6">
+      <div className="max-w-4xl min-w-0 space-y-6 [overflow-wrap:anywhere]">
         <PageHeader
           eyebrow="Your resume library"
           title="Resumes"
-          description="Save the versions you tailor, then see which one actually gets interviews — and which gets auto-rejected."
+          description="Compare saved wording, edit a new version, and choose exactly which resume to use for a role."
           actions={
             !adding && variants.length > 0 ? (
               <button type="button" className={BUTTON.secondary} onClick={beginAdd}>
@@ -428,6 +441,11 @@ const Resumes = () => {
             ) : null
           }
         />
+
+        {requested.present&&!requested.id?<p role="alert" className="text-sm">This resume link is incomplete. Open a version from your library.</p>:null}
+        {editorId&&user?.uid?<ResumeEditor key={`${user.uid}:${editorId}`} id={editorId} owner={user.uid} search={location.search} onSaved={invalidate}/>:null}
+        {compareIds.length>0?<Panel title="Compare two versions"><p className="mb-3 text-sm">{compareIds.length===1?'Select one more version below.':'Two versions selected. Clear the selection to choose a different pair.'}</p><button className={BUTTON.secondary} onClick={()=>setCompareIds([])}>Clear comparison</button></Panel>:null}
+        {compareIds.length===2&&user?.uid?<ResumeTextComparison key={`${user.uid}:${compareIds.join(':')}`} ids={compareIds} owner={user.uid}/>:null}
 
         {variants.length > 0 && !variants.some((v) => v.isDefault) ? (
           <p role="status" className="rounded-xl border border-border p-4 text-sm">No default resume is set. Choose “Make default” below for extension checks. You can still select a resume for an individual check.</p>
@@ -572,7 +590,12 @@ const Resumes = () => {
                       <p className="mt-0.5 text-[13px] text-muted-foreground">{premium ? recordLine(scoreByVariant.get(v.id)) : (v.isDefault ? "Used for your extension job checks." : "Available to choose as your default.")}</p>
                     </div>
                   </div>
-                  <div className="-ml-2 flex shrink-0 items-center gap-1 sm:ml-0">
+                  <div className="-ml-2 flex shrink-0 flex-wrap items-center gap-1 sm:ml-0">
+                    {RESUME_ID.test(v.id)?<>
+                      <button className={BUTTON.ghost} onClick={()=>setEditorId(v.id)}>Open and edit</button>
+                      <Link className={BUTTON.ghost} to={resumeToolHref('/apply-gate',v.id,location.search)}>Use in Apply Gate</Link>
+                      <label className="flex items-center gap-2 px-2 text-sm"><input type="checkbox" aria-label={`Compare ${v.name}`} checked={compareIds.includes(v.id)} disabled={!compareIds.includes(v.id)&&compareIds.length>=2} onChange={e=>setCompareIds(current=>e.target.checked?[...current,v.id]:current.filter(id=>id!==v.id))}/>Compare</label>
+                    </>:null}
                     {!v.isDefault ? (
                       <button type="button" className={BUTTON.ghost} disabled={mutationPending} onClick={() => setDefaultMut.mutate(v.id)}>
                         <Star className="h-3.5 w-3.5" aria-hidden /> Make default
