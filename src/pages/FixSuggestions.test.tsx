@@ -15,6 +15,7 @@ let dateNowSpy: ReturnType<typeof vi.spyOn>;
 
 const {
   closeApplication,
+  closeQueueOutcome,
   completeQueueAction,
   fetchFollowupSuggestions,
   fetchRankedActionQueue,
@@ -27,6 +28,7 @@ const {
   recordSuggestionDraftFeedback,
 } = vi.hoisted(() => ({
   closeApplication: vi.fn(),
+  closeQueueOutcome: vi.fn(),
   completeQueueAction: vi.fn(),
   fetchFollowupSuggestions: vi.fn(),
   fetchRankedActionQueue: vi.fn(),
@@ -63,6 +65,7 @@ vi.mock("@/lib/emails", async () => {
   return {
     ...actual,
     closeApplication,
+    closeQueueOutcome,
     completeQueueAction,
     fetchFollowupSuggestions,
     fetchRankedActionQueue,
@@ -208,6 +211,7 @@ function buildQueueResponse(overrides: Partial<Record<"doToday" | "thisWeek" | "
 
   const staleAction = {
     id: "queue-stale-1",
+    actionReference: 'j1.31.42.' + 'a'.repeat(64),
     logicalKey: "stale:ghost-thread",
     dedupeKey: "stale:ghost-thread:v1",
     primaryEntityId: "stale:ghost-thread",
@@ -388,6 +392,7 @@ beforeEach(() => {
     wasStale: false,
   });
   closeApplication.mockResolvedValue({ success: true });
+  closeQueueOutcome.mockResolvedValue({ success: true, state: 'completed' });
   dismissQueueAction.mockResolvedValue({
     success: true,
     state: "snoozed",
@@ -737,14 +742,43 @@ describe("Next Actions", () => {
     await user.click(await screen.findByRole("button", { name: "Close it out" }));
 
     await waitFor(() => {
-      expect(closeApplication).toHaveBeenCalledWith({
-        applicationId: "ghost-app",
-        emailId: "ghost-email",
-        // "No response" leads so the close is a neutral ghosting close-out, not a rejection.
-        reason: "No response - ghosted, closed from Next Actions: Move Associate Quality Engineer - Software (QA) out of active focus",
+      expect(closeQueueOutcome).toHaveBeenCalledWith({
+        logicalKey: 'stale:ghost-thread', dedupeKey: 'stale:ghost-thread:v1', actionReference: 'j1.31.42.' + 'a'.repeat(64),
       });
     });
-    expect(completeQueueAction).toHaveBeenCalledWith({ logicalKey: "stale:ghost-thread", dedupeKey: "stale:ghost-thread:v1" });
+    expect(completeQueueAction).not.toHaveBeenCalled(); expect(closeApplication).not.toHaveBeenCalled();
+  });
+
+  test('unconfirmed close retains the task and retries its same reference without separate writes', async () => {
+    closeQueueOutcome.mockRejectedValueOnce(new Error('Save could not be confirmed')).mockResolvedValueOnce({ success:true,state:'completed' });
+    renderPage(); await userEvent.click(await screen.findByRole('button',{name:'Close it out'}));
+    await waitFor(()=>expect(toastError).toHaveBeenCalledWith('Save could not be confirmed'));
+    expect(toastSuccess).not.toHaveBeenCalled(); expect(completeQueueAction).not.toHaveBeenCalled(); expect(closeApplication).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button',{name:'Close it out'}));
+    await waitFor(()=>expect(closeQueueOutcome).toHaveBeenCalledTimes(2));
+    expect(closeQueueOutcome.mock.calls[1][0]).toEqual(closeQueueOutcome.mock.calls[0][0]);
+  });
+
+  test('close cards have no task-only Mark done shortcut', async () => {
+    renderPage(); const button=await screen.findByRole('button',{name:'Close it out'});
+    expect(within(button.closest('article')!).queryByRole('button',{name:'Mark done'})).not.toBeInTheDocument();
+  });
+
+  test('cached close task without reference requests refresh without a mutation', async () => {
+    const response=buildQueueResponse(); for(const action of response.queue.resolvedActions as Array<{actionReference?:string|null}>) action.actionReference=null;
+    for(const action of response.queue.thisWeek as Array<{actionReference?:string|null}>) action.actionReference=null;
+    fetchRankedActionQueue.mockResolvedValue(response);
+    renderPage(); await userEvent.click(await screen.findByRole('button',{name:'Refresh role'}));
+    expect(closeQueueOutcome).not.toHaveBeenCalled(); expect(completeQueueAction).not.toHaveBeenCalled(); expect(closeApplication).not.toHaveBeenCalled();
+  });
+
+  test('double-click during close sends one transaction and ignores its response after navigation', async () => {
+    let finish: (result:unknown)=>void;
+    closeQueueOutcome.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));
+    const page=renderPage(); const button=await screen.findByRole('button',{name:'Close it out'});
+    await userEvent.dblClick(button); expect(closeQueueOutcome).toHaveBeenCalledTimes(1);
+    page.unmount(); finish!({success:true,state:'completed'}); await new Promise(resolve=>setTimeout(resolve,0));
+    expect(toastSuccess).not.toHaveBeenCalled();
   });
 
   test("drafts the thank-you note in place, with presets and the thread context", async () => {

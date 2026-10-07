@@ -365,6 +365,7 @@ export type RankedAction = {
   id: string;
   logicalKey: string;
   dedupeKey: string;
+  actionReference?: string | null;
   primaryEntityId: string;
   evidenceVersion: string;
   actionType: string;
@@ -752,6 +753,21 @@ export async function completeQueueAction(params: {
     method: "POST",
     body: JSON.stringify(params),
   });
+}
+
+export async function closeQueueOutcome(params: {
+  logicalKey: string;
+  dedupeKey: string;
+  actionReference: string;
+}): Promise<{ success: true; state: 'completed'; logicalKey: string; dedupeKey: string; replayed: boolean; recorded: boolean; application: unknown }> {
+  const result = await apiFetch(
+    '/api/suggestions/queue/actions/close', { method: 'POST', body: JSON.stringify(params) });
+  if (result.success !== true || result.state !== 'completed' || result.logicalKey !== params.logicalKey
+    || result.dedupeKey !== params.dedupeKey || typeof result.replayed !== 'boolean' || typeof result.recorded !== 'boolean'
+    || !result.application || typeof result.application !== 'object' || !Number.isSafeInteger(Number(result.application.id)) || Number(result.application.id) <= 0) {
+    throw new Error('The save could not be confirmed. Retry this same task to check whether it saved.');
+  }
+  return result;
 }
 
 export async function dismissQueueAction(params: {

@@ -47,7 +47,7 @@ import { useCanonicalQueueImpressions } from "@/hooks/useCanonicalQueueImpressio
 import { useAuth } from "@/lib/AuthContext.jsx";
 import { ApiRequestError } from "@/lib/api.js";
 import {
-  closeApplication,
+  closeQueueOutcome,
   completeQueueAction,
   dismissQueueAction,
   fetchRankedActionQueue,
@@ -1054,6 +1054,8 @@ const FixSuggestions = () => {
   const feedbackRequests = useRef(new WeakMap<FeedbackRequest, {key:string; owner:string}>());
   const [draftFeedbackByTaskId, setDraftFeedbackByTaskId] = useState<Record<string, SuggestionDraftFeedbackLabel>>({});
   const [pendingLogicalKeys, setPendingLogicalKeys] = useState<Record<string, true>>({});
+  const pendingMutations = useRef(new Set<string>());
+  useEffect(() => { setPendingLogicalKeys({}); }, [user?.uid]);
 
   const isAuthed = Boolean(user);
 
@@ -1331,11 +1333,16 @@ const FixSuggestions = () => {
 
   const withPendingLogicalKey = async <T,>(logicalKey: string | undefined, fn: () => Promise<T>) => {
     if (!logicalKey) return fn();
+    const owner = currentOwner.current;
+    const key = `${owner}:${logicalKey}`;
+    if (pendingMutations.current.has(key)) return;
+    pendingMutations.current.add(key);
     setPendingLogicalKeys((current) => ({ ...current, [logicalKey]: true }));
     try {
       return await fn();
     } finally {
-      setPendingLogicalKeys((current) => {
+      pendingMutations.current.delete(key);
+      if (mounted.current && currentOwner.current === owner) setPendingLogicalKeys((current) => {
         if (!current[logicalKey]) return current;
         const next = { ...current };
         delete next[logicalKey];
@@ -1395,34 +1402,35 @@ const FixSuggestions = () => {
 
   const closeQueueItem = async (item: QueueItem) => {
     if (!item.logicalKey) return;
-
+    const owner = currentOwner.current;
+    const isCurrent = () => mounted.current && currentOwner.current === owner;
     await withPendingLogicalKey(item.logicalKey, async () => {
+      if (!item.dedupeKey || !item.actionReference) {
+        toast.error('Refresh this role before closing it.');
+        try { await refreshQueueState(); } catch { if (isCurrent()) toast.error('Could not refresh this role. Try again.'); }
+        return;
+      }
       try {
-        // Mark the queue action done first. The complete endpoint re-derives the
-        // queue to validate, so it must run before closeApplication removes the
-        // underlying email from the open-tracked set.
-        await completeQueueAction({
+        await closeQueueOutcome({
           logicalKey: item.logicalKey,
           dedupeKey: item.dedupeKey,
+          actionReference: item.actionReference,
         });
-        await closeApplication({
-          applicationId: item.applicationId ?? null,
-          emailId: item.emailId ?? null,
-          // Lead with "No response" so the close is classified as a neutral
-          // ghosting close-out, NOT a rejection (this queue only closes stale /
-          // ghosted roles — see isCloseIntent). Counting employer silence as a
-          // rejection inflated the rejection rate. See classifyManualCloseOutcome.
-          reason: `No response - ghosted, closed from Next Actions: ${item.title}`,
-        });
-        await refreshQueueState();
+        if (!isCurrent()) return;
         toast.success("Application closed and removed from active focus.");
       } catch (error) {
+        if (!isCurrent()) return;
         if (isStaleQueueActionError(error)) {
-          await refreshQueueState();
+          toast.error('This role or task changed. Review the refreshed task before closing it.');
+          try { await refreshQueueState(); } catch { if (isCurrent()) toast.error('Could not refresh this role. Try again.'); }
           return;
         }
-        toast.error(error instanceof Error ? error.message : "Unable to close application.");
+        toast.error(error instanceof Error ? error.message : "The save could not be confirmed. Retry this same task.");
+        return;
       }
+      // A refresh failure must not turn a confirmed commit into a save failure.
+      try { await refreshQueueState(); }
+      catch { if (isCurrent()) toast.error('Saved. Refresh Next Actions to see the updated list.'); }
     });
   };
 
@@ -1610,7 +1618,7 @@ const FixSuggestions = () => {
         : cta.kind === "draft" && draft ? "Show draft"
           : cta.kind === "prep" && detailsOpen ? "Hide prep plan"
             : cta.kind === "cleanup" && inlineOpen ? "Hide repair"
-              : cta.label;
+              : cta.kind === "close" && !item.actionReference ? "Refresh role" : cta.label;
     // One button look for every action. Close-out used to be red, which on the dark Today button was
     // red-on-ink (hard to read) and framed the recommended move for a long-quiet thread as a warning.
     const ctaClass = cn(variant === "today" ? BUTTON.primary : BUTTON.secondary, "shrink-0");
@@ -1659,7 +1667,7 @@ const FixSuggestions = () => {
                 {ctaLabel}
               </button>
             )}
-            {item.logicalKey && cta.kind !== "complete" ? (
+            {item.logicalKey && cta.kind !== "complete" && !isCloseIntent(item.intent) ? (
               <button
                 type="button"
                 onClick={() => void completeQueueItem(item, isHandledInGmail ? "Removed from today's list." : undefined)}

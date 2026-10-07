@@ -19,6 +19,7 @@ export type QueueItem = {
   id: string;
   logicalKey?: string;
   dedupeKey?: string;
+  actionReference?: string | null;
   status?: "open" | "blocked" | "done" | "dismissed" | "expired";
   bucket?: "doToday" | "thisWeek" | "later" | "blocked" | "cleanup";
   source: QueueSource;
@@ -1461,6 +1462,7 @@ function mapRankedActionToQueueItem(
     id: action.id,
     logicalKey: action.logicalKey,
     dedupeKey: action.dedupeKey,
+    actionReference: action.actionReference,
     status: action.effectiveStatus || action.status,
     bucket,
     source,
