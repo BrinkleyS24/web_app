@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -10,7 +10,6 @@ import {
   CheckSquare,
   ChevronsUpDown,
   Clock3,
-  Copy,
   Filter,
   FileSearch,
   Layers3,
@@ -37,6 +36,8 @@ import {
   ToneChip,
 } from "@/components/premium/PremiumUI";
 import { BUTTON, CARD, EYEBROW, TONES } from "@/components/premium/tone";
+import { OutreachDraftEditor } from "@/components/premium/OutreachDraftEditor";
+import { useDraftSession } from "@/hooks/useDraftSession";
 import { WhyLine } from "@/components/premium/WhyLine";
 import { WeekInReview } from "@/components/premium/WeekInReview";
 import { describeActionIdentity, describeActionKind, resolveActionCta } from "@/lib/actionPresentation";
@@ -338,17 +339,13 @@ function defaultDraftTone(item: QueueItem): SuggestionDraftTone {
   return "warm";
 }
 
-function buildDraftClipboardText(draft: SuggestionDraft, includeSubject = false) {
-  if (!includeSubject) return draft.body;
-  return [`Subject: ${draft.subject}`, "", draft.body].join("\n");
-}
-
 function buildDraftTaskKey(
   threadId?: string | null,
   actionType?: string | null,
   emailId?: string | number | null,
+  version?: string | null,
 ) {
-  return `${buildActionKey(threadId, actionType)}:${String(emailId ?? "").trim()}`;
+  return `${buildActionKey(threadId, actionType)}:${String(emailId ?? "").trim()}:${version || "legacy"}`;
 }
 
 function CollapsibleQueueSection({
@@ -737,8 +734,7 @@ function SuggestionDraftPanel({
   submittedFeedback,
   isSubmittingFeedback,
   onToneChange,
-  onCopyDraft,
-  onCopyDraftWithSubject,
+  onRetry,
   onSubmitFeedback,
 }: {
   draft: SuggestionDraft | undefined;
@@ -751,8 +747,7 @@ function SuggestionDraftPanel({
   submittedFeedback?: SuggestionDraftFeedbackLabel | null;
   isSubmittingFeedback: boolean;
   onToneChange: (tone: SuggestionDraftTone) => void;
-  onCopyDraft: () => void;
-  onCopyDraftWithSubject: () => void;
+  onRetry: () => void;
   onSubmitFeedback: (label: SuggestionDraftFeedbackLabel) => void;
 }) {
   const feedbackLabel = submittedFeedback
@@ -791,7 +786,7 @@ function SuggestionDraftPanel({
       ) : draft ? (
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_280px]">
           <div className="min-w-0 space-y-3">
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">
+            <div className="min-w-0 max-w-sm">
               <div className="rounded-2xl border border-border/70 bg-background/80 p-3">
                 <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground" htmlFor={`draft-tone-${draftKey}`}>
                   Preset
@@ -800,6 +795,7 @@ function SuggestionDraftPanel({
                   id={`draft-tone-${draftKey}`}
                   className="mt-2 h-9 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"
                   value={draftTone}
+                  disabled={isGenerating}
                   onChange={(event) => onToneChange(event.target.value as SuggestionDraftTone)}
                 >
                   {availableDraftToneOptions.map((option) => (
@@ -810,12 +806,6 @@ function SuggestionDraftPanel({
                 </select>
               </div>
 
-              <div className="min-w-0 rounded-2xl border border-border/70 bg-background/80 p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Subject</p>
-                <p className="mt-2 text-sm font-medium text-foreground [overflow-wrap:anywhere]" data-testid="draft-subject">
-                  {draft.subject}
-                </p>
-              </div>
             </div>
 
             {draft.warning ? (
@@ -824,32 +814,7 @@ function SuggestionDraftPanel({
               </div>
             ) : null}
 
-            <textarea
-              className="min-h-[180px] w-full rounded-2xl border border-border bg-background/90 p-4 text-sm leading-6 text-foreground outline-none focus:border-primary"
-              readOnly
-              value={draft.body}
-            />
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" onClick={onCopyDraft}>
-                <Copy className="h-4 w-4" />
-                Copy draft
-              </Button>
-              <Button variant="outline" size="sm" onClick={onCopyDraftWithSubject}>
-                <Copy className="h-4 w-4" />
-                Copy subject + body
-              </Button>
-              {gmailUrl ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(gmailUrl, "_blank", "noopener,noreferrer")}
-                >
-                  <ArrowUpRight className="h-4 w-4" />
-                  Open Gmail
-                </Button>
-              ) : null}
-            </div>
+            <OutreachDraftEditor key={`${draftKey}:${draftTone}`} draft={draft} draftKey={`${draftKey}:${draftTone}`} gmailUrl={gmailUrl} />
 
             <details className="group rounded-2xl border border-border/70 bg-background/70">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
@@ -858,7 +823,7 @@ function SuggestionDraftPanel({
               </summary>
               <div className="border-t border-border/70 px-3 py-3">
                 <p className="text-xs leading-5 text-muted-foreground">
-                  What was wrong with it? Your answer helps improve future drafts.
+                  What was wrong with the generated version? Feedback describes that version; your edits are not uploaded.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                 {draftFeedbackOptions.map((option) => {
@@ -943,7 +908,10 @@ function SuggestionDraftPanel({
           </div>
         </div>
       ) : (
-        <p className="mt-4 text-sm text-muted-foreground">No draft generated yet.</p>
+        <div className="mt-4 space-y-2">
+          <p className="text-sm text-muted-foreground">No draft is ready for this preset. Try generating it again.</p>
+          <Button variant="outline" onClick={onRetry}>Try generating draft again</Button>
+        </div>
       )}
     </div>
   );
@@ -1073,15 +1041,24 @@ const FixSuggestions = () => {
     };
   }, [openActionMenuId]);
   const [openDraftTaskId, setOpenDraftTaskId] = useState<string>("");
-  const [draftToneByTaskId, setDraftToneByTaskId] = useState<Record<string, SuggestionDraftTone>>({});
-  const [draftByTaskId, setDraftByTaskId] = useState<Record<string, SuggestionDraft>>({});
+  const [draftToneByTaskId, setDraftToneByTaskId] = useDraftSession<SuggestionDraftTone>("presets");
+  const [draftByTaskId, setDraftByTaskId] = useDraftSession<SuggestionDraft>("generated");
+  const mounted = useRef(true);
+  const currentOwner = useRef(user?.uid);
+  currentOwner.current = user?.uid;
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  type DraftRequest = Parameters<typeof generateSuggestionDraft>[0];
+  const draftRequests = useRef(new WeakMap<DraftRequest, { key: string; owner: string }>());
+  const latestDraftRequest = useRef(new Map<string, DraftRequest>());
+  type FeedbackRequest = Parameters<typeof recordSuggestionDraftFeedback>[0];
+  const feedbackRequests = useRef(new WeakMap<FeedbackRequest, {key:string; owner:string}>());
   const [draftFeedbackByTaskId, setDraftFeedbackByTaskId] = useState<Record<string, SuggestionDraftFeedbackLabel>>({});
   const [pendingLogicalKeys, setPendingLogicalKeys] = useState<Record<string, true>>({});
 
   const isAuthed = Boolean(user);
 
   const queueQuery = useQuery({
-    queryKey: ["fix-suggestions", "queue"],
+    queryKey: ["fix-suggestions", "queue", user?.uid],
     queryFn: async () => {
       try {
         return await fetchRankedActionQueue();
@@ -1161,22 +1138,43 @@ const FixSuggestions = () => {
   const draftMutation = useMutation({
     mutationFn: generateSuggestionDraft,
     onSuccess: (data, variables) => {
-      const itemId = buildDraftTaskKey(variables.threadId, variables.actionType, variables.emailId);
-      setDraftByTaskId((current) => ({
-        ...current,
-        [itemId]: data.draft,
-      }));
-      toast.success("Draft generated.");
+      const request = draftRequests.current.get(variables);
+      if (!mounted.current || !request || request.owner !== currentOwner.current || latestDraftRequest.current.get(request.key) !== variables) return;
+      if (!data.success || typeof data.draft?.body !== "string" || typeof data.draft?.subject !== "string") {
+        toast.error("The draft was not generated. Try again."); return;
+      }
+      setDraftByTaskId(current => ({ ...current, [request.key]: data.draft }));
+      toast.success("Draft generated. Review and edit it before copying.");
     },
-    onError: (error: Error) => {
-      toast.error(error.message || "Unable to generate draft.");
+    onError: (error: Error, variables) => {
+      const request = draftRequests.current.get(variables);
+      if (mounted.current && request?.owner === currentOwner.current) toast.error(error.message || "Unable to generate draft.");
     },
   });
+
+  const requestDraft = (item: QueueItem, tone: SuggestionDraftTone) => {
+    const base = buildDraftTaskKey(item.threadId, item.actionType, item.emailId, item.dedupeKey);
+    const key = `${base}:${tone}`;
+    if (draftByTaskId[key]) return;
+    const payload: DraftRequest = {
+      ...(item.logicalKey && item.dedupeKey && /^[a-f0-9]{16}$/.test(item.logicalKey) && /^[a-f0-9]{16}$/.test(item.dedupeKey)
+        ? { logicalKey: item.logicalKey, dedupeKey: item.dedupeKey } : {}),
+      threadId: item.threadId || "", actionType: item.actionType || "", tone,
+      ...(item.emailId == null ? {} : { emailId: item.emailId }),
+      ...(item.applicationId == null ? {} : { applicationId: item.applicationId }),
+      suggestionSource: item.suggestionSource || item.source,
+    };
+    draftRequests.current.set(payload, {key, owner:user?.uid});
+    latestDraftRequest.current.set(key, payload);
+    draftMutation.mutate(payload);
+  };
 
   const draftFeedbackMutation = useMutation({
     mutationFn: recordSuggestionDraftFeedback,
     onSuccess: (_, variables) => {
-      const itemId = buildDraftTaskKey(variables.threadId, variables.actionType, variables.emailId);
+      const request = feedbackRequests.current.get(variables);
+      if (!mounted.current || request?.owner !== currentOwner.current) return;
+      const itemId = request.key;
       setDraftFeedbackByTaskId((current) => ({
         ...current,
         [itemId]: variables.feedbackLabel,
@@ -1428,28 +1426,19 @@ const FixSuggestions = () => {
     });
   };
 
-  const copyDraft = async (draft: SuggestionDraft, includeSubject = false) => {
-    try {
-      await navigator.clipboard.writeText(buildDraftClipboardText(draft, includeSubject));
-      toast.success(includeSubject ? "Subject and draft copied." : "Draft copied.");
-    } catch {
-      toast.error("Unable to copy draft.");
-    }
-  };
-
   const displayEntries = useMemo(() => buildDisplayQueueEntries(filteredSuggestions), [filteredSuggestions]);
 
   const getDraftUiForItem = (item: QueueItem) => {
     const gmailUrl =
       item.source === "followup" || item.source === "stale" ? buildGmailThreadUrl(item.threadId) : null;
-    const draftKey = buildDraftTaskKey(item.threadId, item.actionType, item.emailId);
-    const draft = draftByTaskId[draftKey];
+    const draftKey = buildDraftTaskKey(item.threadId, item.actionType, item.emailId, item.dedupeKey);
     const draftOpen = openDraftTaskId === draftKey;
     const availableDraftToneOptions = getDraftToneOptionsForItem(item);
     const preferredDraftTone = (draftToneByTaskId[draftKey] || defaultDraftTone(item)) as SuggestionDraftTone;
     const draftTone = availableDraftToneOptions.some((option) => option.value === preferredDraftTone)
       ? preferredDraftTone
       : availableDraftToneOptions[0]?.value || defaultDraftTone(item);
+    const draft = draftByTaskId[`${draftKey}:${draftTone}`];
     const draftToneMeta = getDraftToneMeta(draft?.context || draftTone);
     const canDraft = Boolean(item.hasDraft && item.threadId && item.actionType);
 
@@ -1466,19 +1455,9 @@ const FixSuggestions = () => {
   };
 
   const toggleDraftForItem = (item: QueueItem, tone: SuggestionDraftTone) => {
-    const draftKey = buildDraftTaskKey(item.threadId, item.actionType, item.emailId);
-    const existingDraft = draftByTaskId[draftKey];
-    setOpenDraftTaskId((current) => (current === draftKey ? "" : draftKey));
-    if (!existingDraft) {
-      draftMutation.mutate({
-        threadId: item.threadId || "",
-        actionType: item.actionType || "",
-        tone,
-        emailId: item.emailId ?? null,
-        applicationId: item.applicationId ?? null,
-        suggestionSource: item.suggestionSource || item.source,
-      });
-    }
+    const draftKey = buildDraftTaskKey(item.threadId, item.actionType, item.emailId, item.dedupeKey);
+    setOpenDraftTaskId(current => current === draftKey ? "" : draftKey);
+    requestDraft(item, tone);
   };
 
   const renderDraftPanel = (item: QueueItem) => {
@@ -1499,7 +1478,7 @@ const FixSuggestions = () => {
         draftToneMeta={draftToneMeta}
         availableDraftToneOptions={availableDraftToneOptions}
         gmailUrl={gmailUrl}
-        isGenerating={draftMutation.isPending && openDraftTaskId === draftKey}
+        isGenerating={draftMutation.isPending && draftRequests.current.get(draftMutation.variables)?.key === `${draftKey}:${draftTone}`}
         submittedFeedback={draftFeedbackByTaskId[draftKey] || null}
         isSubmittingFeedback={draftFeedbackMutation.isPending}
         onToneChange={(nextTone) => {
@@ -1507,26 +1486,18 @@ const FixSuggestions = () => {
             ...current,
             [draftKey]: nextTone,
           }));
-          draftMutation.mutate({
-            threadId: item.threadId || "",
-            actionType: item.actionType || "",
-            tone: nextTone,
-            emailId: item.emailId ?? null,
-            applicationId: item.applicationId ?? null,
-            suggestionSource: item.suggestionSource || item.source,
-          });
+          requestDraft(item, nextTone);
         }}
-        onCopyDraft={() => copyDraft(draft as SuggestionDraft)}
-        onCopyDraftWithSubject={() => copyDraft(draft as SuggestionDraft, true)}
+        onRetry={() => requestDraft(item, draftTone)}
         onSubmitFeedback={(feedbackLabel) => {
           if (!draft || !item.threadId || !item.actionType) return;
-          draftFeedbackMutation.mutate({
+          const feedbackRequest: FeedbackRequest = {
             threadId: item.threadId,
             actionType: item.actionType,
             feedbackLabel,
             tone: draftTone,
-            emailId: item.emailId ?? null,
-            applicationId: item.applicationId ?? null,
+            ...(item.emailId == null ? {} : { emailId: item.emailId }),
+            ...(item.applicationId == null ? {} : { applicationId: item.applicationId }),
             suggestionSource: item.suggestionSource || item.source,
             draft: {
               subject: draft.subject,
@@ -1545,7 +1516,9 @@ const FixSuggestions = () => {
             feedback: {
               surface: "fix_suggestions",
             },
-          });
+          };
+          feedbackRequests.current.set(feedbackRequest, {key:draftKey,owner:user?.uid});
+          draftFeedbackMutation.mutate(feedbackRequest);
         }}
       />
     );
@@ -1589,7 +1562,8 @@ const FixSuggestions = () => {
   const location = useLocation();
   const [handledHash, setHandledHash] = useState("");
   useEffect(() => {
-    const id = decodeURIComponent((location.hash || "").replace(/^#/, ""));
+    let id: string;
+    try { id = decodeURIComponent((location.hash || "").replace(/^#/, "")); } catch { return; }
     if (!id || id === handledHash || combinedSuggestions.length === 0) return;
     const target = combinedSuggestions.find((item) => item.id === id);
     if (!target) return;

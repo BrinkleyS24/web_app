@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
+import { readActionContext } from "@/lib/actionWorkspace";
+import { useWorkspaceAction } from "@/hooks/useWorkspaceAction";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { EmptyState, PageHeader, ToneChip } from "@/components/premium/PremiumUI";
 import { BUTTON, CARD, EYEBROW, TONES } from "@/components/premium/tone";
@@ -1097,6 +1100,10 @@ function actionConfirmationCopy(action: ApplyGateAction): { title: string; body:
 
 const ApplyGate = () => {
   const { user } = useAuth();
+  const location = useLocation();
+  const actionContext = readActionContext(location.search);
+  const workspace = useWorkspaceAction(actionContext?.logicalKey, user?.uid);
+  const seededTask = useRef("");
   const [jobTitle, setJobTitle] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -1104,6 +1111,21 @@ const ApplyGate = () => {
   const [variantId, setVariantId] = useState("");
   const [riskTolerance, setRiskTolerance] = useState<ApplyGateRiskTolerance>("balanced");
   const [result, setResult] = useState<ApplyGateResult | null>(null);
+  useEffect(() => {
+    const action = workspace.action;
+    if (!actionContext || !action || workspace.queue.isFetching || workspace.queue.isError
+      || action.dedupeKey !== actionContext.dedupeKey || (action.effectiveStatus || action.status) !== "open"
+      || seededTask.current === actionContext.logicalKey) return;
+    seededTask.current = actionContext.logicalKey;
+    // Never splice task metadata into a posting the user is already editing.
+    if (jobTitle || companyName || jobUrl || jobDescription || result) return;
+    setJobTitle(action.roleTitle || "");
+    setCompanyName(action.company || "");
+    if (/^job:https?:\/\//i.test(action.primaryEntityId || "")) {
+      const href = action.primaryEntityId.slice(4);
+      try { const url = new URL(href); if (["http:", "https:"].includes(url.protocol)) setJobUrl(href); } catch { /* Unknown URL stays empty. */ }
+    }
+  }, [actionContext?.logicalKey, actionContext?.dedupeKey, workspace.action, workspace.queue.isFetching, workspace.queue.isError, jobTitle, companyName, jobUrl, jobDescription, result]);
   const [isCurrentWarningExpanded, setIsCurrentWarningExpanded] = useState(false);
   // Collapsed-by-default analytical breakdown (keeps the default verdict skimmable).
   const [showBreakdown, setShowBreakdown] = useState(false);

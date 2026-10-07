@@ -17,6 +17,7 @@ import { Link } from "react-router-dom";
 import type { ActionCta } from "@/lib/actionPresentation";
 import { describeActionKind } from "@/lib/actionPresentation";
 import type { QueueItem } from "@/lib/premiumTaskQueue";
+import { actionToolHref } from "@/lib/actionWorkspace";
 import { cn } from "@/lib/utils";
 import { TONES, type Tone } from "./tone";
 
@@ -75,7 +76,7 @@ export function ActionCtaButton({
   }
   if (cta.kind === "route" && cta.href) {
     return (
-      <Link to={cta.href} className={className}>
+      <Link to={actionToolHref(cta.href, item)} className={className}>
         {label}
       </Link>
     );

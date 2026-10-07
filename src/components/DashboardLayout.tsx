@@ -1,6 +1,7 @@
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppTopBar } from "@/components/AppTopBar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { ActionWorkspaceBanner } from "@/components/premium/ActionWorkspaceBanner";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -10,6 +11,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 flex flex-col min-h-screen min-w-0">
           <AppTopBar />
           <div className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto animate-fade-in">
+            <ActionWorkspaceBanner />
             {children}
           </div>
         </main>

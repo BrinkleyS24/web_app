@@ -774,6 +774,45 @@ describe("Next Actions", () => {
     expect(screen.getByText("Suggested reply contact: Jordan Lee <jordan@example.test>")).toBeInTheDocument();
   });
 
+  test("switching presets restores edits without regenerating the original draft", async () => {
+    const user = userEvent.setup(); renderPage();
+    await user.click(await screen.findByRole("button", { name: "Draft thank-you note" }));
+    await user.clear(await screen.findByLabelText("Message")); await user.type(screen.getByLabelText("Message"), "My edited original preset");
+    await user.selectOptions(screen.getByLabelText("Preset"), "warm");
+    await waitFor(() => expect(generateSuggestionDraft).toHaveBeenCalledTimes(2));
+    await screen.findByLabelText("Message");
+    await user.selectOptions(screen.getByLabelText("Preset"), "post_interview");
+    expect(screen.getByLabelText("Message")).toHaveValue("My edited original preset");
+    expect(generateSuggestionDraft).toHaveBeenCalledTimes(2);
+  });
+
+  test("a generation response after leaving the page does not write a draft or toast success", async () => {
+    let finish: (value: unknown) => void;
+    generateSuggestionDraft.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const page = renderPage(); await userEvent.click(await screen.findByRole("button", { name: "Draft thank-you note" }));
+    await waitFor(() => expect(generateSuggestionDraft).toHaveBeenCalled()); page.unmount();
+    finish!({success:true,draft:{subject:"Late",body:"Late private message",context:"post_interview"}});
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
+  test("unlinked outreach omits absent IDs in draft and feedback requests", async () => {
+    const response = buildQueueResponse();
+    const action = { ...response.queue.doToday[0], emailId: null, applicationId: null,
+      logicalKey: "0123456789abcdef", dedupeKey: "fedcba9876543210" };
+    response.queue.doToday = [action]; response.queue.resolvedActions = [action];
+    fetchRankedActionQueue.mockResolvedValue(response);
+    renderPage(); await userEvent.click(await screen.findByRole("button", { name: "Draft thank-you note" }));
+    await screen.findByLabelText("Message");
+    const payload = generateSuggestionDraft.mock.calls[0][0];
+    expect(payload).toMatchObject({ logicalKey: action.logicalKey, dedupeKey: action.dedupeKey, threadId: "wf-thread" });
+    expect(payload).not.toHaveProperty("emailId"); expect(payload).not.toHaveProperty("applicationId");
+    await userEvent.click(screen.getByRole("button", { name: "Wrong facts" }));
+    await waitFor(() => expect(recordSuggestionDraftFeedback).toHaveBeenCalled());
+    const feedback = recordSuggestionDraftFeedback.mock.calls[0][0];
+    expect(feedback).not.toHaveProperty("emailId"); expect(feedback).not.toHaveProperty("applicationId");
+  });
+
   test("records draft feedback with the draft snapshot", async () => {
     const user = userEvent.setup();
     renderPage();

@@ -816,6 +816,8 @@ export async function undoSuggestionAction(params: {
 }
 
 export async function generateSuggestionDraft(params: {
+  logicalKey?: string;
+  dedupeKey?: string;
   threadId: string;
   actionType: string;
   tone?: SuggestionDraftTone;

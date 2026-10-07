@@ -1,0 +1,52 @@
+import { expect, test } from "@playwright/test";
+const logicalKey="0123456789abcdef", dedupeKey="fedcba9876543210";
+const base={effortMinutes:5,urgencyLevel:"medium",confidenceLevel:"strong",status:"open",effectiveStatus:"open",createdAt:"2026-10-06T00:00:00Z",evidenceVersion:"v1",blockedByLogicalKeys:[],playbook:["Review the role and finish this task."],sourceLabel:"Recommended action",stageLabel:"Open",routeLabel:"Open",evidence:["Scheduling appears in the posting."]};
+const tool={...base,id:"tool-task",logicalKey,dedupeKey,primaryEntityId:"job:https://jobs.example.test/receptionist",actionType:"tailor_resume",actionCategory:"optimization",source:"apply_gate",queueSource:"resume",intent:"TAILOR_RESUME",intentLabel:"Tailor resume",title:"Show your scheduling experience",company:"Example Health",roleTitle:"Receptionist",whyNow:"This posting asks for front-desk scheduling.",targetOutcome:"Show your relevant experience.",draftEligible:false,routeHref:"/apply-gate"};
+const outreach={...base,id:"outreach-task",logicalKey:"aaaaaaaaaaaaaaaa",dedupeKey:"bbbbbbbbbbbbbbbb",primaryEntityId:"thread",threadId:"thread",emailId:"email",applicationId:"app",actionType:"thank_you",actionCategory:"communication",source:"followup_engine",queueSource:"followup",intent:"SEND_THANK_YOU",intentLabel:"Thank-you",title:"Send a thank-you to Example Health",company:"Example Health",roleTitle:"Receptionist",whyNow:"The interview is fresh.",targetOutcome:"Reply to the interview contact.",draftEligible:true,routeHref:"/next-actions",suggestionSource:"email_followup"};
+
+for(const width of [390,1280]) test(`action context and editable drafts finish coherently at ${width}px`,async({page})=>{
+  await page.setViewportSize({width,height:1000});
+  const errors:string[]=[]; page.on("pageerror",err=>errors.push(err.message));
+  let completed=false; const completions:unknown[]=[]; let copied="";
+  await page.addInitScript(()=>{ Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText:async(text:string)=>{(window as unknown as {copied:string}).copied=text;}}}); });
+  await page.route("**/api/**",async route=>{
+    const path=new URL(route.request().url()).pathname;
+    let body:unknown={success:true};
+    if(path.endsWith("/suggestions/queue")) body={success:true,queue:{doToday:completed?[outreach]:[outreach,tool],thisWeek:[],later:[],blocked:[],dismissed:[],expired:[],done:completed?[{...tool,effectiveStatus:"done"}]:[],resolvedActions:[outreach,{...tool,effectiveStatus:completed?"done":"open"}]}};
+    else if(path.endsWith("/queue/actions/complete")){completions.push(route.request().postDataJSON());completed=true;body={success:true,state:"completed",logicalKey,dedupeKey};}
+    else if(path.endsWith("/suggestions/draft")) body={success:true,draft:{subject:"Thank you",body:"Hello,\nThank you for your time.\nBest,\n[Your Name]",context:"post_interview",actionType:"thank_you",confidence:"medium",recipient:"Recruiter <recruiter@example.test>",sendStrategyLabel:"Reply in the conversation",evidence:["Interview invitation"]}};
+    else if(path.endsWith("/profile/resume")) body={success:true,resumeText:"Receptionist with scheduling and customer service experience."};
+    else if(path.endsWith("/stored-emails")) body={success:true,emails:[]};
+    else if(path.endsWith("/suggestions/states")) body={success:true,actions:[]};
+    else if(path.endsWith("/followup-needed")) body={success:true,suggestions:[]};
+    else if(path.endsWith("/apply-gate/history")) body={success:true,history:[]};
+    else if(path.endsWith("/resumes")) body={success:true,variants:[]};
+    await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(body)});
+  });
+  await page.goto("/next-actions");
+  await page.getByRole("button",{name:"Draft thank-you note"}).click();
+  await page.getByLabel("Subject",{exact:true}).fill("Thanks for the interview");
+  await page.getByLabel("Message",{exact:true}).fill("Hello,\nI enjoyed discussing the team.\nBest,");
+  await page.getByLabel("Your signature").fill("Stacey Brinkley");
+  await page.getByRole("button",{name:"Copy subject + body"}).click();
+  copied=await page.evaluate(()=>(window as unknown as {copied:string}).copied);
+  expect(copied).toBe("Subject: Thanks for the interview\n\nHello,\nI enjoyed discussing the team.\nBest,\nStacey Brinkley");
+  expect(completions).toHaveLength(0);
+  await page.getByRole("link",{name:"Tailor in Apply Gate"}).click();
+  await expect(page).toHaveURL(new RegExp(`action=${logicalKey}&version=${dedupeKey}`));
+  await expect(page.getByRole("region",{name:"Action context"})).toContainText(tool.title);
+  await expect(page.locator("#job-title")).toHaveValue("Receptionist");
+  await expect(page.locator("#company-name")).toHaveValue("Example Health");
+  await expect(page.locator("#job-url")).toHaveValue("https://jobs.example.test/receptionist");
+  expect(completions).toHaveLength(0);
+  await page.getByRole("button",{name:"I've finished this task"}).click();
+  await expect(page.getByText(/Task marked done/)).toBeVisible();
+  expect(completions).toEqual([{logicalKey,dedupeKey}]);
+  await page.getByRole("link",{name:"Back to Next Actions"}).click();
+  await page.getByRole("button",{name:"Show draft"}).click();
+  await expect(page.getByLabel("Subject",{exact:true})).toHaveValue("Thanks for the interview");
+  await expect(page.getByLabel("Message",{exact:true})).toHaveValue("Hello,\nI enjoyed discussing the team.\nBest,");
+  await expect(page.getByLabel("Your signature")).toHaveValue("Stacey Brinkley");
+  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
+  expect(overflow).toBe(false); expect(errors).toEqual([]);
+});
