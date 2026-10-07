@@ -1,6 +1,6 @@
 # Resume compare, edit, save and use
 
-Status: implementation and local verification complete. Backend source `fa31186` is live as `applendium-backend-resume-fa31186` and passed staged/public signed-in resume acceptance with cleanup. Web publication remains pending. The review below was written before source changes.
+Status: verified live October 7, 2026. Backend source `fa31186` is live as `applendium-backend-resume-fa31186` and passed staged/public signed-in resume acceptance with cleanup. Web implementation `b4c0d9a` is published with the new markers verified. The review below was written before source changes. Full evidence/limits: backend `docs/RESUME_WORKSPACE_RELEASE_2026-10-07.md`.
 
 ## Implementation and dependencies
 
