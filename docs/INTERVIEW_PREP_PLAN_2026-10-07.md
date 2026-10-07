@@ -1,6 +1,6 @@
 # Interview preparation workspace
 
-Status: implementation and local verification complete. Corrected backend source `8d087b7` passed signed-in staged and public acceptance and is live as `applendium-backend-prep-8d087b7`; web publication is pending. The analysis below was written before implementation and extended before each material scope change.
+Status: verified live October 7, 2026. Backend source `8d087b7` passed signed-in staged/public acceptance and is live as `applendium-backend-prep-8d087b7`; web implementation `ca8fd6f` is published with new feature markers verified. The analysis below was written before implementation and extended before each material scope change. Release evidence and limits: backend `docs/INTERVIEW_PREP_RELEASE_2026-10-07.md`.
 
 ## Implementation and dependency analysis
 
