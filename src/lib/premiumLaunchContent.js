@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 export const premiumUpdatesHref =
-  "mailto:support@applendium.com?subject=Applendium%20Premium%20Updates";
+  "mailto:support@applendium.com?subject=Applendium™%20Premium%20Updates";
 
 export const heroFactItems = [
   {
@@ -41,7 +41,7 @@ export function getLaunchStatusItems(isExtensionLive) {
       title: "Chrome extension",
       body: isExtensionLive
         ? "Install the Chrome extension, sign in with Google, and start tracking job-application emails directly from Gmail."
-        : "The first Applendium release is in Chrome Web Store review. Once approved, users will install it from the listing and launch it from the Chrome toolbar.",
+        : "The first Applendium™ release is in Chrome Web Store review. Once approved, users will install it from the listing and launch it from the Chrome toolbar.",
     },
     {
       icon: ShieldCheck,
@@ -79,7 +79,7 @@ export const availableNowItems = [
   {
     title: "Clear privacy and support surface",
     body:
-      "Applendium.com stays live for support, privacy details, and launch communication while premium workflows remain intentionally gated.",
+      "Applendium™.com stays live for support, privacy details, and launch communication while premium workflows remain intentionally gated.",
   },
 ];
 
@@ -124,7 +124,7 @@ export function getRolloutSteps(isExtensionLive) {
           phase: "Install",
           title: "Install the Chrome extension",
           body:
-            "Add Applendium to Chrome and launch it from the toolbar instead of starting from a manual spreadsheet or notes app.",
+            "Add Applendium™ to Chrome and launch it from the toolbar instead of starting from a manual spreadsheet or notes app.",
         },
         {
           step: "02",
@@ -154,7 +154,7 @@ export function getRolloutSteps(isExtensionLive) {
           phase: "Install",
           title: "Install once the listing is approved",
           body:
-            "After approval, add Applendium to Chrome and launch it from the toolbar instead of starting from a manual spreadsheet or notes app.",
+            "After approval, add Applendium™ to Chrome and launch it from the toolbar instead of starting from a manual spreadsheet or notes app.",
         },
         {
           step: "03",

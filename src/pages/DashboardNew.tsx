@@ -77,7 +77,7 @@ function heroLook(answer: DashboardAnswer): { eyebrow: string; icon: LucideIcon;
   if (answer.debriefItems.length > 0) return { eyebrow: "Needs your input", icon: MessageCircleQuestion, tone: "attention" };
   if (id.startsWith("commitment-")) return { eyebrow: "Coming up", icon: CalendarClock, tone: "upcoming" };
   if (id.endsWith("coverage-gap") || !id) return { eyebrow: "Where your search stands", icon: Sparkles, tone: "neutral" };
-  return { eyebrow: "What Applendium noticed", icon: Radar, tone: "brand" };
+  return { eyebrow: "What Applendium™ noticed", icon: Radar, tone: "brand" };
 }
 
 const Dashboard = () => {
@@ -132,7 +132,7 @@ const Dashboard = () => {
         alerts,
         cohortMetrics,
         alertsUnavailableMessage: alertsQuery.isError
-          ? "Applendium could not load your strategy read just now. Your data is safe; try again in a moment."
+          ? "Applendium™ could not load your strategy read just now. Your data is safe; try again in a moment."
           : null,
       }),
     [alerts, alertsQuery.isError, cohortMetrics],
@@ -169,7 +169,7 @@ const Dashboard = () => {
             <div>
               <p className="text-[14px] font-semibold text-foreground">Gmail is disconnected</p>
               <p className="mt-0.5 text-[13px] text-muted-foreground">
-                New applications and replies are not coming in. Open the Applendium extension and sign in again to reconnect —
+                New applications and replies are not coming in. Open the Applendium™ extension and sign in again to reconnect —
                 everything already here is safe.
               </p>
             </div>

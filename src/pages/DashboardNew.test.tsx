@@ -442,7 +442,7 @@ describe("DashboardNew", () => {
 
     expect(await screen.findByText(/Good (morning|afternoon|evening), Stacey\./)).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "You are applying mostly to low-match roles" })).toBeInTheDocument();
-    expect(screen.getByText("What Applendium noticed")).toBeInTheDocument();
+    expect(screen.getByText("What Applendium™ noticed")).toBeInTheDocument();
     expect(screen.getByText("Recent Apply Gate decisions show repeated fix-first signals.")).toBeInTheDocument();
     expect(screen.getByText("3 of 4 recent checks were risky")).toBeInTheDocument();
     // Diagnosis, prescription and a place to start — all three, or it is not coaching.
@@ -535,7 +535,7 @@ describe("DashboardNew", () => {
   });
 
   test("shows what each follow-up stands on, written by the backend", async () => {
-    const why = "13 days with no reply · Applendium suggests a follow-up on days 10–14 · half of the 129 answers you've had came within 9 days, mostly rejections";
+    const why = "13 days with no reply · Applendium™ suggests a follow-up on days 10–14 · half of the 129 answers you've had came within 9 days, mostly rejections";
     fetchRankedActionQueue.mockResolvedValue({
       success: true,
       queue: {

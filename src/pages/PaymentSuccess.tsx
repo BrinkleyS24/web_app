@@ -22,8 +22,8 @@ export default function PaymentSuccess() {
   const [statusError, setStatusError] = useState("");
 
   usePageMetadata({
-    title: "Applendium | Payment Complete",
-    description: "Applendium Premium payment confirmation.",
+    title: "Applendium™ | Payment Complete",
+    description: "Applendium™ Premium payment confirmation.",
   });
 
   useEffect(() => {
@@ -95,8 +95,8 @@ export default function PaymentSuccess() {
       <header className="sticky top-0 z-50 w-full bg-[#fdfdfc]/85 backdrop-blur" data-testid="site-header">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 md:px-10">
           <Link to="/" className="group flex items-center gap-2">
-            <img src="/favicon.png" alt="Applendium" className="h-8 w-8 rounded-md bg-[#0B1220] p-0.5" />
-            <span className="landingDisplay text-xl font-extrabold tracking-tight">applendium</span>
+            <img src="/favicon.png" alt="Applendium™" className="h-8 w-8 rounded-md bg-[#0B1220] p-0.5" />
+            <span className="landingDisplay text-xl font-extrabold tracking-tight">applendium™</span>
           </Link>
           <a
             href={chromeHref}

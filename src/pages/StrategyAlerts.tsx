@@ -235,7 +235,7 @@ const StrategyAlerts = () => {
         <PageHeader
           eyebrow="Patterns in your search"
           title="Strategy Alerts"
-          description="What Applendium noticed across your inbox, why it matters, and what to do about it. An alert only appears when there is enough evidence behind it."
+          description="What Applendium™ noticed across your inbox, why it matters, and what to do about it. An alert only appears when there is enough evidence behind it."
         />
 
         {alertsQuery.isLoading ? (

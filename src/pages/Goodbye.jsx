@@ -20,8 +20,8 @@ export default function Goodbye() {
   const [state, setState] = useState("asking"); // asking | sending | thanks | error
 
   usePageMetadata({
-    title: "Applendium | Sorry to see you go",
-    description: "Tell us why you removed Applendium. One click helps us make it better.",
+    title: "Applendium™ | Sorry to see you go",
+    description: "Tell us why you removed Applendium™. One click helps us make it better.",
   });
 
   const send = async (event) => {
@@ -46,8 +46,8 @@ export default function Goodbye() {
     <div className="landingPage min-h-screen bg-[#fdfdfc] text-[#111111]">
       <main className="mx-auto flex max-w-xl flex-col gap-6 px-6 py-16">
         <Link to="/" className="flex items-center gap-2" data-testid="logo-link">
-          <img src="/favicon.png" alt="Applendium" className="h-8 w-8 rounded-md bg-[#0B1220] p-0.5" />
-          <span className="landingDisplay text-xl font-extrabold tracking-tight">applendium</span>
+          <img src="/favicon.png" alt="Applendium™" className="h-8 w-8 rounded-md bg-[#0B1220] p-0.5" />
+          <span className="landingDisplay text-xl font-extrabold tracking-tight">applendium™</span>
         </Link>
 
         {state === "thanks" ? (
@@ -56,12 +56,12 @@ export default function Goodbye() {
               {reason === "found_job" ? "Congratulations on the new job." : "Thank you. That helps."}
             </h1>
             <p className="text-base leading-relaxed text-[#444444]">
-              Your search history stays in your account, so if you search again, Applendium picks up where you left off.
+              Your search history stays in your account, so if you search again, Applendium™ picks up where you left off.
               Want it deleted instead? <Link to="/support" className="underline underline-offset-2">Ask us</Link> and we'll remove it.
             </p>
             {CHROME_WEB_STORE_URL ? (
               <a href={CHROME_WEB_STORE_URL} className="font-semibold text-[#0A7A55] underline underline-offset-4">
-                Changed your mind? Add Applendium back to Chrome
+                Changed your mind? Add Applendium™ back to Chrome
               </a>
             ) : null}
           </section>
@@ -70,12 +70,12 @@ export default function Goodbye() {
             <div className="flex flex-col gap-2">
               <h1 className="landingDisplay text-3xl font-extrabold tracking-tight">Sorry to see you go</h1>
               <p className="text-base leading-relaxed text-[#444444]">
-                Why did you remove Applendium? One click helps us make it better. It's optional.
+                Why did you remove Applendium™ One click helps us make it better. It's optional.
               </p>
             </div>
 
             <fieldset className="flex flex-col gap-2">
-              <legend className="sr-only">Why did you remove Applendium?</legend>
+              <legend className="sr-only">Why did you remove Applendium™</legend>
               {UNINSTALL_REASONS.map((option) => (
                 <label
                   key={option.id}

@@ -7,9 +7,9 @@ export default function Privacy() {
         <h1>Privacy Policy</h1>
         <p className="muted">Effective date: October 5, 2026</p>
 
-        <h2>What Applendium accesses</h2>
+        <h2>What Applendium™ accesses</h2>
         <p>
-          Applendium connects to Gmail only after you authorize access. The app reads email metadata
+          Applendium™ connects to Gmail only after you authorize access. The app reads email metadata
           and message content needed to identify job-search emails, classify application status,
           extract company and position details, and provide job-search workflow features.
         </p>
@@ -17,13 +17,13 @@ export default function Privacy() {
         <h2>How your data is used</h2>
         <p>
           Gmail data is used only to provide and improve user-facing job tracking features inside
-          Applendium. We do not sell Gmail data, use it for advertising, or allow humans to read it
+          Applendium™. We do not sell Gmail data, use it for advertising, or allow humans to read it
           except when required for security, abuse prevention, support you request, or legal compliance.
         </p>
 
         <h2>Usage information</h2>
         <p>
-          To keep Applendium working and to improve it, we record basic usage events: when the extension
+          To keep Applendium™ working and to improve it, we record basic usage events: when the extension
           syncs, when you open the extension or the website, and which plan you are on. These records are
           tied to a coded version of your account ID (never your name or email address), contain no email
           content, and are kept for about 30 days. If you remove the extension, Chrome opens a short optional page asking why;
@@ -33,7 +33,7 @@ export default function Privacy() {
 
         <h2>Google API Limited Use</h2>
         <p>
-          Applendium's use and transfer of information received from Google APIs adheres to the
+          Applendium™'s use and transfer of information received from Google APIs adheres to the
           Google API Services User Data Policy, including the Limited Use requirements.
         </p>
 
@@ -46,7 +46,7 @@ export default function Privacy() {
 
         <h2>Service providers</h2>
         <p>
-          Applendium relies on a small set of vetted service providers to operate, and shares data with
+          Applendium™ relies on a small set of vetted service providers to operate, and shares data with
           them only as needed to provide the features you use. Providers that may process your data, or
           information derived from it, include:
         </p>
@@ -57,9 +57,9 @@ export default function Privacy() {
           <li>
             <strong>OpenAI</strong> — powers AI features. It processes content you provide (such as job
             postings, your resume with your name and contact details removed, and questions you type into
-            Ask Applendium) and facts derived from your job emails, such as the company, role, application
+            Ask Applendium™) and facts derived from your job emails, such as the company, role, application
             stage and dates, and whether an assessment or a decision arrived (for inbox coaching and Ask
-            Applendium). It never receives the text of your emails: when Ask Applendium shows you an email,
+            Applendium™). It never receives the text of your emails: when Ask Applendium™ shows you an email,
             it comes straight from your inbox and is not sent to OpenAI. Data sent through OpenAI's API is
             used only to generate results for you and is not used to train OpenAI's models.
           </li>
@@ -88,7 +88,7 @@ export default function Privacy() {
         <h2>Contact</h2>
         <p>
           For privacy, security, or deletion requests, contact support through applendium.com/support
-          or the Chrome Web Store support contact for Applendium.
+          or the Chrome Web Store support contact for Applendium™.
         </p>
       </section>
     </main>

@@ -112,7 +112,7 @@ export function InterviewDebriefCards({
         setRequiresRefresh(true);
         setError("That did not save. Refresh this page to load the current role before retrying.");
       } else if (failure instanceof ApiRequestError && (failure.status ?? 0) >= 500) {
-        setError("That did not save. Applendium could not save your answer. Try again in a moment.");
+        setError("That did not save. Applendium™ could not save your answer. Try again in a moment.");
       } else {
         setError("That did not save. Check your connection and try again.");
       }

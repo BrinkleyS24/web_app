@@ -60,7 +60,7 @@ export default function Home() {
 
         <div className="row" style={{ marginTop: 16 }}>
           <a className="btn btnPrimary" href="/">
-            Go back to applendium.com
+            Go back to Applendium™
           </a>
         </div>
       </div>
@@ -74,7 +74,7 @@ export default function Home() {
       </p>
       <h2 style={{ marginTop: 0 }}>
         {WEB_WORKSPACE_IS_PUBLIC
-          ? "Open your Applendium workspace"
+          ? "Open your Applendium™ workspace"
           : "This web workspace is not public yet"}
       </h2>
 
@@ -104,8 +104,8 @@ export default function Home() {
         <div style={{ marginTop: 12 }}>
           <p className="muted">
             {extensionDetected
-              ? "You're not signed into the Applendium extension. Open the extension popup and sign in, then refresh this page."
-              : "This page works with the Applendium Chrome extension. Make sure the extension is installed and you're signed in, then refresh this page."}
+              ? "You're not signed into the Applendium™ extension. Open the extension popup and sign in, then refresh this page."
+              : "This page works with the Applendium™ Chrome extension. Make sure the extension is installed and you're signed in, then refresh this page."}
           </p>
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid rgba(148, 163, 184, 0.2)" }}>
             <p className="muted" style={{ marginBottom: 10 }}>
@@ -119,7 +119,7 @@ export default function Home() {
       {planError ? <div className="error" style={{ marginTop: 12 }}>{planError}</div> : null}
 
       <p className="muted" style={{ marginTop: 16 }}>
-        Looking for the public site? <a href="/">Go back to applendium.com</a>.
+        Looking for the public site? <a href="/">Go back to Applendium™</a>.
       </p>
     </div>
   );

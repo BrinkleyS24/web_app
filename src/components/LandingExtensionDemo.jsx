@@ -112,7 +112,7 @@ const MOCK_THREADS = [
       },
       {
         id: "stripe-msg-2",
-        from: "Applendium Demo",
+        from: "Applendium™ Demo",
         subject: "Stage detected: Applied",
         dateLabel: "Thu, Apr 23, 2026, 10:43 AM",
         body:
@@ -194,7 +194,7 @@ const MOCK_THREADS = [
       },
       {
         id: "notion-msg-2",
-        from: "Applendium Demo",
+        from: "Applendium™ Demo",
         subject: "Stage detected: Applied",
         dateLabel: "Mon, Apr 20, 2026, 9:09 AM",
         body:
@@ -865,7 +865,7 @@ function LoggedOutView({ isLoginPending, onLogin }) {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/15">
             <img src="/logo-transparent.png" alt="" className="h-10 w-10" />
           </div>
-          <h1 className="text-2xl font-bold lowercase text-foreground">applendium</h1>
+          <h1 className="text-2xl font-bold lowercase text-foreground">applendium™</h1>
           <p className="mt-2 text-sm text-muted-foreground">Track your job search from your inbox.</p>
         </div>
 
@@ -1092,7 +1092,7 @@ export default function LandingExtensionDemo() {
                 </button>
               ) : null}
               <img src="/logo-transparent.png" alt="" className="h-5 w-5 shrink-0" />
-              <span className="truncate text-sm font-semibold lowercase text-primary-foreground">applendium</span>
+              <span className="truncate text-sm font-semibold lowercase text-primary-foreground">applendium™</span>
               <span className="rounded bg-primary-foreground/10 px-1.5 py-0.5 text-[10px] text-primary-foreground/75">
                 Free
               </span>

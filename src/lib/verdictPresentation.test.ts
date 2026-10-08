@@ -14,7 +14,7 @@ describe("describeVerdictDecision", () => {
 });
 
 describe("describeVerdictOutcome", () => {
-  test("what Applendium saw happen beats what the user reported", () => {
+  test("what Applendium™ saw happen beats what the user reported", () => {
     expect(describeVerdictOutcome({ derived_outcome_label: "rejected", user_action: "applied" }))
       .toEqual({ label: "You applied · Rejected", tone: "risk" });
     expect(describeVerdictOutcome({ derived_outcome_label: "interviewed" }))

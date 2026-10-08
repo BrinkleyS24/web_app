@@ -56,7 +56,7 @@ export type AskResponse = {
 export const ASK_MAX_QUESTION_CHARS = 300;
 
 /**
- * One question to Ask Applendium. A lookup plus one or two AI calls usually takes a few seconds;
+ * One question to Ask Applendium™. A lookup plus one or two AI calls usually takes a few seconds;
  * the wider timeout covers a slow model without leaving the member staring at a spinner forever.
  */
 export async function askApplendium(question: string): Promise<AskResponse> {

@@ -30,7 +30,7 @@ export default function LandingFounding({ priceLabel }) {
             </h2>
             <div className="mt-5 max-w-[52ch] space-y-4 text-base leading-[1.65] text-[#5C6470]">
               <p>
-                Applendium is built by one person, self-funded, no investors. The next
+                Applendium™ is built by one person, self-funded, no investors. The next
                 step is an independent security certification (Google&apos;s CASA
                 assessment): a third-party lab audits the codebase, and the
                 &quot;unverified app&quot; notice you currently see when connecting

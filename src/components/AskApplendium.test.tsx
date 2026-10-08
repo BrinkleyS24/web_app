@@ -25,7 +25,7 @@ const ANSWER = {
   answer: "Two companies haven't replied in over two weeks: Acme Corp and Initech.",
   applications: [
     { ref: "A4", company: "Acme Corp", role: "Test Analyst", stage: "quiet", appliedOn: "2026-08-17", lastUpdateOn: "2026-08-17", nextStep: null, threadId: "t-acme" },
-    { ref: "A5", company: "Initech", role: null, stage: "waiting", appliedOn: "2026-09-14", lastUpdateOn: "2026-09-14", nextStep: "follow_up", why: "12 days with no reply · Applendium suggests a follow-up on days 10–14", threadId: null },
+    { ref: "A5", company: "Initech", role: null, stage: "waiting", appliedOn: "2026-09-14", lastUpdateOn: "2026-09-14", nextStep: "follow_up", why: "12 days with no reply · Applendium™ suggests a follow-up on days 10–14", threadId: null },
   ],
   basis: { applications: 5, earliestTrackedOn: "2026-08-07" },
 };
@@ -90,7 +90,7 @@ describe("AskApplendium", () => {
     expect(rows[1]).toHaveTextContent("Last update Sep 14 · Time to follow up");
     expect(rows[0]).not.toHaveTextContent("follow up");
     // The why line our backend wrote, under the application it explains; none where nothing is due.
-    expect(within(rows[1]).getByTestId("why-line")).toHaveTextContent("Why: 12 days with no reply · Applendium suggests a follow-up on days 10–14");
+    expect(within(rows[1]).getByTestId("why-line")).toHaveTextContent("Why: 12 days with no reply · Applendium™ suggests a follow-up on days 10–14");
     expect(within(rows[0]).queryByTestId("why-line")).toBeNull();
     expect(screen.getByText(/Based on 5 tracked applications since Aug 7/)).toBeInTheDocument();
     expect(screen.getByText(/never the text of your emails/)).toBeInTheDocument();

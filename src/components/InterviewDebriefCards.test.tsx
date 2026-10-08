@@ -136,7 +136,7 @@ describe("InterviewDebriefCards", () => {
     [409, "APPLICATION_LINK_BUSY", /Your jobs are being updated/],
     [409, "APPLICATION_LINK_REVIEW_REQUIRED", /could not link this email to one application safely/],
     [409, "APPLICATION_LINK_LIMIT", /tracking limit is reached/],
-    [500, undefined, /Applendium could not save/],
+    [500, undefined, /Applendium™ could not save/],
   ])("explains a %s save failure without blaming the connection", async (status, code, message) => {
     recordInterviewDebrief.mockRejectedValue(new ApiRequestError("save failed", { status, payload: { code } }));
     const user = userEvent.setup();

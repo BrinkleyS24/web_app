@@ -1648,7 +1648,7 @@ export type ApplyGateHistoryItem = {
   created_at: string;
   /** Made before Apply Gate's current scoring went live; re-check to get today's read. */
   outdated?: boolean;
-  /** What the inbox showed happened after the check, when Applendium could link it. */
+  /** What the inbox showed happened after the check, when Applendium™ could link it. */
   derived_outcome_label?: string | null;
   derived_outcome_at?: string | null;
   application_id?: string | number | null;

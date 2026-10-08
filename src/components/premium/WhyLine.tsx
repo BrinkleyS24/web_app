@@ -3,10 +3,10 @@ import { Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * What a suggestion stands on (2026-09-26): days since the last update, the rule Applendium applied,
+ * What a suggestion stands on (2026-09-26): days since the last update, the rule Applendium™ applied,
  * and the member's own answer timing when there is enough of it. Written by the backend's
  * services/followUpBasis.js, never by the AI, so it can be checked against the inbox. One component
- * so the Dashboard, Next Actions and Ask Applendium say it the same way.
+ * so the Dashboard, Next Actions and Ask Applendium™ say it the same way.
  */
 export function WhyLine({
   why,

@@ -52,7 +52,7 @@ const OUTCOMES: Record<string, { label: string; tone: Tone }> = {
 };
 
 /**
- * What happened after the check. What Applendium saw in the inbox comes first — the user should not
+ * What happened after the check. What Applendium™ saw in the inbox comes first — the user should not
  * have to report an application the tracker already found — then what the user recorded.
  */
 export function describeVerdictOutcome(item: OutcomeLike): { label: string; tone: Tone } | null {

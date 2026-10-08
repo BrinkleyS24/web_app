@@ -236,7 +236,7 @@ export default function Settings() {
                     Write your next-step suggestions in plain language instead of a fixed template.
                   </p>
                   <p className="text-[13px] leading-relaxed text-muted-foreground">
-                    When this is on, Applendium sends the structured details of a thread (company, role,
+                    When this is on, Applendium™ sends the structured details of a thread (company, role,
                     sender domain, stage and dates) to an AI model to draft the suggestion. It does not
                     send the text of your emails. Turn it off and you still get every suggestion, just in
                     the standard wording.
@@ -341,7 +341,7 @@ export default function Settings() {
               )}
               {billedByStripe || !isPremium ? (
                 <p className="text-[12px] text-muted-foreground">
-                  Payments are handled by Stripe. Applendium never stores card numbers.
+                  Payments are handled by Stripe. Applendium™ never stores card numbers.
                 </p>
               ) : null}
             </div>

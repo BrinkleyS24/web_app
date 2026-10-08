@@ -199,21 +199,21 @@ export function AuthProvider({ children }) {
       for (let i = 0; i < 4; i += 1) {
         if (cancelled || auth?.currentUser) break;
         try {
-          console.log(`[Applendium] Bridge sign-in attempt ${i + 1}/4...`);
+          console.log(`[Applendium™] Bridge sign-in attempt ${i + 1}/4...`);
           const result = await signInFromExtensionBridge();
           if (result?.success) {
-            console.log("[Applendium] Bridge sign-in succeeded!");
+            console.log("[Applendium™] Bridge sign-in succeeded!");
             setExtensionDetected(true);
             setExtensionAuthResolved(true);
             break;
           }
           if (result?.error && !result.error.includes("timed out")) {
-            console.log("[Applendium] Extension detected but sign-in failed:", result.error);
+            console.log("[Applendium™] Extension detected but sign-in failed:", result.error);
             setExtensionDetected(true);
             setExtensionAuthResolved(true);
           }
         } catch (error) {
-          console.log("[Applendium] Bridge attempt error:", error?.message);
+          console.log("[Applendium™] Bridge attempt error:", error?.message);
         }
 
         if (i < 3 && !cancelled) {
@@ -325,7 +325,7 @@ export function AuthProvider({ children }) {
         setPlanError("");
       })
       .catch((error) => {
-        console.error("[Applendium] Failed to fetch user plan:", error);
+        console.error("[Applendium™] Failed to fetch user plan:", error);
         if (cancelled) return;
         setPlanUid(user.uid);
         setPlanLoading(false);

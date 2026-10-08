@@ -34,7 +34,7 @@ export default function LandingDemoVideo() {
               <iframe
                 className="absolute inset-0 h-full w-full"
                 src={EMBED_SRC}
-                title="Applendium — 60-second product demo"
+                title="Applendium™ — 60-second product demo"
                 loading="lazy"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 referrerPolicy="strict-origin-when-cross-origin"

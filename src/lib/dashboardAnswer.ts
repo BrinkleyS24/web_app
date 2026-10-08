@@ -188,7 +188,7 @@ export function buildDashboardAnswer({
   return {
     claim: "Nothing is tracked yet",
     evidence:
-      "Once Applendium has read your job-search email, this is where it tells you what to do next and why.",
+      "Once Applendium™ has read your job-search email, this is where it tells you what to do next and why.",
     stat: null,
     recommendation: null,
     alertId: null,

@@ -32,9 +32,9 @@ function BrandHeader() {
       <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between px-6 md:px-8">
         <Link to="/" className="flex items-center gap-2.5">
           <div className="grid h-7 w-7 shrink-0 place-items-center rounded-[7px] bg-[#0B1220]">
-            <img src="/logo-transparent.png" alt="Applendium" className="block h-[22px] w-[22px]" />
+            <img src="/logo-transparent.png" alt="Applendium™" className="block h-[22px] w-[22px]" />
           </div>
-          <span className="landingDisplay text-lg font-bold tracking-[-0.02em]">applendium</span>
+          <span className="landingDisplay text-lg font-bold tracking-[-0.02em]">applendium™</span>
         </Link>
         <a
           href={CHROME_WEB_STORE_URL}
@@ -129,8 +129,8 @@ export default function Upgrade() {
     : "The app could not confirm Premium against the local backend. Retry the check after the backend is running with the latest changes.";
 
   usePageMetadata({
-    title: "Applendium | Premium",
-    description: "Applendium Premium unlocks Apply Gate and the weekly search-health summary.",
+    title: "Applendium™ | Premium",
+    description: "Applendium™ Premium unlocks Apply Gate and the weekly search-health summary.",
   });
 
   async function handleCheckout() {
@@ -416,7 +416,7 @@ export default function Upgrade() {
           <p className="mt-8 text-center text-[13px] text-[#9AA0A6]">
             Questions?{" "}
             <a
-              href="mailto:support@applendium.com?subject=Applendium%20Premium"
+              href="mailto:support@applendium.com?subject=Applendium™%20Premium"
               className="font-semibold text-[#0B1220] transition-colors hover:text-[#0A7A55]"
             >
               support@applendium.com

@@ -232,7 +232,7 @@ function PreviewPane({ row, onBack }) {
       </div>
 
       <div className="mt-3">
-        <p className="landingMono text-[9px] font-bold uppercase tracking-[0.14em] text-[#5C6B85]">Applendium detected</p>
+        <p className="landingMono text-[9px] font-bold uppercase tracking-[0.14em] text-[#5C6B85]">Applendium™ detected</p>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {row.detected.map((d) => (
             <span
@@ -345,7 +345,7 @@ export default function LandingHero({ chromeHref }) {
           </h1>
 
           <p className="mt-7 max-w-[44ch] text-[17px] leading-[1.6] text-[#98A1B3] md:text-[18px]">
-            Applendium reads the Gmail threads you already have and turns them into a live application
+            Applendium™ reads the Gmail threads you already have and turns them into a live application
             pipeline. No spreadsheet. No manual logging. No write access — ever.
           </p>
 
@@ -393,7 +393,7 @@ export default function LandingHero({ chromeHref }) {
             data-testid="product-hunt-badge"
           >
             <img
-              alt="Applendium - Your AI copilot for every job application. | Product Hunt"
+              alt="Applendium™ - Your AI copilot for every job application. | Product Hunt"
               width="250"
               height="54"
               src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1200982&theme=dark&t=1784510126800"
@@ -416,7 +416,7 @@ export default function LandingHero({ chromeHref }) {
                 <span className="grid h-5 w-5 place-items-center rounded-[6px] bg-[#0B1220]">
                   <img src="/logo-transparent.png" alt="" className="h-3.5 w-3.5" />
                 </span>
-                <span className="text-[13px] font-semibold lowercase text-white">applendium</span>
+                <span className="text-[13px] font-semibold lowercase text-white">applendium™</span>
                 <span className="landingMono rounded bg-white/[0.06] px-1.5 py-0.5 text-[9px] text-[#9AA7BD]">Free</span>
                 <span className="landingMono rounded bg-white/[0.06] px-1.5 py-0.5 text-[9px] text-[#9AA7BD]">128/500</span>
               </div>

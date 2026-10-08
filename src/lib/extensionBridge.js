@@ -39,28 +39,28 @@ export async function signInFromExtensionBridge() {
     return { success: false, error: "Firebase is not configured." };
   }
 
-  console.log("[Applendium Bridge] Requesting extension-backed web auth...");
+  console.log("[Applendium™ Bridge] Requesting extension-backed web auth...");
   const tokenResponse = await requestBridge(BRIDGE_REQUEST, BRIDGE_RESPONSE);
   if (!tokenResponse?.success || !tokenResponse?.firebaseToken) {
-    console.log("[Applendium Bridge] Token request failed:", tokenResponse?.error);
+    console.log("[Applendium™ Bridge] Token request failed:", tokenResponse?.error);
     return { success: false, error: tokenResponse?.error || "No extension token available." };
   }
 
-  console.log("[Applendium Bridge] Signing in with custom token...");
+  console.log("[Applendium™ Bridge] Signing in with custom token...");
   await signInWithCustomToken(auth, tokenResponse.firebaseToken);
-  console.log("[Applendium Bridge] Sign-in complete!");
+  console.log("[Applendium™ Bridge] Sign-in complete!");
   return { success: true };
 }
 
 export async function signOutFromExtensionBridge() {
-  console.log("[Applendium Bridge] Requesting extension logout...");
+  console.log("[Applendium™ Bridge] Requesting extension logout...");
   const logoutResponse = await requestBridge(LOGOUT_REQUEST, LOGOUT_RESPONSE);
   if (!logoutResponse?.success) {
-    console.log("[Applendium Bridge] Logout request failed:", logoutResponse?.error);
+    console.log("[Applendium™ Bridge] Logout request failed:", logoutResponse?.error);
     return { success: false, error: logoutResponse?.error || "Extension logout failed." };
   }
 
-  console.log("[Applendium Bridge] Extension logout complete.");
+  console.log("[Applendium™ Bridge] Extension logout complete.");
   return { success: true };
 }
 

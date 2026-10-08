@@ -12,7 +12,7 @@ import { STATUS_TONE } from "@/lib/statusTone";
 import { cn } from "@/lib/utils";
 
 /**
- * Ask Applendium (2026-09-26): a question box that answers from the member's own tracked
+ * Ask Applendium™ (2026-09-26): a question box that answers from the member's own tracked
  * applications. The backend does the lookups and counting; the AI only words the answer, and
  * every application it names is listed underneath with a way back to the email.
  */
@@ -84,7 +84,7 @@ export function AskApplendium() {
           <Sparkles className="h-3.5 w-3.5" />
         </span>
         <h2 id="ask-applendium-title" className={cn(EYEBROW, "text-foreground")}>
-          Ask Applendium
+          Ask Applendium™
         </h2>
       </div>
       <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">

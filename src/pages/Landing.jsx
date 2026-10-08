@@ -52,7 +52,7 @@ const HOW_IT_WORKS_STEPS = [
   {
     step: "01",
     title: "Install the extension",
-    body: "Add Applendium to Chrome from the Web Store. One click — no account-setup theatrics.",
+    body: "Add Applendium™ to Chrome from the Web Store. One click — no account-setup theatrics.",
   },
   {
     step: "02",
@@ -85,7 +85,7 @@ const FREE_FEATURES = [
   {
     tag: "SAFE",
     title: "Read-only, always",
-    body: "Applendium cannot send, delete, or modify email. The scope is reviewable in your Google account at any time.",
+    body: "Applendium™ cannot send, delete, or modify email. The scope is reviewable in your Google account at any time.",
   },
 ];
 
@@ -124,7 +124,7 @@ const PRIVACY_CARDS = [
 function BrandMark({ boxClass = "h-7 w-7 rounded-[7px]", imgClass = "h-[22px] w-[22px]" }) {
   return (
     <div className={`${boxClass} grid shrink-0 place-items-center bg-[#0B1220]`}>
-      <img src="/logo-transparent.png" alt="Applendium" className={`${imgClass} block`} />
+      <img src="/logo-transparent.png" alt="Applendium™" className={`${imgClass} block`} />
     </div>
   );
 }
@@ -193,9 +193,9 @@ export default function Landing() {
   }, []);
 
   usePageMetadata({
-    title: "Applendium | Gmail Job Tracker for Chrome",
+    title: "Applendium™ | Gmail Job Tracker for Chrome",
     description:
-      "Applendium reads Gmail in read-only mode, groups applications by stage, and replaces the spreadsheet with a cleaner Chrome extension workflow.",
+      "Applendium™ reads Gmail in read-only mode, groups applications by stage, and replaces the spreadsheet with a cleaner Chrome extension workflow.",
   });
 
   function closeMobileMenu() {
@@ -216,7 +216,7 @@ export default function Landing() {
             onClick={closeMobileMenu}
           >
             <BrandMark />
-            <span className="landingDisplay text-lg font-bold tracking-[-0.02em]">applendium</span>
+            <span className="landingDisplay text-lg font-bold tracking-[-0.02em]">applendium™</span>
           </a>
 
           <nav className="hidden items-center gap-7 md:flex" aria-label="Primary">
@@ -616,7 +616,7 @@ export default function Landing() {
             <div>
               <Eyebrow>Support</Eyebrow>
               <h2 className="landingDisplay mt-4 text-[30px] font-bold leading-[1.08] tracking-[-0.03em] md:text-[36px]">
-                Need help with Applendium?
+                Need help with Applendium™
               </h2>
               <p className="mt-5 max-w-[46ch] text-base leading-[1.65] text-[#5C6470]">
                 Send the account email, what you expected to happen, what happened instead, and any
@@ -636,7 +636,7 @@ export default function Landing() {
                   Installation, sign-in, sync, billing, and account troubleshooting.
                 </p>
                 <a
-                  href="mailto:support@applendium.com?subject=Applendium%20Support"
+                  href="mailto:support@applendium.com?subject=Applendium™%20Support"
                   className="landingButtonDark mt-5 inline-flex items-center justify-center rounded-lg bg-[#0B1220] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0A7A55]"
                 >
                   Email support
@@ -654,7 +654,7 @@ export default function Landing() {
                   Data deletion, Gmail access, and privacy-specific account requests.
                 </p>
                 <a
-                  href="mailto:privacy@applendium.com?subject=Applendium%20Privacy%20Request"
+                  href="mailto:privacy@applendium.com?subject=Applendium™%20Privacy%20Request"
                   className="mt-5 inline-flex items-center justify-center rounded-lg border border-[#D8DAD3] bg-white px-4 py-2.5 text-sm font-semibold text-[#0B1220] transition-colors hover:border-[#0B1220]"
                 >
                   Contact privacy
@@ -703,7 +703,7 @@ export default function Landing() {
           <div className="flex items-center gap-2">
             <BrandMark boxClass="h-5 w-5 rounded-[5px]" imgClass="h-[15px] w-[15px]" />
             <span className="text-[13px] text-[#9AA0A6]">
-              &copy; {year} Applendium &mdash; made for the inbox.
+              &copy; {year} Applendium™ &mdash; made for the inbox.
             </span>
           </div>
           <div className="flex flex-wrap gap-6">

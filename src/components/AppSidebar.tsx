@@ -103,7 +103,7 @@ export function AppSidebar() {
             <img src="/logo-transparent.png" alt="" className="block h-5 w-5" />
           </div>
           <h2 className="text-[15px] font-bold leading-tight tracking-[-0.01em] text-sidebar-accent-foreground">
-            Applendium
+            Applendium™
           </h2>
         </div>
       </SidebarHeader>

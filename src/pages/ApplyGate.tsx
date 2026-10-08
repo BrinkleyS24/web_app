@@ -2421,7 +2421,7 @@ const ApplyGateWorkspace = () => {
                   const historySavePending = savingAction?.verdictId === item.id;
                   const historyDecision = describeVerdictDecision(item);
                   const historyOutcome = describeVerdictOutcome(item);
-                  // Once Applendium has seen what happened (or the user recorded it), the decision
+                  // Once Applendium™ has seen what happened (or the user recorded it), the decision
                   // buttons have done their job — the outcome line above says the rest.
                   const historyDecided = Boolean(historyOutcome);
                   const historySaveError = actionSaveError?.verdictId === item.id
