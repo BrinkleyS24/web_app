@@ -4,6 +4,12 @@
 /yt            /?utm_source=youtube       302
 /li            /?utm_source=linkedin      302
 
+# Firebase sign-in served from our own domain (2026-10-14), so Google's sign-in screen says
+# "continue to applendium.com" instead of "intrackt-908ae.firebaseapp.com". Inert until
+# VITE_FIREBASE_AUTH_DOMAIN is switched to applendium.com, which must wait until
+# https://applendium.com/__/auth/handler is an authorized redirect URI on the OAuth web client.
+/__/auth/*     https://intrackt-908ae.firebaseapp.com/__/auth/:splat   200!
+
 # Static blog (real .html files are served before this catch-all; this maps the bare paths)
 /blog          /blog/index.html   200
 /blog/         /blog/index.html   200
