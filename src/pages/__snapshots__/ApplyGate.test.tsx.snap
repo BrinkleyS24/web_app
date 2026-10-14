@@ -13,7 +13,7 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
           class="min-w-0 max-w-3xl"
         >
           <p
-            class="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground"
+            class="font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground"
           >
             Before you apply
           </p>
@@ -23,7 +23,7 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
             Apply Gate
           </h1>
           <p
-            class="mt-1.5 max-w-[68ch] text-[14px] leading-relaxed text-muted-foreground"
+            class="mt-1.5 max-w-[68ch] text-[15px] leading-relaxed text-muted-foreground"
           >
             Paste a job and get a clear call — apply, fix first, or skip — with the reasons behind it and what to fix before you spend the time.
           </p>
@@ -161,7 +161,7 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
             </p>
           </div>
           <button
-            class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-[13px] sm:min-h-9 font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
             type="button"
           >
             Check this role
@@ -185,7 +185,7 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
                 Saved check · resume not identified
               </p>
               <p
-                class="font-mono text-[10px] font-bold uppercase tracking-[0.18em] mt-3 text-warning"
+                class="font-mono text-[11px] font-bold uppercase tracking-[0.18em] mt-3 text-warning"
               >
                 Our call
               </p>
