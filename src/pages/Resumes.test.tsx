@@ -245,6 +245,30 @@ describe("Resumes page", () => {
     expect(screen.getByText("Most interviews")).toBeInTheDocument();
   });
 
+  test("tablet layout: titles and headers never break per letter, actions sit under the title", async () => {
+    // Mobile review 2026-10-14: at 768px the title rendered one letter per line, the actions
+    // overlapped the icon and headers split mid-word ("SE NT", "OUTCOM E").
+    fetchResumeVariants.mockResolvedValue({
+      success: true,
+      variants: [
+        { id: "A", name: "Teacher K-12", isDefault: true, createdAt: "", charCount: 1200 },
+        { id: "B", name: "Math Teacher 7-12", isDefault: false, createdAt: "", charCount: 1300 },
+      ],
+    });
+    const { container } = renderPage();
+    await screen.findByText("Which version works");
+    expect(container.innerHTML).not.toContain("overflow-wrap:anywhere");
+    for (const header of container.querySelectorAll("thead th")) expect(header.className).toContain("whitespace-nowrap");
+    // The count columns wait for lg, where the content column has room.
+    expect(screen.getByRole("columnheader", { name: "Sent" }).className).toContain("lg:table-cell");
+    const title = await screen.findByRole("heading", { name: "Math Teacher 7-12" });
+    const header = title.closest("article")!.firstElementChild!;
+    expect(header.className).not.toMatch(/sm:flex-row|md:flex-row/);
+    const actions = header.lastElementChild!;
+    expect(actions.className).not.toContain("shrink-0");
+    expect(actions.className).toContain("flex-wrap");
+  });
+
   test("with one version there is nothing to compare, so no table", async () => {
     fetchResumeVariants.mockResolvedValue({
       success: true,

@@ -260,7 +260,7 @@ function VariantComparison({
     if (b.id === recommendation?.variantId) return 1;
     return (scoreByVariant.get(b.id)?.sent ?? 0) - (scoreByVariant.get(a.id)?.sent ?? 0);
   });
-  const th = "px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground";
+  const th = "whitespace-nowrap px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground";
   const td = "px-3 py-2.5 text-[13px] tabular-nums";
 
   return (
@@ -281,14 +281,15 @@ function VariantComparison({
         </p>
       ) : null}
       <div className="-mx-1 overflow-x-auto">
-        {/* On a phone the counts step aside and the answer columns stay: version, rate, health. */}
-        <table className="w-full border-collapse sm:min-w-[520px]">
+        {/* On a phone or tablet the counts step aside and the answer columns stay: version, rate,
+            health. The counts return at lg, where the content column has room for them. */}
+        <table className="w-full border-collapse lg:min-w-[520px]">
           <thead>
             <tr className="border-b border-border">
               <th scope="col" className={th}>Version</th>
-              <th scope="col" className={cn(th, "hidden text-right sm:table-cell")}>Sent</th>
-              <th scope="col" className={cn(th, "hidden text-right sm:table-cell")}>With an outcome</th>
-              <th scope="col" className={cn(th, "hidden text-right sm:table-cell")}>Interviews</th>
+              <th scope="col" className={cn(th, "hidden text-right lg:table-cell")}>Sent</th>
+              <th scope="col" className={cn(th, "hidden text-right lg:table-cell")}>With an outcome</th>
+              <th scope="col" className={cn(th, "hidden text-right lg:table-cell")}>Interviews</th>
               <th scope="col" className={cn(th, "text-right")}>Interview rate</th>
               <th scope="col" className={th}>Resume health</th>
             </tr>
@@ -310,9 +311,9 @@ function VariantComparison({
                       {variant.isDefault ? <ToneChip tone="brand">Default</ToneChip> : null}
                     </span>
                   </th>
-                  <td className={cn(td, "hidden text-right text-foreground sm:table-cell")}>{score?.sent ?? 0}</td>
-                  <td className={cn(td, "hidden text-right text-foreground sm:table-cell")}>{matched}</td>
-                  <td className={cn(td, "hidden text-right text-foreground sm:table-cell")}>
+                  <td className={cn(td, "hidden text-right text-foreground lg:table-cell")}>{score?.sent ?? 0}</td>
+                  <td className={cn(td, "hidden text-right text-foreground lg:table-cell")}>{matched}</td>
+                  <td className={cn(td, "hidden text-right text-foreground lg:table-cell")}>
                     {score?.interviewed ?? 0}
                     {score?.offered ? <span className="ml-1 text-muted-foreground">· {score.offered} offer{score.offered === 1 ? "" : "s"}</span> : null}
                   </td>
@@ -428,7 +429,10 @@ const Resumes = () => {
 
   return (
     <DashboardLayout>
-      <div className="max-w-4xl min-w-0 space-y-6 [overflow-wrap:anywhere]">
+      {/* break-words, not overflow-wrap:anywhere (2026-10-14): "anywhere" lowers every flex child's
+          minimum width to one character, so at 768px the resume title rendered one letter per line
+          and table headers split mid-word ("SE NT", "OUTCOM E"). */}
+      <div className="max-w-4xl min-w-0 space-y-6 break-words">
         <PageHeader
           eyebrow="Your resume library"
           title="Resumes"
@@ -521,7 +525,7 @@ const Resumes = () => {
                 <span className={EYEBROW}>Name</span>
                 <input
                   className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Name (e.g., QA-focused)"
+                  placeholder="Name (e.g., Operations focus)"
                   value={draftName}
                   onChange={(e) => setDraftName(e.target.value)}
                 />
@@ -577,8 +581,10 @@ const Resumes = () => {
           <div className="space-y-4">
             {variants.map((v) => (
               <article key={v.id} id={`resume-${v.id}`} className={cn(CARD, "scroll-mt-24 space-y-4 p-5")}>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                {/* Title above, actions below at every width (2026-10-14): side by side, five actions
+                    left the title a sliver of width at 768px and overlapped the icon. */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
                     <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg", TONES.brand.icon)}>
                       <FileText className="h-4 w-4" aria-hidden />
                     </span>
@@ -590,7 +596,7 @@ const Resumes = () => {
                       <p className="mt-0.5 text-[13px] text-muted-foreground">{premium ? recordLine(scoreByVariant.get(v.id)) : (v.isDefault ? "Used for your extension job checks." : "Available to choose as your default.")}</p>
                     </div>
                   </div>
-                  <div className="-ml-2 flex shrink-0 flex-wrap items-center gap-1 sm:ml-0">
+                  <div className="-ml-2 flex min-w-0 flex-wrap items-center gap-1">
                     {RESUME_ID.test(v.id)?<>
                       <button className={BUTTON.ghost} onClick={()=>setEditorId(v.id)}>Open and edit</button>
                       <Link className={BUTTON.ghost} to={resumeToolHref('/apply-gate',v.id,location.search)}>Use in Apply Gate</Link>

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { ResumeEditor, ResumeTextComparison } from './ResumeEditor';
+import { ResumeEditor, ResumeTextComparison, markResumeLines } from './ResumeEditor';
 const { fetchResumeDocument, createResumeVariant, useAuth } = vi.hoisted(() => ({ fetchResumeDocument: vi.fn(), createResumeVariant: vi.fn(), useAuth: vi.fn() }));
 vi.mock('@/lib/resumeWorkspace', async () => ({ ...await vi.importActual('@/lib/resumeWorkspace'), fetchResumeDocument }));
 vi.mock('@/lib/emails', () => ({ createResumeVariant }));
@@ -29,6 +29,7 @@ test('editing saves a new identity with default off and uses only verified saved
   expect(doc.text).toBe(text);
   const clipboard = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
   await user.click(screen.getByRole('button', { name: 'Copy saved text' })); expect(clipboard).toHaveBeenCalledWith(edited);
+  await user.click(screen.getByRole('button', { name: 'Edit this draft again' }));
   await user.type(screen.getByLabelText('Resume text to save'), ' Changed draft'); expect(screen.queryByRole('link', { name: 'Use this version in Apply Gate' })).not.toBeInTheDocument();
 });
 test('lost save response preserves draft and uses the same request ID on unchanged retry', async () => {
@@ -73,4 +74,34 @@ test('comparison loads exactly two documents and renders source HTML as text', a
   fetchResumeDocument.mockImplementation(async (value: string) => ({ ...doc, id: value, name: value === id ? 'First' : 'Second', text: value === id ? text : `${text}\n<script>alert('test')</script>` }));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }); render(<QueryClientProvider client={client}><ResumeTextComparison ids={[id, second]} owner="owner" /></QueryClientProvider>);
   await screen.findByText('Second'); expect(fetchResumeDocument.mock.calls.map(c => c[0]).sort()).toEqual([id, second].sort()); expect(document.querySelector('script')).toBeNull(); expect(screen.getByText(/lines only/)).toBeInTheDocument();
+});
+
+// 2026-10-14 (teacher review): the confirmation sat under the still-filled editor.
+test('a verified save puts the confirmation on top and switches the editor to its saved state', async () => {
+  const user = await (view(), edit());
+  await user.click(screen.getByRole('button', { name: 'Save as new version' }));
+  const savedBox = await screen.findByTestId('resume-saved');
+  expect(savedBox).toHaveTextContent('Ready to use: Front desk revised');
+  expect(savedBox).toHaveTextContent(/Saved and verified/);
+  expect(screen.getByRole('heading', { name: 'New version saved' })).toBeInTheDocument();
+  // The draft form is gone, so nothing above or below the confirmation looks unsaved.
+  expect(screen.queryByLabelText('Resume text to save')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Save as new version' })).not.toBeInTheDocument();
+  await waitFor(() => expect(savedBox).toHaveFocus());
+  // Bringing the form back keeps the confirmation first.
+  await user.click(screen.getByRole('button', { name: 'Edit this draft again' }));
+  const textarea = screen.getByLabelText('Resume text to save');
+  expect(savedBox.compareDocumentPosition(textarea) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test('compare highlights the lines only in each version', async () => {
+  const first = ['Name', 'Taught grades 7-12', 'Ran the robotics club'].join('\n');
+  const secondText = ['Name', 'Taught grades 7-12', 'Built two Rise modules', 'Administered Canvas course shells'].join('\n');
+  expect(markResumeLines(first, secondText).filter(l => l.changed).map(l => l.text)).toEqual(['Ran the robotics club']);
+  fetchResumeDocument.mockImplementation(async (value: string) => ({ ...doc, id: value, name: value === id ? 'First' : 'Second', text: value === id ? first : secondText }));
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }); render(<QueryClientProvider client={client}><ResumeTextComparison ids={[id, second]} owner="owner" /></QueryClientProvider>);
+  const removed = await screen.findByTestId('resume-lines-removed'); const added = screen.getByTestId('resume-lines-added');
+  expect([...removed.querySelectorAll('[data-changed]')].map(n => n.textContent)).toEqual(['Removed line: -Ran the robotics club']);
+  expect([...added.querySelectorAll('[data-changed]')].map(n => n.textContent)).toEqual(['Added line: +Built two Rise modules', 'Added line: +Administered Canvas course shells']);
+  expect(screen.getByText(/1 lines only in the first version; 2 only in the second/)).toBeInTheDocument();
 });
