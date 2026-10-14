@@ -198,6 +198,13 @@ export type InterviewDebriefItem = {
   daysSilent: number | null;
   /** "20 days ago" / "7 months ago". Coarsened server-side so both surfaces read the same. */
   silentLabel?: string | null;
+  /**
+   * "interviewed 14 days ago" / "invited 22 days ago" / "interview on Oct 20": counted from the
+   * interview itself when the calendar has it, else from the invitation, and SAYS which
+   * (2026-10-14). Absent on older backends, which fall back to silentLabel.
+   */
+  interviewAgeLabel?: string | null;
+  state?: "live" | "quiet";
 };
 
 export type StrategyAlert = {

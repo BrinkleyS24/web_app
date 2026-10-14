@@ -539,12 +539,15 @@ export function getCleanupUnlinkedCandidates(emails: StoredEmail[]) {
   });
 }
 
-function daysSince(value?: string | null) {
+// Calendar days in the user's own time zone, not elapsed 24-hour periods: an email from 11 p.m.
+// yesterday is 1 day old this morning. Counting 24-hour periods made every "opens in N days"
+// countdown read one day long for most of the day (A+ review, 2026-10-14).
+export function daysSince(value?: string | null, now: Date = new Date()) {
   if (!value) return null;
   const date = parseApiDate(value);
   if (!date) return null;
-  const diffMs = Date.now() - date.getTime();
-  return Math.max(0, Math.floor(diffMs / 86_400_000));
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  return Math.max(0, Math.round((startOfDay(now) - startOfDay(date)) / 86_400_000));
 }
 
 function buildFollowupQueue(suggestions: FollowupSuggestion[]): QueueItem[] {

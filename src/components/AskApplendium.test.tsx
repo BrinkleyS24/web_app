@@ -158,4 +158,40 @@ describe("AskApplendium", () => {
     await userEvent.type(screen.getByLabelText("Your question"), "hi");
     expect(screen.getByRole("button", { name: "Ask" })).toBeDisabled();
   });
+
+  test("privacy and interview-prep questions hand off to the right page", async () => {
+    askApplendium.mockResolvedValue({ success: true, answer: "Applendium stores job emails it tracks.", applications: [], handoff: { kind: "privacy", label: "Your data in Settings" } });
+    renderAsk();
+    await userEvent.type(screen.getByLabelText("Your question"), "What do you store?{Enter}");
+    expect(await screen.findByRole("link", { name: "Your data in Settings" })).toHaveAttribute("href", "/settings#your-data");
+    expect(screen.queryByText(/saved resume list/)).not.toBeInTheDocument();
+  });
+
+  test("a drafted email is editable and copies what the member edited", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    askApplendium.mockResolvedValue({ success: true, answer: "Here is a draft.", applications: [], draft: { subject: "Thank you", body: "Hi Sam, thank you for your time." } });
+    renderAsk();
+    await userEvent.type(screen.getByLabelText("Your question"), "Write a thank you{Enter}");
+    const body = await screen.findByLabelText("Message");
+    await userEvent.clear(body);
+    await userEvent.type(body, "Edited body");
+    await userEvent.click(screen.getByRole("button", { name: "Copy email" }));
+    expect(writeText).toHaveBeenCalledWith("Subject: Thank you\n\nEdited body");
+  });
+
+  test("a computed no-reply list renders every item", async () => {
+    askApplendium.mockResolvedValue({
+      success: true, answer: "2 applications have had no reply for 14+ days.", applications: [],
+      list: { kind: "no_reply", minDays: 14, total: 2, items: [
+        { ref: "A1", company: "Acme", role: "Analyst", appliedOn: "2026-09-01", lastUpdateOn: "2026-09-01", daysSinceLastUpdate: 43 },
+        { ref: "A2", company: "Globex", role: null, appliedOn: "2026-09-20", lastUpdateOn: "2026-09-20", daysSinceLastUpdate: 24 },
+      ] },
+    });
+    renderAsk();
+    await userEvent.type(screen.getByLabelText("Your question"), "Who hasn't replied?{Enter}");
+    const list = await screen.findByTestId("ask-list");
+    expect(within(list).getByText("Acme")).toBeInTheDocument();
+    expect(within(list).getByText("No reply in 24 days")).toBeInTheDocument();
+  });
 });

@@ -157,7 +157,9 @@ export function InterviewDebriefCards({
       <div className="rounded-xl border border-border bg-muted/30 px-4 py-3.5">
         <p className="text-[13px] font-semibold leading-snug text-foreground">
           {current.label}
-          {current.silentLabel ? (
+          {current.interviewAgeLabel ? (
+            <span className="font-normal text-muted-foreground"> · {current.interviewAgeLabel}</span>
+          ) : current.silentLabel ? (
             <span className="font-normal text-muted-foreground"> · interviewed {current.silentLabel}</span>
           ) : null}
         </p>

@@ -1446,8 +1446,8 @@ const ApplyGateWorkspace = () => {
     if (lvl === "high") return "This is a confident read.";
     if (lvl === "medium") return "This is a solid read, with some open questions noted below.";
     return String(type || "").toUpperCase() === "CONFLICTED_SIGNAL"
-      ? "Take this read with a grain of salt: parts of this job fit you well and parts don’t, so it’s a close call."
-      : "Take this read with a grain of salt: there isn't much history like this role to lean on yet.";
+      ? "This one is a close call: parts of this job fit you well and parts don’t."
+      : "There isn't much history with roles like this yet, so this call rests on the posting and your resume.";
   };
 
   const handleAnalyze = useCallback(() => {

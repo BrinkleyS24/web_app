@@ -260,3 +260,16 @@ describe('displayed batch identity', () => {
     expect(recordInterviewDebrief).not.toHaveBeenCalled();
   });
 });
+
+// The backend says whether the age counts from the interview or from the invitation (2026-10-14):
+// "interviewed 22 days ago" was really the invitation's age.
+test("shows the backend's interview age label when it has one", () => {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <InterviewDebriefCards items={[{ ...items[0], interviewAgeLabel: "invited 22 days ago" }]} total={1} />
+    </QueryClientProvider>,
+  );
+  expect(screen.getByText(/invited 22 days ago/)).toBeInTheDocument();
+  expect(screen.queryByText(/interviewed 20 days ago/)).not.toBeInTheDocument();
+});

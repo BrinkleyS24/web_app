@@ -6,7 +6,8 @@ import { ArrowUp, ExternalLink, Loader2, Sparkles } from "lucide-react";
 import { ErrorState, ToneChip } from "@/components/premium/PremiumUI";
 import { WhyLine } from "@/components/premium/WhyLine";
 import { BUTTON, CARD, EYEBROW, TONES, type Tone } from "@/components/premium/tone";
-import { ASK_MAX_QUESTION_CHARS, askApplendium, type AskNextStep, type AskResponse, type AskStage } from "@/lib/ask";
+import { ASK_HANDOFF_ROUTES, ASK_MAX_QUESTION_CHARS, askApplendium, type AskNextStep, type AskResponse, type AskStage } from "@/lib/ask";
+import { AskDraft } from "@/components/AskDraft";
 import { buildGmailThreadUrl } from "@/lib/premiumTaskQueue";
 import { STATUS_TONE } from "@/lib/statusTone";
 import { cn } from "@/lib/utils";
@@ -151,10 +152,28 @@ export function AskApplendium() {
                 {result.answer}
               </p>
 
-              {result.handoff && ["apply_gate", "resumes"].includes(result.handoff.kind) ? (
-                <Link to={result.handoff.kind === "resumes" ? "/resumes" : "/apply-gate"} className={BUTTON.primary}>
+              {result.handoff && ASK_HANDOFF_ROUTES[result.handoff.kind] ? (
+                <Link to={ASK_HANDOFF_ROUTES[result.handoff.kind]} className={BUTTON.primary}>
                   {result.handoff.label}
                 </Link>
+              ) : null}
+
+              {result.draft?.body ? <AskDraft key={result.draft.body} draft={result.draft} /> : null}
+
+              {result.list?.items?.length && !result.applications.length ? (
+                <ul className="divide-y divide-border rounded-xl border border-border" data-testid="ask-list">
+                  {result.list.items.map((item) => (
+                    <li key={item.ref} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-3.5 py-2.5 text-[13px]">
+                      <span className="min-w-0 font-semibold text-foreground">
+                        {item.company}
+                        {item.role ? <span className="font-normal text-muted-foreground"> · {item.role}</span> : null}
+                      </span>
+                      {item.daysSinceLastUpdate != null ? (
+                        <span className="text-muted-foreground">No reply in {item.daysSinceLastUpdate} days</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
               ) : null}
 
               {result.applications.length ? (
@@ -222,7 +241,7 @@ export function AskApplendium() {
 
               <p className="text-[12px] leading-snug text-muted-foreground">
                 {typeof count === "number" ? `Based on ${count} tracked application${count === 1 ? "" : "s"}${since ? ` since ${since}` : ""}. ` : ""}
-                {result.handoff
+                {result.handoff && ["apply_gate", "resumes"].includes(result.handoff.kind)
                   ? "This handoff uses your saved resume list. No resume content was sent to AI."
                   : "The AI answers from company, role, stage and dates, never the text of your emails."}
               </p>
