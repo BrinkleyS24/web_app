@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Chrome, Search } from "lucide-react";
+import PhoneInstallNote from "./PhoneInstallNote.jsx";
 import { motion, AnimatePresence, useMotionValue, useSpring, useReducedMotion, useInView, animate } from "framer-motion";
 
 const EASE_OUT = [0.16, 1, 0.3, 1];
@@ -8,11 +9,13 @@ const EASE_OUT = [0.16, 1, 0.3, 1];
 // Mirrors the real extension popup (see LandingExtensionDemo): metric tiles,
 // search, filter chips, and email rows with a lifecycle stepper. Interactive:
 // chips filter, search filters, a row opens an inline preview.
+// `match` is the row status each tile filters to. Until 2026-10-14 the tiles looked up a chip by
+// `key`, and "interviews"/"offers" never matched "interview"/"offer", so those tiles did nothing.
 const TILES = [
-  { key: "applied", label: "Applied", value: 24, text: "text-white", bg: "bg-white/[0.05]", ring: "ring-white/10" },
-  { key: "interviews", label: "In interviews", value: 6, text: "text-[#F4C770]", bg: "bg-[#F4B740]/[0.10]", ring: "ring-[#F4B740]/20" },
-  { key: "offers", label: "Offers", value: 2, text: "text-[#34E3A8]", bg: "bg-[#34E3A8]/[0.10]", ring: "ring-[#34E3A8]/20" },
-  { key: "rejected", label: "Closed", value: 15, text: "text-[#F2718C]", bg: "bg-[#F2718C]/[0.08]", ring: "ring-[#F2718C]/20" },
+  { key: "applied", match: "applied", label: "Applied", value: 24, text: "text-white", bg: "bg-white/[0.05]", ring: "ring-white/10" },
+  { key: "interviews", match: "interview", label: "In interviews", value: 6, text: "text-[#F4C770]", bg: "bg-[#F4B740]/[0.10]", ring: "ring-[#F4B740]/20" },
+  { key: "offers", match: "offer", label: "Offers", value: 2, text: "text-[#34E3A8]", bg: "bg-[#34E3A8]/[0.10]", ring: "ring-[#34E3A8]/20" },
+  { key: "rejected", match: "rejected", label: "Closed", value: 15, text: "text-[#F2718C]", bg: "bg-[#F2718C]/[0.08]", ring: "ring-[#F2718C]/20" },
 ];
 
 const STATUS = {
@@ -22,49 +25,63 @@ const STATUS = {
   rejected: { label: "Rejected", pill: "bg-[#F2718C]/15 text-[#F2718C] ring-[#F2718C]/25", reached: 0, terminal: true },
 };
 
+// Sample data only. Mixed on purpose (2026-10-14): the product serves teachers, nurses, ops and
+// retail as much as engineers, and every example used to be a tech company.
 const ROWS = [
   {
-    id: "stripe",
-    company: "Stripe",
-    role: "Senior Frontend Engineer",
+    id: "riverside",
+    company: "Riverside Unified School District",
+    role: "5th Grade Teacher",
     subject: "We received your application",
-    from: "Stripe Careers",
+    from: "Riverside USD Human Resources",
     status: "applied",
     date: "Today",
     unread: true,
-    body: "Thanks for applying to the Senior Frontend Engineer role. Our team is reviewing your application and will be in touch about next steps.",
-    detected: ["Application confirmed", "Role + company parsed"],
+    body: "Thank you for applying for the 5th Grade Teacher position. Our hiring team is reviewing applications and will contact selected candidates for interviews.",
+    detected: ["Application confirmed", "Role + employer parsed"],
   },
   {
-    id: "linear",
-    company: "Linear",
-    role: "Product Engineer",
-    subject: "Tech screen confirmed",
-    from: "Linear Recruiting",
+    id: "mercy",
+    company: "Mercy General Hospital",
+    role: "Registered Nurse, Med-Surg",
+    subject: "Interview confirmed for Thursday",
+    from: "Mercy General Talent Acquisition",
     status: "interview",
     date: "Today",
     unread: true,
-    body: "Your technical screen is confirmed for Thursday at 2:00pm. You'll meet with two engineers for a 60-minute pairing session.",
+    body: "Your panel interview with the unit manager is confirmed for Thursday at 2:00 PM. Please bring a copy of your current RN license.",
     detected: ["Moved to Interview", "Interview scheduled"],
   },
   {
-    id: "supabase",
-    company: "Supabase",
-    role: "Senior Engineer",
-    subject: "Verbal offer and next steps",
-    from: "Supabase Recruiting",
+    id: "northline",
+    company: "Northline Logistics",
+    role: "Warehouse Operations Supervisor",
+    subject: "Your offer and next steps",
+    from: "Northline Logistics Recruiting",
     status: "offer",
     date: "Yesterday",
     unread: true,
-    body: "We're thrilled to extend a verbal offer for the Senior Engineer position. The written offer with full compensation details is on its way.",
+    body: "We're glad to offer you the Warehouse Operations Supervisor role. Your written offer with pay and start date details is attached.",
     detected: ["Moved to Offer", "Outcome detected"],
   },
   {
-    id: "airbnb",
-    company: "Airbnb",
+    id: "brightpath",
+    company: "Brightpath Software",
     role: "Frontend Engineer",
+    subject: "We received your application",
+    from: "Brightpath Careers",
+    status: "applied",
+    date: "2d ago",
+    unread: false,
+    body: "Thanks for applying to the Frontend Engineer role. Our team is reviewing your application and will be in touch about next steps.",
+    detected: ["Application confirmed", "Role + employer parsed"],
+  },
+  {
+    id: "harbor",
+    company: "Harbor & Main",
+    role: "Store Manager",
     subject: "Update on your application",
-    from: "Airbnb Recruiting",
+    from: "Harbor & Main Careers",
     status: "rejected",
     date: "5d ago",
     unread: false,
@@ -376,6 +393,8 @@ export default function LandingHero({ chromeHref }) {
             </Link>
           </div>
 
+          <PhoneInstallNote className="mt-5 md:hidden" />
+
           <div className="mt-10 flex flex-wrap gap-x-6 gap-y-3 border-t border-white/10 pt-6">
             {["Read-only OAuth scope", "No data sold", "Revoke anytime"].map((point) => (
               <span key={point} className="flex items-center gap-2">
@@ -430,12 +449,15 @@ export default function LandingHero({ chromeHref }) {
             <div className="space-y-3 p-3">
               <div className="grid grid-cols-4 gap-2">
                 {TILES.map((t) => {
-                  const chip = CHIPS.find((c) => c.match === t.key);
+                  const chip = CHIPS.find((c) => c.match === t.match);
                   const active = chip && activeChip === chip.label;
                   return (
                     <button
                       key={t.key}
                       type="button"
+                      aria-pressed={Boolean(active)}
+                      aria-label={`${t.label}: show only these`}
+                      data-testid={`hero-tile-${t.key}`}
                       onClick={() => chip && selectChip(active ? "All" : chip.label)}
                       className={`rounded-xl px-2 py-2 text-center ring-1 transition-all ${t.bg} ${t.ring} ${
                         active ? "ring-2 ring-offset-2 ring-offset-[#0C1424]" : "hover:brightness-125"
@@ -501,8 +523,8 @@ export default function LandingHero({ chromeHref }) {
             </div>
           </motion.div>
 
-          <p className="landingMono mt-4 text-center text-[10.5px] text-[#5C6B85]">
-            ↑ the real popup — tap a tile, search, or open a thread
+          <p className="landingMono mt-4 text-center text-[10.5px] text-[#8D9AB0]">
+            ↑ the real popup with sample data: tap a tile to filter, search, or open a thread
           </p>
         </div>
       </div>
