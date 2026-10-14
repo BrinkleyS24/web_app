@@ -781,7 +781,10 @@ describe("ApplyGate current UI", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Skip this. You've tried 8 similar roles and 8 got no response.")).toBeInTheDocument();
-      expect(screen.getByText("Your history with roles like this: 8 similar roles - 8 no responses")).toBeInTheDocument();
+      // 2026-10-14: the history summary lives in the collapsed details panel, not a non-wrapping pill.
+      const details = within(screen.getByTestId("apply-gate-details"));
+      expect(details.getByText("Your history with roles like this")).toBeInTheDocument();
+      expect(details.getByText("8 similar roles - 8 no responses")).toBeInTheDocument();
     });
   });
 
@@ -935,8 +938,11 @@ describe("ApplyGate current UI", () => {
 
     await runAnalyze({ jobTitle: "Ultrasound Tech", jobDescription: "ARDMS and ultrasound technology program required." });
 
-    // The analytical breakdown is collapsed by default — expand it to see career-field match.
-    await userEvent.click(await screen.findByRole("button", { name: /Show the full breakdown/i }));
+    // The analytical breakdown sits in the Details block, collapsed by default (2026-10-14).
+    const details = await screen.findByTestId("apply-gate-details");
+    expect(details).not.toHaveAttribute("open");
+    await userEvent.click(within(details).getByText(/^Details/));
+    expect(details).toHaveAttribute("open");
 
     await waitFor(() => {
       expect(screen.getByText("Career-field match")).toBeInTheDocument();

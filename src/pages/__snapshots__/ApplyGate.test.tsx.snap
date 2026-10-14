@@ -56,7 +56,7 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
             <input
               class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
               id="job-title"
-              placeholder="e.g., QA Analyst"
+              placeholder="e.g., Office Manager"
               value="Automation Engineer"
             />
           </div>
@@ -171,148 +171,111 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
           class="min-w-0"
         >
           <div
-            class="rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(11,18,32,0.04)] space-y-3 p-6"
+            class="rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(11,18,32,0.04)] min-w-0 space-y-4 overflow-hidden p-5 sm:p-6"
             data-testid="apply-gate-current-result"
           >
-            <p
-              class="text-xs text-muted-foreground"
+            <section
+              aria-label="Our call"
+              class="-mx-5 -mt-5 border-b px-5 py-5 sm:-mx-6 sm:-mt-6 sm:px-6 bg-warning/[0.035] border-warning/25"
+              data-testid="apply-gate-call"
             >
-              Saved check · resume not identified
-            </p>
-            <div
-              class="-mx-6 -mt-6 mb-1 rounded-t-2xl border-b px-6 py-5 bg-warning/[0.035] border-warning/25"
-            >
-              <div
-                class="flex items-start justify-between gap-4"
+              <p
+                class="text-xs text-muted-foreground"
               >
-                <div
-                  class="min-w-0"
-                >
-                  <p
-                    class="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-warning"
-                  >
-                    Our call
-                  </p>
-                  <h2
-                    class="mt-2 text-xl font-bold tracking-[-0.01em] text-foreground"
-                  >
-                    Fix first before applying
-                  </h2>
-                  <p
-                    class="mt-1 text-sm font-medium leading-relaxed text-muted-foreground"
-                  >
-                    Fix this first. Required education level is missing
-                  </p>
-                  <p
-                    class="mt-1 text-xs leading-relaxed text-muted-foreground/80"
-                  >
-                    A hard blocker or major proof gap is visible. Fix the strongest issue before this becomes another low-probability application.
-                  </p>
-                </div>
-                <div
-                  class="shrink-0 text-center"
+                Saved check · resume not identified
+              </p>
+              <p
+                class="font-mono text-[10px] font-bold uppercase tracking-[0.18em] mt-3 text-warning"
+              >
+                Our call
+              </p>
+              <h2
+                class="mt-1.5 text-xl font-bold tracking-[-0.01em] text-foreground"
+              >
+                Fix first before applying
+              </h2>
+              <p
+                class="mt-1 text-sm font-medium leading-relaxed text-muted-foreground"
+              >
+                Fix this first. Required education level is missing
+              </p>
+              <div
+                class="mt-3 flex min-w-0 flex-wrap items-center gap-2"
+              >
+                <span
+                  class="inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold risk-pill-high bg-destructive/10 text-destructive ring-1 ring-inset ring-destructive/20"
+                  data-severity="high"
                   data-testid="risk-band"
                 >
-                  <div
-                    class="grid h-[78px] min-w-[78px] place-items-center rounded-full border px-3 border-red-500/30 bg-red-500/10 text-red-700"
-                  >
-                    <span
-                      class="text-base font-bold tracking-[-0.01em]"
-                    >
-                      Severe
-                    </span>
-                  </div>
-                  <p
-                    class="mt-2 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
-                  >
-                    Rejection risk · fit-based estimate
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div>
-              <p
-                class="font-semibold text-foreground leading-tight"
-              >
-                Automation Engineer
-              </p>
-            </div>
-            <button
-              aria-expanded="false"
-              class="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-              type="button"
-            >
-              Show the full breakdown
-              <svg
-                aria-hidden="true"
-                class="lucide lucide-chevron-down h-3.5 w-3.5"
-                fill="none"
-                height="24"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                viewBox="0 0 24 24"
-                width="24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="m6 9 6 6 6-6"
-                />
-              </svg>
-            </button>
-            <div
-              class="space-y-1.5"
-            >
-              <p
-                class="text-sm text-muted-foreground leading-relaxed"
-              >
-                • 
-                Missing required: plc programming.
-              </p>
-              <p
-                class="text-sm text-muted-foreground leading-relaxed"
-              >
-                • 
-                Education gap.
-              </p>
-            </div>
-            <div
-              class="flex items-start gap-2 p-3 rounded-lg bg-destructive/5 border border-destructive/10"
-            >
-              <svg
-                aria-hidden="true"
-                class="lucide lucide-triangle-alert w-4 h-4 text-destructive shrink-0 mt-0.5"
-                fill="none"
-                height="24"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                viewBox="0 0 24 24"
-                width="24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"
-                />
-                <path
-                  d="M12 9v4"
-                />
-                <path
-                  d="M12 17h.01"
-                />
-              </svg>
-              <div
-                class="text-sm text-destructive leading-snug"
-              >
-                <span>
-                  Likely rejection driver
-                  : 
-                  Required education level is missing
+                  <span
+                    aria-hidden="true"
+                    class="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive"
+                  />
+                  Severe rejection risk
+                </span>
+                <span
+                  class="text-xs text-muted-foreground"
+                >
+                  Fit-based estimate
                 </span>
               </div>
-            </div>
+              <div
+                class="mt-3 min-w-0"
+              >
+                <p
+                  class="font-semibold leading-tight text-foreground"
+                >
+                  Automation Engineer
+                </p>
+              </div>
+            </section>
+            <section
+              aria-label="What to do"
+              class="scroll-mt-4 space-y-3"
+              data-testid="apply-gate-todo"
+            >
+              <h3
+                class="text-[13px] font-semibold text-foreground"
+              >
+                What to do
+              </h3>
+              <div
+                class="flex items-start gap-2 rounded-lg border border-destructive/10 bg-destructive/5 p-3"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-triangle-alert mt-0.5 h-4 w-4 shrink-0 text-destructive"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"
+                  />
+                  <path
+                    d="M12 9v4"
+                  />
+                  <path
+                    d="M12 17h.01"
+                  />
+                </svg>
+                <div
+                  class="min-w-0 text-sm leading-snug text-destructive"
+                >
+                  <span>
+                    Likely rejection driver
+                    : 
+                    Required education level is missing
+                  </span>
+                </div>
+              </div>
+            </section>
             <div
               class="space-y-2 pt-1"
             >
@@ -355,6 +318,133 @@ exports[`ApplyGate current UI > snapshot: risky verdict renders the current card
                 class="text-xs text-muted-foreground"
               />
             </div>
+            <details
+              class="group rounded-lg border border-border/70 bg-background/70"
+              data-testid="apply-gate-details"
+            >
+              <summary
+                class="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-[13px] font-medium text-foreground [&::-webkit-details-marker]:hidden"
+              >
+                <span
+                  class="min-w-0"
+                >
+                  Details
+                  <span
+                    class="font-normal text-muted-foreground"
+                  >
+                    : 
+                    why this call, full breakdown
+                  </span>
+                </span>
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-chevron-down h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="m6 9 6 6 6-6"
+                  />
+                </svg>
+              </summary>
+              <div
+                class="space-y-3 border-t border-border/70 p-3"
+              >
+                <div
+                  class="space-y-1.5"
+                >
+                  <p
+                    class="text-xs font-semibold text-foreground"
+                  >
+                    Why this call
+                  </p>
+                  <p
+                    class="text-sm leading-relaxed text-muted-foreground"
+                  >
+                    • 
+                    A hard blocker or major proof gap is visible. Fix the strongest issue before this becomes another low-probability application.
+                  </p>
+                  <p
+                    class="text-sm leading-relaxed text-muted-foreground"
+                  >
+                    • 
+                    Missing required: plc programming.
+                  </p>
+                  <p
+                    class="text-sm leading-relaxed text-muted-foreground"
+                  >
+                    • 
+                    Education gap.
+                  </p>
+                </div>
+                <div
+                  class="space-y-3 rounded-lg border border-border/70 bg-background/70 p-3"
+                >
+                  <p
+                    class="text-xs font-semibold text-foreground"
+                  >
+                    Full breakdown
+                  </p>
+                  <div
+                    class="space-y-2"
+                  >
+                    <div
+                      class="flex flex-wrap items-center justify-between gap-2"
+                    >
+                      <p
+                        class="text-xs font-semibold text-foreground"
+                      >
+                        Why this recommendation
+                      </p>
+                      <span
+                        class="text-xs text-muted-foreground"
+                      >
+                        Education or training fit: severe risk.
+                      </span>
+                    </div>
+                    <div
+                      class="grid gap-2 sm:grid-cols-2"
+                    >
+                      <div
+                        class="rounded-md border border-border/60 bg-muted/20 px-3 py-2"
+                      >
+                        <p
+                          class="text-xs font-medium text-foreground"
+                        >
+                          Education or training fit
+                        </p>
+                        <p
+                          class="mt-1 text-xs leading-relaxed text-muted-foreground"
+                        >
+                          Education score is 30/100.
+                        </p>
+                      </div>
+                      <div
+                        class="rounded-md border border-border/60 bg-muted/20 px-3 py-2"
+                      >
+                        <p
+                          class="text-xs font-medium text-foreground"
+                        >
+                          Required evidence coverage
+                        </p>
+                        <p
+                          class="mt-1 text-xs leading-relaxed text-muted-foreground"
+                        >
+                          Required-skill evidence score is 20/100.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </details>
           </div>
         </div>
       </div>

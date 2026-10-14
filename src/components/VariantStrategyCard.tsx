@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, ArrowRight, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { VariantStrategy, VariantStrategyGap } from "@/lib/emails";
 
 export type VariantDraftDecisions = { accepted: string[]; dismissed: string[] };
@@ -8,6 +9,7 @@ export type VariantDraftDecisions = { accepted: string[]; dismissed: string[] };
 type VariantStrategyCardProps = {
   strategy: VariantStrategy;
   onDraftDecisionsChange?: (decisions: VariantDraftDecisions) => void;
+  className?: string;
 };
 
 function gapTypeLabel(type: VariantStrategyGap["type"]): string {
@@ -18,7 +20,7 @@ function gapTypeLabel(type: VariantStrategyGap["type"]): string {
 
 function gapTypeBadgeClass(type: VariantStrategyGap["type"]): string {
   if (type === "missing") return "border-destructive/20 bg-destructive/10 text-destructive";
-  if (type === "buried") return "border-amber-500/20 bg-amber-500/10 text-amber-700";
+  if (type === "buried") return "border-warning/20 bg-warning/10 text-warning-foreground dark:text-warning";
   return "border-accent/20 bg-accent/10 text-accent";
 }
 
@@ -88,12 +90,15 @@ export function variantStrategyNoGapsNote(strategy: VariantStrategy): string | n
   return `No resume changes identified for ${name} in this check. Review the eligibility and next step above.`;
 }
 
-export function VariantStrategyCard({ strategy, onDraftDecisionsChange }: VariantStrategyCardProps) {
+export function VariantStrategyCard({ strategy, onDraftDecisionsChange, className }: VariantStrategyCardProps) {
   const documentNote = variantStrategyDocumentNote(strategy);
   const pickLabel = variantStrategyPickLabel(strategy);
   const noGapsNote = variantStrategyNoGapsNote(strategy);
   const [accepted, setAccepted] = useState<string[]>([]);
   const [dismissed, setDismissed] = useState<string[]>([]);
+  // The "no provable experience" note is the same sentence for every missing gap; printing it under
+  // each one is how one result ended up repeating itself (persona reviews, 2026-10-14). Say it once.
+  const firstSkipSignalIndex = strategy.gaps.findIndex((gap) => gap.skipSignal);
 
   const handleAccept = useCallback(
     (requirement: string) => {
@@ -118,7 +123,7 @@ export function VariantStrategyCard({ strategy, onDraftDecisionsChange }: Varian
   );
 
   return (
-    <div className="glass-card space-y-4 rounded-xl p-4 mt-3.5">
+    <div className={cn("glass-card mt-3.5 min-w-0 space-y-4 rounded-xl p-4", className)}>
       {/* Header */}
       <div>
         <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
@@ -185,7 +190,7 @@ export function VariantStrategyCard({ strategy, onDraftDecisionsChange }: Varian
                 </div>
 
                 {/* Human line */}
-                {gap.skipSignal ? (
+                {gap.skipSignal ? (idx !== firstSkipSignalIndex ? null : (
                   <div className="flex items-start gap-2">
                     <AlertTriangle
                       className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500"
@@ -195,7 +200,7 @@ export function VariantStrategyCard({ strategy, onDraftDecisionsChange }: Varian
                       You may not have provable experience here — consider whether this role fits
                     </p>
                   </div>
-                ) : (
+                )) : (
                   (() => {
                     const line = gapHumanLine(gap.type, gap.location);
                     return line ? <p className="text-xs leading-relaxed text-muted-foreground">{line}</p> : null;

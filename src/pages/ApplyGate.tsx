@@ -11,7 +11,7 @@ import { BUTTON, CARD, EYEBROW, TONES } from "@/components/premium/tone";
 import { describeVerdictDecision, describeVerdictOutcome } from "@/lib/verdictPresentation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Check, ChevronDown, ChevronUp, Info, Loader2, ScanSearch } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, Info, Loader2, ScanSearch } from "lucide-react";
 import {
   normalizeCompanyName,
   splitRoleAndCompany as splitApplyGateRoleAndCompany,
@@ -44,10 +44,14 @@ const APPLY_GATE_STAGES = [
   "Writing your decision brief",
 ];
 
-// The premium verdict is a single ~30s backend call (no streaming), so this
-// shows staged, time-estimated progress instead of a 30s blank spinner — the
-// difference between "is this broken?" and "it's working through my resume".
+// The premium verdict is a single backend call (no streaming), so this shows
+// staged, time-estimated progress instead of a blank spinner — the difference
+// between "is this broken?" and "it's working through my resume".
+// 2026-10-14: checks measured 5-15 s, so the copy says 10-20 s, not "half a
+// minute"; and the panel scrolls itself into view, because the user is usually
+// at the bottom of the form (or above it on a phone) when they press Check.
 function ApplyGateProgress() {
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const reduceMotion =
     typeof window !== "undefined" &&
     typeof window.matchMedia === "function" &&
@@ -63,17 +67,30 @@ function ApplyGateProgress() {
     return () => window.clearInterval(id);
   }, [reduceMotion]);
 
+  useEffect(() => {
+    panelRef.current?.scrollIntoView?.({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
+    // Mount only: re-scrolling on every progress tick would fight the user's own scrolling.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const stageIndex = Math.min(
     APPLY_GATE_STAGES.length - 1,
     Math.floor((pct / 92) * APPLY_GATE_STAGES.length),
   );
 
   return (
-    <div className="glass-card rounded-2xl p-8" role="status" aria-live="polite" aria-busy="true">
+    <div
+      ref={panelRef}
+      data-testid="apply-gate-progress"
+      className="glass-card scroll-mt-20 rounded-2xl p-6 sm:p-8"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
       <p className="text-sm font-semibold">Checking this role…</p>
       <p className="mt-1 text-xs leading-5 text-muted-foreground">
-        The full premium read takes about half a minute — your resume, the posting, and your past
-        outcomes are all in play.
+        This usually takes 10-20 seconds. We compare your resume with the posting and with how
+        similar roles went for you.
       </p>
       <div className="mt-5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
         <div
@@ -228,11 +245,54 @@ function riskBandLabelFromResult(result: ApplyGateResult | null | undefined) {
   return label ? label[0].toUpperCase() + label.slice(1) : null;
 }
 
-function riskBandToneClass(label: string | null) {
-  const normalized = String(label || "").toLowerCase();
-  if (normalized === "low" || normalized === "moderate") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700";
-  if (normalized === "elevated") return "border-amber-500/30 bg-amber-500/10 text-amber-700";
-  return "border-red-500/30 bg-red-500/10 text-red-700";
+export type RiskSeverity = "low" | "moderate" | "high";
+
+// Risk is a severity, not a score to celebrate (designer review, 2026-10-14): "Moderate" used to
+// render as a large mint pill that read as both "good" and "a button". Three severities, three
+// shared tone tokens (their chip text passes WCAG AA on its own tint), never green above Low.
+export function riskSeverityForLabel(label: string | null | undefined): RiskSeverity {
+  const normalized = String(label || "").trim().toLowerCase();
+  if (normalized === "low" || normalized === "very low") return "low";
+  if (normalized === "moderate" || normalized === "medium" || normalized === "elevated") return "moderate";
+  return "high";
+}
+
+export function riskSeverityForPercent(percent: number): RiskSeverity {
+  if (percent < 34) return "low";
+  if (percent < 67) return "moderate";
+  return "high";
+}
+
+const RISK_SEVERITY_TONE: Record<RiskSeverity, "positive" | "attention" | "risk"> = {
+  low: "positive",
+  moderate: "attention",
+  high: "risk",
+};
+
+/** A sentence's identity for dedupe: case, bullets, punctuation and spacing do not make it new. */
+export function normalizeSentence(text: string | null | undefined) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[‘’]/g, "'")
+    .replace(/[^\p{L}\p{N}']+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * One result, one copy of each sentence (persona reviews, 2026-10-14): "Path to win" and "Not
+ * fixable for this posting" printed the same sentence, and "Focus on roles that match..." showed up
+ * four times. Sections render in priority order and each asks this filter first, so a sentence
+ * appears only in the first (most important) place that wants it.
+ */
+export function createSentenceFilter() {
+  const seen = new Set<string>();
+  return (text: string | null | undefined) => {
+    const key = normalizeSentence(text);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  };
 }
 
 function riskBreakdownFromResult(result: ApplyGateResult | null | undefined) {
@@ -552,29 +612,36 @@ function requirementStatusClass(status: string | null | undefined) {
   return "border-border bg-muted text-muted-foreground";
 }
 
-function explanationActionSections(explanation: ApplyGateResult["explanation"] | null | undefined) {
+export type ActionStep = { key: string; label: string; text: string };
+
+/**
+ * The "What to do" checklist. The old five headed sections ("Path to win", "Quick fixes",
+ * "Resume proof improvements", "Long-term gaps", "Not fixable") often repeated each other; one flat
+ * list with a short label per step reads as a plan. Learnable gaps are "Fix first" steps, not a
+ * separate verdict. Dedupe happens at render time against everything shown above the list.
+ */
+function explanationActionSteps(explanation: ApplyGateResult["explanation"] | null | undefined): ActionStep[] {
   const normalize = (items: string[] | null | undefined) => (items || [])
     .map((item) => String(item || "").trim())
     .filter(Boolean);
 
-  if (!explanation) return [] as Array<{ title: string; items: string[] }>;
+  if (!explanation) return [];
 
-  const pathToWin = normalize(explanation.path_to_win?.strategy);
-  const quickFixes = normalize(explanation.action_plan?.quick_fixes);
-  const resumeProof = normalize(explanation.action_plan?.resume_proof_improvements);
-  const longTerm = normalize(explanation.action_plan?.long_term_gaps);
-  const notFixable = normalize(explanation.action_plan?.not_fixable_for_this_posting);
-
-  const sections = [
-    { title: "Path to win", items: pathToWin },
-    { title: "Quick fixes (today)", items: quickFixes },
-    { title: "Resume proof improvements", items: resumeProof },
-    { title: "Long-term gaps", items: longTerm },
-    { title: "Not fixable for this posting", items: notFixable },
-  ].filter((section) => section.items.length > 0);
-
-  return sections.slice(0, 4);
+  const groups: Array<{ label: string; items: string[] }> = [
+    { label: "Fix first", items: normalize(explanation.action_plan?.quick_fixes) },
+    { label: "Fix first", items: normalize(explanation.action_plan?.resume_proof_improvements) },
+    { label: "Plan", items: normalize(explanation.path_to_win?.strategy) },
+    { label: "Fix first", items: normalize(explanation.action_plan?.long_term_gaps) },
+    { label: "Hard requirement", items: normalize(explanation.action_plan?.not_fixable_for_this_posting) },
+  ];
+  return groups.flatMap((group, groupIndex) => group.items.map((text, index) => ({
+    key: `${groupIndex}-${index}`,
+    label: group.label,
+    text,
+  })));
 }
+
+const MAX_VISIBLE_STEPS = 5;
 
 function memoryConfidenceLabel(value: string | null | undefined) {
   if (value === "meaningful") return "Meaningful pattern";
@@ -781,7 +848,7 @@ function decisionCopyForStatus(status: VerdictStatus, recommendation: string | n
     return {
       title: "Apply, but tailor first",
       body: "This is aligned enough to pursue, but the resume needs to lead with the strongest proof before you send it.",
-      toneClass: "border-amber-500/30 bg-amber-500/10 text-amber-700",
+      toneClass: "border-warning/30 bg-warning/10 text-warning-foreground dark:text-warning",
     };
   }
 
@@ -932,7 +999,7 @@ function safeDegradedDecisionCopy() {
   return {
     title: "Decision unavailable",
     body: "Apply Gate could not produce a consistent decision for this role. Review it manually before acting.",
-    toneClass: "border-amber-500/30 bg-amber-500/10 text-amber-700",
+    toneClass: "border-warning/30 bg-warning/10 text-warning-foreground dark:text-warning",
   };
 }
 
@@ -1038,13 +1105,40 @@ function sameHistoryPosting(
   return true;
 }
 
-function dedupeHistoryItems<T extends { job_title: string; job_url?: string | null; company_name?: string | null; id: string }>(items: T[]) {
-  const deduped: T[] = [];
+export type GroupedHistoryItem<T> = T & { _checkCount: number; _earlierChecks: T[] };
+
+/**
+ * One card per posting, without losing the runs behind it (teacher review, 2026-10-14): three checks
+ * of the same posting used to collapse to the newest, so the earlier two simply vanished. The first
+ * item of each group is the newest (the API and the optimistic insert are newest-first); the rest
+ * stay attached as earlier checks so the card can say "Checked 3 times" and list them.
+ */
+export function groupHistoryItems<T extends { job_title: string; job_url?: string | null; company_name?: string | null; id: string }>(items: T[]) {
+  const groups: Array<GroupedHistoryItem<T>> = [];
+  const seenIds = new Set<string>();
   for (const item of items) {
-    if (deduped.some((existing) => sameHistoryPosting(existing, item))) continue;
-    deduped.push(item);
+    if (seenIds.has(item.id)) continue;
+    seenIds.add(item.id);
+    const group = groups.find((existing) => sameHistoryPosting(existing, item));
+    if (group) {
+      group._checkCount += 1;
+      group._earlierChecks.push(item);
+      continue;
+    }
+    groups.push({ ...item, _checkCount: 1, _earlierChecks: [] });
   }
-  return deduped;
+  return groups;
+}
+
+function checkedTimesLabel(count: number) {
+  return `Checked ${count} times`;
+}
+
+function formatCheckDate(value: string | null | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function buildHistoryDisplayItemFromResult(
@@ -1142,8 +1236,6 @@ const ApplyGateWorkspace = () => {
     }
   }, [actionContext?.logicalKey, actionContext?.dedupeKey, workspace.action, workspace.queue.isFetching, workspace.queue.isError, jobTitle, companyName, jobUrl, jobDescription, result]);
   const [isCurrentWarningExpanded, setIsCurrentWarningExpanded] = useState(false);
-  // Collapsed-by-default analytical breakdown (keeps the default verdict skimmable).
-  const [showBreakdown, setShowBreakdown] = useState(false);
   // After the user records what they did, show a confirmation + next step instead of
   // silently clearing the card (which read as "the button did nothing").
   const [actionConfirmation, setActionConfirmation] = useState<{ action: ApplyGateAction } | null>(null);
@@ -1245,7 +1337,6 @@ const ApplyGateWorkspace = () => {
         const data = await recheckApplyGateVerdict(verdictId);
         setResult(data);
         setIsCurrentWarningExpanded(false);
-        setShowBreakdown(false);
         setActionConfirmation(null);
         await queryClient.invalidateQueries({ queryKey: ["apply-gate-history"] });
         resultTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1263,10 +1354,16 @@ const ApplyGateWorkspace = () => {
     () => buildHistoryDisplayItemFromResult(result, jobTitle, companyName, null),
     [companyName, jobTitle, result],
   );
-  const history = useMemo<ApplyGateHistoryDisplayItem[]>(() => {
-    const deduped = dedupeHistoryItems(rawHistory);
-    if (!currentHistoryProjection) return deduped;
-    return deduped.filter((item) => !sameHistoryPosting(item, currentHistoryProjection));
+  const history = useMemo<Array<GroupedHistoryItem<ApplyGateHistoryDisplayItem>>>(() => {
+    const grouped = groupHistoryItems<ApplyGateHistoryDisplayItem>(rawHistory);
+    if (!currentHistoryProjection) return grouped;
+    return grouped.filter((item) => !sameHistoryPosting(item, currentHistoryProjection));
+  }, [currentHistoryProjection, rawHistory]);
+  // Earlier runs of the posting on screen now. They are hidden from "Roles you checked" (the
+  // current result stands for them), so they are listed in its details instead of vanishing.
+  const currentEarlierChecks = useMemo<ApplyGateHistoryDisplayItem[]>(() => {
+    if (!currentHistoryProjection) return [];
+    return rawHistory.filter((item) => item.id !== currentHistoryProjection.id && sameHistoryPosting(item, currentHistoryProjection));
   }, [currentHistoryProjection, rawHistory]);
 
   const analyzeMutation = useMutation({
@@ -1282,7 +1379,6 @@ const ApplyGateWorkspace = () => {
     onSuccess: (data) => {
       setResult(data);
       setIsCurrentWarningExpanded(false);
-      setShowBreakdown(false);
       setActionConfirmation(null);
       setSavingAction(null);
       setActionSaveError(null);
@@ -1296,10 +1392,11 @@ const ApplyGateWorkspace = () => {
         const persistedHistoryItem = currentAsHistory as ApplyGateHistoryItem;
         queryClient.setQueryData<ApplyGateHistoryQueryData>(["apply-gate-history"], (previous) => {
           const prior = previous?.history ?? [];
-          const merged = dedupeHistoryItems([
+          // Keep every earlier run: the page groups by posting at render time (2026-10-14).
+          const merged = [
             persistedHistoryItem,
             ...prior.filter((item) => item.id !== persistedHistoryItem.id),
-          ]);
+          ];
           return {
             success: previous?.success ?? true,
             history: merged,
@@ -1623,7 +1720,6 @@ const ApplyGateWorkspace = () => {
     .slice(0, 2);
   const currentSearchMemory = result?.explanation?.search_memory || result?.searchMemory || null;
   const currentBaseRateContext = currentSearchMemory?.baseRateContext || null;
-  const currentActionSections = explanationActionSections(result?.explanation);
   const currentRequirementLedgerItems = (
     result?.explanation?.requirement_ledger?.items
     || result?.scoringBreakdown?.requirementLedger?.items
@@ -1694,6 +1790,90 @@ const ApplyGateWorkspace = () => {
   const currentFitLabel = currentDisplayDecisionMissing
     ? "Decision unavailable"
     : reviewLabelForDecisionLabel(currentDecisionLabel, currentStatus || "risky");
+
+  // ── The three-block result (2026-10-14) ─────────────────────────────
+  // Filter calls run in reading order, so a sentence survives only in its first, most important
+  // place: the call, then what to do, then the collapsed details.
+  const keepCurrentSentence = createSentenceFilter();
+  if (currentDecisionCopy?.title) keepCurrentSentence(currentDecisionCopy.title);
+  const currentReasonCandidates = [
+    currentDecisionNudge,
+    currentIsCompressedDecision ? null : currentDecisionCopy?.body,
+  ].map((line) => String(line || "").trim()).filter(Boolean);
+  const currentKeptReasons = currentReasonCandidates.filter((line) => keepCurrentSentence(line));
+  // One sentence under the label; a second distinct line moves into "Why this call".
+  const currentCallReason = currentKeptReasons[0] || null;
+  const currentShowWarning = Boolean(
+    !currentIsCompressedDecision
+    && (result?.explanation?.presentation || currentStatus !== "strong")
+    && currentWarning
+    && keepCurrentSentence(currentWarningFull),
+  );
+  const currentSteps = currentIsCompressedDecision
+    ? []
+    : explanationActionSteps(result?.explanation).filter((step) => keepCurrentSentence(step.text));
+  const currentVisibleSteps = currentSteps.slice(0, MAX_VISIBLE_STEPS);
+  const currentMoreSteps = currentSteps.slice(MAX_VISIBLE_STEPS);
+  const currentWhyBullets = [...currentKeptReasons.slice(1), ...currentVisibleReasons.filter((line) => keepCurrentSentence(line))];
+  const currentShowPriorHistory = Boolean(!result?.explanation?.presentation && result?.priorHistory);
+  const currentShowMemoryPanel = Boolean(!currentIsCompressedDecision && currentSearchMemory);
+  const currentMemorySignals = (currentSearchMemory?.patternSignals || [])
+    .slice(0, 3)
+    .filter((signal) => keepCurrentSentence(signal));
+  const currentLedgerRows = currentIsCompressedDecision
+    ? []
+    : currentRequirementLedgerItems.map((item) => ({
+      item,
+      sentence: item.source_sentence && item.source_sentence !== item.label && keepCurrentSentence(item.source_sentence)
+        ? item.source_sentence
+        : null,
+    }));
+  const currentShowConfidence = !currentIsCompressedDecision && Boolean(
+    currentDecisionConfidence || currentAssessmentConfidence || currentDecisionConfidenceFactors.length > 0
+    || currentUncertaintyNotes.length > 0 || currentOpportunityCost?.message,
+  );
+  const currentConfidenceLines = (currentShowConfidence ? [
+    { text: currentOutcomeBands ? coachScreeningLine(currentOutcomeBands.atsPass, currentOutcomeBands.humanWin) : null, strong: false, bullet: false },
+    { text: currentDecisionConfidence ? coachConfidenceLine(currentDecisionConfidence, currentConfidenceType) : null, strong: true, bullet: false },
+    ...currentDecisionConfidenceFactors.map((text) => ({ text, strong: false, bullet: true })),
+    ...currentUncertaintyNotes.map((text) => ({ text, strong: false, bullet: true })),
+    { text: currentOpportunityCost?.message || null, strong: false, bullet: true },
+  ] : [])
+    .filter((line): line is { text: string; strong: boolean; bullet: boolean } => Boolean(line.text) && keepCurrentSentence(line.text));
+  const currentShowBreakdown = currentConfidenceLines.length > 0 || Boolean(
+    !currentIsCompressedDecision
+    && (currentRiskBreakdown?.components?.length || currentOccupationGrounding?.job || currentOccupationGrounding?.candidate),
+  );
+  const currentDetailParts = [
+    currentWhyBullets.length > 0 ? "why this call" : null,
+    currentShowPriorHistory || currentShowMemoryPanel || currentMemoryBadge || variantRecommendation || currentEarlierChecks.length > 0
+      ? "your history" : null,
+    currentLedgerRows.length > 0 ? "requirement check" : null,
+    result?.variantStrategy ? "resume strategy" : null,
+    currentShowBreakdown ? "full breakdown" : null,
+    currentMoreSteps.length > 0 ? "more steps" : null,
+  ].filter(Boolean) as string[];
+  const currentHasDetails = currentDetailParts.length > 0 || resumeHealthOpenCount > 0;
+  const currentDetailsSummary = currentDetailParts.length > 0 ? currentDetailParts.join(", ") : "resume checks";
+  const currentRiskPill: { severity: RiskSeverity; text: string; note: string | null } | null = (
+    currentRiskCalibration === APPLY_GATE_RISK_CALIBRATED && typeof currentRisk === "number"
+      // Outcome-calibrated: the % is a real probability.
+      ? { severity: riskSeverityForPercent(currentRisk), text: `${currentRisk}% rejection risk`, note: null }
+      : currentRiskLabel
+        // Not outcome-calibrated: never fake a probability, show the qualitative band.
+        ? { severity: riskSeverityForLabel(currentRiskLabel), text: `${currentRiskLabel} rejection risk`, note: "Fit-based estimate" }
+        : null
+  );
+  const earlierCheckLine = (item: ApplyGateHistoryDisplayItem) => {
+    const resumeName = item.explanation_payload?.resume_document?.name
+      || variants.find((v) => v.id === (item.resume_variant_id || item.explanation_payload?.resume_document?.variantId))?.name
+      || null;
+    return [
+      formatCheckDate(item.created_at) || "Earlier",
+      describeVerdictDecision(item).label,
+      resumeName ? `checked against ${resumeName}` : null,
+    ].filter(Boolean).join(" · ");
+  };
 
   return (
     <DashboardLayout>
@@ -1771,7 +1951,7 @@ const ApplyGateWorkspace = () => {
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
               value={jobTitle}
               onChange={(e) => setJobTitle(e.target.value)}
-              placeholder="e.g., QA Analyst"
+              placeholder="e.g., Office Manager"
             />
           </div>
           <div className="space-y-2">
@@ -1887,469 +2067,470 @@ const ApplyGateWorkspace = () => {
                 </div>
               </div>
             ) : result ? (
-              <>
-              <div data-testid="apply-gate-current-result" className={cn(CARD, "space-y-3 p-6")}>
-            <p className="text-xs text-muted-foreground">{result.resumeDocument?.name
-              ? `Checked against: ${result.resumeDocument.name}`
-              : result.resumeDocument?.variantId
-                ? `Checked against: ${variants.find((v) => v.id === result.resumeDocument?.variantId)?.name || 'a previously saved resume'}`
-                : 'Saved check · resume not identified'}</p>
-            {currentDecisionCopy && (
-              <div
-                className={cn(
-                  "-mx-6 -mt-6 mb-1 rounded-t-2xl border-b px-6 py-5",
-                  TONES[describeVerdictDecision({ verdict: result.verdict, explanation_payload: result.explanation }).tone].surface,
-                )}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className={cn(EYEBROW, TONES[describeVerdictDecision({ verdict: result.verdict, explanation_payload: result.explanation }).tone].text)}>Our call</p>
-                    <h2 className="mt-2 text-xl font-bold tracking-[-0.01em] text-foreground">{currentDecisionCopy.title}</h2>
-                    {currentDecisionNudge ? (
-                      <p className="mt-1 text-sm font-medium leading-relaxed text-muted-foreground">{currentDecisionNudge}</p>
-                    ) : null}
-                    {(!currentIsCompressedDecision && (!currentDecisionNudge || currentDecisionNudge !== currentDecisionCopy.body)) ? (
-                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground/80">{currentDecisionCopy.body}</p>
-                    ) : null}
-                  </div>
-                  {currentRiskCalibration === APPLY_GATE_RISK_CALIBRATED && typeof currentRisk === "number" ? (
-                    // Outcome-calibrated → the % is a real probability; show the ring.
-                    <div className="shrink-0 text-center">
-                      <div
-                        className="grid h-[78px] w-[78px] place-items-center rounded-full"
-                        style={{
-                          background: `conic-gradient(${
-                            currentRisk < 34 ? "#0E8C63" : currentRisk < 67 ? "#B45309" : "#B3261E"
-                          } 0% ${currentRisk}%, var(--border) ${currentRisk}% 100%)`,
-                        }}
-                      >
-                        <div className="grid h-[62px] w-[62px] place-items-center rounded-full bg-card">
-                          <span className="text-[19px] font-bold tracking-[-0.02em] text-foreground">{currentRisk}%</span>
-                        </div>
-                      </div>
-                      <p className="mt-2 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                        Rejection risk
-                      </p>
-                    </div>
-                  ) : currentRiskLabel ? (
-                    // Not outcome-calibrated → never fake a probability. Show the honest
-                    // qualitative fit-based band instead of a precise % (Phase A honesty fix).
-                    <div className="shrink-0 text-center" data-testid="risk-band">
-                      <div
-                        className={`grid h-[78px] min-w-[78px] place-items-center rounded-full border px-3 ${riskBandToneClass(currentRiskLabel)}`}
-                      >
-                        <span className="text-base font-bold tracking-[-0.01em]">{currentRiskLabel}</span>
-                      </div>
-                      <p className="mt-2 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                        Rejection risk · fit-based estimate
-                      </p>
+              // Three blocks, in reading order (persona reviews, 2026-10-14): the call, what to do,
+              // then everything else collapsed. It used to be seven stacked sub-cards that repeated
+              // each other; every sentence below passes one shared dedupe filter.
+              <div data-testid="apply-gate-current-result" className={cn(CARD, "min-w-0 space-y-4 overflow-hidden p-5 sm:p-6")}>
+                <section
+                  data-testid="apply-gate-call"
+                  aria-label="Our call"
+                  className={cn(
+                    "-mx-5 -mt-5 border-b px-5 py-5 sm:-mx-6 sm:-mt-6 sm:px-6",
+                    TONES[describeVerdictDecision({ verdict: result.verdict, explanation_payload: result.explanation }).tone].surface,
+                  )}
+                >
+                  <p className="text-xs text-muted-foreground">{result.resumeDocument?.name
+                    ? `Checked against: ${result.resumeDocument.name}`
+                    : result.resumeDocument?.variantId
+                      ? `Checked against: ${variants.find((v) => v.id === result.resumeDocument?.variantId)?.name || 'a previously saved resume'}`
+                      : 'Saved check · resume not identified'}</p>
+                  {currentDecisionCopy ? (
+                    <>
+                      <p className={cn(EYEBROW, "mt-3", TONES[describeVerdictDecision({ verdict: result.verdict, explanation_payload: result.explanation }).tone].text)}>Our call</p>
+                      <h2 className="mt-1.5 text-xl font-bold tracking-[-0.01em] text-foreground">{currentDecisionCopy.title}</h2>
+                    </>
+                  ) : null}
+                  {currentCallReason ? (
+                    <p className="mt-1 text-sm font-medium leading-relaxed text-muted-foreground">{currentCallReason}</p>
+                  ) : null}
+                  {currentRiskPill || currentEarlierChecks.length > 0 ? (
+                    <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2">
+                      {currentRiskPill ? (
+                        <span
+                          data-testid="risk-band"
+                          data-severity={currentRiskPill.severity}
+                          className={cn(
+                            "inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold",
+                            `risk-pill-${currentRiskPill.severity}`,
+                            TONES[RISK_SEVERITY_TONE[currentRiskPill.severity]].chip,
+                          )}
+                        >
+                          <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", TONES[RISK_SEVERITY_TONE[currentRiskPill.severity]].rail)} aria-hidden />
+                          {currentRiskPill.text}
+                        </span>
+                      ) : null}
+                      {currentRiskPill?.note ? (
+                        <span className="text-xs text-muted-foreground">{currentRiskPill.note}</span>
+                      ) : null}
+                      {currentEarlierChecks.length > 0 ? (
+                        <ToneChip tone="neutral">{checkedTimesLabel(currentEarlierChecks.length + 1)}</ToneChip>
+                      ) : null}
                     </div>
                   ) : null}
-                </div>
-              </div>
-            )}
+                  <div className="mt-3 min-w-0">
+                    <p className="font-semibold leading-tight text-foreground">{currentRoleCompany.role}</p>
+                    {currentRoleCompany.company ? (
+                      <p className="mt-0.5 text-sm leading-tight text-muted-foreground">{currentRoleCompany.company}</p>
+                    ) : null}
+                  </div>
+                </section>
 
-            {/* New reads include history in the canonical decision. The legacy history panel
-                contains its own recommendation and must not introduce a second call. */}
-            {!result.explanation?.presentation && result.priorHistory ? (
-              <div
-                className={`rounded-xl border px-4 py-3 ${
-                  result.priorHistory.recommendation === "skip"
-                    ? "border-destructive/40 bg-destructive/5 text-destructive"
-                    : result.priorHistory.recommendation === "fix_first"
-                      ? "border-yellow-500/40 bg-yellow-500/5 text-yellow-700 dark:text-yellow-300"
-                      : result.priorHistory.recommendation === "proceed_with_confidence"
-                        ? "border-emerald-500/40 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300"
-                        /* No recommendation means history had nothing to say about THIS posting —
-                           which is the common case now that a raw rejection count no longer drives
-                           the verdict. It used to fall through to the green style, so a headline
-                           counting rejections rendered as good news. Neutral is the honest state. */
-                        : "border-border bg-muted/40 text-muted-foreground"
-                }`}
-              >
-                <div className="flex items-start gap-2">
-                  {result.priorHistory.recommendation === "skip"
-                    || result.priorHistory.recommendation === "fix_first" ? (
-                    <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-                  ) : result.priorHistory.recommendation === "proceed_with_confidence" ? (
-                    <Check className="w-4 h-4 mt-0.5 shrink-0" />
-                  ) : (
-                    <Info className="w-4 h-4 mt-0.5 shrink-0" />
-                  )}
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide">
-                      {/* The count comes from applications now, not the inbox, whenever the
-                          canonical summary is available. Labelling it "inbox" would name the wrong
-                          source for the number directly underneath. */}
-                      {result.priorHistory.rejectionCountSource === "emails"
-                        ? "Prior inbox history"
-                        : "Your history with roles like this"}
-                    </p>
-                    <p className="mt-1 text-sm font-medium leading-relaxed">
-                      {result.priorHistory.headline}
-                    </p>
-                    {result.priorHistory.examples.length > 0 ? (
-                      <ul className="mt-2 space-y-0.5">
-                        {result.priorHistory.examples.map((ex, idx) => (
-                          <li key={`prior-ex-${idx}`} className="text-xs opacity-90">
-                            <span className="font-medium">
-                              {ex.company || "Unknown"}
+                {currentShowWarning || currentVisibleSteps.length > 0 || currentStatus === "strong" || currentStatus === "potential" ? (
+                  <section ref={actionPlanRef} data-testid="apply-gate-todo" aria-label="What to do" className="scroll-mt-4 space-y-3">
+                    {currentShowWarning || currentVisibleSteps.length > 0 ? (
+                      <h3 className="text-[13px] font-semibold text-foreground">What to do</h3>
+                    ) : null}
+                    {currentShowWarning && currentWarning ? (() => {
+                      // Classify the FULL sentence, not the truncated one, so an ellipsis can never
+                      // change whether this reads as a risk.
+                      const presentation = warningPresentation(currentStatus || "risky", currentWarningFull, result?.explanation?.presentation);
+                      return (
+                        <div
+                          className={presentation.isRisk
+                            ? "flex items-start gap-2 rounded-lg border border-destructive/10 bg-destructive/5 p-3"
+                            : "flex items-start gap-2 rounded-lg border border-border/60 bg-muted/30 p-3"}
+                        >
+                          {presentation.isRisk ? (
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                          ) : (
+                            <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                          )}
+                          <div className={cn("min-w-0 text-sm leading-snug", presentation.isRisk ? "text-destructive" : "text-muted-foreground")}>
+                            <span>{presentation.prefix}: {currentWarning}</span>
+                            {currentWarningCanExpand && (
+                              <button
+                                type="button"
+                                className="ml-1 underline underline-offset-2"
+                                onClick={() => setIsCurrentWarningExpanded((prev) => !prev)}
+                              >
+                                {isCurrentWarningExpanded ? "Show less" : "Read more"}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })() : null}
+                    {currentVisibleSteps.length > 0 ? (
+                      <ul className="space-y-2" data-testid="apply-gate-steps">
+                        {currentVisibleSteps.map((step) => (
+                          <li key={step.key} className="flex items-start gap-2.5 text-sm leading-relaxed">
+                            <span className="mt-1 h-3.5 w-3.5 shrink-0 rounded border border-muted-foreground/60" aria-hidden />
+                            <span className="min-w-0">
+                              <span className="font-semibold text-foreground">{step.label}: </span>
+                              <span className="text-muted-foreground">{step.text}</span>
                             </span>
-                            {ex.position ? ` — ${ex.position}` : ""}
-                            {ex.subject ? ` · "${ex.subject}"` : ""}
                           </li>
                         ))}
                       </ul>
                     ) : null}
-                    {/* A rejection count with no base rate next to it reads as a verdict on
-                        the person. This is the only place in the screen that can say "this
-                        is normal", so it sits inside the same panel as the count itself. */}
-                    {currentBaseRateContext?.message ? (
-                      <p className="mt-2 rounded-md bg-background/60 px-2.5 py-1.5 text-xs leading-relaxed text-muted-foreground">
-                        <span className="font-medium text-foreground">For perspective: </span>
-                        {currentBaseRateContext.message}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            {variantRecommendation ? (
-              <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 text-xs leading-relaxed text-muted-foreground">
-                <span className="font-semibold text-foreground">{variantRecommendation.name}</span> has your best
-                track record on roles like this — {variantRecommendation.interviewRate}% reach an interview. Consider
-                sending that one.
-              </div>
-            ) : null}
-
-            <div>
-              <p className="font-semibold text-foreground leading-tight">{currentRoleCompany.role}</p>
-              {currentRoleCompany.company ? (
-                <p className="text-sm text-muted-foreground leading-tight mt-0.5">{currentRoleCompany.company}</p>
-              ) : null}
-            </div>
-
-            {currentMemoryBadge ? (
-              <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                <ToneChip tone="neutral">Your history with roles like this: {currentMemoryBadge}</ToneChip>
-              </div>
-            ) : null}
-
-            {!currentIsCompressedDecision && (currentRiskBreakdown?.components?.length || currentOccupationGrounding?.job || currentOccupationGrounding?.candidate) ? (
-              <button
-                type="button"
-                onClick={() => setShowBreakdown((v) => !v)}
-                className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                aria-expanded={showBreakdown}
-              >
-                {showBreakdown ? "Hide the full breakdown" : "Show the full breakdown"}
-                {showBreakdown ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-              </button>
-            ) : null}
-
-            {!currentIsCompressedDecision && showBreakdown && currentRiskBreakdown?.components?.length ? (
-              <div className="rounded-lg border border-border/70 bg-background/70 p-3 space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs font-semibold text-foreground">Why this recommendation</p>
-                  <span className="text-xs text-muted-foreground">{currentRiskBreakdown.summary}</span>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {currentRiskBreakdown.components.slice(0, 4).map((component) => (
-                    <div key={component.key} className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-medium text-foreground">{component.label}</p>
-                      </div>
-                      {component.evidence ? (
-                        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{component.evidence}</p>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {!currentIsCompressedDecision && showBreakdown && (currentOccupationGrounding?.job || currentOccupationGrounding?.candidate) ? (
-              <div className="rounded-lg border border-border/70 bg-background/70 p-3 space-y-2">
-                <p className="text-xs font-semibold text-foreground">Career-field match</p>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">This role</p>
-                    <p className="text-xs font-medium text-foreground">{currentOccupationGrounding.job?.title || "Unclear"}</p>
-                  </div>
-                  <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Your background</p>
-                    <p className="text-xs font-medium text-foreground">{currentOccupationGrounding.candidate?.title || "Unclear"}</p>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {occupationAlignmentLabel(currentOccupationGrounding.alignmentLabel)}
-                </p>
-              </div>
-            ) : null}
-
-            {!currentIsCompressedDecision && currentSearchMemory ? (
-              <div className="rounded-lg border border-border/70 bg-background/70 p-3 space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-xs font-semibold text-foreground">Your history with roles like this</p>
-                    <p className="text-xs text-muted-foreground">
-                      {currentSearchMemory.outcomeSummary.similarRoleCount > 0
-                        ? `You've seen ${currentSearchMemory.outcomeSummary.similarRoleCount} similar tracked role${currentSearchMemory.outcomeSummary.similarRoleCount === 1 ? "" : "s"}.`
-                        : "No similar tracked roles found yet."}
-                    </p>
-                  </div>
-                  <span className="rounded border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                    {memoryConfidenceLabel(currentSearchMemory.confidence)}
-                  </span>
-                </div>
-
-                {memoryOutcomeTiles(currentSearchMemory.outcomeSummary).length > 0 ? (
-                  <div className="grid gap-2 grid-cols-2 sm:grid-cols-4">
-                    {memoryOutcomeTiles(currentSearchMemory.outcomeSummary).map((tile) => (
-                      <div key={tile.label} className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{tile.label}</p>
-                        <p className="text-sm font-semibold text-foreground">{tile.value}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-
-                {memoryResponseTimeLine(currentSearchMemory.outcomeSummary) ? (
-                  <p className="text-xs text-muted-foreground">
-                    {memoryResponseTimeLine(currentSearchMemory.outcomeSummary)}
-                  </p>
-                ) : null}
-
-                {currentSearchMemory.patternSignals.length > 0 ? (
-                  <div className="space-y-1">
-                    {currentSearchMemory.patternSignals.slice(0, 3).map((signal, idx) => (
-                      <p key={`memory-signal-${idx}`} className="text-xs text-muted-foreground leading-relaxed">{"\u2022"} {signal}</p>
-                    ))}
-                  </div>
-                ) : null}
-
-                {currentSearchMemory.similarRoles.length > 0 ? (
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-foreground">Closest tracked roles</p>
-                    {currentSearchMemory.similarRoles.slice(0, 3).map((role) => (
-                      <div key={`${role.id || role.role}-${role.company || ""}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-                        <p className="text-xs text-foreground">
-                          {role.role}{role.company ? ` at ${role.company}` : ""}
-                        </p>
-                        <span className="rounded border border-border bg-background px-2 py-0.5 text-[11px] text-muted-foreground">
-                          {memoryOutcomeLabel(role.responseOutcome || role.outcome, role.noResponse)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            <div className="space-y-1.5">
-              {currentVisibleReasons.map((reason, idx) => (
-                <p key={idx} className="text-sm text-muted-foreground leading-relaxed">• {reason}</p>
-              ))}
-            </div>
-
-            {(!currentIsCompressedDecision && (result?.explanation?.presentation || currentStatus !== "strong") && currentWarning) && (() => {
-              // Classify the FULL sentence, not the truncated one, so an ellipsis can never
-              // change whether this reads as a risk.
-              const presentation = warningPresentation(currentStatus || "risky", currentWarningFull, result?.explanation?.presentation);
-              return (
-                <div
-                  className={presentation.isRisk
-                    ? "flex items-start gap-2 p-3 rounded-lg bg-destructive/5 border border-destructive/10"
-                    : "flex items-start gap-2 p-3 rounded-lg bg-muted/30 border border-border/60"}
-                >
-                  {presentation.isRisk ? (
-                    <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-                  ) : (
-                    <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-                  )}
-                  <div className={presentation.isRisk ? "text-sm text-destructive leading-snug" : "text-sm text-muted-foreground leading-snug"}>
-                    <span>{presentation.prefix}: {currentWarning}</span>
-                    {currentWarningCanExpand && (
-                      <button
-                        type="button"
-                        className="ml-1 underline underline-offset-2"
-                        onClick={() => setIsCurrentWarningExpanded((prev) => !prev)}
-                      >
-                        {isCurrentWarningExpanded ? "Show less" : "Read more"}
-                      </button>
+                    {(currentStatus === "strong" || currentStatus === "potential") && (
+                      <ReferralNudge company={result.companyName} />
                     )}
-                  </div>
-                </div>
-              );
-            })()}
+                  </section>
+                ) : null}
 
-            {!currentIsCompressedDecision && currentRequirementLedgerItems.length > 0 && (
-              <div className="rounded-lg border border-border/70 bg-background/70 p-3 space-y-2">
-                <p className="text-xs font-semibold text-foreground">Requirement check</p>
-                <div className="space-y-2">
-                  {currentRequirementLedgerItems.map((item) => (
-                    <div key={item.id || `${item.type}-${item.label}`} className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`rounded border px-2 py-0.5 text-[11px] font-medium ${requirementStatusClass(item.candidate_status)}`}>
-                          {requirementStatusLabel(item.candidate_status)}
-                        </span>
-                        <span className="text-xs font-medium text-foreground">{item.label}</span>
-                      </div>
-                      {item.source_sentence && item.source_sentence !== item.label ? (
-                        <p className="text-xs text-muted-foreground leading-relaxed">{item.source_sentence}</p>
+                {actionConfirmation ? (
+                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-2">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                      <Check className="h-4 w-4 shrink-0" />
+                      {actionConfirmationCopy(actionConfirmation.action).title}
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {actionConfirmationCopy(actionConfirmation.action).body}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                      {actionConfirmation.action === "applied" && (result?.jobUrl || jobUrl).trim() ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-8"
+                          onClick={() => window.open((result?.jobUrl || jobUrl).trim(), "_blank", "noopener,noreferrer")}
+                        >
+                          Open the posting
+                        </Button>
                       ) : null}
+                      {actionConfirmation.action === "fixed" && currentVisibleSteps.length > 0 ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-8"
+                          onClick={() => actionPlanRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                        >
+                          See the fixes
+                        </Button>
+                      ) : null}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-xs h-8 text-muted-foreground"
+                        onClick={() => {
+                          setActionConfirmation(null);
+                          setResult(null);
+                        }}
+                      >
+                        Review another role
+                      </Button>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {!currentIsCompressedDecision && (currentDecisionConfidence || currentAssessmentConfidence || currentDecisionConfidenceFactors.length > 0 || currentUncertaintyNotes.length > 0 || currentOpportunityCost?.message) && (
-              <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 space-y-1">
-                {currentOutcomeBands ? (
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {coachScreeningLine(currentOutcomeBands.atsPass, currentOutcomeBands.humanWin)}
-                  </p>
-                ) : null}
-                {currentDecisionConfidence && (
-                  <p className="text-xs text-foreground font-medium leading-relaxed">
-                    {coachConfidenceLine(currentDecisionConfidence, currentConfidenceType)}
-                  </p>
-                )}
-                {currentDecisionConfidenceFactors.map((note, idx) => (
-                  <p key={`decision-confidence-${idx}`} className="text-xs text-muted-foreground leading-relaxed">{"\u2022"} {note}</p>
-                ))}
-                {currentUncertaintyNotes.map((note, idx) => (
-                  <p key={idx} className="text-xs text-muted-foreground leading-relaxed">{"\u2022"} {note}</p>
-                ))}
-                {currentOpportunityCost?.message ? (
-                  <p className="text-xs text-muted-foreground leading-relaxed">{"\u2022"} {currentOpportunityCost.message}</p>
-                ) : null}
-              </div>
-            )}
-
-            {!currentIsCompressedDecision && currentActionSections.length > 0 && (
-              <div ref={actionPlanRef} className="rounded-lg border border-border/70 bg-background/70 p-3 space-y-2 scroll-mt-4">
-                <p className="text-xs font-semibold text-foreground">{currentHasUniversalHardGate ? "What this means" : "How to improve your odds"}</p>
-                <div className="space-y-2">
-                  {currentActionSections.map((section) => (
-                    <div key={section.title} className="space-y-1">
-                      <p className="text-xs font-medium text-foreground">{section.title}</p>
-                      {section.items.map((item, idx) => (
-                        <p key={`${section.title}-${idx}`} className="text-xs text-muted-foreground leading-relaxed">{"\u2022"} {item}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 pt-1">
+                    {currentDecisionActions.length ? (
+                      <p data-testid="apply-gate-question" className="text-xs text-muted-foreground">{DECISION_QUESTION}</p>
+                    ) : null}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {currentDecisionActions.map((item) => (
+                        <Button
+                          key={`${item.action}-${item.label}`}
+                          size="sm"
+                          variant={item.variant || "default"}
+                          className={`${item.className || ""} text-xs h-8`.trim()}
+                          onClick={() => void handleAction(item.action)}
+                          disabled={currentSavePending}
+                          aria-busy={currentSavePending && savingAction?.action === item.action ? "true" : undefined}
+                        >
+                          {currentSavePending && savingAction?.action === item.action ? "Saving..." : item.label}
+                        </Button>
                       ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {(currentStatus === "strong" || currentStatus === "potential") && (
-              <ReferralNudge company={result.companyName} />
-            )}
-
-            {actionConfirmation ? (
-              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-2">
-                <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                  <Check className="h-4 w-4 shrink-0" />
-                  {actionConfirmationCopy(actionConfirmation.action).title}
-                </p>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {actionConfirmationCopy(actionConfirmation.action).body}
-                </p>
-                <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                  {actionConfirmation.action === "applied" && (result?.jobUrl || jobUrl).trim() ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-xs h-8"
-                      onClick={() => window.open((result?.jobUrl || jobUrl).trim(), "_blank", "noopener,noreferrer")}
-                    >
-                      Open the posting
-                    </Button>
-                  ) : null}
-                  {actionConfirmation.action === "fixed" && currentActionSections.length > 0 ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-xs h-8"
-                      onClick={() => actionPlanRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                    >
-                      See the fixes
-                    </Button>
-                  ) : null}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-xs h-8 text-muted-foreground"
-                    onClick={() => {
-                      setActionConfirmation(null);
-                      setResult(null);
-                    }}
-                  >
-                    Review another role
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2 pt-1">
-                {currentDecisionActions.length ? (
-                  <p data-testid="apply-gate-question" className="text-xs text-muted-foreground">{DECISION_QUESTION}</p>
-                ) : null}
-                <div className="flex flex-wrap items-center gap-2">
-                  {currentDecisionActions.map((item) => (
-                    <Button
-                      key={`${item.action}-${item.label}`}
-                      size="sm"
-                      variant={item.variant || "default"}
-                      className={`${item.className || ""} text-xs h-8`.trim()}
-                      onClick={() => void handleAction(item.action)}
-                      disabled={currentSavePending}
-                      aria-busy={currentSavePending && savingAction?.action === item.action ? "true" : undefined}
-                    >
-                      {currentSavePending && savingAction?.action === item.action ? "Saving..." : item.label}
-                    </Button>
-                  ))}
-                </div>
-                {currentSaveError ? (
-                  <p role="alert" className="text-xs font-medium text-destructive">
-                    {currentSaveError}
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground" aria-live="polite">
-                    {currentSavePending
-                      ? "Saving your choice…"
-                      : currentDisplayDecisionMissing
-                      ? "This call could not load cleanly. Run the check again before deciding."
-                      : currentHasUniversalHardGate
-                      ? "Apply anyway only if you already meet these requirements and your resume is missing the proof."
-                      : null}
-                  </p>
+                    {currentSaveError ? (
+                      <p role="alert" className="text-xs font-medium text-destructive">
+                        {currentSaveError}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground" aria-live="polite">
+                        {currentSavePending
+                          ? "Saving your choice…"
+                          : currentDisplayDecisionMissing
+                          ? "This call could not load cleanly. Run the check again before deciding."
+                          : currentHasUniversalHardGate
+                          ? "Apply anyway only if you already meet these requirements and your resume is missing the proof."
+                          : null}
+                      </p>
+                    )}
+                  </div>
                 )}
+
+                {currentHasDetails ? (
+                  <details key={result.id || "current"} data-testid="apply-gate-details" className="group rounded-lg border border-border/70 bg-background/70">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-[13px] font-medium text-foreground [&::-webkit-details-marker]:hidden">
+                      <span className="min-w-0">Details<span className="font-normal text-muted-foreground">: {currentDetailsSummary}</span></span>
+                      <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
+                    </summary>
+                    <div className="space-y-3 border-t border-border/70 p-3">
+                      {currentWhyBullets.length > 0 ? (
+                        <div className="space-y-1.5">
+                          <p className="text-xs font-semibold text-foreground">Why this call</p>
+                          {currentWhyBullets.map((reason, idx) => (
+                            <p key={idx} className="text-sm leading-relaxed text-muted-foreground">• {reason}</p>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {/* New reads include history in the canonical decision. The legacy history panel
+                          contains its own recommendation and must not introduce a second call. */}
+                      {currentShowPriorHistory && result.priorHistory ? (
+                        <div
+                          className={`rounded-xl border px-4 py-3 ${
+                            result.priorHistory.recommendation === "skip"
+                              ? "border-destructive/40 bg-destructive/5 text-destructive"
+                              : result.priorHistory.recommendation === "fix_first"
+                                ? "border-yellow-500/40 bg-yellow-500/5 text-yellow-800 dark:text-yellow-300"
+                                : result.priorHistory.recommendation === "proceed_with_confidence"
+                                  ? "border-emerald-500/40 bg-emerald-500/5 text-emerald-800 dark:text-emerald-300"
+                                  /* No recommendation means history had nothing to say about THIS posting.
+                                     Neutral is the honest state, never the green "good news" style. */
+                                  : "border-border bg-muted/40 text-muted-foreground"
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            {result.priorHistory.recommendation === "skip"
+                              || result.priorHistory.recommendation === "fix_first" ? (
+                              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                            ) : result.priorHistory.recommendation === "proceed_with_confidence" ? (
+                              <Check className="mt-0.5 h-4 w-4 shrink-0" />
+                            ) : (
+                              <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold uppercase tracking-wide">
+                                {/* The count comes from applications now, not the inbox, whenever the
+                                    canonical summary is available. */}
+                                {result.priorHistory.rejectionCountSource === "emails"
+                                  ? "Prior inbox history"
+                                  : "Your history with roles like this"}
+                              </p>
+                              <p className="mt-1 text-sm font-medium leading-relaxed">
+                                {result.priorHistory.headline}
+                              </p>
+                              {result.priorHistory.examples.length > 0 ? (
+                                <ul className="mt-2 space-y-0.5">
+                                  {result.priorHistory.examples.map((ex, idx) => (
+                                    <li key={`prior-ex-${idx}`} className="text-xs">
+                                      <span className="font-medium">
+                                        {ex.company || "Unknown"}
+                                      </span>
+                                      {ex.position ? ` · ${ex.position}` : ""}
+                                      {ex.subject ? ` · "${ex.subject}"` : ""}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : null}
+                              {/* A rejection count with no base rate next to it reads as a verdict on
+                                  the person, so the base rate sits in the same panel as the count. */}
+                              {currentBaseRateContext?.message ? (
+                                <p className="mt-2 rounded-md bg-background/60 px-2.5 py-1.5 text-xs leading-relaxed text-muted-foreground">
+                                  <span className="font-medium text-foreground">For perspective: </span>
+                                  {currentBaseRateContext.message}
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {variantRecommendation ? (
+                        <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 text-xs leading-relaxed text-muted-foreground">
+                          <span className="font-semibold text-foreground">{variantRecommendation.name}</span> has your best
+                          track record on roles like this: {variantRecommendation.interviewRate}% reach an interview. Consider
+                          sending that one.
+                        </div>
+                      ) : null}
+
+                      {currentShowMemoryPanel && currentSearchMemory ? (
+                        <div className="space-y-3 rounded-lg border border-border/70 bg-background/70 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-foreground">Your history with roles like this</p>
+                              <p className="text-xs text-muted-foreground">
+                                {currentMemoryBadge
+                                  ? currentMemoryBadge
+                                  : currentSearchMemory.outcomeSummary.similarRoleCount > 0
+                                  ? `You've seen ${currentSearchMemory.outcomeSummary.similarRoleCount} similar tracked role${currentSearchMemory.outcomeSummary.similarRoleCount === 1 ? "" : "s"}.`
+                                  : "No similar tracked roles found yet."}
+                              </p>
+                            </div>
+                            <span className="rounded border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                              {memoryConfidenceLabel(currentSearchMemory.confidence)}
+                            </span>
+                          </div>
+
+                          {memoryOutcomeTiles(currentSearchMemory.outcomeSummary).length > 0 ? (
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                              {memoryOutcomeTiles(currentSearchMemory.outcomeSummary).map((tile) => (
+                                <div key={tile.label} className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{tile.label}</p>
+                                  <p className="text-sm font-semibold text-foreground">{tile.value}</p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+
+                          {memoryResponseTimeLine(currentSearchMemory.outcomeSummary) ? (
+                            <p className="text-xs text-muted-foreground">
+                              {memoryResponseTimeLine(currentSearchMemory.outcomeSummary)}
+                            </p>
+                          ) : null}
+
+                          {currentMemorySignals.length > 0 ? (
+                            <div className="space-y-1">
+                              {currentMemorySignals.map((signal, idx) => (
+                                <p key={`memory-signal-${idx}`} className="text-xs leading-relaxed text-muted-foreground">{"•"} {signal}</p>
+                              ))}
+                            </div>
+                          ) : null}
+
+                          {currentSearchMemory.similarRoles.length > 0 ? (
+                            <div className="space-y-1">
+                              <p className="text-xs font-medium text-foreground">Closest tracked roles</p>
+                              {currentSearchMemory.similarRoles.slice(0, 3).map((role) => (
+                                <div key={`${role.id || role.role}-${role.company || ""}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                                  <p className="min-w-0 text-xs text-foreground">
+                                    {role.role}{role.company ? ` at ${role.company}` : ""}
+                                  </p>
+                                  <span className="rounded border border-border bg-background px-2 py-0.5 text-[11px] text-muted-foreground">
+                                    {memoryOutcomeLabel(role.responseOutcome || role.outcome, role.noResponse)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : currentMemoryBadge ? (
+                        // This used to be a non-wrapping pill that made a 390px page 429px wide.
+                        <p className="text-xs text-muted-foreground">Your history with roles like this: {currentMemoryBadge}</p>
+                      ) : null}
+
+                      {currentEarlierChecks.length > 0 ? (
+                        <div className="space-y-1.5 rounded-lg border border-border/70 bg-background/70 p-3">
+                          <p className="text-xs font-semibold text-foreground">Earlier checks of this posting</p>
+                          <ul className="space-y-1">
+                            {currentEarlierChecks.map((item) => (
+                              <li key={item.id} className="text-xs leading-relaxed text-muted-foreground">
+                                {earlierCheckLine(item)}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+
+                      {currentLedgerRows.length > 0 ? (
+                        <div className="space-y-2 rounded-lg border border-border/70 bg-background/70 p-3">
+                          <p className="text-xs font-semibold text-foreground">Requirement check</p>
+                          <div className="space-y-2">
+                            {currentLedgerRows.map(({ item, sentence }) => (
+                              <div key={item.id || `${item.type}-${item.label}`} className="space-y-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className={`rounded border px-2 py-0.5 text-[11px] font-medium ${requirementStatusClass(item.candidate_status)}`}>
+                                    {requirementStatusLabel(item.candidate_status)}
+                                  </span>
+                                  <span className="min-w-0 text-xs font-medium text-foreground">{item.label}</span>
+                                </div>
+                                {sentence ? (
+                                  <p className="text-xs leading-relaxed text-muted-foreground">{sentence}</p>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {resumeHealthOpenCount > 0 ? (
+                        <a
+                          href="/resumes"
+                          className="block rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs leading-relaxed text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+                        >
+                          <span className="font-medium text-foreground">
+                            {resumeHealthOpenCount === 1
+                              ? "1 open check on this resume"
+                              : `${resumeHealthOpenCount} open checks on this resume`}
+                          </span>{" "}
+                          (about the document, not this job). Review on Resumes.
+                        </a>
+                      ) : null}
+
+                      {result.variantStrategy ? (
+                        <VariantStrategyCard
+                          className="mt-0"
+                          strategy={result.variantStrategy}
+                          onDraftDecisionsChange={setVariantDraftDecisions}
+                        />
+                      ) : null}
+
+                      {currentShowBreakdown ? (
+                        <div className="space-y-3 rounded-lg border border-border/70 bg-background/70 p-3">
+                          <p className="text-xs font-semibold text-foreground">Full breakdown</p>
+                          {currentConfidenceLines.length > 0 ? (
+                            <div className="space-y-1">
+                              {currentConfidenceLines.map((line, idx) => (
+                                <p key={`confidence-${idx}`} className={cn("text-xs leading-relaxed", line.strong ? "font-medium text-foreground" : "text-muted-foreground")}>
+                                  {line.bullet ? "• " : ""}{line.text}
+                                </p>
+                              ))}
+                            </div>
+                          ) : null}
+                          {!currentIsCompressedDecision && currentRiskBreakdown?.components?.length ? (
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-xs font-semibold text-foreground">Why this recommendation</p>
+                                <span className="text-xs text-muted-foreground">{currentRiskBreakdown.summary}</span>
+                              </div>
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                {currentRiskBreakdown.components.slice(0, 4).map((component) => (
+                                  <div key={component.key} className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                                    <p className="text-xs font-medium text-foreground">{component.label}</p>
+                                    {component.evidence ? (
+                                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{component.evidence}</p>
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                          {!currentIsCompressedDecision && (currentOccupationGrounding?.job || currentOccupationGrounding?.candidate) ? (
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold text-foreground">Career-field match</p>
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">This role</p>
+                                  <p className="text-xs font-medium text-foreground">{currentOccupationGrounding?.job?.title || "Unclear"}</p>
+                                </div>
+                                <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Your background</p>
+                                  <p className="text-xs font-medium text-foreground">{currentOccupationGrounding?.candidate?.title || "Unclear"}</p>
+                                </div>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {occupationAlignmentLabel(currentOccupationGrounding?.alignmentLabel)}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {currentMoreSteps.length > 0 ? (
+                        <div className="space-y-1.5">
+                          <p className="text-xs font-semibold text-foreground">More steps</p>
+                          {currentMoreSteps.map((step) => (
+                            <p key={step.key} className="text-xs leading-relaxed text-muted-foreground">
+                              <span className="font-semibold text-foreground">{step.label}: </span>{step.text}
+                            </p>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </details>
+                ) : null}
               </div>
-            )}
-              </div>
-              {resumeHealthOpenCount > 0 ? (
-                <a
-                  href="/resumes"
-                  className="block rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs leading-relaxed text-muted-foreground transition-colors hover:border-border hover:text-foreground"
-                >
-                  <span className="font-medium text-foreground">
-                    {resumeHealthOpenCount === 1
-                      ? "1 open check on this resume"
-                      : `${resumeHealthOpenCount} open checks on this resume`}
-                  </span>{" "}
-                  — about the document, not this job. Review on Resumes.
-                </a>
-              ) : null}
-              {result.variantStrategy ? (
-                <VariantStrategyCard
-                  strategy={result.variantStrategy}
-                  onDraftDecisionsChange={setVariantDraftDecisions}
-                />
-              ) : null}
-              </>
             ) : (
               <div className={cn(CARD, "p-5")}>
                 <EmptyState
@@ -2417,7 +2598,13 @@ const ApplyGateWorkspace = () => {
                       : decisionActionsForStatus(status, recommendation, Boolean(item.hard_blocker)));
                   const outcomeBands = historyOutcomeBands(item, status);
                   const decisionConfidence = decisionConfidenceLabel(item.explanation_payload?.decision_confidence || null);
-                  const historyVisibleReasons = displayDecisionMissing ? [] : visibleReasons;
+                  // Same one-copy rule as the current result (2026-10-14), within each card.
+                  const keepHistorySentence = createSentenceFilter();
+                  const historyShowsCopy = Boolean(item.explanation_payload?.presentation);
+                  const historyTitle = historyShowsCopy && keepHistorySentence(decisionCopy.title) ? decisionCopy.title : null;
+                  const historyBody = historyShowsCopy && keepHistorySentence(decisionCopy.body) ? decisionCopy.body : null;
+                  const historyVisibleReasons = displayDecisionMissing ? [] : visibleReasons.filter((reason) => keepHistorySentence(reason));
+                  const historyShowWarning = Boolean(warning && keepHistorySentence(warningFull));
                   const historySavePending = savingAction?.verdictId === item.id;
                   const historyDecision = describeVerdictDecision(item);
                   const historyOutcome = describeVerdictOutcome(item);
@@ -2436,17 +2623,38 @@ const ApplyGateWorkspace = () => {
                       {[roleCompany.company, historyOutcome?.label].filter(Boolean).join(" · ")}
                     </p>
                   </div>
-                  <ToneChip tone={item.outdated ? "neutral" : historyDecision.tone}>{historyDecision.label}</ToneChip>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                    {item._checkCount > 1 ? (
+                      <span data-testid={`apply-gate-history-count-${item.id}`}>
+                        <ToneChip tone="neutral">{checkedTimesLabel(item._checkCount)}</ToneChip>
+                      </span>
+                    ) : null}
+                    <ToneChip tone={item.outdated ? "neutral" : historyDecision.tone}>{historyDecision.label}</ToneChip>
+                  </div>
                 </div>
                 <p className="text-xs text-muted-foreground">{item.explanation_payload?.resume_document || item.resume_variant_id
                   ? `Checked against: ${item.explanation_payload?.resume_document?.name
                     || variants.find((v) => v.id === (item.resume_variant_id || item.explanation_payload?.resume_document?.variantId))?.name || 'a previously saved resume'}${['legacy', 'seeded_from_legacy'].includes(item.explanation_payload?.resume_document?.source || '') ? ' (from your old profile)' : ''}`
                   : 'Saved check · resume not identified'}</p>
-                {item.explanation_payload?.presentation ? (
+                {historyTitle || historyBody ? (
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold">{decisionCopy.title}</p>
-                    <p className="text-sm leading-relaxed text-muted-foreground">{decisionCopy.body}</p>
+                    {historyTitle ? <p className="text-sm font-semibold">{historyTitle}</p> : null}
+                    {historyBody ? <p className="text-sm leading-relaxed text-muted-foreground">{historyBody}</p> : null}
                   </div>
+                ) : null}
+                {item._earlierChecks.length > 0 ? (
+                  // Earlier runs of this posting stay one tap away instead of vanishing (2026-10-14).
+                  <details className="group">
+                    <summary className="cursor-pointer list-none text-[12.5px] font-medium text-muted-foreground transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+                      <span className="group-open:hidden">Show earlier checks ({item._earlierChecks.length})</span>
+                      <span className="hidden group-open:inline">Hide earlier checks</span>
+                    </summary>
+                    <ul className="mt-2 space-y-1">
+                      {item._earlierChecks.map((earlier) => (
+                        <li key={earlier.id} className="text-xs leading-relaxed text-muted-foreground">{earlierCheckLine(earlier)}</li>
+                      ))}
+                    </ul>
+                  </details>
                 ) : null}
                 {item.outdated ? (
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3">
@@ -2476,7 +2684,7 @@ const ApplyGateWorkspace = () => {
                 {historyVisibleReasons.map((reason, index) => (
                   <p key={index} className="text-sm text-muted-foreground leading-relaxed">• {reason}</p>
                 ))}
-                {!displayDecisionMissing && (item.explanation_payload?.presentation || status !== "strong") && warning && (() => {
+                {!displayDecisionMissing && (item.explanation_payload?.presentation || status !== "strong") && historyShowWarning && (() => {
                   const presentation = warningPresentation(status, warningFull, item.explanation_payload?.presentation);
                   return (
                   <div
