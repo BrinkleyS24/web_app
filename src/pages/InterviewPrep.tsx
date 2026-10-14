@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { PageHeader, Panel } from "@/components/premium/PremiumUI";
+import { EmptyState, ErrorState, LoadingRows, PageHeader, Panel } from "@/components/premium/PremiumUI";
 import { BUTTON } from "@/components/premium/tone";
 import { useAuth } from "@/lib/AuthContext.jsx";
-import { fetchResumeVariants } from "@/lib/emails";
-import { readActionContext, type ActionContext } from "@/lib/actionWorkspace";
+import { fetchRankedActionQueue, fetchResumeVariants, fetchStoredEmails } from "@/lib/emails";
+import { actionToolHref, readActionContext, type ActionContext } from "@/lib/actionWorkspace";
+import { deriveLiveInterviews, LIVE_INTERVIEW_WINDOW_DAYS, type LiveInterview } from "@/lib/liveInterviews";
+import { buildQueueItemsFromRankedQueue } from "@/lib/premiumTaskQueue";
 import { buildInterviewPractice, fetchInterviewSource, invitationScheduleLabel, splitFocusAreas, type PracticePack } from "@/lib/interviewPrep";
 import { useDraftSession } from "@/hooks/useDraftSession";
 import { friendlyErrorMessage } from "@/lib/apiErrors";
@@ -20,8 +22,53 @@ export default function InterviewPrep() {
   const {user}=useAuth(); const location=useLocation(); const context=readActionContext(location.search);
   return <DashboardLayout><PageHeader eyebrow="Practice with your evidence" title="Interview preparation" description="Prepare truthful examples for this role, with the invitation and the resume you choose in view." />
     {context && user ? <PrepWorkspace key={`${user.uid}:${context.logicalKey}:${context.dedupeKey}`} context={context} owner={user.uid} />
-      : <Panel className="mt-5"><p>Open an interview task from Next Actions to prepare for its exact conversation.</p><Link to="/next-actions" className={BUTTON.secondary}>Back to Next Actions</Link></Panel>}
+      : user ? <LiveInterviewList owner={user.uid} /> : null}
   </DashboardLayout>;
+}
+
+/**
+ * The way in when no task is open (persona review, 2026-10-14): the page used to say "Open an
+ * interview task from Next Actions" and stop, so a user with a live interview and no task had no
+ * route to prep. It now lists live interviews from the same emails the Dashboard counts, each with
+ * its prep task when Next Actions has one. A failed request shows an error, never "no interviews".
+ */
+function LiveInterviewList({owner}:{owner:string}) {
+  const emails=useQuery({queryKey:["interview-prep","stored-emails",owner],queryFn:async()=>{
+    const response=await fetchStoredEmails({limit:500,offset:0});
+    if(!response?.success||!Array.isArray(response.emails))throw new Error("Your interviews could not be loaded.");
+    return response.emails;
+  },retry:false,staleTime:60_000});
+  // Same key as the Dashboard and sidebar, so this is usually already loaded.
+  const queue=useQuery({queryKey:["dashboard","queue"],queryFn:fetchRankedActionQueue,retry:false,staleTime:30_000});
+  let queueItems:ReturnType<typeof buildQueueItemsFromRankedQueue>=[];
+  try{queueItems=buildQueueItemsFromRankedQueue(queue.data?.queue||null);}catch{queueItems=[];}
+  const interviews=emails.data?deriveLiveInterviews(emails.data,queueItems):[];
+
+  if(emails.isPending)return <Panel className="mt-5" title="Your live interviews"><LoadingRows rows={2}/></Panel>;
+  if(emails.isError)return <div className="mt-5"><ErrorState title="Your interviews did not load" detail="Your data is safe. Try again in a moment." onRetry={()=>void emails.refetch()}/></div>;
+  return <Panel className="mt-5" title="Your live interviews" description={`Interviews with no decision yet and an email in the last ${LIVE_INTERVIEW_WINDOW_DAYS} days.`}>
+    {queue.isError?<div className="mb-3"><ErrorState title="Your prep tasks could not be checked" detail="The interviews below are correct. Try again to see which have a prep task." onRetry={()=>void queue.refetch()}/></div>:null}
+    {interviews.length===0?<EmptyState compact title="No live interviews right now" body="When an interview invitation reaches your inbox, it appears here with a way to prepare." action={<Link to="/next-actions" className={BUTTON.secondary}>Open Next Actions</Link>}/>
+      :<ul className="divide-y divide-border" data-testid="live-interviews">{interviews.map(item=><LiveInterviewRow key={item.key} item={item} queueLoading={queue.isPending}/>)}</ul>}
+  </Panel>;
+}
+
+function LiveInterviewRow({item,queueLoading}:{item:LiveInterview;queueLoading:boolean}) {
+  const title=[item.company,item.role].filter(Boolean).join(" · ")||"Interview";
+  const days=Math.max(0,Math.floor((Date.now()-item.lastEmailAt.getTime())/86_400_000));
+  const when=days===0?"today":days===1?"yesterday":`${days} days ago`;
+  const task=item.prepTask;
+  const href=task?actionToolHref("/interview-prep",task):null;
+  const hasWorkspace=Boolean(href&&href!=="/interview-prep");
+  return <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-w-0">
+      <p className="text-[15px] font-semibold text-foreground">{title}</p>
+      <p className="text-[13px] text-muted-foreground">Last email {when}</p>
+    </div>
+    {task?(hasWorkspace?<Link to={href!} className={BUTTON.primary}>Prepare for this interview</Link>:<Link to="/next-actions" className={BUTTON.secondary}>Open the prep task</Link>)
+      :queueLoading?<p className="text-[13px] text-muted-foreground">Checking for a prep task…</p>
+      :<p className="text-[13px] text-muted-foreground sm:max-w-[30ch] sm:text-right">Your prep task will appear in Next Actions.</p>}
+  </li>;
 }
 
 function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
