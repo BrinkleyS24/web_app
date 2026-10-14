@@ -542,7 +542,7 @@ export function getCleanupUnlinkedCandidates(emails: StoredEmail[]) {
 // Calendar days in the user's own time zone, not elapsed 24-hour periods: an email from 11 p.m.
 // yesterday is 1 day old this morning. Counting 24-hour periods made every "opens in N days"
 // countdown read one day long for most of the day (A+ review, 2026-10-14).
-export function daysSince(value?: string | null, now: Date = new Date()) {
+export function daysSince(value?: string | null, now: Date = new Date(Date.now())) {
   if (!value) return null;
   const date = parseApiDate(value);
   if (!date) return null;
