@@ -198,5 +198,25 @@ describe("StrategyAlerts", () => {
     // Not mixed into the findings that need attention.
     expect(screen.getByRole("region", { name: "Needs attention" })).not.toHaveTextContent("Your experiment");
   });
-});
 
+  // The debrief card appeared word for word here and on the Dashboard (persona review, 2026-10-14).
+  test("the interview debrief is one link to the Dashboard, not a second copy of the card", async () => {
+    fetchStrategyAlerts.mockResolvedValue({
+      success: true,
+      alerts: [lowMatch, {
+        id: "performance-interview-debrief",
+        kind: "performance",
+        severity: "medium",
+        title: "You have reached 6 interviews. I know the decision on only 2 of them.",
+        description: "4 went quiet after the interview.",
+        debrief: { kind: "interview_outcome", total: 4, items: [{ key: "a", emailId: 7, label: "Quillstone Learning" }] },
+      }],
+    });
+    renderPage();
+    const link = await screen.findByTestId("debrief-link");
+    expect(link).toHaveAttribute("href", "/dashboard");
+    expect(link).toHaveTextContent("4 interviews need your answer");
+    expect(screen.queryByText(/I know the decision on only 2/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Never heard back" })).not.toBeInTheDocument();
+  });
+});
