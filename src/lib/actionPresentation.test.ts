@@ -25,6 +25,24 @@ function item(overrides: Partial<QueueItem> = {}): QueueItem {
 const GMAIL = "https://mail.google.com/mail/u/0/#all/t1";
 
 describe("resolveActionCta", () => {
+  // "Work the offer -> Open in Apply Gate" went to /fix-suggestions, which redirects to Next Actions:
+  // a dead loop (persona review, 2026-10-14). No action links back to the action list.
+  test("an action never links back to the action list", () => {
+    const offer = resolveActionCta(item({
+      id: "strategy:performance-focus-offer", source: "apply_gate", actionType: "follow_up", intent: "FIX_TARGETING",
+      threadId: null, hasDraft: false, routeHref: "/fix-suggestions", routeLabel: "Open queue",
+    }), null);
+    expect(offer).toEqual({ kind: "route", label: "See the details", href: "/strategy-alerts#performance-focus-offer" });
+
+    const gate = resolveActionCta(item({ source: "apply_gate", actionType: "fix_targeting", hasDraft: false, routeHref: "/fix-suggestions" }), null);
+    expect(gate.href).toBe("/apply-gate");
+    const generic = resolveActionCta(item({ actionType: "other", hasDraft: false, routeHref: "/next-actions#x", routeLabel: "Open" }), GMAIL);
+    expect(generic).toEqual({ kind: "gmail", label: "Open in Gmail", href: GMAIL });
+    for (const kind of [offer, gate, generic]) {
+      expect(kind.href || "").not.toMatch(/fix-suggestions|next-actions/);
+    }
+  });
+
   // 2026-09-25: every card on Next Actions offered "Generate draft", research ones included.
   test("a follow-up drafts the email", () => {
     expect(resolveActionCta(item(), GMAIL)).toEqual({ kind: "draft", label: "Draft follow-up" });
