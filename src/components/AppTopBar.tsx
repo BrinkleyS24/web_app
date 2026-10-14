@@ -24,7 +24,7 @@ export function AppTopBar() {
 
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-sm">
-      <SidebarTrigger />
+      <SidebarTrigger className="size-10 sm:size-8" />
       {premium ? (
         <div className="ml-auto flex items-center gap-2">
           <span className="hidden text-[12px] text-muted-foreground sm:inline" aria-live="polite">

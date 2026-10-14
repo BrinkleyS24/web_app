@@ -50,7 +50,7 @@
   --sidebar-accent-foreground: #FFFFFF;
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: #2FBE8F;
-  --sidebar-muted: #6B7894;
+  --sidebar-muted: #7C8AA3; /* was #6B7894 (4.23:1 on the ink sidebar); 5.37:1 passes AA (2026-10-14) */
 
   /* Legacy vars for original pages */
   --bg: #FAFAF8;
@@ -300,6 +300,34 @@ a:not([class]) {
   body {
     @apply bg-background text-foreground;
   }
+  /* A visible focus ring on every interactive element (persona review, 2026-10-14: text links showed
+     focus only as an underline). Components that draw their own ring opt out with
+     focus-visible:outline-none, which sits in a later layer and wins. */
+  :where(a, button, [role="button"], [role="menuitem"], [role="switch"], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Skip link: hidden until focused, then the first thing a keyboard user sees (2026-10-14). */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -64px;
+  z-index: 100;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: 12px;
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
 /* Lovable utility classes */
