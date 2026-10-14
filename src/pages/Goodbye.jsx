@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import usePageMetadata from "../lib/usePageMetadata.js";
 import { CHROME_WEB_STORE_URL } from "../lib/publicSiteConfig.js";
 import { UNINSTALL_REASONS, submitUninstallAnswer } from "../lib/activity";
+import PublicShell from "../components/landing/PublicShell.jsx";
 
 const NOTE_MAX = 280;
 
@@ -43,12 +44,8 @@ export default function Goodbye() {
   };
 
   return (
-    <div className="landingPage min-h-screen bg-[#fdfdfc] text-[#111111]">
-      <main className="mx-auto flex max-w-xl flex-col gap-6 px-6 py-16">
-        <Link to="/" className="flex items-center gap-2" data-testid="logo-link">
-          <img src="/favicon.png" alt="Applendium™" className="h-8 w-8 rounded-md bg-[#0B1220] p-0.5" />
-          <span className="landingDisplay text-xl font-extrabold tracking-tight">applendium™</span>
-        </Link>
+    <PublicShell>
+      <main className="mx-auto flex max-w-xl flex-col gap-6 px-4 py-12 text-[#111111] sm:px-6 sm:py-16">
 
         {state === "thanks" ? (
           <section className="flex flex-col gap-3" data-testid="goodbye-thanks">
@@ -57,7 +54,7 @@ export default function Goodbye() {
             </h1>
             <p className="text-base leading-relaxed text-[#444444]">
               Your search history stays in your account, so if you search again, Applendium™ picks up where you left off.
-              Want it deleted instead? <Link to="/support" className="underline underline-offset-2">Ask us</Link> and we'll remove it.
+              Want it deleted instead? See <a href="#your-data" className="underline underline-offset-2">Your data</a> below.
             </p>
             {CHROME_WEB_STORE_URL ? (
               <a href={CHROME_WEB_STORE_URL} className="font-semibold text-[#0A7A55] underline underline-offset-4">
@@ -70,7 +67,7 @@ export default function Goodbye() {
             <div className="flex flex-col gap-2">
               <h1 className="landingDisplay text-3xl font-extrabold tracking-tight">Sorry to see you go</h1>
               <p className="text-base leading-relaxed text-[#444444]">
-                Why did you remove Applendium™ One click helps us make it better. It's optional.
+                Why did you remove Applendium™? One click helps us make it better. It's optional.
               </p>
             </div>
 
@@ -126,7 +123,46 @@ export default function Goodbye() {
             </p>
           </form>
         )}
+
+        {/* Added 2026-10-14: removing the extension does not revoke Gmail access or delete stored
+            data, and this page is the moment someone leaving most wants to know how. */}
+        <section
+          id="your-data"
+          aria-labelledby="your-data-heading"
+          className="rounded-xl border border-[#e5e5e5] bg-white px-5 py-4"
+          data-testid="goodbye-your-data"
+        >
+          <h2 id="your-data-heading" className="landingDisplay text-lg font-bold tracking-tight">Your data</h2>
+          <p className="mt-2 text-sm leading-relaxed text-[#444444]">
+            Removing the extension stops new syncs. It does not remove Gmail access or delete what is already stored.
+          </p>
+          <ul className="mt-3 flex flex-col gap-3 text-sm leading-relaxed text-[#444444]">
+            <li>
+              <span className="font-semibold text-[#111111]">Remove Gmail access:</span> in your Google Account, open
+              Security, then Your connections to third-party apps &amp; services, choose Applendium™ and remove access.{" "}
+              <a
+                href="https://myaccount.google.com/connections"
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-[#0A7A55] underline underline-offset-2"
+              >
+                Open Google Account connections
+              </a>
+            </li>
+            <li>
+              <span className="font-semibold text-[#111111]">Delete your Applendium™ data:</span> email{" "}
+              <a
+                href="mailto:privacy@applendium.com?subject=Delete%20my%20Applendium%20data"
+                className="font-semibold text-[#0A7A55] underline underline-offset-2"
+              >
+                privacy@applendium.com
+              </a>{" "}
+              from the Gmail address you used and we will delete your account and everything stored. If you still use
+              Applendium™ on another computer, you can do it yourself in Settings &gt; Your data.
+            </li>
+          </ul>
+        </section>
       </main>
-    </div>
+    </PublicShell>
   );
 }

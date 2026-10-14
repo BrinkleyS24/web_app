@@ -1,9 +1,8 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Chrome } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import usePageMetadata from "../lib/usePageMetadata.js";
-import { CHROME_WEB_STORE_URL } from "../lib/publicSiteConfig.js";
-import { premiumUpdatesHref } from "../lib/premiumLaunchContent.js";
+import { PublicFooter, PublicHeader } from "../components/landing/PublicShell.jsx";
 
 const sections = [
   {
@@ -72,19 +71,7 @@ const sections = [
   },
 ];
 
-function BrandMark({ className = "h-8 w-8" }) {
-  return (
-    <img
-      src="/favicon.png"
-      alt="Applendium™"
-      className={`${className} rounded-md bg-[#0B1220] p-0.5`}
-    />
-  );
-}
-
 export default function Terms() {
-  const chromeHref = CHROME_WEB_STORE_URL || premiumUpdatesHref;
-  const year = new Date().getFullYear();
 
   usePageMetadata({
     title: "Applendium™ | Terms of Service",
@@ -93,49 +80,14 @@ export default function Terms() {
   });
 
   return (
-    <div className="landingPage min-h-screen bg-[#fdfdfc] text-[#111111]">
-      <header className="sticky top-0 z-50 w-full bg-[#fdfdfc]/85 backdrop-blur" data-testid="site-header">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 md:px-10">
-          <Link to="/" className="group flex items-center gap-2" data-testid="logo-link">
-            <BrandMark />
-            <span className="landingDisplay text-xl font-extrabold tracking-tight">applendium™</span>
-          </Link>
-
-          <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">
-            <Link to="/#how-it-works" className="landingLinkUnderline text-sm font-medium text-gray-700 hover:text-black">
-              How it works
-            </Link>
-            <Link to="/#features" className="landingLinkUnderline text-sm font-medium text-gray-700 hover:text-black">
-              Features
-            </Link>
-            <Link to="/upgrade" className="landingLinkUnderline text-sm font-medium text-gray-700 hover:text-black">
-              Premium
-            </Link>
-            <Link to="/#privacy" className="landingLinkUnderline text-sm font-medium text-gray-700 hover:text-black">
-              Privacy
-            </Link>
-            <Link to="/terms" className="landingLinkUnderline text-sm font-semibold text-black">
-              Terms
-            </Link>
-          </nav>
-
-          <a
-            href={chromeHref}
-            target="_blank"
-            rel="noreferrer"
-            className="landingButtonDark inline-flex items-center gap-2 rounded-md bg-[#111111] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[#10B981]"
-          >
-            <Chrome className="h-4 w-4" />
-            Install
-          </a>
-        </div>
-      </header>
+    <div className="landingPage min-h-screen bg-[#FAFAF8] text-[#111111]">
+      <PublicHeader />
 
       <main>
         <section className="relative overflow-hidden">
           <div className="bg-grid pointer-events-none absolute inset-0 opacity-60" />
           <div className="relative mx-auto max-w-7xl px-6 py-20 md:px-10 md:py-28">
-            <span className="landingMono text-xs font-bold uppercase tracking-[0.24em] text-[#10B981]">
+            <span className="landingMono text-xs font-bold uppercase tracking-[0.24em] text-[#0A7A55]">
               Terms of Service
             </span>
             <h1 className="landingDisplay mt-6 max-w-4xl text-5xl font-black leading-[0.9] tracking-tighter text-[#111111] md:text-7xl">
@@ -179,7 +131,7 @@ export default function Terms() {
         <section className="py-16 md:py-20">
           <div className="mx-auto grid max-w-7xl gap-5 px-6 md:px-10 lg:grid-cols-2">
             <article className="rounded-2xl border border-gray-200 bg-white p-6">
-              <p className="landingMono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">
+              <p className="landingMono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-600">
                 Support
               </p>
               <h2 className="landingDisplay mt-4 text-2xl font-bold text-[#111111]">
@@ -217,16 +169,7 @@ export default function Terms() {
         </section>
       </main>
 
-      <footer className="border-t border-gray-200 bg-[#F3F4F6]">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-8 md:flex-row md:items-center md:justify-between md:px-10">
-          <span className="landingMono text-[11px] tracking-wider text-gray-500">
-            (c) {year} Applendium™ - made for the inbox.
-          </span>
-          <Link to="/#support" className="landingMono text-[11px] uppercase tracking-[0.2em] text-gray-500 hover:text-[#10B981]">
-            Support
-          </Link>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

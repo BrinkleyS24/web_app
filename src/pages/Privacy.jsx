@@ -1,8 +1,11 @@
 import React from "react";
+import { Link } from "react-router-dom";
+import PublicShell from "../components/landing/PublicShell.jsx";
 
 export default function Privacy() {
   return (
-    <main className="page page--legal">
+    <PublicShell>
+    <main className="page page--legal" style={{ minHeight: "auto" }}>
       <section className="legal-shell">
         <h1>Privacy Policy</h1>
         <p className="muted">Effective date: October 5, 2026</p>
@@ -80,17 +83,21 @@ export default function Privacy() {
 
         <h2>Deletion</h2>
         <p>
-          You can request deletion of your account and stored application data from support. Authenticated
-          account deletion is also supported by the backend. Deletion removes stored Gmail-derived
+          You can delete your account and stored application data yourself in Settings &gt; Your data, where
+          you can also export your applications, or ask us to do it at{" "}
+          <a href="mailto:privacy@applendium.com">privacy@applendium.com</a>. Deletion removes stored Gmail-derived
           records, application history, feedback, suggestions, reports, and your application user record.
         </p>
 
         <h2>Contact</h2>
         <p>
-          For privacy, security, or deletion requests, contact support through applendium.com/support
-          or the Chrome Web Store support contact for Applendium™.
+          For privacy, security, or deletion requests, email{" "}
+          <a href="mailto:privacy@applendium.com">privacy@applendium.com</a>. For anything else, email{" "}
+          <a href="mailto:support@applendium.com">support@applendium.com</a> or see our{" "}
+          <Link to="/#support" data-testid="privacy-support-link">support section</Link>.
         </p>
       </section>
     </main>
+    </PublicShell>
   );
 }
