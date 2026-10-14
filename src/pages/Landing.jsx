@@ -7,6 +7,7 @@ import TiltCard from "../components/landing/TiltCard.jsx";
 import Reveal from "../components/landing/Reveal.jsx";
 import Magnetic from "../components/landing/Magnetic.jsx";
 import LandingFounding from "../components/landing/LandingFounding.jsx";
+import { PublicFooter } from "../components/landing/PublicShell.jsx";
 import usePageMetadata from "../lib/usePageMetadata.js";
 import { premiumUpdatesHref } from "../lib/premiumLaunchContent.js";
 import { CHROME_WEB_STORE_URL, FOUNDING_CHECKOUT_URL } from "../lib/publicSiteConfig.js";
@@ -23,11 +24,11 @@ const NAV_LINKS = [
 ];
 
 const OLD_WAY_ROWS = [
-  { company: "Stripe", role: "Sr. Engineer", status: "reply?", statusTone: "warn" },
+  { company: "Mercy General", role: "RN, nights", status: "reply?", statusTone: "warn" },
   { company: "???", role: "forgot to log", status: "—", rowTone: "faded" },
-  { company: "Vercel", role: "Design Eng", status: "applied" },
-  { company: "Notion", role: "duplicate??", status: "???", statusTone: "danger" },
-  { company: "Figma", role: "Designer…?", status: "ghosted", statusTone: "faded" },
+  { company: "Riverside USD", role: "5th grade", status: "applied" },
+  { company: "Northline", role: "duplicate??", status: "???", statusTone: "danger" },
+  { company: "Brightpath", role: "Engineer…?", status: "ghosted", statusTone: "faded" },
 ];
 
 const PROBLEM_FAILURES = [
@@ -107,8 +108,12 @@ const PREMIUM_FEATURES = [
     body: "Save the versions you tailor and see which one actually gets interviews, from the replies in your inbox.",
   },
   {
-    title: "Weekly Summary",
-    body: "A digest of what changed this week and what deserves attention next — in your inbox, naturally.",
+    title: "Interview Prep",
+    body: "Practice built from your real interview invitations, with the posting and your resume side by side.",
+  },
+  {
+    title: "Ask Applendium™",
+    body: "Ask about your search in plain words and get answers backed by the emails in your inbox.",
   },
 ];
 
@@ -129,7 +134,8 @@ function BrandMark({ boxClass = "h-7 w-7 rounded-[7px]", imgClass = "h-[22px] w-
   );
 }
 
-function Eyebrow({ children, className = "text-[#9AA0A6]" }) {
+// Default was #9AA0A6 (2.4-2.6:1 on these backgrounds, fails WCAG AA); #5C6470 passes (2026-10-14).
+function Eyebrow({ children, className = "text-[#5C6470]" }) {
   return (
     <p
       className={`landingMono text-[11px] font-semibold uppercase tracking-[0.22em] ${className}`}
@@ -167,7 +173,6 @@ export default function Landing() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [premiumPrice, setPremiumPrice] = useState(null);
   const chromeHref = CHROME_WEB_STORE_URL || premiumUpdatesHref;
-  const year = new Date().getFullYear();
 
   useEffect(() => {
     let cancelled = false;
@@ -182,14 +187,20 @@ export default function Landing() {
   }, []);
 
   const priceLabel = formatPremiumPrice(premiumPrice);
+  const quarterlyLabel = formatPremiumPrice(premiumPrice?.quarterly);
 
   useEffect(() => {
     if (!window.location.hash) return;
 
-    const target = document.querySelector(window.location.hash);
-    if (target) {
-      target.scrollIntoView({ block: "start" });
-    }
+    const scrollToHash = () => {
+      const target = document.querySelector(window.location.hash);
+      if (target) target.scrollIntoView({ block: "start" });
+    };
+    scrollToHash();
+    // Sections above the target finish laying out after mount (fonts, reveal animations), which
+    // left /support visitors near the top of the page. Scroll once more after layout (2026-10-14).
+    const timer = window.setTimeout(scrollToHash, 400);
+    return () => window.clearTimeout(timer);
   }, []);
 
   usePageMetadata({
@@ -211,7 +222,7 @@ export default function Landing() {
         <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between px-6 md:px-8">
           <a
             href="#top"
-            className="flex items-center gap-2.5"
+            className="flex min-h-[44px] items-center gap-2.5"
             data-testid="logo-link"
             onClick={closeMobileMenu}
           >
@@ -250,8 +261,9 @@ export default function Landing() {
 
           <button
             type="button"
-            className="p-2 md:hidden"
-            aria-label="Toggle menu"
+            className="grid h-11 w-11 place-items-center md:hidden"
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileMenuOpen}
             onClick={() => setMobileMenuOpen((open) => !open)}
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -260,13 +272,13 @@ export default function Landing() {
 
         {mobileMenuOpen ? (
           <div className="border-t border-[#E9EAE5] bg-[#FAFAF8]/95 backdrop-blur md:hidden">
-            <div className="mx-auto flex max-w-[1180px] flex-col gap-4 px-6 py-5">
+            <div className="mx-auto flex max-w-[1180px] flex-col gap-1 px-6 py-4">
               {NAV_LINKS.map((nav) =>
                 nav.to ? (
                   <Link
                     key={nav.label}
                     to={nav.to}
-                    className="text-base font-medium text-[#0B1220]"
+                    className="flex min-h-[44px] items-center text-base font-medium text-[#0B1220]"
                     onClick={closeMobileMenu}
                   >
                     {nav.label}
@@ -275,7 +287,7 @@ export default function Landing() {
                   <a
                     key={nav.label}
                     href={nav.href}
-                    className="text-base font-medium text-[#0B1220]"
+                    className="flex min-h-[44px] items-center text-base font-medium text-[#0B1220]"
                     onClick={closeMobileMenu}
                   >
                     {nav.label}
@@ -284,14 +296,14 @@ export default function Landing() {
               )}
               <a
                 href="#support"
-                className="text-base font-medium text-[#0B1220]"
+                className="flex min-h-[44px] items-center text-base font-medium text-[#0B1220]"
                 onClick={closeMobileMenu}
               >
                 Support
               </a>
               <Link
                 to="/upgrade?source=landing"
-                className="text-base font-semibold text-[#0B1220]"
+                className="flex min-h-[44px] items-center text-base font-semibold text-[#0B1220]"
                 onClick={closeMobileMenu}
               >
                 Sign in
@@ -325,7 +337,7 @@ export default function Landing() {
           <div className="mt-12 grid grid-cols-1 items-start gap-12 lg:grid-cols-2">
             <div className="overflow-hidden rounded-[14px] border border-[#E5E7E3] bg-white">
               <div className="flex flex-wrap items-center gap-2 border-b border-[#EEF0EC] bg-[#FCFCFB] px-4 py-3">
-                <span className="landingMono text-[10px] font-bold uppercase tracking-[0.16em] text-[#9AA0A6]">
+                <span className="landingMono text-[10px] font-bold uppercase tracking-[0.16em] text-[#5C6470]">
                   job_search_FINAL_v3.xlsx
                 </span>
                 <span className="landingMono ml-auto rounded-full bg-[#FBF3E4] px-2 py-0.5 text-[10px] font-semibold text-[#B45309]">
@@ -338,7 +350,7 @@ export default function Landing() {
                     {["Company", "Role", "Status"].map((heading) => (
                       <th
                         key={heading}
-                        className="landingMono px-4 py-2.5 text-left text-[9.5px] font-bold uppercase tracking-[0.16em] text-[#9AA0A6]"
+                        className="landingMono px-4 py-2.5 text-left text-[9.5px] font-bold uppercase tracking-[0.16em] text-[#5C6470]"
                       >
                         {heading}
                       </th>
@@ -349,12 +361,12 @@ export default function Landing() {
                   {OLD_WAY_ROWS.map((row) => (
                     <tr key={`${row.company}-${row.role}`} className="border-t border-[#EEF0EC]">
                       <td
-                        className={`px-4 py-2.5 font-medium ${row.rowTone === "faded" ? "text-[#9AA0A6]" : "text-[#0B1220]"}`}
+                        className={`px-4 py-2.5 font-medium ${row.rowTone === "faded" ? "text-[#6B7280]" : "text-[#0B1220]"}`}
                       >
                         {row.company}
                       </td>
                       <td
-                        className={`px-4 py-2.5 ${row.rowTone === "faded" || row.role.includes("?") ? "italic text-[#9AA0A6]" : "text-[#5C6470]"}`}
+                        className={`px-4 py-2.5 ${row.rowTone === "faded" || row.role.includes("?") ? "italic text-[#6B7280]" : "text-[#5C6470]"}`}
                       >
                         {row.role}
                       </td>
@@ -365,7 +377,7 @@ export default function Landing() {
                             : row.statusTone === "danger"
                               ? "text-[#B3261E]"
                               : row.statusTone === "faded" || row.rowTone === "faded"
-                                ? "text-[#9AA0A6]"
+                                ? "text-[#6B7280]"
                                 : "text-[#5C6470]"
                         }`}
                       >
@@ -505,17 +517,15 @@ export default function Landing() {
                         {PREMIUM_FEATURES[0].body}
                       </p>
                     </div>
-                    <div className="mt-6 rounded-xl border border-white/10 bg-[#0B1220]/70 p-3.5">
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-2 text-[13px] font-semibold text-white">
-                          <span className="h-2 w-2 rounded-full bg-[#34E3A8] shadow-[0_0_10px_2px_rgba(52,227,168,0.55)]" />
-                          Apply, but tailor first
-                        </span>
-                        <span className="landingMono text-[11px] text-[#5FD9AE]">fit 72%</span>
-                      </div>
-                      <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
-                        <div className="h-full w-[72%] rounded-full bg-gradient-to-r from-[#2FBE8F] to-[#34E3A8]" />
-                      </div>
+                    {/* The "fit 72%" bar was removed 2026-10-14: the app never shows a fit percentage. */}
+                    <div className="mt-6 rounded-xl border border-white/10 bg-[#0B1220]/70 p-3.5" data-testid="apply-gate-sample">
+                      <span className="flex items-center gap-2 text-[13px] font-semibold text-white">
+                        <span className="h-2 w-2 rounded-full bg-[#34E3A8] shadow-[0_0_10px_2px_rgba(52,227,168,0.55)]" />
+                        Apply, but tailor first
+                      </span>
+                      <p className="mt-2 text-[13px] leading-[1.5] text-[#B7C0CF]">
+                        Example: the posting asks for scheduling experience your resume never mentions. Add it, then apply.
+                      </p>
                     </div>
                   </div>
                 </TiltCard>
@@ -530,14 +540,16 @@ export default function Landing() {
                           {priceLabel ? priceLabel.suffix : ""}
                         </span>
                       </p>
-                      <p className="landingMono mt-2 text-[11px] leading-[1.7] text-[#5C6B85]">
-                        one plan · all features · cancel anytime
+                      <p className="landingMono mt-2 text-[11px] leading-[1.7] text-[#98A1B3]" data-testid="landing-price-note">
+                        {quarterlyLabel
+                          ? `or ${quarterlyLabel.amount}${quarterlyLabel.suffix} · all features · cancel anytime`
+                          : "all features · cancel anytime"}
                       </p>
                     </div>
                     <Magnetic className="shrink-0">
                       <Link
                         to="/upgrade?source=landing"
-                        className="inline-flex items-center gap-2 rounded-[11px] bg-white px-4 py-2.5 text-sm font-semibold text-[#0B1220] transition-colors hover:bg-[#E9FBF3]"
+                        className="inline-flex min-h-[44px] items-center gap-2 rounded-[11px] bg-white px-4 py-2.5 text-sm font-semibold text-[#0B1220] transition-colors hover:bg-[#E9FBF3]"
                       >
                         Start Premium
                         <ArrowRight className="h-4 w-4" />
@@ -558,9 +570,9 @@ export default function Landing() {
                   </div>
                 </TiltCard>
 
-                {/* Strategy Alerts / Resume versions / Weekly Summary */}
-                {[2, 3, 4].map((i) => (
-                  <TiltCard key={PREMIUM_FEATURES[i].title} className="h-full rounded-2xl lg:col-span-2">
+                {/* Strategy Alerts / Resume versions / Interview Prep / Ask */}
+                {[2, 3, 4, 5].map((i) => (
+                  <TiltCard key={PREMIUM_FEATURES[i].title} className="h-full rounded-2xl lg:col-span-3">
                     <div className="flex h-full flex-col justify-center rounded-2xl border border-white/10 bg-[#0E1726]/70 p-6 backdrop-blur-sm">
                       <span className="landingMono text-[10px] font-bold uppercase tracking-[0.16em] text-[#2FBE8F]">
                         {PREMIUM_FEATURES[i].title}
@@ -626,7 +638,7 @@ export default function Landing() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <article className="rounded-[14px] border border-[#E5E7E3] bg-white p-6">
-                <p className="landingMono text-[10px] font-bold uppercase tracking-[0.16em] text-[#9AA0A6]">
+                <p className="landingMono text-[10px] font-bold uppercase tracking-[0.16em] text-[#5C6470]">
                   General support
                 </p>
                 <h3 className="mt-3 text-lg font-bold tracking-[-0.01em]">
@@ -637,14 +649,14 @@ export default function Landing() {
                 </p>
                 <a
                   href="mailto:support@applendium.com?subject=Applendium™%20Support"
-                  className="landingButtonDark mt-5 inline-flex items-center justify-center rounded-lg bg-[#0B1220] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0A7A55]"
+                  className="landingButtonDark mt-5 inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[#0B1220] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0A7A55]"
                 >
                   Email support
                 </a>
               </article>
 
               <article className="rounded-[14px] border border-[#E5E7E3] bg-white p-6">
-                <p className="landingMono text-[10px] font-bold uppercase tracking-[0.16em] text-[#9AA0A6]">
+                <p className="landingMono text-[10px] font-bold uppercase tracking-[0.16em] text-[#5C6470]">
                   Privacy requests
                 </p>
                 <h3 className="mt-3 text-lg font-bold tracking-[-0.01em]">
@@ -655,7 +667,7 @@ export default function Landing() {
                 </p>
                 <a
                   href="mailto:privacy@applendium.com?subject=Applendium™%20Privacy%20Request"
-                  className="mt-5 inline-flex items-center justify-center rounded-lg border border-[#D8DAD3] bg-white px-4 py-2.5 text-sm font-semibold text-[#0B1220] transition-colors hover:border-[#0B1220]"
+                  className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-lg border border-[#D8DAD3] bg-white px-4 py-2.5 text-sm font-semibold text-[#0B1220] transition-colors hover:border-[#0B1220]"
                 >
                   Contact privacy
                 </a>
@@ -698,58 +710,7 @@ export default function Landing() {
         </section>
       </main>
 
-      <footer className="border-t border-[#E9EAE5]" data-testid="site-footer">
-        <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-4 px-6 py-7 md:px-8">
-          <div className="flex items-center gap-2">
-            <BrandMark boxClass="h-5 w-5 rounded-[5px]" imgClass="h-[15px] w-[15px]" />
-            <span className="text-[13px] text-[#9AA0A6]">
-              &copy; {year} Applendium™ &mdash; made for the inbox.
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-6">
-            <a href="#privacy" className="text-[13px] text-[#6B7280] transition-colors hover:text-[#0B1220]">
-              Privacy
-            </a>
-            <Link
-              to="/terms"
-              className="text-[13px] text-[#6B7280] transition-colors hover:text-[#0B1220]"
-              data-testid="footer-terms-link"
-            >
-              Terms
-            </Link>
-            <a
-              href="#support"
-              className="text-[13px] text-[#6B7280] transition-colors hover:text-[#0B1220]"
-              data-testid="footer-support-link"
-            >
-              Support
-            </a>
-            <a
-              href="#premium"
-              className="text-[13px] text-[#6B7280] transition-colors hover:text-[#0B1220]"
-              data-testid="footer-premium-link"
-            >
-              Premium
-            </a>
-            <a
-              href={chromeHref}
-              target="_blank"
-              rel="noreferrer"
-              className="text-[13px] text-[#6B7280] transition-colors hover:text-[#0B1220]"
-              data-testid="footer-chrome-link"
-            >
-              Chrome Web Store
-            </a>
-            <a
-              href={premiumUpdatesHref}
-              className="text-[13px] font-semibold text-[#0B1220] transition-colors hover:text-[#0A7A55]"
-              data-testid="footer-email-cta"
-            >
-              support@applendium.com
-            </a>
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

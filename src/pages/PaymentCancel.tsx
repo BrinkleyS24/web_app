@@ -1,16 +1,14 @@
 import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Clock3, Chrome } from "lucide-react";
+import { Clock3 } from "lucide-react";
+import { PublicFooter, PublicHeader } from "../components/landing/PublicShell.jsx";
 import usePageMetadata from "../lib/usePageMetadata.js";
 import { trackFunnel } from "../lib/funnel.js";
-import { CHROME_WEB_STORE_URL } from "../lib/publicSiteConfig.js";
-import { premiumUpdatesHref } from "../lib/premiumLaunchContent.js";
 
 export default function PaymentCancel() {
   useEffect(() => {
     trackFunnel("checkout_cancel");
   }, []);
-  const chromeHref = CHROME_WEB_STORE_URL || premiumUpdatesHref;
 
   usePageMetadata({
     title: "Applendium™ | Checkout Canceled",
@@ -18,30 +16,14 @@ export default function PaymentCancel() {
   });
 
   return (
-    <div className="landingPage min-h-screen bg-[#fdfdfc] text-[#111111]">
-      <header className="sticky top-0 z-50 w-full bg-[#fdfdfc]/85 backdrop-blur" data-testid="site-header">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 md:px-10">
-          <Link to="/" className="group flex items-center gap-2">
-            <img src="/favicon.png" alt="Applendium™" className="h-8 w-8 rounded-md bg-[#0B1220] p-0.5" />
-            <span className="landingDisplay text-xl font-extrabold tracking-tight">applendium™</span>
-          </Link>
-          <a
-            href={chromeHref}
-            target="_blank"
-            rel="noreferrer"
-            className="landingButtonDark inline-flex items-center gap-2 rounded-md bg-[#111111] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[#10B981]"
-          >
-            <Chrome className="h-4 w-4" />
-            Install
-          </a>
-        </div>
-      </header>
+    <div className="landingPage min-h-screen bg-[#FAFAF8] text-[#111111]">
+      <PublicHeader />
 
       <main>
         <section className="relative overflow-hidden">
           <div className="bg-grid pointer-events-none absolute inset-0 opacity-60" />
           <div className="relative mx-auto max-w-4xl px-6 py-24 md:px-10 md:py-32">
-            <div className="landingMono inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-[#10B981]">
+            <div className="landingMono inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-[#0A7A55]">
               <Clock3 className="h-4 w-4" aria-hidden="true" />
               Checkout canceled
             </div>
@@ -49,8 +31,8 @@ export default function PaymentCancel() {
               No payment was completed.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-gray-600 md:text-xl">
-              You can review Premium whenever you are ready. It starts with
-              Apply Gate and a weekly search-health summary.
+              You can review Premium whenever you are ready. Your free
+              tracker keeps working as before.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
@@ -69,6 +51,7 @@ export default function PaymentCancel() {
           </div>
         </section>
       </main>
+      <PublicFooter />
     </div>
   );
 }

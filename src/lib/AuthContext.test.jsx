@@ -1,6 +1,6 @@
 import React from "react";
 import { act, render } from "@testing-library/react";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 const authState = vi.hoisted(() => ({ callback: null }));
 vi.mock("firebase/auth", () => ({
@@ -19,6 +19,7 @@ const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("./api.js", () => ({ apiFetch }));
 
 import { AuthProvider, useAuth } from "./AuthContext.jsx";
+import { signInFromExtensionBridge } from "./extensionBridge.js";
 
 function Probe({ renders }) {
   const { user, loading, planLoading, plan, planError } = useAuth();
@@ -66,5 +67,61 @@ describe("AuthProvider plan loading", () => {
     render(<AuthProvider><Probe renders={renders} /></AuthProvider>);
     await act(async () => { authState.callback(null); });
     expect(renders.at(-1)).toEqual(expect.objectContaining({ user: false, planLoading: false, plan: null }));
+  });
+});
+
+describe("AuthProvider extension bridge (2026-10-14: signed-out decision speed)", () => {
+  function BridgeProbe({ renders }) {
+    const { user, bridgeDone, extensionDetected, loading } = useAuth();
+    renders.push({ user: Boolean(user), bridgeDone, extensionDetected, loading });
+    return null;
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    authState.callback = null;
+    delete window.__applendiumExtensionReady;
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    signInFromExtensionBridge.mockReset().mockImplementation(() => new Promise(() => {}));
+    delete window.__applendiumExtensionReady;
+  });
+
+  test("with no extension answering, it gives up after one attempt instead of four", async () => {
+    signInFromExtensionBridge.mockResolvedValue({ success: false, error: "Extension token request timed out." });
+    const renders = [];
+    render(<AuthProvider><BridgeProbe renders={renders} /></AuthProvider>);
+    await act(async () => { authState.callback(null); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+    expect(signInFromExtensionBridge).toHaveBeenCalledTimes(1);
+    expect(renders.at(-1)).toEqual(expect.objectContaining({ user: false, bridgeDone: true }));
+  });
+
+  test("an extension that says nobody is signed in settles it on the first answer", async () => {
+    signInFromExtensionBridge.mockResolvedValue({ success: false, loggedIn: false, error: "User not authenticated" });
+    const renders = [];
+    render(<AuthProvider><BridgeProbe renders={renders} /></AuthProvider>);
+    await act(async () => { authState.callback(null); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+    expect(signInFromExtensionBridge).toHaveBeenCalledTimes(1);
+    expect(renders.at(-1)).toEqual(expect.objectContaining({ bridgeDone: true, extensionDetected: true }));
+  });
+
+  test("an installed extension with a passing error still gets its retries", async () => {
+    signInFromExtensionBridge.mockResolvedValue({ success: false, error: "Failed to create web auth token." });
+    render(<AuthProvider><BridgeProbe renders={[]} /></AuthProvider>);
+    await act(async () => { authState.callback(null); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+    expect(signInFromExtensionBridge).toHaveBeenCalledTimes(4);
+  });
+
+  test("an early 'not signed in' announcement from the extension needs no bridge round trip", async () => {
+    window.__applendiumExtensionReady = { loggedIn: false };
+    const renders = [];
+    render(<AuthProvider><BridgeProbe renders={renders} /></AuthProvider>);
+    await act(async () => { authState.callback(null); });
+    expect(renders.at(-1)).toEqual(expect.objectContaining({ bridgeDone: true, extensionDetected: true, loading: false }));
+    expect(signInFromExtensionBridge).not.toHaveBeenCalled();
   });
 });

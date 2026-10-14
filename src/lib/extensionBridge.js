@@ -43,7 +43,13 @@ export async function signInFromExtensionBridge() {
   const tokenResponse = await requestBridge(BRIDGE_REQUEST, BRIDGE_RESPONSE);
   if (!tokenResponse?.success || !tokenResponse?.firebaseToken) {
     console.log("[Applendium™ Bridge] Token request failed:", tokenResponse?.error);
-    return { success: false, error: tokenResponse?.error || "No extension token available." };
+    // loggedIn:false is the extension saying, definitively, that nobody is signed in to it, so the
+    // caller can stop retrying (2026-10-14). A timeout carries no loggedIn at all.
+    return {
+      success: false,
+      error: tokenResponse?.error || "No extension token available.",
+      ...(tokenResponse?.loggedIn === false ? { loggedIn: false } : {}),
+    };
   }
 
   console.log("[Applendium™ Bridge] Signing in with custom token...");

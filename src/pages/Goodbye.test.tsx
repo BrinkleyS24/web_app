@@ -56,4 +56,30 @@ describe("Goodbye (uninstall survey)", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("That didn't send"));
     expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
   });
+
+  // 2026-10-14 persona findings: the question lacked its "?", and nothing told someone who just
+  // uninstalled how to revoke Gmail access or delete what is stored.
+  it("asks the question with a question mark", () => {
+    renderAt("/goodbye");
+    expect(screen.getByText(/Why did you remove Applendium™\? One click helps us/)).toBeInTheDocument();
+  });
+
+  it("tells a leaver how to revoke Gmail access and delete their data, before and after answering", async () => {
+    renderAt("/goodbye");
+    const block = screen.getByTestId("goodbye-your-data");
+    expect(block).toHaveTextContent("does not remove Gmail access or delete what is already stored");
+    expect(screen.getByRole("link", { name: "Open Google Account connections" }))
+      .toHaveAttribute("href", "https://myaccount.google.com/connections");
+    expect(screen.getByRole("link", { name: "privacy@applendium.com" }).getAttribute("href"))
+      .toMatch(/^mailto:privacy@applendium\.com/);
+    expect(block).toHaveTextContent("Settings > Your data");
+    // The page has the public header and footer, so it is not a dead end.
+    expect(screen.getByTestId("site-header")).toBeInTheDocument();
+    expect(screen.getByTestId("footer-privacy-link")).toHaveAttribute("href", "/privacy");
+
+    fireEvent.click(screen.getByLabelText("I got a job"));
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(screen.getByTestId("goodbye-thanks")).toBeInTheDocument());
+    expect(screen.getByTestId("goodbye-your-data")).toBeInTheDocument();
+  });
 });

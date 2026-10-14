@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Chrome, Clock3 } from "lucide-react";
+import { CheckCircle2, Clock3 } from "lucide-react";
 import { useAuth } from "../lib/AuthContext.jsx";
 import { apiFetch } from "../lib/api.js";
+import { PublicFooter, PublicHeader } from "../components/landing/PublicShell.jsx";
 import usePageMetadata from "../lib/usePageMetadata.js";
 import { trackFunnel } from "../lib/funnel.js";
-import { CHROME_WEB_STORE_URL } from "../lib/publicSiteConfig.js";
-import { premiumUpdatesHref } from "../lib/premiumLaunchContent.js";
 
 const MAX_STATUS_ATTEMPTS = 8;
 const STATUS_POLL_MS = 1500;
@@ -16,7 +15,6 @@ export default function PaymentSuccess() {
     trackFunnel("checkout_success");
   }, []);
   const { user, loading, plan, planLoading } = useAuth();
-  const chromeHref = CHROME_WEB_STORE_URL || premiumUpdatesHref;
   const [attempt, setAttempt] = useState(0);
   const [statusMessage, setStatusMessage] = useState("Finalizing premium access...");
   const [statusError, setStatusError] = useState("");
@@ -91,30 +89,14 @@ export default function PaymentSuccess() {
   }, [loading, plan, planLoading, user]);
 
   return (
-    <div className="landingPage min-h-screen bg-[#fdfdfc] text-[#111111]">
-      <header className="sticky top-0 z-50 w-full bg-[#fdfdfc]/85 backdrop-blur" data-testid="site-header">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 md:px-10">
-          <Link to="/" className="group flex items-center gap-2">
-            <img src="/favicon.png" alt="Applendium™" className="h-8 w-8 rounded-md bg-[#0B1220] p-0.5" />
-            <span className="landingDisplay text-xl font-extrabold tracking-tight">applendium™</span>
-          </Link>
-          <a
-            href={chromeHref}
-            target="_blank"
-            rel="noreferrer"
-            className="landingButtonDark inline-flex items-center gap-2 rounded-md bg-[#111111] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[#10B981]"
-          >
-            <Chrome className="h-4 w-4" />
-            Install
-          </a>
-        </div>
-      </header>
+    <div className="landingPage min-h-screen bg-[#FAFAF8] text-[#111111]">
+      <PublicHeader />
 
       <main>
         <section className="relative overflow-hidden">
           <div className="bg-grid pointer-events-none absolute inset-0 opacity-60" />
           <div className="relative mx-auto max-w-4xl px-6 py-24 md:px-10 md:py-32">
-            <div className="landingMono inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-[#10B981]">
+            <div className="landingMono inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-[#0A7A55]">
               {attempt >= MAX_STATUS_ATTEMPTS ? <Clock3 className="h-4 w-4" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
               Payment complete
             </div>
@@ -150,6 +132,7 @@ export default function PaymentSuccess() {
           </div>
         </section>
       </main>
+      <PublicFooter />
     </div>
   );
 }

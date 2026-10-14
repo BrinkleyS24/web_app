@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth, firebaseConfigured } from "./firebase.js";
 import { signInFromExtensionBridge, signOutFromExtensionBridge } from "./extensionBridge.js";
@@ -49,6 +49,15 @@ function writeDevBypassSignedOutState(nextValue) {
   }
 }
 
+// Set by the inline listener in index.html when the extension announced itself before React mounted.
+function readEarlyExtensionReady() {
+  try {
+    return typeof window !== "undefined" ? window.__applendiumExtensionReady || null : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 const AuthContext = createContext({
   user: null,
   loading: true,
@@ -82,11 +91,19 @@ export function AuthProvider({ children }) {
     DEV_AUTH_BYPASS_ENABLED
     && isLocalHost
     && !devBypassSignedOut;
+  const [earlyExtension] = useState(readEarlyExtensionReady);
   const [user, setUser] = useState(isLocalDevBypass ? buildDevBypassUser() : null);
   const [authReady, setAuthReady] = useState(isLocalDevBypass || false);
-  const [bridgeDone, setBridgeDone] = useState(isLocalDevBypass || !firebaseConfigured);
-  const [extensionDetected, setExtensionDetected] = useState(false);
-  const [extensionAuthResolved, setExtensionAuthResolved] = useState(isLocalDevBypass || !firebaseConfigured);
+  // An extension that already said "nobody is signed in" settles the signed-out decision at once.
+  const [bridgeDone, setBridgeDone] = useState(
+    isLocalDevBypass || !firebaseConfigured || earlyExtension?.loggedIn === false,
+  );
+  const [extensionDetected, setExtensionDetected] = useState(Boolean(earlyExtension));
+  const [extensionAuthResolved, setExtensionAuthResolved] = useState(
+    isLocalDevBypass || !firebaseConfigured || Boolean(earlyExtension),
+  );
+  // Read inside the bridge loop, which outlives the render that started it.
+  const extensionSeenRef = useRef(Boolean(earlyExtension));
   const [plan, setPlan] = useState(isLocalDevBypass ? "premium" : null);
   const [planLoadingState, setPlanLoading] = useState(!isLocalDevBypass);
   // Which signed-in user the current `plan` was fetched for. The plan effect runs after the
@@ -196,6 +213,9 @@ export function AuthProvider({ children }) {
     (async () => {
       await new Promise((resolve) => setTimeout(resolve, 500));
 
+      // 2026-10-14: a signed-out visitor with no extension used to sit on "Loading..." for 8-30 s
+      // while this loop retried four 6-second timeouts. Now it retries only while there is evidence
+      // of an installed extension, and stops at once when the extension says nobody is signed in.
       for (let i = 0; i < 4; i += 1) {
         if (cancelled || auth?.currentUser) break;
         try {
@@ -203,18 +223,31 @@ export function AuthProvider({ children }) {
           const result = await signInFromExtensionBridge();
           if (result?.success) {
             console.log("[Applendium™] Bridge sign-in succeeded!");
+            extensionSeenRef.current = true;
+            setExtensionDetected(true);
+            setExtensionAuthResolved(true);
+            break;
+          }
+          if (result?.loggedIn === false) {
+            console.log("[Applendium™] Extension reports no signed-in user.");
+            extensionSeenRef.current = true;
             setExtensionDetected(true);
             setExtensionAuthResolved(true);
             break;
           }
           if (result?.error && !result.error.includes("timed out")) {
             console.log("[Applendium™] Extension detected but sign-in failed:", result.error);
+            extensionSeenRef.current = true;
             setExtensionDetected(true);
             setExtensionAuthResolved(true);
           }
         } catch (error) {
           console.log("[Applendium™] Bridge attempt error:", error?.message);
         }
+
+        // Nothing answered: no extension on this page, so one attempt is enough. An extension that
+        // signs in later pushes AUTH_STATE_PUSH, which restarts this loop.
+        if (!extensionSeenRef.current) break;
 
         if (i < 3 && !cancelled) {
           await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -240,6 +273,7 @@ export function AuthProvider({ children }) {
       if (!data) return;
 
       if (data.type === EXTENSION_READY) {
+        extensionSeenRef.current = true;
         setExtensionDetected(true);
         setExtensionAuthResolved(true);
 
@@ -259,6 +293,7 @@ export function AuthProvider({ children }) {
 
       if (data.type !== AUTH_STATE_PUSH) return;
 
+      extensionSeenRef.current = true;
       setExtensionDetected(true);
       setExtensionAuthResolved(true);
 

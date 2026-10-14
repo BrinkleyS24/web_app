@@ -49,6 +49,22 @@
     </script>
     <!-- Umami: cookieless, privacy-first analytics (no consent banner needed). -->
     <script defer src="https://cloud.umami.is/script.js" data-website-id="fa10f534-0213-436b-b631-c44934d97a67"></script>
+    <!-- The extension's content script announces itself (APPLENDIUM_EXTENSION_READY) at
+         document_start, often before React has mounted a listener. Record it here so the app can
+         tell "no extension" from "extension still answering" without waiting out long timeouts. -->
+    <script>
+      (function () {
+        try {
+          window.addEventListener("message", function (event) {
+            if (event.source !== window || event.origin !== window.location.origin) return;
+            var data = event.data;
+            if (data && data.type === "APPLENDIUM_EXTENSION_READY") {
+              window.__applendiumExtensionReady = { loggedIn: Boolean(data.loggedIn) };
+            }
+          });
+        } catch (_) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertCircle, ArrowRight, Chrome, RefreshCw } from "lucide-react";
+import { AlertCircle, ArrowRight, RefreshCw } from "lucide-react";
 import AuthButton from "../components/AuthButton.jsx";
 import { useAuth } from "../lib/AuthContext.jsx";
 import { getApiBaseUrl } from "../lib/api.js";
@@ -8,47 +8,32 @@ import { startPremiumCheckout, fetchPremiumPrice, formatPremiumPrice, readUpgrad
 import { trackFunnel } from "../lib/funnel.js";
 import usePageMetadata from "../lib/usePageMetadata.js";
 import LandingFounding from "../components/landing/LandingFounding.jsx";
+import { PublicFooter, PublicHeader } from "../components/landing/PublicShell.jsx";
 import { CHROME_WEB_STORE_URL, FOUNDING_CHECKOUT_URL } from "../lib/publicSiteConfig.js";
 
+// Every line below was checked against the backend on 2026-10-14 (config/constants.js
+// FREE_TIER_SYNC_QUOTA and PLAN_HISTORY_WINDOW_DAYS, applyGateAllowanceService, the resume and
+// suggestion routes, and the extension's ungated activity report). Change them only with the code.
 const FREE_FEATURES = [
-  "Pipeline by stage, live from Gmail",
-  "Search companies & roles",
-  "Thread-linked statuses",
-  "One Apply Gate check a week",
-  "Read-only scope, always",
+  "Tracks up to 500 applications per rolling 30 days, live from Gmail",
+  "Pipeline by stage, search, and thread-linked statuses",
+  "1 Apply Gate check a week",
+  "Activity report you can download as a PDF",
+  "Save, compare and edit resume versions",
+  "90 days of email history",
+  "Read-only Gmail access, always",
 ];
 
 const PREMIUM_FEATURES = [
   "Everything in Free",
-  "Apply Gate on every job you look at",
+  "Apply Gate on every job you check",
   "Next Actions, with the reason for each",
   "Strategy Alerts on what is and is not working",
-  "Weekly search-health summary",
+  "Resume versions: see which one gets interviews",
+  "Interview Prep built from your interview emails",
+  "Ask Applendium™ questions about your search",
+  "180 days of email history",
 ];
-
-function BrandHeader() {
-  return (
-    <header className="border-b border-[#E9EAE5]" data-testid="site-header">
-      <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between px-6 md:px-8">
-        <Link to="/" className="flex items-center gap-2.5">
-          <div className="grid h-7 w-7 shrink-0 place-items-center rounded-[7px] bg-[#0B1220]">
-            <img src="/logo-transparent.png" alt="Applendium™" className="block h-[22px] w-[22px]" />
-          </div>
-          <span className="landingDisplay text-lg font-bold tracking-[-0.02em]">applendium™</span>
-        </Link>
-        <a
-          href={CHROME_WEB_STORE_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="landingButtonDark inline-flex items-center gap-2 rounded-lg bg-[#0B1220] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0A7A55]"
-        >
-          <Chrome className="h-4 w-4" />
-          Add to Chrome
-        </a>
-      </div>
-    </header>
-  );
-}
 
 export default function Upgrade() {
   const { user, loading, plan, planLoading, planError, accountStatus, logout } = useAuth();
@@ -70,9 +55,10 @@ export default function Upgrade() {
   }, []);
   const quarterlyPrice = premiumPrice?.quarterly || null;
   const selectedPlan = quarterlyPrice ? billingPlan : "monthly";
-  const formattedPrice = formatPremiumPrice(selectedPlan === "quarterly" ? quarterlyPrice : premiumPrice);
+  const formattedMonthly = formatPremiumPrice(premiumPrice);
+  const formattedQuarterly = formatPremiumPrice(quarterlyPrice);
   // Founding copy below always quotes the monthly price.
-  const monthlyFormattedPrice = formatPremiumPrice(premiumPrice);
+  const monthlyFormattedPrice = formattedMonthly;
   const quarterlySavings = quarterlyPrice && premiumPrice?.unitAmount
     ? Math.round((1 - quarterlyPrice.unitAmount / (premiumPrice.unitAmount * (quarterlyPrice.intervalCount || 3))) * 100)
     : 0;
@@ -130,7 +116,7 @@ export default function Upgrade() {
 
   usePageMetadata({
     title: "Applendium™ | Premium",
-    description: "Applendium™ Premium unlocks Apply Gate and the weekly search-health summary.",
+    description: "Applendium™ Free tracks your applications from Gmail. Premium adds Apply Gate on every job, Next Actions, Strategy Alerts, Interview Prep and Ask Applendium™.",
   });
 
   async function handleCheckout() {
@@ -167,7 +153,7 @@ export default function Upgrade() {
 
   return (
     <div className="landingPage min-h-screen bg-[#FAFAF8] text-[#0B1220]">
-      <BrandHeader />
+      <PublicHeader />
 
       <main>
         <section className={`mx-auto max-w-[980px] px-6 pt-20 md:px-8 ${showFounding ? "pb-16" : "pb-24"}`}>
@@ -208,11 +194,11 @@ export default function Upgrade() {
             </a>
           ) : null}
 
-          <div className="mt-14 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[1fr_1.2fr]">
+          <div className="mt-14 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
             <div className="rounded-[18px] border border-[#E9EAE5] bg-white p-8">
               <h2 className="text-lg font-bold">Free</h2>
               <p className="mt-3.5 text-[38px] font-bold tracking-[-0.03em]">$0</p>
-              <p className="mt-1 text-[13px] text-[#9AA0A6]">forever</p>
+              <p className="mt-1 text-[13px] text-[#5C6470]" data-testid="free-forever">forever</p>
               <div className="mt-6 grid gap-3 border-t border-[#EEF0EC] pt-[22px]">
                 {FREE_FEATURES.map((feature) => (
                   <div key={feature} className="flex items-center gap-2.5">
@@ -233,33 +219,71 @@ export default function Upgrade() {
 
             <div className="relative overflow-hidden rounded-[18px] bg-[#0B1220] p-8">
               <h2 className="text-lg font-bold text-white">Premium</h2>
-              {quarterlyPrice && !isPremium ? (
-                <div role="radiogroup" aria-label="Billing" className="mt-4 inline-flex rounded-[10px] border border-[#1C2A42] bg-[#0E1726] p-1" data-testid="billing-plan-toggle">
+              {quarterlyPrice ? (
+                // Both live prices side by side (2026-10-14): the quarterly plan used to hide behind a
+                // toggle, and premium members saw no quarterly option at all. Prices come only from
+                // GET /api/subscriptions/price, never from this file.
+                <div
+                  {...(!isPremium ? { role: "radiogroup", "aria-label": "Billing", "data-testid": "billing-plan-toggle" } : { "data-testid": "billing-plan-prices" })}
+                  className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2"
+                >
                   {[
-                    ["monthly", "Monthly"],
-                    ["quarterly", quarterlySavings > 0 ? `Quarterly · save ${quarterlySavings}%` : "Quarterly"],
-                  ].map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      role="radio"
-                      aria-checked={selectedPlan === value}
-                      data-testid={`billing-plan-${value}`}
-                      onClick={() => choosePlan(value)}
-                      className={`rounded-[8px] px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
-                        selectedPlan === value ? "bg-[#0A7A55] text-white" : "text-[#98A1B3] hover:text-white"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                    {
+                      value: "monthly",
+                      label: "Monthly",
+                      price: formattedMonthly,
+                      note: "cancel anytime",
+                    },
+                    {
+                      value: "quarterly",
+                      label: quarterlySavings > 0 ? `Quarterly · save ${quarterlySavings}%` : "Quarterly",
+                      price: formattedQuarterly,
+                      note: quarterlyPerMonth ? `about ${quarterlyPerMonth.amount}/mo · billed every 3 months` : "billed every 3 months",
+                    },
+                  ].map((option) => {
+                    const selected = !isPremium && selectedPlan === option.value;
+                    const body = (
+                      <>
+                        <span className="block text-[12.5px] font-semibold text-[#C9D0DC]">{option.label}</span>
+                        {option.price ? (
+                          <span className="mt-1.5 block text-[30px] font-bold leading-none tracking-[-0.03em] text-white">
+                            {option.price.amount}
+                            {option.price.suffix ? (
+                              <span className="ml-1 text-sm font-semibold text-[#98A1B3]">{option.price.suffix}</span>
+                            ) : null}
+                          </span>
+                        ) : null}
+                        <span className="mt-1.5 block text-[12.5px] leading-snug text-[#98A1B3]" data-testid={`billing-plan-${option.value}-note`}>
+                          {option.note}
+                        </span>
+                      </>
+                    );
+                    return isPremium ? (
+                      <div key={option.value} className="rounded-[12px] border border-[#1C2A42] bg-[#0E1726] p-4">
+                        {body}
+                      </div>
+                    ) : (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        data-testid={`billing-plan-${option.value}`}
+                        onClick={() => choosePlan(option.value)}
+                        className={`min-h-[44px] rounded-[12px] border p-4 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#34E3A8]/60 ${
+                          selected ? "border-[#2FBE8F] bg-[#0A7A55]/20" : "border-[#1C2A42] bg-[#0E1726] hover:border-[#3A4A66]"
+                        }`}
+                      >
+                        {body}
+                      </button>
+                    );
+                  })}
                 </div>
-              ) : null}
-              {formattedPrice ? (
+              ) : formattedMonthly ? (
                 <p className="mt-3.5 text-[38px] font-bold tracking-[-0.03em] text-white">
-                  {formattedPrice.amount}
-                  {formattedPrice.suffix ? (
-                    <span className="ml-1 text-base font-semibold text-[#98A1B3]">{formattedPrice.suffix}</span>
+                  {formattedMonthly.amount}
+                  {formattedMonthly.suffix ? (
+                    <span className="ml-1 text-base font-semibold text-[#98A1B3]">{formattedMonthly.suffix}</span>
                   ) : null}
                 </p>
               ) : (
@@ -268,10 +292,14 @@ export default function Upgrade() {
                   <span className="ml-2 text-base font-semibold text-[#98A1B3]">at checkout</span>
                 </p>
               )}
-              <p className="mt-1 text-[13px] text-[#98A1B3]" data-testid="billing-plan-note">
-                {selectedPlan === "quarterly" && quarterlyPerMonth
-                  ? `about ${quarterlyPerMonth.amount}/mo · billed every 3 months · cancel anytime`
-                  : "cancel anytime"}
+              <p className="mt-2 text-[13px] text-[#98A1B3]" data-testid="billing-plan-note">
+                {isPremium
+                  ? "You're on Premium."
+                  : !quarterlyPrice
+                    ? "cancel anytime"
+                    : selectedPlan === "quarterly" && quarterlyPerMonth
+                    ? `Selected: quarterly, about ${quarterlyPerMonth.amount}/mo · billed every 3 months · cancel anytime`
+                    : "Selected: monthly · cancel anytime"}
               </p>
               <div className="mt-6 grid gap-3 border-t border-[#1C2A42] pt-[22px]">
                 {PREMIUM_FEATURES.map((feature) => (
@@ -413,7 +441,7 @@ export default function Upgrade() {
             </div>
           ) : null}
 
-          <p className="mt-8 text-center text-[13px] text-[#9AA0A6]">
+          <p className="mt-8 text-center text-[13px] text-[#5C6470]">
             Questions?{" "}
             <a
               href="mailto:support@applendium.com?subject=Applendium™%20Premium"
@@ -426,6 +454,7 @@ export default function Upgrade() {
 
         {showFounding ? <LandingFounding priceLabel={monthlyFormattedPrice} /> : null}
       </main>
+      <PublicFooter />
     </div>
   );
 }

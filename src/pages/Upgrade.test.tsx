@@ -156,4 +156,48 @@ describe("Upgrade — quarterly plan and funnel events", () => {
     expect(await screen.findByText("Open dashboard")).toBeInTheDocument();
     expect(screen.queryByTestId("billing-plan-toggle")).toBeNull();
   });
+
+  // 2026-10-14 persona findings: the quarterly plan was hidden (behind a toggle, and entirely for
+  // premium members), the cards were unequal, half of Premium was missing from the list, and the
+  // Free column left out the activity report and the real limits.
+  test("monthly and quarterly prices are both on screen at once, before any click", async () => {
+    await renderUpgrade({ founding: "" });
+    expect(await screen.findByText("$24.99")).toBeInTheDocument();
+    expect(screen.getByText("$59.00")).toBeInTheDocument();
+    expect(screen.getByTestId("billing-plan-monthly")).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByTestId("billing-plan-quarterly-note")).toHaveTextContent("about $19.67/mo");
+    // Prices come from the price endpoint only.
+    expect(fetchPremiumPrice).toHaveBeenCalled();
+  });
+
+  test("a premium member still sees both prices, without a plan picker", async () => {
+    await renderUpgrade({ founding: "", plan: "premium" });
+    expect(await screen.findByText("$59.00")).toBeInTheDocument();
+    expect(screen.getByText("$24.99")).toBeInTheDocument();
+    expect(screen.getByTestId("billing-plan-note")).toHaveTextContent("You're on Premium.");
+    expect(screen.queryByRole("radio")).toBeNull();
+  });
+
+  test("the plan lists are complete and the free limits match the backend", async () => {
+    await renderUpgrade({ founding: "" });
+    await screen.findByText("$59.00");
+    for (const line of [
+      "Tracks up to 500 applications per rolling 30 days, live from Gmail",
+      "1 Apply Gate check a week",
+      "Activity report you can download as a PDF",
+      "90 days of email history",
+      "Apply Gate on every job you check",
+      "Next Actions, with the reason for each",
+      "Strategy Alerts on what is and is not working",
+      "Resume versions: see which one gets interviews",
+      "Interview Prep built from your interview emails",
+      "Ask Applendium™ questions about your search",
+      "180 days of email history",
+    ]) {
+      expect(screen.getByText(line)).toBeInTheDocument();
+    }
+    expect(screen.queryByText(/trial|refund|guarantee/i)).toBeNull();
+    // "forever" was #9AA0A6 on white (2.64:1).
+    expect(screen.getByTestId("free-forever").className).toContain("text-[#5C6470]");
+  });
 });
