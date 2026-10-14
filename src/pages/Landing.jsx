@@ -222,7 +222,7 @@ export default function Landing() {
         <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between px-6 md:px-8">
           <a
             href="#top"
-            className="flex items-center gap-2.5"
+            className="flex min-h-[44px] items-center gap-2.5"
             data-testid="logo-link"
             onClick={closeMobileMenu}
           >
@@ -549,7 +549,7 @@ export default function Landing() {
                     <Magnetic className="shrink-0">
                       <Link
                         to="/upgrade?source=landing"
-                        className="inline-flex items-center gap-2 rounded-[11px] bg-white px-4 py-2.5 text-sm font-semibold text-[#0B1220] transition-colors hover:bg-[#E9FBF3]"
+                        className="inline-flex min-h-[44px] items-center gap-2 rounded-[11px] bg-white px-4 py-2.5 text-sm font-semibold text-[#0B1220] transition-colors hover:bg-[#E9FBF3]"
                       >
                         Start Premium
                         <ArrowRight className="h-4 w-4" />
@@ -649,7 +649,7 @@ export default function Landing() {
                 </p>
                 <a
                   href="mailto:support@applendium.com?subject=Applendium™%20Support"
-                  className="landingButtonDark mt-5 inline-flex items-center justify-center rounded-lg bg-[#0B1220] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0A7A55]"
+                  className="landingButtonDark mt-5 inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[#0B1220] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0A7A55]"
                 >
                   Email support
                 </a>
@@ -667,7 +667,7 @@ export default function Landing() {
                 </p>
                 <a
                   href="mailto:privacy@applendium.com?subject=Applendium™%20Privacy%20Request"
-                  className="mt-5 inline-flex items-center justify-center rounded-lg border border-[#D8DAD3] bg-white px-4 py-2.5 text-sm font-semibold text-[#0B1220] transition-colors hover:border-[#0B1220]"
+                  className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-lg border border-[#D8DAD3] bg-white px-4 py-2.5 text-sm font-semibold text-[#0B1220] transition-colors hover:border-[#0B1220]"
                 >
                   Contact privacy
                 </a>

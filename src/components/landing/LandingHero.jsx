@@ -474,7 +474,7 @@ export default function LandingHero({ chromeHref }) {
                 })}
               </div>
 
-              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 focus-within:border-[#2FBE8F]/40">
+              <div className="flex min-h-[44px] items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-1 focus-within:border-[#2FBE8F]/40">
                 <Search className="h-3.5 w-3.5 text-[#7C8AA3]" />
                 <input
                   type="text"
@@ -485,7 +485,7 @@ export default function LandingHero({ chromeHref }) {
                   }}
                   placeholder="Search companies, roles…"
                   aria-label="Search applications"
-                  className="w-full bg-transparent text-[11px] text-white placeholder:text-[#5C6B85] focus:outline-none"
+                  className="min-h-[36px] w-full bg-transparent text-[11px] text-white placeholder:text-[#5C6B85] focus:outline-none"
                 />
               </div>
 
