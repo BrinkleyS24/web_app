@@ -9,6 +9,7 @@ import { fetchResumeVariants } from "@/lib/emails";
 import { readActionContext, type ActionContext } from "@/lib/actionWorkspace";
 import { buildInterviewPractice, fetchInterviewSource, invitationScheduleLabel, splitFocusAreas, type PracticePack } from "@/lib/interviewPrep";
 import { useDraftSession } from "@/hooks/useDraftSession";
+import { friendlyErrorMessage } from "@/lib/apiErrors";
 
 type PrepSession = { variantId:string; posting:string; focus:string; pack?:PracticePack; builtInput?:string; notes:Record<string,string> };
 const empty:PrepSession = {variantId:"",posting:"",focus:"",notes:{}};
@@ -56,7 +57,7 @@ function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
       const pack=await buildInterviewPractice({...context,sourceVersion:source.data!.sourceVersion,variantId:snapshot.variantId,jobDescription:snapshot.posting,focusAreas:splitFocusAreas(snapshot.focus)});
       if(!mounted.current||JSON.stringify([sessionRef.current.variantId,sessionRef.current.posting,sessionRef.current.focus])!==signature)return;
       update({pack,builtInput:signature,notes:{}});setResetAllowed(false);setFocusNewPack(true);
-    }catch(err){if(mounted.current)setError(err instanceof Error?err.message:"Practice could not be built. Your inputs remain here.");}
+    }catch(err){if(mounted.current)setError(friendlyErrorMessage(err,"Practice could not be built. Your inputs remain here."));}
     finally{guard.current=false;if(mounted.current)setPending(false);}
   }
   function setNote(key:string,value:string){ updateSessions(current=>{const previous=current[sessionKey]||empty;return {...current,[sessionKey]:{...previous,notes:{...previous.notes,[key]:value}}};});setCopied(""); }
@@ -68,7 +69,7 @@ function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
   }
   return <div className="mt-5 min-w-0 space-y-5 [overflow-wrap:anywhere]">
     <Panel title="1. Confirm the invitation">
-      {source.isPending?<p role="status">Loading your interview source…</p>:source.isError?<><p role="alert">{source.error instanceof Error?source.error.message:"Your interview source could not be loaded."}</p><button className={BUTTON.secondary} onClick={()=>void source.refetch()}>Reload interview source</button></>:source.data?<>
+      {source.isPending?<p role="status">Loading your interview source…</p>:source.isError?<><p role="alert">{friendlyErrorMessage(source.error,"Your interview source could not be loaded.")}</p><button className={BUTTON.secondary} onClick={()=>void source.refetch()}>Reload interview source</button></>:source.data?<>
         <p className="font-semibold">{[source.data.company,source.data.role].filter(Boolean).join(" · ")||"Interview conversation"}</p>
         <p className="mt-2 text-sm">{invitationScheduleLabel(source.data.schedule)}</p>
         <p className="mt-2 text-sm text-muted-foreground">Confirm the time, timezone, interview format and contact in the original invitation. These may change.</p>

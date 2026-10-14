@@ -10,6 +10,7 @@ import { ASK_MAX_QUESTION_CHARS, askApplendium, type AskNextStep, type AskRespon
 import { buildGmailThreadUrl } from "@/lib/premiumTaskQueue";
 import { STATUS_TONE } from "@/lib/statusTone";
 import { cn } from "@/lib/utils";
+import { friendlyErrorMessage } from "@/lib/apiErrors";
 
 /**
  * Ask Applendium™ (2026-09-26): a question box that answers from the member's own tracked
@@ -141,7 +142,7 @@ export function AskApplendium() {
           ) : null}
 
           {mutation.isError ? (
-            <ErrorState title="No answer this time" detail={mutation.error?.message} onRetry={() => asked && ask(asked)} />
+            <ErrorState title="No answer this time" detail={friendlyErrorMessage(mutation.error, "Applendium could not answer just now. Try again in a moment.")} onRetry={() => asked && ask(asked)} />
           ) : null}
 
           {result && !mutation.isPending ? (

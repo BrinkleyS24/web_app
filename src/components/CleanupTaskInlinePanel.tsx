@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Link2, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyErrorMessage } from "@/lib/apiErrors";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -132,7 +133,7 @@ export function CleanupTaskInlinePanel({ task, storedEmails, onRefresh, loading 
       await onRefresh();
       toast.success(linked ? "Details saved and application links updated." : "Details saved. A company and role are still needed to link this email.");
     } catch (error) {
-      const detail = error instanceof Error ? error.message : "Unable to save thread details.";
+      const detail = friendlyErrorMessage(error, "The details did not save. Try again.");
       toast.error(linked ? "Changes saved, but the updated view could not load. Refresh to check the result." : `${savedFields ? "Some details were saved. " : ""}${detail}`);
     } finally {
       setBusyKey("");
@@ -162,7 +163,7 @@ export function CleanupTaskInlinePanel({ task, storedEmails, onRefresh, loading 
       const relinked = Number(result?.relinked || 0);
       toast.success(relinked > 1 ? `Linked ${relinked} related emails.` : "Application journey linked.");
     } catch (error) {
-      toast.error(linked ? "Links updated, but the updated view could not load. Refresh to check the result." : error instanceof Error ? error.message : "Unable to link this thread.");
+      toast.error(linked ? "Links updated, but the updated view could not load. Refresh to check the result." : friendlyErrorMessage(error, "This thread could not be linked. Try again."));
     } finally {
       setBusyKey("");
       saving.current = false;

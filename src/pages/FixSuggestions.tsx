@@ -40,6 +40,7 @@ import { OutreachDraftEditor } from "@/components/premium/OutreachDraftEditor";
 import { useDraftSession } from "@/hooks/useDraftSession";
 import { WhyLine } from "@/components/premium/WhyLine";
 import { describeActionIdentity, describeActionKind, resolveActionCta } from "@/lib/actionPresentation";
+import { friendlyErrorMessage } from "@/lib/apiErrors";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useCanonicalQueueImpressions } from "@/hooks/useCanonicalQueueImpressions";
@@ -1149,7 +1150,7 @@ const FixSuggestions = () => {
     },
     onError: (error: Error, variables) => {
       const request = draftRequests.current.get(variables);
-      if (mounted.current && request?.owner === currentOwner.current) toast.error(error.message || "Unable to generate draft.");
+      if (mounted.current && request?.owner === currentOwner.current) toast.error(friendlyErrorMessage(error, "The draft was not generated. Try again."));
     },
   });
 
@@ -1183,7 +1184,7 @@ const FixSuggestions = () => {
       toast.success("Draft feedback saved.");
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Unable to save draft feedback.");
+      toast.error(friendlyErrorMessage(error, "Your feedback did not save. Try again."));
     },
   });
 
@@ -1373,7 +1374,7 @@ const FixSuggestions = () => {
           await refreshQueueState();
           return;
         }
-        toast.error(error instanceof Error ? error.message : "Unable to mark suggestion complete.");
+        toast.error(friendlyErrorMessage(error, "That did not save. Try again."));
       }
     });
   };
@@ -1394,7 +1395,7 @@ const FixSuggestions = () => {
           await refreshQueueState();
           return;
         }
-        toast.error(error instanceof Error ? error.message : "Unable to snooze suggestion.");
+        toast.error(friendlyErrorMessage(error, "The snooze did not save. Try again."));
       }
     });
   };
@@ -1424,7 +1425,7 @@ const FixSuggestions = () => {
           try { await refreshQueueState(); } catch { if (isCurrent()) toast.error('Could not refresh this role. Try again.'); }
           return;
         }
-        toast.error(error instanceof Error ? error.message : "The save could not be confirmed. Retry this same task.");
+        toast.error(friendlyErrorMessage(error, "The save could not be confirmed. Retry this same task."));
         return;
       }
       // A refresh failure must not turn a confirmed commit into a save failure.
@@ -1826,7 +1827,7 @@ const FixSuggestions = () => {
               <LoadingRows rows={3} />
             </div>
           ) : queueError ? (
-            <ErrorState title="Your actions did not load" detail={queueError} onRetry={() => void queueQuery.refetch()} />
+            <ErrorState title="Your actions did not load" detail={friendlyErrorMessage({ message: queueError })} onRetry={() => void queueQuery.refetch()} />
           ) : todayItems.length === 0 ? (
             <div className={cn(CARD, "p-5")}>
               <EmptyState

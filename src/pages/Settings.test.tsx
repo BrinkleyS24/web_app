@@ -197,3 +197,26 @@ describe("Settings resume for free users", () => {
     expect(fetchResume).not.toHaveBeenCalled();
   });
 });
+
+// "Billing details did not load: BLOCKED_BY_QA_HARNESS" reached the screen (persona review, 2026-10-14).
+describe("Settings errors", () => {
+  test("a raw backend code is never shown; a sentence is", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path === "/api/subscriptions/status") throw Object.assign(new Error("BLOCKED_BY_QA_HARNESS"), { status: 403 });
+      return { success: true, enabled: true, available: true, premium: true };
+    });
+    renderPage();
+    expect(await screen.findByText("Billing details did not load")).toBeInTheDocument();
+    expect(screen.queryByText(/BLOCKED_BY_QA_HARNESS/)).not.toBeInTheDocument();
+    expect(screen.getByText(/not available for your account right now/)).toBeInTheDocument();
+  });
+
+  test("Settings has a Your data section", async () => {
+    mockApi({ coach: { enabled: true, available: true, premium: true } });
+    renderPage();
+    expect(await screen.findByRole("button", { name: "Delete my account" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Export my data" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Disconnect Gmail" })).toBeInTheDocument();
+  });
+});
