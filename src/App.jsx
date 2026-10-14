@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Landing from "./pages/Landing.jsx";
 import Privacy from "./pages/Privacy.jsx";
@@ -21,6 +21,7 @@ import AdminJobs from "./pages/AdminJobs.tsx";
 import AdminReview from "./pages/AdminReview.tsx";
 import AdminUsers from "./pages/AdminUsers.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import SignedOutWorkspace from "./components/landing/SignedOutWorkspace.jsx";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -54,38 +55,74 @@ const DASHBOARD_ROUTES = [
   "/admin/users",
 ];
 
-function LoadingScreen() {
+function LoadingScreen({ restoring = false }) {
   return (
-    <div className="container" style={{ paddingTop: 48 }}>
-      <p className="muted">Loading...</p>
+    <div className="container" style={{ paddingTop: 48 }} role="status" aria-live="polite">
+      <p className="muted">{restoring ? "Signing you in from the Applendium™ extension..." : "Loading..."}</p>
     </div>
   );
 }
 
-function RequireNonAdminUser({ children }) {
-  const { user, loading, bridgeDone, planLoading, adminEmail } = useAuth();
+// How long a signed-out visitor with no sign of the extension sees "Loading..." before the
+// signed-out page replaces it. The bridge check keeps running behind that page (2026-10-14).
+export const SIGNED_OUT_GRACE_MS = 1200;
 
-  // On a cold load of a gated route, Firebase emits null once before the session
-  // restores and the extension bridge re-authenticates. Wait for that to settle
-  // before deciding the user is signed out — otherwise a real signed-in user gets
-  // bounced to /upgrade on hard refresh / deep link.
-  if (loading || planLoading || (!user && !bridgeDone)) return <LoadingScreen />;
-  if (!user) return <Navigate to="/upgrade" replace />;
+function useElapsed(ms) {
+  const [elapsed, setElapsed] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setElapsed(true), ms);
+    return () => clearTimeout(timer);
+  }, [ms]);
+  return elapsed;
+}
+
+/**
+ * The signed-out decision for workspace routes. On a cold load Firebase reports null once before a
+ * session restores, and the extension bridge may still be signing the visitor in, so a signed-in
+ * user must never be sent away during that window. Before 2026-10-14 every guard showed "Loading..."
+ * until the bridge had retried for up to ~30 s and then redirected to /upgrade. Now:
+ *   - "signed-in"  a user is present (plan checks follow in each guard);
+ *   - "restoring"  the extension is present and still signing in: keep the spinner;
+ *   - "signed-out" the bridge finished with no user, or nothing has answered after a short grace.
+ * The signed-out page renders in place, never as a redirect, so a late bridge sign-in still lands
+ * the visitor on the page they asked for.
+ */
+export function useWorkspaceAuthState() {
+  const { user, loading, bridgeDone, extensionDetected } = useAuth();
+  const graceOver = useElapsed(SIGNED_OUT_GRACE_MS);
+  if (user) return "signed-in";
+  if (loading) return "loading";
+  if (bridgeDone) return "signed-out";
+  if (extensionDetected) return "restoring";
+  return graceOver ? "signed-out-checking" : "loading";
+}
+
+function SignedOutGate({ state, upgradeHref = "/upgrade?source=web_signed_out" }) {
+  if (state === "loading" || state === "restoring") return <LoadingScreen restoring={state === "restoring"} />;
+  return <SignedOutWorkspace checking={state === "signed-out-checking"} upgradeHref={upgradeHref} />;
+}
+
+function RequireNonAdminUser({ children }) {
+  const { loading, planLoading, adminEmail } = useAuth();
+  const state = useWorkspaceAuthState();
+
+  if (state !== "signed-in") return <SignedOutGate state={state} />;
+  if (loading || planLoading) return <LoadingScreen />;
   if (adminEmail) return <Navigate to="/admin/review" replace />;
 
   return children;
 }
 
 function RequirePremiumUser({ children }) {
-  const { user, loading, bridgeDone, plan, planLoading, planError, adminEmail } = useAuth();
+  const { loading, plan, planLoading, planError, adminEmail } = useAuth();
+  const state = useWorkspaceAuthState();
   const location = useLocation();
   // Which Premium page turned this visitor away, so the Upgrade page can attribute the wall.
   const upgradeHref = `/upgrade?source=${gateSource(location.pathname)}`;
 
-  // See RequireNonAdminUser: hold the loading state until auth has settled so a
-  // premium user isn't redirected to /upgrade during the auth-restore window.
-  if (loading || planLoading || (!user && !bridgeDone)) return <LoadingScreen />;
-  if (!user) return <Navigate to={upgradeHref} replace />;
+  if (state !== "signed-in") return <SignedOutGate state={state} upgradeHref={upgradeHref} />;
+  // A signed-in user's plan is still loading: hold, so a premium user isn't sent to /upgrade.
+  if (loading || planLoading) return <LoadingScreen />;
   if (adminEmail) return <Navigate to="/admin/review" replace />;
 
   if (planError && plan !== "premium") {
@@ -107,13 +144,11 @@ function RequirePremiumUser({ children }) {
 }
 
 function RequireAdminEmail({ children }) {
-  const { user, loading, bridgeDone, planLoading, adminEmail } = useAuth();
+  const { loading, planLoading, adminEmail } = useAuth();
+  const state = useWorkspaceAuthState();
 
-  if (loading || planLoading || (!user && !bridgeDone)) return <LoadingScreen />;
-
-  if (!user) {
-    return <Navigate to="/upgrade" replace />;
-  }
+  if (state !== "signed-in") return <SignedOutGate state={state} />;
+  if (loading || planLoading) return <LoadingScreen />;
 
   if (!adminEmail) {
     return <NotFound />;

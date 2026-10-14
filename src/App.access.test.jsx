@@ -42,7 +42,8 @@ test('a signed-in free user can reach resume management', () => {
 });
 test('signed-out users still cannot access resume management', () => {
   authState.current = { ...signedIn(), user: null }; render(tree());
-  expect(screen.getByText('Upgrade')).toBeInTheDocument();
+  expect(screen.getByTestId('signed-out-workspace')).toBeInTheDocument();
+  expect(screen.queryByText(/Resumes/)).not.toBeInTheDocument();
 });
 test('account changes remount page state and isolate the query cache', () => {
   authState.clients = [];
