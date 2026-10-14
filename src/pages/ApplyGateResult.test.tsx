@@ -15,6 +15,9 @@ import ApplyGate, {
   riskSeverityForPercent,
 } from "./ApplyGate";
 
+// These tests type into the form; under a full parallel run 5 s is too tight.
+vi.setConfig({ testTimeout: 20_000 });
+
 const useAuth = vi.fn();
 
 const {
