@@ -30,7 +30,7 @@ export function PageHeader({
         {eyebrow ? <p className={EYEBROW}>{eyebrow}</p> : null}
         <h1 className="mt-2 text-[28px] font-bold leading-tight tracking-[-0.025em] text-foreground">{title}</h1>
         {description ? (
-          <p className="mt-1.5 max-w-[68ch] text-[14px] leading-relaxed text-muted-foreground">{description}</p>
+          <p className="mt-1.5 max-w-[68ch] text-[15px] leading-relaxed text-muted-foreground">{description}</p>
         ) : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
@@ -135,7 +135,7 @@ export function StatTile({
       ) : (
         <p
           className={cn(
-            "mt-1.5 text-[26px] font-bold leading-tight tracking-[-0.03em] tabular-nums",
+            "mt-1.5 text-[28px] font-bold leading-tight tracking-[-0.03em] tabular-nums",
             tone ? TONES[tone].text : "text-foreground",
           )}
         >
@@ -185,7 +185,7 @@ export function EmptyState({
           <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
         </div>
       ) : null}
-      <p className="text-[14px] font-semibold text-foreground">{title}</p>
+      <p className="text-[15px] font-semibold text-foreground">{title}</p>
       {body ? <p className="mx-auto mt-1 max-w-[52ch] text-[13px] leading-relaxed text-muted-foreground">{body}</p> : null}
       {action ? <div className="mt-3.5 flex justify-center">{action}</div> : null}
     </div>
@@ -206,7 +206,7 @@ export function ErrorState({
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
       <div className="min-w-0 flex-1">
         <p className="text-[13px] font-semibold text-foreground">{title}</p>
-        {detail ? <p className="mt-0.5 text-[12.5px] leading-snug text-muted-foreground">{detail}</p> : null}
+        {detail ? <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{detail}</p> : null}
       </div>
       {onRetry ? (
         <button type="button" onClick={onRetry} className={BUTTON.ghost}>

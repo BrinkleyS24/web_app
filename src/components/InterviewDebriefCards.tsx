@@ -179,7 +179,7 @@ export function InterviewDebriefCards({
       {error || current.actionReference === null ? (
         <div className="mt-2" role="alert">
           <p className="text-[12px] font-semibold leading-snug text-destructive">{error || "I could not identify this application safely. Review the role in the extension before recording its outcome."}</p>
-          {requiresRefresh ? <button type="button" onClick={() => window.location.reload()} className="mt-2 rounded-lg border border-border bg-card px-3 py-1.5 text-[12.5px] font-semibold text-foreground">Refresh page</button> : null}
+          {requiresRefresh ? <button type="button" onClick={() => window.location.reload()} className="mt-2 rounded-lg border border-border bg-card px-3 py-1.5 text-[13px] font-semibold text-foreground">Refresh page</button> : null}
         </div>
       ) : (
         <p className="mt-2 text-[12px] leading-snug text-muted-foreground" data-testid="debrief-progress">

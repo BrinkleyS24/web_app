@@ -62,13 +62,13 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
           <ToneChip tone={look.tone}>{look.label}</ToneChip>
           {alert.timeframe_label ? <span className="text-[12px] text-muted-foreground">{alert.timeframe_label}</span> : null}
         </div>
-        <h2 className="mt-2.5 text-[18px] font-bold leading-snug tracking-[-0.015em] text-foreground">{alert.title}</h2>
+        <h2 className="mt-2.5 text-[20px] font-bold leading-snug tracking-[-0.015em] text-foreground">{alert.title}</h2>
         {alert.supporting_stat ? (
-          <p className="mt-1.5 text-[14px] font-semibold text-foreground/85">{alert.supporting_stat}</p>
+          <p className="mt-1.5 text-[15px] font-semibold text-foreground/85">{alert.supporting_stat}</p>
         ) : null}
         {alert.description ? (
           <div className="mt-1.5 max-w-[74ch]">
-            <p className={cn("text-[13.5px] leading-relaxed text-muted-foreground", !expanded && longDescription && "line-clamp-2")}>
+            <p className={cn("text-[13px] leading-relaxed text-muted-foreground", !expanded && longDescription && "line-clamp-2")}>
               {alert.description}
             </p>
             {longDescription ? (
@@ -76,7 +76,7 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
                 type="button"
                 onClick={() => setExpanded((open) => !open)}
                 aria-expanded={expanded}
-                className="mt-1 text-[12.5px] font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                className="mt-1 text-[13px] font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
               >
                 {expanded ? "Show less" : "Read more"}
               </button>
@@ -86,7 +86,7 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
 
         <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
             {alert.recommendation ? (
-              <p className="flex max-w-[64ch] gap-2 text-[14px] leading-relaxed text-foreground">
+              <p className="flex max-w-[64ch] gap-2 text-[15px] leading-relaxed text-foreground">
                 <ArrowRight className={cn("mt-1 h-4 w-4 shrink-0", TONES[look.tone].text)} aria-hidden />
                 {alert.recommendation}
               </p>
@@ -103,16 +103,16 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
               <FlaskConical className="h-3.5 w-3.5" aria-hidden />
               Try it and see
             </p>
-            <p className="mt-1 text-[13.5px] leading-snug text-foreground">{alert.experiment.ask}</p>
+            <p className="mt-1 text-[13px] leading-snug text-foreground">{alert.experiment.ask}</p>
             {alert.experiment.howItWorks ? (
-              <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">{alert.experiment.howItWorks}</p>
+              <p className="mt-1 text-[13px] leading-snug text-muted-foreground">{alert.experiment.howItWorks}</p>
             ) : null}
-            <Link to="/next-actions" className={cn(BUTTON.secondary, "mt-2.5 inline-flex px-3 py-1.5 text-[12.5px]")}>
+            <Link to="/next-actions" className={cn(BUTTON.secondary, "mt-2.5 inline-flex px-3 py-1.5 text-[13px]")}>
               Start in Next Actions
             </Link>
           </div>
         ) : alert.kind !== "experiment" && alert.experiment?.status === "started" ? (
-          <p className="mt-3 text-[12.5px] text-muted-foreground">
+          <p className="mt-3 text-[13px] text-muted-foreground">
             You are trying this now. Its progress is under Your experiments at the top of this page.
           </p>
         ) : null}
@@ -151,8 +151,8 @@ function SkillGapsPanel({ gaps, outdatedExcluded }: { gaps: ResumeGap[]; outdate
           {gaps.slice(0, 6).map((gap) => (
             <li key={`${gap.category}-${gap.skill}`} className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
               <div className="min-w-0">
-                <p className="text-[14px] font-semibold text-foreground">{gap.skill}</p>
-                <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+                <p className="text-[15px] font-semibold text-foreground">{gap.skill}</p>
+                <p className="mt-0.5 text-[13px] text-muted-foreground">
                   {gap.examples
                     .map((example) => [example.company, example.position].filter(Boolean).join(" · "))
                     .filter(Boolean)

@@ -87,7 +87,7 @@ export function FirstMoveCard() {
         <X className="h-4 w-4" />
       </button>
 
-      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-accent">
+      <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-accent">
         First move
       </p>
 

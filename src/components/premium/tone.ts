@@ -87,5 +87,12 @@ export const BUTTON = {
   link: "inline-flex items-center gap-1 rounded-sm text-[13px] font-semibold text-accent transition-colors hover:text-accent/80 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
 } as const;
 
+/**
+ * Type scale for signed-in pages (designer review, 2026-10-14: the Dashboard used 11 sizes). Use only:
+ * 11 (eyebrows, chips), 12 (meta, footnotes), 13 (secondary text, buttons), 15 (body, card titles),
+ * 20 (section headlines, phone hero), 28 (page titles, stat values).
+ */
+export const TYPE_SCALE_PX = [11, 12, 13, 15, 20, 28] as const;
+
 export const EYEBROW = "font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground";
 export const CARD = "rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(11,18,32,0.04)]";
