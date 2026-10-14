@@ -30,7 +30,7 @@ function renderPanel() {
 beforeEach(() => {
   logout.mockResolvedValue(undefined);
 });
-afterEach(() => vi.clearAllMocks());
+afterEach(() => { vi.clearAllMocks(); });
 
 // Settings had only Sign out: no disconnect, delete or export (mobile persona, 2026-10-14).
 describe("YourDataPanel", () => {
