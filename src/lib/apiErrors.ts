@@ -20,7 +20,7 @@ export function isHumanMessage(message: unknown): message is string {
   if (CODE_LIKE.test(text)) return false;
   if (!/\s/.test(text)) return false;
   // Raw transport or status lines carry no advice.
-  if (/^(server error \(\d+\)|request failed|internal server error|bad request|forbidden|unauthorized|not found)\b/i.test(text)) return false;
+  if (/^(server error \(\d+\)|request failed|internal server error|bad request|forbidden|unauthorized|not found)(?=[\s.:]|$)/i.test(text)) return false;
   if (/^https?:\/\//i.test(text) || /^</.test(text)) return false;
   return true;
 }
