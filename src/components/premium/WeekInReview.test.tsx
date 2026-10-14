@@ -91,8 +91,8 @@ describe("WeekInReview (the Weekly Summary, folded into Next Actions)", () => {
     expect(screen.getByText("Waiting on you")).toBeInTheDocument();
   });
 
-  test("an old /weekly-summary link lands here opened", async () => {
-    renderPage({ open: false, entry: "/next-actions#this-week" });
+  test("an old /weekly-summary link lands on the week card opened", async () => {
+    renderPage({ open: false, entry: "/dashboard#this-week" });
     expect(await screen.findByTestId("week-details")).toBeInTheDocument();
   });
 });

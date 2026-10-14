@@ -8,7 +8,9 @@ import { ErrorState, LoadingRows, PageHeader, Panel, PanelLink, StatTile } from 
 import { BUTTON, EYEBROW } from "@/components/premium/tone";
 import { Switch } from "@/components/ui/switch";
 import { fetchResumeVariants } from "@/lib/emails";
+import { YourDataPanel } from "@/components/YourDataPanel";
 import { cn } from "@/lib/utils";
+import { friendlyErrorMessage } from "@/lib/apiErrors";
 import {
   CreditCard,
   Crown,
@@ -89,7 +91,7 @@ export default function Settings() {
       const resp = await apiFetch("/api/user/coach-preference", { method: "GET" });
       setCoachPref(resp || null);
     } catch (error: any) {
-      setCoachError(error?.message || "Failed to load your coach settings.");
+      setCoachError(friendlyErrorMessage(error, "Your coach setting did not load. Try again in a moment."));
     } finally {
       setCoachLoading(false);
     }
@@ -109,7 +111,7 @@ export default function Settings() {
       setCoachPref(resp || null);
     } catch (error: any) {
       setCoachPref(previous);
-      setCoachError(error?.message || "Failed to save your coach settings.");
+      setCoachError(friendlyErrorMessage(error, "Your coach setting did not save. Try again."));
     } finally {
       setCoachSaving(false);
     }
@@ -127,7 +129,7 @@ export default function Settings() {
       const resp = await apiFetch("/api/subscriptions/status", { method: "GET" });
       setSubStatus(resp || null);
     } catch (error: any) {
-      setSubError(error?.message || "Failed to load subscription status.");
+      setSubError(friendlyErrorMessage(error, "Your billing details did not load. Try again in a moment."));
     } finally {
       setSubLoading(false);
     }
@@ -145,7 +147,7 @@ export default function Settings() {
       if (!url) throw new Error("Backend did not return a portal URL.");
       window.location.assign(url);
     } catch (error: any) {
-      setSubError(error?.message || "Billing portal is not available for this account yet.");
+      setSubError(friendlyErrorMessage(error, "The billing portal is not available for this account yet."));
     } finally {
       setBusyPortal(false);
     }
@@ -204,8 +206,8 @@ export default function Settings() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-3xl space-y-5">
-        <PageHeader title="Settings" description="Your account, resumes, coach voice and billing." />
+      <div className="space-y-5">
+        <PageHeader eyebrow="Your account" title="Settings" description="Your account, resumes, coach voice, billing and data." />
 
         <Panel title="Account" icon={User}>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -347,6 +349,8 @@ export default function Settings() {
             </div>
           </div>
         </Panel>
+
+        <YourDataPanel />
       </div>
     </DashboardLayout>
   );

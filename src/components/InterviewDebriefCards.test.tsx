@@ -63,7 +63,8 @@ describe("InterviewDebriefCards", () => {
     expect(screen.getByText("Verisk · Software Engineer in Test")).toBeInTheDocument();
     expect(screen.getByText(/interviewed 20 days ago/)).toBeInTheDocument();
     expect(screen.queryByText("Onebrief · QA Engineer")).not.toBeInTheDocument();
-    expect(screen.getByText(/1 more · about 1 minute/)).toBeInTheDocument();
+    // Punctuated (persona review, 2026-10-14: "about 1 minute Stop whenever" ran together).
+    expect(screen.getByTestId("debrief-progress")).toHaveTextContent("1 more, about 1 minute. Stop whenever you like. Every answer counts on its own.");
     // The cost of stopping has to be zero, or the ask reads as an obligation.
     expect(screen.getByText(/Stop whenever you like/)).toBeInTheDocument();
   });
@@ -83,11 +84,23 @@ describe("InterviewDebriefCards", () => {
     expect(await screen.findByText("Onebrief · QA Engineer")).toBeInTheDocument();
   });
 
+  test("each tap is confirmed at once and the count goes down, Still live included", async () => {
+    const user = userEvent.setup();
+    renderCards(5);
+    expect(screen.getByTestId("debrief-progress")).toHaveTextContent("4 more");
+
+    await user.click(screen.getByRole("button", { name: "Still live" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Noted. Verisk stays open.");
+    expect(screen.getByTestId("debrief-progress")).toHaveTextContent("3 more");
+  });
+
   test("a rejection the user remembers is recorded as an adverse decision", async () => {
     const user = userEvent.setup();
-    renderCards();
+    renderCards(5);
 
     await user.click(screen.getByRole("button", { name: "Rejected" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Saved: Rejected for Verisk.");
+    expect(screen.getByTestId("debrief-progress")).toHaveTextContent("3 more");
 
     await waitFor(() => expect(recordInterviewDebrief).toHaveBeenCalledWith({
       emailId: 101,
@@ -192,7 +205,7 @@ describe("InterviewDebriefCards", () => {
     // The payload caps the rows it carries; the user is being asked about more than that.
     renderCards(19);
 
-    expect(screen.getByText(/18 more · about 3 minutes/)).toBeInTheDocument();
+    expect(screen.getByText(/18 more, about 3 minutes\./)).toBeInTheDocument();
   });
 
   test("each answer maps to a close label the backend taxonomy already understands", () => {

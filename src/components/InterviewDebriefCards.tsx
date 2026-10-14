@@ -55,6 +55,9 @@ export function InterviewDebriefCards({
   const [requiresRefresh, setRequiresRefresh] = useState(false);
   const [answeredCount, setAnsweredCount] = useState(0);
   const [alreadyResolvedCount, setAlreadyResolvedCount] = useState(0);
+  // What the last tap did, said back at once (persona review, 2026-10-14): without it a tap looked
+  // like nothing happened, because the next card simply replaced the last one.
+  const [confirmation, setConfirmation] = useState<string | null>(null);
   const saving = useRef(false);
 
   const remaining = useMemo(() => batch.filter((item) => !handled.has(item.key)), [batch, handled]);
@@ -71,10 +74,13 @@ export function InterviewDebriefCards({
   const handle = async (item: InterviewDebriefItem, outcome: Outcome) => {
     if (saving.current || requiresRefresh || item.actionReference === null) return;
     setError(null);
+    setConfirmation(null);
+    const name = item.company || item.label;
 
     if (outcome === "live") {
       const next = new Set(handled).add(item.key);
       setHandled(next);
+      setConfirmation(`Noted. ${name} stays open.`);
       if (next.size >= batch.length) refreshDependentViews();
       return;
     }
@@ -87,8 +93,13 @@ export function InterviewDebriefCards({
       if (result?.success !== true) throw new Error("Save was not confirmed");
       const next = new Set(handled).add(item.key);
       setHandled(next);
-      if (result.recorded === false) setAlreadyResolvedCount((count) => count + 1);
-      else setAnsweredCount((count) => count + 1);
+      if (result.recorded === false) {
+        setAlreadyResolvedCount((count) => count + 1);
+        setConfirmation(`${name} already had an outcome. Nothing changed.`);
+      } else {
+        setAnsweredCount((count) => count + 1);
+        setConfirmation(`Saved: ${outcome === "rejected" ? "Rejected" : "Never heard back"} for ${name}.`);
+      }
       if (next.size >= batch.length) refreshDependentViews();
     } catch (failure) {
       // The card stays. A silent failure here would look like the answer was accepted and
@@ -129,14 +140,15 @@ export function InterviewDebriefCards({
         <Check className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
         <span>
           {answeredCount > 0
-            ? `${answeredCount} recorded. Your next read uses ${answeredCount === 1 ? "it" : "them"} — reload when you want the updated one.`
+            ? `${answeredCount} recorded. Your next read uses ${answeredCount === 1 ? "it" : "them"}. Reload to see the update.`
             : "These roles already have tracked outcomes. Refresh to see the updated read."}
         </span>
       </div>
     );
   }
 
-  const stillToGo = Math.max(batchTotal - answeredCount - 1, 0);
+  // Every handled card counts down, "Still live" included: it used to stay at the same "N more".
+  const stillToGo = Math.max(batchTotal - handled.size - 1, 0);
   const minutes = Math.max(1, Math.round(((stillToGo + 1) * SECONDS_PER_CARD) / 60));
   const isPending = pending === current.key;
 
@@ -156,7 +168,7 @@ export function InterviewDebriefCards({
               type="button"
               disabled={isPending || requiresRefresh || current.actionReference === null}
               onClick={() => handle(current, choice.outcome)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[12.5px] font-semibold text-foreground transition-colors hover:border-primary hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-[13px] font-semibold text-foreground transition-colors hover:border-primary hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
               {choice.label}
@@ -167,14 +179,20 @@ export function InterviewDebriefCards({
       {error || current.actionReference === null ? (
         <div className="mt-2" role="alert">
           <p className="text-[12px] font-semibold leading-snug text-destructive">{error || "I could not identify this application safely. Review the role in the extension before recording its outcome."}</p>
-          {requiresRefresh ? <button type="button" onClick={() => window.location.reload()} className="mt-2 rounded-lg border border-border bg-card px-3 py-1.5 text-[12.5px] font-semibold text-foreground">Refresh page</button> : null}
+          {requiresRefresh ? <button type="button" onClick={() => window.location.reload()} className="mt-2 rounded-lg border border-border bg-card px-3 py-1.5 text-[13px] font-semibold text-foreground">Refresh page</button> : null}
         </div>
       ) : (
-        <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
-          {stillToGo > 0 ? `${stillToGo} more · about ${minutes} minute${minutes === 1 ? "" : "s"}` : "Last one."}
-          {" "}Stop whenever you like — every answer counts on its own.
+        <p className="mt-2 text-[12px] leading-snug text-muted-foreground" data-testid="debrief-progress">
+          {stillToGo > 0 ? `${stillToGo} more, about ${minutes} minute${minutes === 1 ? "" : "s"}.` : "Last one."}
+          {" "}Stop whenever you like. Every answer counts on its own.
         </p>
       )}
+      {confirmation && !error ? (
+        <p role="status" className="mt-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-success">
+          <Check className="h-3.5 w-3.5" aria-hidden />
+          {confirmation}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -23,7 +23,11 @@ import { STATUS_TONE } from "@/lib/statusTone";
 import { parseApiDate } from "@/lib/apiDate";
 
 /**
- * The week in review, folded into Next Actions (2026-10-04). It used to be its own Weekly Summary
+ * The one week summary, on the Dashboard since 2026-10-14. Next Actions and the Dashboard each had
+ * their own (4 tiles with Offers there, 3 rows without them here), so the persona review read two
+ * different weeks; now there is one component in one place.
+ *
+ * History: the week in review, folded into Next Actions (2026-10-04). It used to be its own Weekly Summary
  * page beside Next Actions and the Dashboard's "This week" panel: three places for one week. Here it
  * is context for the actions, collapsed to the headline and four counts; Details opens the read and
  * the week's emails. /weekly-summary redirects to #this-week, which opens it.
@@ -54,7 +58,7 @@ function EventRow({ item, tone, label }: { item: WeeklyHighlightEmail; tone: Ton
   return (
     <li className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
       <div className="min-w-0">
-        <p className="text-[13.5px] font-medium text-foreground">
+        <p className="text-[13px] font-medium text-foreground">
           {source.primary}
           {source.secondary ? <span className="font-normal text-muted-foreground"> · {source.secondary}</span> : null}
         </p>
@@ -78,7 +82,7 @@ function SilentRow({ item }: { item: WeeklyHighlightSilent }) {
   return (
     <li className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
       <div className="min-w-0">
-        <p className="text-[13.5px] font-medium text-foreground">
+        <p className="text-[13px] font-medium text-foreground">
           {source.primary}
           {source.secondary ? <span className="font-normal text-muted-foreground"> · {source.secondary}</span> : null}
         </p>
@@ -138,7 +142,7 @@ function WeeksRead({ readout }: { readout: WeeklyReadout }) {
           <p className={EYEBROW}>Do next week</p>
           <ol className="mt-2 space-y-2">
             {sections.nextWeek.map((item, index) => (
-              <li key={`nw-${index}`} className="flex gap-2.5 text-[13.5px] leading-snug">
+              <li key={`nw-${index}`} className="flex gap-2.5 text-[13px] leading-snug">
                 <span
                   className={cn(
                     "mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-semibold",
@@ -166,7 +170,7 @@ function WeeksRead({ readout }: { readout: WeeklyReadout }) {
           <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
           <div>
             <p className={cn(EYEBROW, TONES.brand.text)}>Emerging pattern</p>
-            <p className="mt-1 text-[13.5px] leading-snug text-foreground">{sections.emergingPattern.text}</p>
+            <p className="mt-1 text-[13px] leading-snug text-foreground">{sections.emergingPattern.text}</p>
           </div>
         </div>
       ) : null}
@@ -193,7 +197,16 @@ function EventGroup({ icon: Icon, tone, title, description, children }: {
   );
 }
 
-export function WeekInReview({ defaultOpen = false, className }: { defaultOpen?: boolean; className?: string }) {
+export function WeekInReview({
+  defaultOpen = false,
+  className,
+  compact = false,
+}: {
+  defaultOpen?: boolean;
+  className?: string;
+  /** Narrow column: tiles two by two and event groups stacked. */
+  compact?: boolean;
+}) {
   const { user } = useAuth();
   const location = useLocation();
   const linkedHere = location.hash === `#${WEEK_ANCHOR}`;
@@ -255,7 +268,7 @@ export function WeekInReview({ defaultOpen = false, className }: { defaultOpen?:
               data-testid="week-toggle"
               aria-expanded={open}
               onClick={() => setOpen((value) => !value)}
-              className={cn(BUTTON.secondary, "px-3 py-1.5 text-[12.5px]")}
+              className={cn(BUTTON.secondary, "px-3 py-1.5 text-[13px]")}
             >
               {open ? "Hide" : "Details"}
             </button>
@@ -268,13 +281,13 @@ export function WeekInReview({ defaultOpen = false, className }: { defaultOpen?:
           <ErrorState title="This week did not load" detail="Your data is safe. Try again in a moment." onRetry={() => void highlightsQuery.refetch()} />
         ) : (
           <div className="space-y-5">
-            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="week-counts">
+            <dl className={cn("grid grid-cols-2 gap-3", !compact && "sm:grid-cols-4")} data-testid="week-counts">
               {stats.map((stat) => (
                 <div key={stat.label} className="rounded-lg border border-border px-3 py-2">
-                  <dt className="text-[11.5px] text-muted-foreground">{stat.label}</dt>
-                  <dd className="text-[18px] font-semibold tabular-nums text-foreground">{stat.value}</dd>
+                  <dt className="text-[12px] text-muted-foreground">{stat.label}</dt>
+                  <dd className="text-[20px] font-semibold tabular-nums text-foreground">{stat.value}</dd>
                   {deltaHint(stat.value, stat.prior) ? (
-                    <dd className="text-[11.5px] text-muted-foreground">{deltaHint(stat.value, stat.prior)}</dd>
+                    <dd className="text-[12px] text-muted-foreground">{deltaHint(stat.value, stat.prior)}</dd>
                   ) : null}
                 </div>
               ))}
@@ -291,7 +304,7 @@ export function WeekInReview({ defaultOpen = false, className }: { defaultOpen?:
                 ) : null}
 
                 {h && hasEvents ? (
-                  <div className="grid items-start gap-5 lg:grid-cols-2">
+                  <div className={cn("grid items-start gap-5", !compact && "lg:grid-cols-2")}>
                     {h.newOffers.length ? (
                       <EventGroup icon={Sparkles} tone="positive" title="Offers">
                         {h.newOffers.map((item, idx) => <EventRow key={`offer-${idx}`} item={item} tone="positive" label="Offer" />)}
@@ -323,7 +336,7 @@ export function WeekInReview({ defaultOpen = false, className }: { defaultOpen?:
                 {h?.topRejectionTheme ? (
                   <div className={cn("rounded-xl border px-4 py-3", TONES.risk.surface)}>
                     <p className={cn(EYEBROW, TONES.risk.text)}>Keeps coming up (last 30 days)</p>
-                    <p className="mt-1 text-[13.5px] text-foreground">
+                    <p className="mt-1 text-[13px] text-foreground">
                       “{h.topRejectionTheme.phrase}”
                       <span className="text-muted-foreground"> — in {h.topRejectionTheme.occurrences} rejections</span>
                     </p>

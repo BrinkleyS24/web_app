@@ -55,10 +55,10 @@ export const TONES: Record<Tone, ToneStyle> = {
     surface: "bg-card border-border",
   },
   done: {
-    chip: "bg-muted text-muted-foreground/80 ring-1 ring-inset ring-border",
-    icon: "bg-muted text-muted-foreground/70",
+    chip: "bg-muted text-muted-foreground ring-1 ring-inset ring-border",
+    icon: "bg-muted text-muted-foreground",
     rail: "bg-muted-foreground/25",
-    text: "text-muted-foreground/80",
+    text: "text-muted-foreground",
     surface: "bg-muted/40 border-border",
   },
   brand: {
@@ -70,18 +70,29 @@ export const TONES: Record<Tone, ToneStyle> = {
   },
 };
 
-/** Shared button looks for premium pages (the shadcn outline variant fills brand-green on hover). */
+/**
+ * Shared button looks for premium pages (the shadcn outline variant fills brand-green on hover).
+ * 2026-10-14 (persona review): at least 40px tall on phones (many controls were 28-32px), and every
+ * look, links included, shows a focus ring rather than only an underline.
+ */
 export const BUTTON = {
   primary:
-    "inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
+    "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-[13px] sm:min-h-9 font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
   accent:
-    "inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-[13px] font-semibold text-accent-foreground shadow-sm transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
+    "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-[13px] sm:min-h-9 font-semibold text-accent-foreground shadow-sm transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
   secondary:
-    "inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-[13px] font-semibold text-foreground transition-colors hover:border-foreground/25 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
+    "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2 text-[13px] sm:min-h-9 font-semibold text-foreground transition-colors hover:border-foreground/25 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
   ghost:
-    "inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60",
-  link: "inline-flex items-center gap-1 text-[13px] font-semibold text-accent transition-colors hover:text-accent/80 focus-visible:outline-none focus-visible:underline",
+    "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] sm:min-h-8 font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60",
+  link: "inline-flex items-center gap-1 rounded-sm text-[13px] font-semibold text-accent transition-colors hover:text-accent/80 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
 } as const;
 
-export const EYEBROW = "font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground";
+/**
+ * Type scale for signed-in pages (designer review, 2026-10-14: the Dashboard used 11 sizes). Use only:
+ * 11 (eyebrows, chips), 12 (meta, footnotes), 13 (secondary text, buttons), 15 (body, card titles),
+ * 20 (section headlines, phone hero), 28 (page titles, stat values).
+ */
+export const TYPE_SCALE_PX = [11, 12, 13, 15, 20, 28] as const;
+
+export const EYEBROW = "font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground";
 export const CARD = "rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(11,18,32,0.04)]";

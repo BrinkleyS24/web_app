@@ -29,6 +29,24 @@ const RESUME_TYPES = new Set(["tailor_resume", "resume_proof_gap", "portfolio"])
 const APPLY_GATE_TYPES = new Set(["apply_gate_fix", "fix_targeting", "apply"]);
 const PREP_TYPES = new Set(["prep_interview", "prepare_interview"]);
 
+/**
+ * Backend hrefs that only lead back to the action list. The ranked queue's default route is the
+ * legacy "/fix-suggestions" ("Open queue"), which redirects to Next Actions, so "Work the offer ->
+ * Open in Apply Gate" sent people in a circle (persona review, 2026-10-14). A list item never links
+ * to its own list; these hrefs are treated as "no route" and the item picks a real destination.
+ */
+const LIST_ALIAS_PATHS = new Set(["/fix-suggestions", "/next-actions", "/weekly-summary"]);
+
+export function usableRouteHref(href: string | null | undefined): string | null {
+  const value = String(href || "").trim();
+  if (!value) return null;
+  const path = value.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
+  if (LIST_ALIAS_PATHS.has(path)) return null;
+  // Outcome Memory's one finding moved to Strategy Alerts.
+  if (path === "/outcome-memory") return "/strategy-alerts";
+  return value;
+}
+
 function actionTypeOf(item: QueueItem) {
   return String(item.actionType || "").trim().toLowerCase();
 }
@@ -40,6 +58,7 @@ function searchTerms(item: QueueItem) {
 export function resolveActionCta(item: QueueItem, gmailUrl: string | null): ActionCta {
   const type = actionTypeOf(item);
   const intent = item.intent || null;
+  const routeHref = usableRouteHref(item.routeHref);
 
   if (intent === "CLEANUP_STRUCTURED_FIELDS" || intent === "LINK_APPLICATIONS") {
     return { kind: "cleanup", label: intent === "LINK_APPLICATIONS" ? "Link applications" : "Fix the details" };
@@ -80,17 +99,24 @@ export function resolveActionCta(item: QueueItem, gmailUrl: string | null): Acti
     return { kind: "gmail", label: "Open assessment email", href: gmailUrl };
   }
 
+  // An action raised by a strategy alert ("Work the offer and keep parallel processes warm") with no
+  // real route of its own opens the alert that explains it, not a tool unrelated to the move.
+  if (!routeHref && String(item.id || "").startsWith("strategy:")) {
+    const alertId = String(item.id).slice("strategy:".length);
+    if (alertId) return { kind: "route", label: "See the details", href: `/strategy-alerts#${encodeURIComponent(alertId)}` };
+  }
+
   if (RESUME_TYPES.has(type) || intent === "TAILOR_RESUME" || item.source === "resume") {
     // The label follows the destination: tailoring for one posting happens in Apply Gate.
-    const href = item.routeHref || "/resumes";
+    const href = routeHref || "/resumes";
     return { kind: "route", label: href.startsWith("/apply-gate") ? "Tailor in Apply Gate" : "Update your resume", href };
   }
 
   if (APPLY_GATE_TYPES.has(type) || intent === "FIX_TARGETING" || intent === "APPLY_TO_ROLE" || item.source === "apply_gate") {
-    return { kind: "route", label: "Open in Apply Gate", href: item.routeHref || "/apply-gate" };
+    return { kind: "route", label: "Open in Apply Gate", href: routeHref && routeHref.startsWith("/apply-gate") ? routeHref : "/apply-gate" };
   }
 
-  if (item.routeHref) return { kind: "route", label: item.routeLabel || "Open", href: item.routeHref };
+  if (routeHref) return { kind: "route", label: item.routeLabel || "Open", href: routeHref };
   if (gmailUrl) return { kind: "gmail", label: "Open in Gmail", href: gmailUrl };
   return { kind: "complete", label: "Mark done" };
 }

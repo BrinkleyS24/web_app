@@ -59,22 +59,28 @@ beforeEach(() => {
       { id: "performance-activity-down", kind: "performance", severity: "medium", title: "Fewer applications", description: "" },
       { id: "performance-coverage-gap", kind: "performance", severity: "low", title: "Not enough yet", description: "" },
       { id: "focus-industry", kind: "focus", severity: "positive", title: "Healthcare converts", description: "" },
+      {
+        id: "performance-interview-debrief", kind: "performance", severity: "medium", title: "How did these end?", description: "",
+        debrief: { kind: "interview_outcome", total: 1, items: [{ key: "x", emailId: 1, label: "Quillstone" }] },
+      },
     ],
   });
 });
 
 describe("useNavCounts", () => {
-  test("counts Today and the alerts that need attention, never floors or good news", async () => {
+  // The badge said 2 beside a page of 3 cards (persona review, 2026-10-14). It now counts exactly
+  // the cards the page shows: good news included, floors and the dashboard-only debrief excluded.
+  test("counts Today and exactly the alert cards Strategy Alerts shows", async () => {
     const { result } = renderHook(() => useNavCounts(true), { wrapper });
     await waitFor(() => expect(result.current["/next-actions"]).toBe(4));
-    await waitFor(() => expect(result.current["/strategy-alerts"]).toBe(2));
+    await waitFor(() => expect(result.current["/strategy-alerts"]).toBe(3));
   });
 
   test("a malformed queue means no badge, not a broken page", async () => {
     fetchRankedActionQueue.mockResolvedValue({ success: true, queue: { doToday: [{ id: "bad" }], thisWeek: [], later: [], blocked: [] } });
     const { result } = renderHook(() => useNavCounts(true), { wrapper });
     await waitFor(() => expect(fetchRankedActionQueue).toHaveBeenCalled());
-    await waitFor(() => expect(result.current["/strategy-alerts"]).toBe(2));
+    await waitFor(() => expect(result.current["/strategy-alerts"]).toBe(3));
     expect(result.current["/next-actions"]).toBe(0);
   });
 

@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  CalendarCheck,
   Crown,
   FileText,
   LayoutDashboard,
@@ -7,6 +8,7 @@ import {
   Radar,
   ScanSearch,
   Settings as SettingsIcon,
+  Sparkles,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -28,26 +30,31 @@ type NavItem = { title: string; url: string; icon: LucideIcon };
 // Two groups, in the order the product works: understand the search and act on it, then the
 // tools behind the decisions. Outcome Memory is gone as its own page — its one current finding
 // (skill gaps across roles you checked) lives on Strategy Alerts now.
+//
+// Interview Prep and Ask Applendium joined the nav on 2026-10-14 (persona review): prep had no way in
+// at all, and Ask existed only as a card on the Dashboard. The same list renders in the mobile drawer.
 const searchNav: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Next Actions", url: "/next-actions", icon: ListChecks },
   { title: "Strategy Alerts", url: "/strategy-alerts", icon: Radar },
+  { title: "Interview Prep", url: "/interview-prep", icon: CalendarCheck },
 ];
 
 const toolsNav: NavItem[] = [
   { title: "Apply Gate", url: "/apply-gate", icon: ScanSearch },
   { title: "Resumes", url: "/resumes", icon: FileText },
+  { title: "Ask Applendium", url: "/ask", icon: Sparkles },
 ];
 
 const linkClass =
-  "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13.5px] font-medium text-sidebar-foreground transition-colors hover:bg-white/[0.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring";
+  "group flex min-h-10 items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-white/[0.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring";
 const activeLinkClass =
   "bg-sidebar-accent text-sidebar-accent-foreground font-semibold [&_svg]:text-[#5FD9AE]";
 
 function NavGroup({ label, items, counts = {} }: { label: string; items: NavItem[]; counts?: Record<string, number> }) {
   return (
     <SidebarGroup className="px-0 py-1">
-      <SidebarGroupLabel className="px-2.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-sidebar-muted">
+      <SidebarGroupLabel className="px-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-sidebar-muted">
         {label}
       </SidebarGroupLabel>
       <SidebarGroupContent>
@@ -61,7 +68,7 @@ function NavGroup({ label, items, counts = {} }: { label: string; items: NavItem
                   {counts[item.url] ? (
                     <span
                       className="ml-auto min-w-[20px] rounded-full bg-white/[0.08] px-1.5 py-px text-center text-[11px] font-semibold tabular-nums text-white/80"
-                      aria-label={`${counts[item.url]} ${item.url === "/next-actions" ? "for today" : "need attention"}`}
+                      aria-label={`${counts[item.url]} ${item.url === "/next-actions" ? "for today" : counts[item.url] === 1 ? "alert" : "alerts"}`}
                     >
                       {counts[item.url]}
                     </span>
@@ -102,9 +109,9 @@ export function AppSidebar() {
           <div className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[7px] bg-white/[0.06] ring-1 ring-white/10">
             <img src="/logo-transparent.png" alt="" className="block h-5 w-5" />
           </div>
-          <h2 className="text-[15px] font-bold leading-tight tracking-[-0.01em] text-sidebar-accent-foreground">
+          <p className="text-[15px] font-bold leading-tight tracking-[-0.01em] text-sidebar-accent-foreground">
             Applendium™
-          </h2>
+          </p>
         </div>
       </SidebarHeader>
 
@@ -136,7 +143,7 @@ export function AppSidebar() {
               {initials}
             </div>
             <div className="min-w-0">
-              <div className="truncate text-[12.5px] font-semibold text-sidebar-accent-foreground">{displayName}</div>
+              <div className="truncate text-[13px] font-semibold text-sidebar-accent-foreground">{displayName}</div>
               {user?.email && user.email !== displayName ? (
                 <div className="truncate text-[11px] text-sidebar-muted">{user.email}</div>
               ) : null}

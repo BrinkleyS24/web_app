@@ -16,21 +16,18 @@ import {
 } from "lucide-react";
 
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { InterviewDebriefCards } from "@/components/InterviewDebriefCards";
 import { EmptyState, ErrorState, LoadingRows, PageHeader, Panel, SectionLabel, ToneChip } from "@/components/premium/PremiumUI";
 import { BUTTON, CARD, EYEBROW, TONES, type Tone } from "@/components/premium/tone";
 import { useAuth } from "@/lib/AuthContext.jsx";
 import { fetchResumeGaps, fetchStrategyAlerts, type ResumeGap, type StrategyAlert } from "@/lib/emails";
+import { findDebriefAlert, isPlaceholderAlert as isPlaceholder, visibleStrategyAlerts } from "@/lib/strategyAlertVisibility";
 import { cn } from "@/lib/utils";
-
-const isPlaceholder = (alert: StrategyAlert) => String(alert?.id || "").endsWith("coverage-gap");
 
 function alertLook(alert: StrategyAlert): { tone: Tone; label: string; icon: LucideIcon } {
   if (alert.kind === "experiment") {
     return { tone: "brand", label: alert.experiment?.status === "measured" ? "Experiment result" : "Experiment running", icon: FlaskConical };
   }
   if (alert.kind === "commitment") return { tone: "upcoming", label: "Coming up", icon: CalendarClock };
-  if (alert.debrief?.items?.length) return { tone: "attention", label: "Needs your input", icon: MessageCircleQuestion };
   if (alert.severity === "positive") return { tone: "positive", label: "Keep doing this", icon: CheckCircle2 };
   if (alert.severity === "high") return { tone: "risk", label: "Act on this", icon: AlertTriangle };
   if (alert.kind === "focus") return { tone: "attention", label: "Worth a look", icon: Compass };
@@ -54,7 +51,6 @@ function alertCta(alert: StrategyAlert): { to: string; label: string } {
 function AlertCard({ alert }: { alert: StrategyAlert }) {
   const look = alertLook(alert);
   const cta = alertCta(alert);
-  const debriefItems = alert.debrief?.items?.filter((item) => item?.emailId != null) || [];
   const [expanded, setExpanded] = useState(false);
   const longDescription = (alert.description || "").length > 180;
 
@@ -66,13 +62,13 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
           <ToneChip tone={look.tone}>{look.label}</ToneChip>
           {alert.timeframe_label ? <span className="text-[12px] text-muted-foreground">{alert.timeframe_label}</span> : null}
         </div>
-        <h2 className="mt-2.5 text-[18px] font-bold leading-snug tracking-[-0.015em] text-foreground">{alert.title}</h2>
+        <h2 className="mt-2.5 text-[20px] font-bold leading-snug tracking-[-0.015em] text-foreground">{alert.title}</h2>
         {alert.supporting_stat ? (
-          <p className="mt-1.5 text-[14px] font-semibold text-foreground/85">{alert.supporting_stat}</p>
+          <p className="mt-1.5 text-[15px] font-semibold text-foreground/85">{alert.supporting_stat}</p>
         ) : null}
         {alert.description ? (
           <div className="mt-1.5 max-w-[74ch]">
-            <p className={cn("text-[13.5px] leading-relaxed text-muted-foreground", !expanded && longDescription && "line-clamp-2")}>
+            <p className={cn("text-[13px] leading-relaxed text-muted-foreground", !expanded && longDescription && "line-clamp-2")}>
               {alert.description}
             </p>
             {longDescription ? (
@@ -80,7 +76,7 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
                 type="button"
                 onClick={() => setExpanded((open) => !open)}
                 aria-expanded={expanded}
-                className="mt-1 text-[12.5px] font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                className="mt-1 text-[13px] font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
               >
                 {expanded ? "Show less" : "Read more"}
               </button>
@@ -88,20 +84,9 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
           </div>
         ) : null}
 
-        {debriefItems.length > 0 ? (
-          <>
+        <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
             {alert.recommendation ? (
-              <p className="mt-4 flex max-w-[74ch] gap-2 text-[14px] leading-relaxed text-foreground">
-                <ArrowRight className={cn("mt-1 h-4 w-4 shrink-0", TONES[look.tone].text)} aria-hidden />
-                {alert.recommendation}
-              </p>
-            ) : null}
-            <InterviewDebriefCards items={debriefItems} total={Math.max(alert.debrief?.total ?? 0, debriefItems.length)} />
-          </>
-        ) : (
-          <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-            {alert.recommendation ? (
-              <p className="flex max-w-[64ch] gap-2 text-[14px] leading-relaxed text-foreground">
+              <p className="flex max-w-[64ch] gap-2 text-[15px] leading-relaxed text-foreground">
                 <ArrowRight className={cn("mt-1 h-4 w-4 shrink-0", TONES[look.tone].text)} aria-hidden />
                 {alert.recommendation}
               </p>
@@ -109,8 +94,7 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
             <Link to={cta.to} className={cn(BUTTON.secondary, "shrink-0 self-start sm:self-center")}>
               {cta.label}
             </Link>
-          </div>
-        )}
+        </div>
 
         {/* The finding's experiment: one change to try, measured on the next applications. */}
         {alert.kind !== "experiment" && alert.experiment?.status === "not_started" ? (
@@ -119,16 +103,16 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
               <FlaskConical className="h-3.5 w-3.5" aria-hidden />
               Try it and see
             </p>
-            <p className="mt-1 text-[13.5px] leading-snug text-foreground">{alert.experiment.ask}</p>
+            <p className="mt-1 text-[13px] leading-snug text-foreground">{alert.experiment.ask}</p>
             {alert.experiment.howItWorks ? (
-              <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">{alert.experiment.howItWorks}</p>
+              <p className="mt-1 text-[13px] leading-snug text-muted-foreground">{alert.experiment.howItWorks}</p>
             ) : null}
-            <Link to="/next-actions" className={cn(BUTTON.secondary, "mt-2.5 inline-flex px-3 py-1.5 text-[12.5px]")}>
+            <Link to="/next-actions" className={cn(BUTTON.secondary, "mt-2.5 inline-flex px-3 py-1.5 text-[13px]")}>
               Start in Next Actions
             </Link>
           </div>
         ) : alert.kind !== "experiment" && alert.experiment?.status === "started" ? (
-          <p className="mt-3 text-[12.5px] text-muted-foreground">
+          <p className="mt-3 text-[13px] text-muted-foreground">
             You are trying this now. Its progress is under Your experiments at the top of this page.
           </p>
         ) : null}
@@ -167,8 +151,8 @@ function SkillGapsPanel({ gaps, outdatedExcluded }: { gaps: ResumeGap[]; outdate
           {gaps.slice(0, 6).map((gap) => (
             <li key={`${gap.category}-${gap.skill}`} className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
               <div className="min-w-0">
-                <p className="text-[14px] font-semibold text-foreground">{gap.skill}</p>
-                <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+                <p className="text-[15px] font-semibold text-foreground">{gap.skill}</p>
+                <p className="mt-0.5 text-[13px] text-muted-foreground">
                   {gap.examples
                     .map((example) => [example.company, example.position].filter(Boolean).join(" · "))
                     .filter(Boolean)
@@ -211,7 +195,11 @@ const StrategyAlerts = () => {
   const allAlerts = useMemo(() => alertsQuery.data?.alerts || [], [alertsQuery.data]);
   // Only findings with evidence behind them. The "not enough data yet" placeholder is kept for its
   // honest floor, shown in the empty state instead of as a card of its own.
-  const alerts = useMemo(() => allAlerts.filter((alert) => !isPlaceholder(alert)), [allAlerts]);
+  const alerts = useMemo(() => visibleStrategyAlerts(allAlerts), [allAlerts]);
+  // The interview questions are answered on the Dashboard; here they get one line pointing there,
+  // not a second copy of the same card (persona review, 2026-10-14).
+  const debrief = useMemo(() => findDebriefAlert(allAlerts), [allAlerts]);
+  const debriefCount = debrief ? Math.max(debrief.debrief?.total ?? 0, debrief.debrief?.items?.length ?? 0) : 0;
   const floor = useMemo(() => allAlerts.find(isPlaceholder) || null, [allAlerts]);
   // Experiments lead: the user chose to run them, and each reports on what happened since.
   const experiments = alerts.filter((alert) => alert.kind === "experiment");
@@ -248,7 +236,28 @@ const StrategyAlerts = () => {
             detail="Your data is safe. Try again in a moment."
             onRetry={() => void alertsQuery.refetch()}
           />
-        ) : alerts.length === 0 ? (
+        ) : null}
+
+        {!alertsQuery.isLoading && !alertsQuery.isError && debriefCount > 0 ? (
+          <Link
+            to="/dashboard"
+            data-testid="debrief-link"
+            className={cn(CARD, "flex items-center justify-between gap-3 px-5 py-4 transition-colors hover:border-foreground/25")}
+          >
+            <span className="flex min-w-0 items-center gap-3">
+              <MessageCircleQuestion className={cn("h-4 w-4 shrink-0", TONES.attention.text)} aria-hidden />
+              <span className="text-[15px] font-semibold text-foreground">
+                {debriefCount} {debriefCount === 1 ? "interview needs" : "interviews need"} your answer
+              </span>
+            </span>
+            <span className="inline-flex shrink-0 items-center gap-1 text-[13px] font-semibold text-accent">
+              Answer on the Dashboard
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+            </span>
+          </Link>
+        ) : null}
+
+        {alertsQuery.isLoading || alertsQuery.isError ? null : alerts.length === 0 ? (
           <div className={cn(CARD, "p-5")}>
             <EmptyState
               icon={Radar}

@@ -1,13 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { fetchRankedActionQueue, fetchStrategyAlerts, type StrategyAlert } from "@/lib/emails";
+import { fetchRankedActionQueue, fetchStrategyAlerts } from "@/lib/emails";
 import { buildDashboardMoveQueue, buildQueueItemsFromRankedQueue, splitTodayAndMore } from "@/lib/premiumTaskQueue";
-
-// "Not enough data yet" alerts are floors, not findings; they never earn a count.
-const isPlaceholderAlert = (alert: StrategyAlert) => String(alert?.id || "").endsWith("coverage-gap");
+import { visibleStrategyAlerts } from "@/lib/strategyAlertVisibility";
 
 /**
- * Counts for the sidebar: how many actions are in Today, and how many alerts need attention. The
+ * Counts for the sidebar: how many actions are in Today, and how many alert cards Strategy Alerts shows. The
  * nav gave no reason to click anything (review, 2026-09-26). Both read the Dashboard's own queries
  * (same keys), so on the Dashboard they cost nothing and elsewhere at most one fetch per 5 minutes.
  */
@@ -36,10 +34,9 @@ export function useNavCounts(enabled: boolean) {
     today = 0;
   }
 
-  const alerts = alertsQuery.data?.alerts ?? [];
-  const needsAttention = alerts.filter(
-    (alert) => !isPlaceholderAlert(alert) && alert.severity !== "positive" && alert.severity !== "low",
-  ).length;
+  // Exactly the cards Strategy Alerts shows (2026-10-14): the old "needs attention" subset said 2
+  // beside a page of 3.
+  const alertCards = visibleStrategyAlerts(alertsQuery.data?.alerts).length;
 
-  return { "/next-actions": today, "/strategy-alerts": needsAttention } as Record<string, number>;
+  return { "/next-actions": today, "/strategy-alerts": alertCards } as Record<string, number>;
 }

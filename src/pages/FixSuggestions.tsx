@@ -39,8 +39,8 @@ import { BUTTON, CARD, EYEBROW, TONES } from "@/components/premium/tone";
 import { OutreachDraftEditor } from "@/components/premium/OutreachDraftEditor";
 import { useDraftSession } from "@/hooks/useDraftSession";
 import { WhyLine } from "@/components/premium/WhyLine";
-import { WeekInReview } from "@/components/premium/WeekInReview";
 import { describeActionIdentity, describeActionKind, resolveActionCta } from "@/lib/actionPresentation";
+import { friendlyErrorMessage } from "@/lib/apiErrors";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useCanonicalQueueImpressions } from "@/hooks/useCanonicalQueueImpressions";
@@ -878,7 +878,7 @@ function SuggestionDraftPanel({
               <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
                 {(draft.coachingPoints || []).map((entry, entryIndex) => (
                   <li key={entry} className="flex gap-3">
-                    <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                    <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
                       {entryIndex + 1}
                     </span>
                     <span className="leading-5">{entry}</span>
@@ -1150,7 +1150,7 @@ const FixSuggestions = () => {
     },
     onError: (error: Error, variables) => {
       const request = draftRequests.current.get(variables);
-      if (mounted.current && request?.owner === currentOwner.current) toast.error(error.message || "Unable to generate draft.");
+      if (mounted.current && request?.owner === currentOwner.current) toast.error(friendlyErrorMessage(error, "The draft was not generated. Try again."));
     },
   });
 
@@ -1184,7 +1184,7 @@ const FixSuggestions = () => {
       toast.success("Draft feedback saved.");
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Unable to save draft feedback.");
+      toast.error(friendlyErrorMessage(error, "Your feedback did not save. Try again."));
     },
   });
 
@@ -1374,7 +1374,7 @@ const FixSuggestions = () => {
           await refreshQueueState();
           return;
         }
-        toast.error(error instanceof Error ? error.message : "Unable to mark suggestion complete.");
+        toast.error(friendlyErrorMessage(error, "That did not save. Try again."));
       }
     });
   };
@@ -1395,7 +1395,7 @@ const FixSuggestions = () => {
           await refreshQueueState();
           return;
         }
-        toast.error(error instanceof Error ? error.message : "Unable to snooze suggestion.");
+        toast.error(friendlyErrorMessage(error, "The snooze did not save. Try again."));
       }
     });
   };
@@ -1425,7 +1425,7 @@ const FixSuggestions = () => {
           try { await refreshQueueState(); } catch { if (isCurrent()) toast.error('Could not refresh this role. Try again.'); }
           return;
         }
-        toast.error(error instanceof Error ? error.message : "The save could not be confirmed. Retry this same task.");
+        toast.error(friendlyErrorMessage(error, "The save could not be confirmed. Retry this same task."));
         return;
       }
       // A refresh failure must not turn a confirmed commit into a save failure.
@@ -1542,7 +1542,7 @@ const FixSuggestions = () => {
   // Held-back repeats are NOT in this list at all, so the note sits at its end rather than under
   // Today, where "11 more are waiting behind these" read as a third count of the same list.
   const heldBackNote = heldBackTotal > 0 ? (
-    <p className="px-1 text-[12.5px] leading-relaxed text-muted-foreground">
+    <p className="px-1 text-[13px] leading-relaxed text-muted-foreground">
       {heldBackTotal} similar {heldBackTotal === 1 ? "action is" : "actions are"} held back so this list does not
       repeat itself ({heldBackBreakdown}). As you clear one, the next takes its place.
     </p>
@@ -1639,24 +1639,24 @@ const FixSuggestions = () => {
           <ActionIcon item={item} />
           <div className="min-w-0 grow basis-[calc(100%-52px)] sm:basis-0">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <h3 className={cn("font-semibold leading-snug tracking-[-0.01em] text-foreground", variant === "today" ? "text-[15px]" : "text-[14px]")}>
+              <h3 className={cn("font-semibold leading-snug tracking-[-0.01em] text-foreground", variant === "today" ? "text-[15px]" : "text-[15px]")}>
                 {item.title}
               </h3>
               {variant === "more" && item.urgency === "high" ? <ToneChip tone="attention">Time-sensitive</ToneChip> : null}
             </div>
-            <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+            <p className="mt-0.5 text-[13px] text-muted-foreground">
               <span className="font-medium text-foreground/70">{kind}</span>
               {identity ? ` · ${identity}` : ""}
               {item.estimatedTime ? ` · ${item.estimatedTime}` : ""}
             </p>
             <WhyLine why={item.why} className="mt-1" />
             {item.threadId && !item.applicationId && item.source !== "cleanup" ? (
-              <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">
+              <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
                 Application link not confirmed. This action uses the email conversation; updates on other threads may be missing.
               </p>
             ) : null}
             {reason && variant === "today" ? (
-              <p className="mt-2 max-w-[72ch] text-[13.5px] leading-relaxed text-foreground/80">{reason}</p>
+              <p className="mt-2 max-w-[72ch] text-[13px] leading-relaxed text-foreground/80">{reason}</p>
             ) : null}
           </div>
           <div className="ml-[50px] flex shrink-0 items-center gap-1 sm:ml-0">
@@ -1672,7 +1672,7 @@ const FixSuggestions = () => {
                 type="button"
                 onClick={() => void completeQueueItem(item, isHandledInGmail ? "Removed from today's list." : undefined)}
                 disabled={mutationBusy}
-                className={cn(BUTTON.ghost, "px-2")}
+                className={cn(BUTTON.ghost, "min-w-10 px-2 sm:min-w-8")}
                 aria-label={isHandledInGmail ? "Already handled — remove from list" : "Mark done"}
                 title={isHandledInGmail ? "Already handled" : "Mark done"}
               >
@@ -1683,7 +1683,7 @@ const FixSuggestions = () => {
               <button
                 type="button"
                 onClick={() => setOpenActionMenuId((current) => (current === item.id ? "" : item.id))}
-                className={cn(BUTTON.ghost, "px-2")}
+                className={cn(BUTTON.ghost, "min-w-10 px-2 sm:min-w-8")}
                 aria-label="More options"
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
@@ -1784,14 +1784,14 @@ const FixSuggestions = () => {
             <Layers3 className="h-4 w-4" aria-hidden />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[14px] font-semibold text-foreground">
+            <span className="block text-[15px] font-semibold text-foreground">
               Close out {entry.items.length} quiet applications
             </span>
-            <span className="block text-[12.5px] text-muted-foreground">
+            <span className="block text-[13px] text-muted-foreground">
               No reply in a long time. Clear them in one pass so they stop crowding the list.
             </span>
           </span>
-          <span className={cn(BUTTON.secondary, "px-3 py-1.5 text-[12.5px]")}>
+          <span className={cn(BUTTON.secondary, "px-3 py-1.5 text-[13px]")}>
             <span className="group-open:hidden">Review</span>
             <span className="hidden group-open:inline">Hide</span>
           </span>
@@ -1811,7 +1811,7 @@ const FixSuggestions = () => {
           description="What to do next in your search, most useful first. Each action opens the email, draft or tool it needs — nothing is ever sent for you."
           actions={
             !queueQuery.isLoading && filteredSuggestions.length > 0 ? (
-              <span className="text-[12.5px] text-muted-foreground">
+              <span className="text-[13px] text-muted-foreground">
                 {todayItems.length} for today{moreItems.length ? ` · ${moreItems.length} more` : ""}
               </span>
             ) : null
@@ -1827,7 +1827,7 @@ const FixSuggestions = () => {
               <LoadingRows rows={3} />
             </div>
           ) : queueError ? (
-            <ErrorState title="Your actions did not load" detail={queueError} onRetry={() => void queueQuery.refetch()} />
+            <ErrorState title="Your actions did not load" detail={friendlyErrorMessage({ message: queueError })} onRetry={() => void queueQuery.refetch()} />
           ) : todayItems.length === 0 ? (
             <div className={cn(CARD, "p-5")}>
               <EmptyState
@@ -1848,9 +1848,8 @@ const FixSuggestions = () => {
           {moreItems.length === 0 ? heldBackNote : null}
         </section>
 
-        {/* The week in review, folded in from the old Weekly Summary page (2026-10-04): context for
-            the actions above, collapsed to its headline and four counts. */}
-        <WeekInReview />
+        {/* The week summary moved to the Dashboard (2026-10-14): it appeared on both pages with
+            different metrics. One week, one place. */}
 
         {moreItems.length > 0 ? (
           <Panel
@@ -1897,7 +1896,7 @@ const FixSuggestions = () => {
                 data-testid="tidy-toggle"
                 aria-expanded={showTidy}
                 onClick={() => setShowTidy((open) => !open)}
-                className={cn(BUTTON.secondary, "px-3 py-1.5 text-[12.5px]")}
+                className={cn(BUTTON.secondary, "px-3 py-1.5 text-[13px]")}
               >
                 {showTidy ? "Hide" : "Show"}
               </button>
@@ -1910,7 +1909,7 @@ const FixSuggestions = () => {
                   {tidyEntries.map(renderEntry)}
                 </div>
                 {tidyOverflow > 0 ? (
-                  <p className="mt-3 border-t border-border pt-3 text-[12.5px] text-muted-foreground">
+                  <p className="mt-3 border-t border-border pt-3 text-[13px] text-muted-foreground">
                     {tidyOverflow} more {tidyOverflow === 1 ? "appears" : "appear"} as you clear these.
                   </p>
                 ) : null}
@@ -1931,7 +1930,7 @@ const FixSuggestions = () => {
               {snoozedItems.map((item) => (
                 <li key={item.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
                   <div className="min-w-0">
-                    <p className="truncate text-[13.5px] font-medium text-foreground">{item.title}</p>
+                    <p className="truncate text-[13px] font-medium text-foreground">{item.title}</p>
                     {describeActionIdentity(item) ? (
                       <p className="truncate text-[12px] text-muted-foreground">{describeActionIdentity(item)}</p>
                     ) : null}

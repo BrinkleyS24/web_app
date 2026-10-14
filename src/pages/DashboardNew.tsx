@@ -4,17 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   CalendarClock,
-  CalendarRange,
   CircleDot,
   Inbox,
   ListChecks,
   MessageCircleQuestion,
-  Minus,
   Radar,
   ScanSearch,
   Sparkles,
-  TrendingDown,
-  TrendingUp,
   Unplug,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -34,6 +30,7 @@ import {
   ToneChip,
 } from "@/components/premium/PremiumUI";
 import { BUTTON, CARD, EYEBROW, TONES, type Tone } from "@/components/premium/tone";
+import { WeekInReview } from "@/components/premium/WeekInReview";
 import { WhyLine } from "@/components/premium/WhyLine";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useInboxSync } from "@/hooks/useInboxSync";
@@ -53,19 +50,19 @@ import {
   type WeeklyHighlightEmail,
   type WeeklyHighlightsResponse,
 } from "@/lib/emails";
+import { isPlaceholderAlert } from "@/lib/strategyAlertVisibility";
 import {
   buildDashboardMoveQueue,
   buildGmailThreadUrl,
   buildQueueItemsFromRankedQueue,
   type QueueItem,
 } from "@/lib/premiumTaskQueue";
+import { friendlyErrorMessage } from "@/lib/apiErrors";
 import { cn } from "@/lib/utils";
 import { STATUS_TONE } from "@/lib/statusTone";
 import { apiDateMs, parseApiDate } from "@/lib/apiDate";
 import { describeVerdictDecision, describeVerdictOutcome } from "@/lib/verdictPresentation";
 import { describeOutcomeSource } from "@/lib/outcomeSource";
-
-const isPlaceholderAlert = (alert: StrategyAlert) => String(alert?.id || "").endsWith("coverage-gap");
 
 function gmailUrlFor(item: QueueItem) {
   return item.source === "followup" || item.source === "stale" ? buildGmailThreadUrl(item.threadId) : null;
@@ -126,16 +123,24 @@ const Dashboard = () => {
   // The lead card waits for its data. Rendering it early showed "Your search read is not available
   // right now" for a second on every visit — a loading state dressed as a failure (2026-09-25).
   const answerLoading = alertsQuery.isLoading || metricsQuery.isLoading;
+  // A failed request is never read as "nothing tracked" (persona review, 2026-10-14: under HTTP 429
+  // the page said "Nothing tracked yet"). With no alert to lead with, a failed metrics request is as
+  // unavailable as a failed alerts request.
+  const answerUnavailable = alertsQuery.isError || (metricsQuery.isError && alerts.length === 0);
+  const retryAnswer = () => {
+    if (alertsQuery.isError) void alertsQuery.refetch();
+    if (metricsQuery.isError) void metricsQuery.refetch();
+  };
   const answer = useMemo(
     () =>
       buildDashboardAnswer({
         alerts,
         cohortMetrics,
-        alertsUnavailableMessage: alertsQuery.isError
-          ? "Applendium™ could not load your strategy read just now. Your data is safe; try again in a moment."
+        alertsUnavailableMessage: answerUnavailable
+          ? "Applendium could not load your search read just now. Your data is safe. Try again in a moment."
           : null,
       }),
-    [alerts, alertsQuery.isError, cohortMetrics],
+    [alerts, answerUnavailable, cohortMetrics],
   );
   const answerMove = useMemo(() => findAnswerMove(answer, moveQueue), [answer, moveQueue]);
   const asksInPlace = answer.debriefItems.length > 0;
@@ -167,7 +172,7 @@ const Dashboard = () => {
           <div className={cn(CARD, "flex items-start gap-3 px-5 py-4", TONES.attention.surface)} role="status">
             <Unplug className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
             <div>
-              <p className="text-[14px] font-semibold text-foreground">Gmail is disconnected</p>
+              <p className="text-[15px] font-semibold text-foreground">Gmail is disconnected</p>
               <p className="mt-0.5 text-[13px] text-muted-foreground">
                 New applications and replies are not coming in. Open the Applendium™ extension and sign in again to reconnect —
                 everything already here is safe.
@@ -175,11 +180,19 @@ const Dashboard = () => {
             </div>
           </div>
         ) : null}
-        {inbox.error ? <ErrorState title="Your inbox could not be checked just now" detail={inbox.error} onRetry={inbox.syncNow} /> : null}
+        {inbox.error ? (
+          <ErrorState title="Your inbox could not be checked just now" detail={friendlyErrorMessage({ message: inbox.error })} onRetry={inbox.syncNow} />
+        ) : null}
 
         <FirstMoveCard />
 
-        <HeroCard answer={answer} loading={answerLoading} heroMove={heroMove} pairedWithClaim={Boolean(answerMove)} />
+        <HeroCard
+          answer={answer}
+          loading={answerLoading}
+          heroMove={heroMove}
+          pairedWithClaim={Boolean(answerMove)}
+          onRetry={answerUnavailable ? retryAnswer : undefined}
+        />
 
         <AskApplendium />
 
@@ -193,7 +206,9 @@ const Dashboard = () => {
             total={moveQueue.length}
             heroTaken={Boolean(heroMove)}
           />
-          <ThisWeekPanel className="lg:col-span-2" loading={weeklyQuery.isLoading} weekly={weeklyQuery.data} />
+          {/* The one week summary (2026-10-14). Next Actions showed a second one with different
+              metrics; it now lives here only, and /weekly-summary links land on it. */}
+          <WeekInReview className="min-w-0 lg:col-span-2" compact />
         </div>
 
         {/* Everything above answers "what now". Below is the detail behind it, in two columns that
@@ -206,12 +221,24 @@ const Dashboard = () => {
           {/* min-w-0: a grid column otherwise refuses to shrink below its widest one-line (truncated)
               row, which pushed this whole column 93px past a 390px screen. */}
           <div className="min-w-0 space-y-5 lg:col-span-3">
-            <SearchStatusPanel loading={metricsQuery.isLoading} metrics={metricsQuery.data} />
-            <RecentOutcomesPanel loading={weeklyQuery.isLoading} weekly={weeklyQuery.data} />
+            <SearchStatusPanel
+              loading={metricsQuery.isLoading}
+              error={metricsQuery.isError}
+              onRetry={() => void metricsQuery.refetch()}
+              metrics={metricsQuery.data}
+            />
+            <RecentOutcomesPanel
+              loading={weeklyQuery.isLoading}
+              error={weeklyQuery.isError}
+              onRetry={() => void weeklyQuery.refetch()}
+              weekly={weeklyQuery.data}
+            />
           </div>
           <div className="min-w-0 space-y-5 lg:col-span-2">
             <RecentChecksPanel
               loading={historyQuery.isLoading}
+              error={historyQuery.isError || historyQuery.data?.success === false}
+              onRetry={() => void historyQuery.refetch()}
               history={historyQuery.data?.history || []}
             />
             {patterns.length ? <PatternsPanel alerts={patterns} /> : null}
@@ -227,11 +254,13 @@ function HeroCard({
   loading,
   heroMove,
   pairedWithClaim,
+  onRetry,
 }: {
   answer: DashboardAnswer;
   loading: boolean;
   heroMove: QueueItem | null;
   pairedWithClaim: boolean;
+  onRetry?: () => void;
 }) {
   if (loading) {
     return (
@@ -245,9 +274,17 @@ function HeroCard({
     );
   }
 
+  if (onRetry) {
+    return <ErrorState title={answer.claim} detail={answer.evidence} onRetry={onRetry} />;
+  }
+
   const look = heroLook(answer);
   const cta = heroMove ? resolveActionCta(heroMove, gmailUrlFor(heroMove)) : null;
   const moveIdentity = heroMove ? describeActionIdentity(heroMove) : null;
+  // The question card is short so its answer buttons sit above the fold on a 390px phone (persona
+  // review, 2026-10-14: a ~110-word explanation pushed them off the first screen). The reasoning is
+  // one tap away, in Applendium's own words rather than the alert's long paragraph.
+  const asking = answer.debriefItems.length > 0;
 
   return (
     <section className={cn(CARD, "relative overflow-hidden")}>
@@ -258,30 +295,42 @@ function HeroCard({
             <look.icon className="h-3.5 w-3.5" aria-hidden />
             {look.eyebrow}
           </span>
-          {answer.stat ? <ToneChip tone={look.tone === "neutral" ? "neutral" : look.tone}>{answer.stat}</ToneChip> : null}
+          {answer.stat && !asking ? <ToneChip tone={look.tone === "neutral" ? "neutral" : look.tone}>{answer.stat}</ToneChip> : null}
         </div>
-        <h2 className="mt-3 max-w-[44ch] text-[24px] font-bold leading-[1.2] tracking-[-0.02em] text-foreground sm:text-[26px]">
+        <h2 className="mt-3 max-w-[44ch] text-[20px] font-bold leading-[1.25] tracking-[-0.02em] text-foreground sm:text-[28px] sm:leading-[1.2]">
           {answer.claim}
         </h2>
-        {answer.evidence ? (
-          <p className="mt-2.5 max-w-[72ch] text-[14px] leading-relaxed text-muted-foreground">{answer.evidence}</p>
+        {asking ? (
+          <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">How did this one end? One tap each.</p>
+        ) : answer.evidence ? (
+          <p className="mt-2.5 max-w-[72ch] text-[15px] leading-relaxed text-muted-foreground">{answer.evidence}</p>
         ) : null}
 
-        {answer.recommendation ? (
+        {answer.recommendation && !asking ? (
           <div className="mt-4 flex max-w-[72ch] gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3">
             <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
-            <p className="text-[13.5px] leading-relaxed text-foreground/85">{answer.recommendation}</p>
+            <p className="text-[13px] leading-relaxed text-foreground/85">{answer.recommendation}</p>
           </div>
         ) : null}
 
-        {answer.debriefItems.length > 0 ? (
-          <InterviewDebriefCards items={answer.debriefItems} total={answer.debriefTotal} />
+        {asking ? (
+          <>
+            <InterviewDebriefCards items={answer.debriefItems} total={answer.debriefTotal} />
+            <details className="mt-3 max-w-[72ch]" data-testid="debrief-why">
+              <summary className="cursor-pointer text-[13px] font-semibold text-foreground/85">Why am I being asked?</summary>
+              <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+                An interview that ends in silence sends no email, so a company that passed on you looks the same as one
+                that never replied. Those need different advice. Your answers tell Applendium which is which, so its
+                advice about interviewing rests on what happened.
+              </p>
+            </details>
+          </>
         ) : heroMove && cta ? (
           <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
             <ActionCtaButton item={heroMove} cta={cta} className={BUTTON.primary}>
               {cta.label}
             </ActionCtaButton>
-            <p className="text-[12.5px] leading-snug text-muted-foreground">
+            <p className="text-[13px] leading-snug text-muted-foreground">
               {pairedWithClaim ? "What to do about it" : "Top of your list right now"}
               {" · "}
               <span className="font-medium text-foreground/80">{heroMove.title}</span>
@@ -347,80 +396,19 @@ function TodayPanel({
               <li key={item.id} className="flex flex-wrap items-start gap-x-3 gap-y-2 rounded-lg px-2 py-3 transition-colors hover:bg-muted/30 sm:flex-nowrap">
                 <ActionIcon item={item} />
                 <div className="min-w-0 grow basis-[calc(100%-50px)] sm:basis-0">
-                  <p className="text-[14px] font-semibold leading-snug text-foreground">{item.title}</p>
-                  <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+                  <p className="text-[15px] font-semibold leading-snug text-foreground">{item.title}</p>
+                  <p className="mt-0.5 text-[13px] text-muted-foreground">
                     <span className="font-medium text-foreground/70">{kind}</span>
                     {identity ? ` · ${identity}` : ""}
                   </p>
                   <WhyLine why={item.why} className="mt-1" />
                 </div>
                 {/* Below the text on a phone, so the title is not squeezed into a narrow column. */}
-                <ActionCtaButton item={item} cta={cta} className={cn(BUTTON.secondary, "ml-12 shrink-0 px-3 py-1.5 text-[12.5px] sm:ml-0")} />
+                <ActionCtaButton item={item} cta={cta} className={cn(BUTTON.secondary, "ml-12 shrink-0 px-3 py-1.5 text-[13px] sm:ml-0")} />
               </li>
             );
           })}
         </ul>
-      )}
-    </Panel>
-  );
-}
-
-function Delta({ value, prior }: { value: number; prior: number | undefined }) {
-  if (prior == null) return null;
-  // Direction only, in a neutral color: more rejections "up" must not read as good news.
-  const Icon = value > prior ? TrendingUp : value < prior ? TrendingDown : Minus;
-  const text = value > prior ? `up from ${prior}` : value < prior ? `down from ${prior}` : "same as last week";
-  return (
-    <span className="inline-flex items-center gap-1 text-[12px] text-muted-foreground">
-      <Icon className="h-3 w-3" aria-hidden />
-      {text}
-    </span>
-  );
-}
-
-function ThisWeekPanel({
-  className,
-  loading,
-  weekly,
-}: {
-  className?: string;
-  loading: boolean;
-  weekly?: WeeklyHighlightsResponse;
-}) {
-  const counts = weekly?.counts;
-  const prior = weekly?.priorCounts;
-  const rows = counts
-    ? [
-        { label: "Applications sent", value: counts.applications, prior: prior?.applications },
-        { label: "Replies and interviews", value: counts.callbacks, prior: prior?.callbacks },
-        { label: "Rejections", value: counts.rejections, prior: prior?.rejections },
-      ]
-    : [];
-  return (
-    <Panel
-      className={className}
-      icon={CalendarRange}
-      tone="upcoming"
-      title="This week"
-      description={weekly?.readout?.headline || "The last 7 days against the 7 before."}
-      action={<PanelLink to="/next-actions#this-week">Details</PanelLink>}
-    >
-      {loading ? (
-        <LoadingRows rows={3} />
-      ) : !counts ? (
-        <ErrorState title="This week's numbers did not load" />
-      ) : (
-        <dl className="divide-y divide-border">
-          {rows.map((row) => (
-            <div key={row.label} className="flex items-baseline justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
-              <dt className="text-[13px] text-muted-foreground">{row.label}</dt>
-              <dd className="flex items-baseline gap-2.5">
-                <Delta value={row.value} prior={row.prior} />
-                <span className="text-[20px] font-bold tabular-nums tracking-[-0.02em] text-foreground">{row.value}</span>
-              </dd>
-            </div>
-          ))}
-        </dl>
       )}
     </Panel>
   );
@@ -515,7 +503,7 @@ function StageBar({
       </div>
       <ul className="space-y-1.5">
         {segments.map((segment) => (
-          <li key={segment.key} className="flex items-center justify-between gap-2 text-[12.5px]">
+          <li key={segment.key} className="flex items-center justify-between gap-2 text-[13px]">
             <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
               <span className={cn("h-2 w-2 shrink-0 rounded-full", segment.dot)} aria-hidden />
               <span className="truncate">{label(segment)}</span>
@@ -526,7 +514,7 @@ function StageBar({
       </ul>
       {/* Two interview counts that can differ, each named, and where the bar's counts come from
           (Codex audit + founder, 2026-10-06). */}
-      <p className="text-[11.5px] leading-snug text-muted-foreground">
+      <p className="text-[12px] leading-snug text-muted-foreground">
         &ldquo;Reached an interview&rdquo; counts every application that got one, whatever happened next.
         {hasQuietBreakdown
           ? "“Still interviewing” counts those with no decision and an email in the last 30 days. "
@@ -539,7 +527,17 @@ function StageBar({
   );
 }
 
-function SearchStatusPanel({ loading, metrics }: { loading: boolean; metrics?: MetricsResponse }) {
+function SearchStatusPanel({
+  loading,
+  error,
+  onRetry,
+  metrics,
+}: {
+  loading: boolean;
+  error?: boolean;
+  onRetry?: () => void;
+  metrics?: MetricsResponse;
+}) {
   const cohort = metrics?.cohortMetrics;
   // The Signal Layer's funnel when the backend sends it; the same all-time cohort counts otherwise.
   const funnel = metrics?.searchSignals?.funnel
@@ -563,6 +561,8 @@ function SearchStatusPanel({ loading, metrics }: { loading: boolean; metrics?: M
     <Panel icon={CircleDot} tone="neutral" title="How your search is going">
       {loading ? (
         <LoadingRows rows={3} />
+      ) : error ? (
+        <ErrorState title="Your search numbers did not load" detail="Your data is safe. Try again in a moment." onRetry={onRetry} />
       ) : !funnel || applied === 0 ? (
         <EmptyState
           icon={Inbox}
@@ -589,7 +589,7 @@ function SearchStatusPanel({ loading, metrics }: { loading: boolean; metrics?: M
             <BarRow label="Rejected" value={funnel.rejected} of={applied} tone="risk" />
             <BarRow label="Reached an interview" value={funnel.reachedInterview} of={applied} tone="brand" hint={ratePct ?? undefined} />
             <BarRow label="Offers" value={funnel.reachedOffer} of={applied} tone="positive" />
-            <p className="text-[11.5px] leading-snug text-muted-foreground">
+            <p className="text-[12px] leading-snug text-muted-foreground">
               An application can count twice — an interview that ended in a rejection is in both rows.
             </p>
           </div>
@@ -607,7 +607,7 @@ function SearchStatusPanel({ loading, metrics }: { loading: boolean; metrics?: M
                     tone={row.tone}
                   />
                 ))}
-                <p className="text-[11.5px] leading-snug text-muted-foreground">
+                <p className="text-[12px] leading-snug text-muted-foreground">
                   {velocity.classified} rejections could be timed from application to decision
                   {velocity.averageDays != null ? `, averaging ${velocity.averageDays} days` : ""}. Only an inbox can see this.
                 </p>
@@ -648,12 +648,24 @@ function relativeDay(date: string | null) {
   return `${days} days ago`;
 }
 
-function RecentOutcomesPanel({ loading, weekly }: { loading: boolean; weekly?: WeeklyHighlightsResponse }) {
+function RecentOutcomesPanel({
+  loading,
+  error,
+  onRetry,
+  weekly,
+}: {
+  loading: boolean;
+  error?: boolean;
+  onRetry?: () => void;
+  weekly?: WeeklyHighlightsResponse;
+}) {
   const rows = outcomeRows(weekly);
   return (
     <Panel icon={Inbox} tone="neutral" title="Recent outcomes" meta={<span className="text-[12px] text-muted-foreground">Last 7 days</span>}>
       {loading ? (
         <LoadingRows rows={3} />
+      ) : error || !weekly ? (
+        <ErrorState title="Recent outcomes did not load" detail="Your data is safe. Try again in a moment." onRetry={onRetry} />
       ) : rows.length === 0 ? (
         <EmptyState compact title="No replies or decisions this week" body="Interviews, offers and rejections show up here as they arrive." />
       ) : (
@@ -663,7 +675,7 @@ function RecentOutcomesPanel({ loading, weekly }: { loading: boolean; weekly?: W
             return (
               <li key={`${label}-${item.id ?? index}`} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
                 <div className="min-w-0">
-                  <p className="truncate text-[13.5px] font-medium text-foreground">{source.primary}</p>
+                  <p className="truncate text-[13px] font-medium text-foreground">{source.primary}</p>
                   {source.secondary ? <p className="truncate text-[12px] text-muted-foreground">{source.secondary}</p> : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-2.5">
@@ -679,7 +691,17 @@ function RecentOutcomesPanel({ loading, weekly }: { loading: boolean; weekly?: W
   );
 }
 
-function RecentChecksPanel({ loading, history }: { loading: boolean; history: ApplyGateHistoryItem[] }) {
+function RecentChecksPanel({
+  loading,
+  error,
+  onRetry,
+  history,
+}: {
+  loading: boolean;
+  error?: boolean;
+  onRetry?: () => void;
+  history: ApplyGateHistoryItem[];
+}) {
   const rows = history.slice(0, 3);
   return (
     <Panel
@@ -690,6 +712,8 @@ function RecentChecksPanel({ loading, history }: { loading: boolean; history: Ap
     >
       {loading ? (
         <LoadingRows rows={3} />
+      ) : error ? (
+        <ErrorState title="Your Apply Gate checks did not load" detail="Your data is safe. Try again in a moment." onRetry={onRetry} />
       ) : rows.length === 0 ? (
         <EmptyState
           compact
@@ -710,7 +734,7 @@ function RecentChecksPanel({ loading, history }: { loading: boolean; history: Ap
             return (
               <li key={item.id} className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
                 <div className="min-w-0">
-                  <p className="truncate text-[13.5px] font-medium text-foreground">{role}</p>
+                  <p className="truncate text-[13px] font-medium text-foreground">{role}</p>
                   <p className="truncate text-[12px] text-muted-foreground">
                     {[company, outcome?.label].filter(Boolean).join(" · ")}
                     {item.outdated ? (company || outcome ? " · " : "") + "checked before the Sep 24 update" : ""}
@@ -741,8 +765,8 @@ function PatternsPanel({ alerts }: { alerts: StrategyAlert[] }) {
             to={`/strategy-alerts#${encodeURIComponent(alert.id)}`}
             className="group block rounded-xl border border-border bg-muted/30 px-4 py-3.5 transition-colors hover:border-foreground/20 hover:bg-card"
           >
-            <p className="text-[14px] font-semibold leading-snug text-foreground">{alert.title}</p>
-            <p className="mt-1 line-clamp-2 text-[12.5px] leading-relaxed text-muted-foreground">{alert.description}</p>
+            <p className="text-[15px] font-semibold leading-snug text-foreground">{alert.title}</p>
+            <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-muted-foreground">{alert.description}</p>
             {alert.supporting_stat ? <p className="mt-2 text-[12px] font-medium text-foreground/70">{alert.supporting_stat}</p> : null}
           </Link>
         ))}

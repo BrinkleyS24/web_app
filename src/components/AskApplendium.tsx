@@ -10,6 +10,7 @@ import { ASK_MAX_QUESTION_CHARS, askApplendium, type AskNextStep, type AskRespon
 import { buildGmailThreadUrl } from "@/lib/premiumTaskQueue";
 import { STATUS_TONE } from "@/lib/statusTone";
 import { cn } from "@/lib/utils";
+import { friendlyErrorMessage } from "@/lib/apiErrors";
 
 /**
  * Ask Applendium™ (2026-09-26): a question box that answers from the member's own tracked
@@ -99,7 +100,7 @@ export function AskApplendium() {
           maxLength={ASK_MAX_QUESTION_CHARS}
           placeholder="e.g. Which companies haven't replied since I applied?"
           aria-label="Your question"
-          className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3.5 py-2.5 text-[14px] placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3.5 py-2.5 text-[15px] placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
         <button
           type="submit"
@@ -119,7 +120,7 @@ export function AskApplendium() {
               key={suggestion}
               type="button"
               onClick={() => ask(suggestion)}
-              className="rounded-full border border-border bg-muted/40 px-3 py-1.5 text-[12.5px] text-foreground/80 transition hover:bg-muted hover:text-foreground"
+              className="rounded-full border border-border bg-muted/40 px-3 py-1.5 text-[13px] text-foreground/80 transition hover:bg-muted hover:text-foreground"
             >
               {suggestion}
             </button>
@@ -129,19 +130,19 @@ export function AskApplendium() {
 
       {asked ? (
         <div className="mt-4 min-w-0 space-y-3" aria-live="polite">
-          <p className="text-[12.5px] text-muted-foreground">
+          <p className="text-[13px] text-muted-foreground">
             You asked: <span className="font-medium text-foreground/85">{asked}</span>
           </p>
 
           {mutation.isPending ? (
-            <p className="flex items-center gap-2 text-[13.5px] text-muted-foreground" data-testid="ask-thinking">
+            <p className="flex items-center gap-2 text-[13px] text-muted-foreground" data-testid="ask-thinking">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               Looking through your applications…
             </p>
           ) : null}
 
           {mutation.isError ? (
-            <ErrorState title="No answer this time" detail={mutation.error?.message} onRetry={() => asked && ask(asked)} />
+            <ErrorState title="No answer this time" detail={friendlyErrorMessage(mutation.error, "Applendium could not answer just now. Try again in a moment.")} onRetry={() => asked && ask(asked)} />
           ) : null}
 
           {result && !mutation.isPending ? (
@@ -169,7 +170,7 @@ export function AskApplendium() {
                         {/* Full row on a phone, so the chip and link drop below instead of squeezing
                             the name to "P…" and the details to one word per line. */}
                         <div className="min-w-0 basis-full sm:basis-0 sm:flex-1">
-                          <p className="truncate text-[13.5px] font-semibold text-foreground">
+                          <p className="truncate text-[13px] font-semibold text-foreground">
                             {app.company}
                             {app.role ? <span className="font-normal text-muted-foreground"> · {app.role}</span> : null}
                           </p>
@@ -179,7 +180,7 @@ export function AskApplendium() {
                         </div>
                         <ToneChip tone={look.tone}>{look.label}</ToneChip>
                         {gmailUrl ? (
-                          <a href={gmailUrl} target="_blank" rel="noreferrer" className={cn(BUTTON.link, "text-[12.5px]")}>
+                          <a href={gmailUrl} target="_blank" rel="noreferrer" className={cn(BUTTON.link, "text-[13px]")}>
                             Open in Gmail
                             <ExternalLink className="h-3 w-3" aria-hidden />
                           </a>
@@ -197,29 +198,29 @@ export function AskApplendium() {
                     return (
                       <figure key={`${quote.ref}-${quote.date}`} className="rounded-xl border border-border bg-muted/30 px-4 py-3">
                         <figcaption className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="text-[12.5px] font-semibold text-foreground">
+                          <span className="text-[13px] font-semibold text-foreground">
                             What {quote.company} wrote{shortDate(quote.date) ? ` · ${shortDate(quote.date)}` : ""}
                           </span>
                           {gmailUrl ? (
-                            <a href={gmailUrl} target="_blank" rel="noreferrer" className={cn(BUTTON.link, "text-[12.5px]")}>
+                            <a href={gmailUrl} target="_blank" rel="noreferrer" className={cn(BUTTON.link, "text-[13px]")}>
                               Open in Gmail
                               <ExternalLink className="h-3 w-3" aria-hidden />
                             </a>
                           ) : null}
                         </figcaption>
                         {/* Wraps anywhere: one unbroken URL in a company's footer pushed a phone 104px sideways. */}
-                        <blockquote className="mt-2 border-l-2 border-border pl-3 text-[13.5px] leading-relaxed text-foreground/85 [overflow-wrap:anywhere]">
+                        <blockquote className="mt-2 border-l-2 border-border pl-3 text-[13px] leading-relaxed text-foreground/85 [overflow-wrap:anywhere]">
                           {quote.passage}
                         </blockquote>
                         <WhyLine why={quote.rejectionNote} label="From your inbox" testId="quote-note" className="mt-2" />
-                        <p className="mt-1.5 text-[11.5px] text-muted-foreground">Shown straight from your inbox. The AI didn't read it.</p>
+                        <p className="mt-1.5 text-[12px] text-muted-foreground">Shown straight from your inbox. The AI didn't read it.</p>
                       </figure>
                     );
                   })}
                 </div>
               ) : null}
 
-              <p className="text-[11.5px] leading-snug text-muted-foreground">
+              <p className="text-[12px] leading-snug text-muted-foreground">
                 {typeof count === "number" ? `Based on ${count} tracked application${count === 1 ? "" : "s"}${since ? ` since ${since}` : ""}. ` : ""}
                 {result.handoff
                   ? "This handoff uses your saved resume list. No resume content was sent to AI."

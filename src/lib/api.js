@@ -1,4 +1,5 @@
 import { auth } from "./firebase.js";
+import { apiErrorMessage } from "./apiErrors.ts";
 
 const DEFAULT_API_TIMEOUT_MS = 15000;
 
@@ -104,7 +105,10 @@ export async function apiFetch(path, options = {}) {
       json = null;
     }
     if (!res.ok) {
-      const err = json?.error || (text && !text.startsWith("<") ? text : null) || `Server error (${res.status}). Please try again.`;
+      // A backend code ("BLOCKED_BY_QA_HARNESS") or a bare status line is logged, never shown
+      // (persona review, 2026-10-14). Readable backend sentences pass through unchanged, and the
+      // code stays on `payload` for callers that branch on it.
+      const err = apiErrorMessage(res.status, json?.error || json?.message || (text && !text.startsWith("<") ? text : null));
       throw new ApiRequestError(err, {
         status: res.status,
         payload: json,
