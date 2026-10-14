@@ -586,13 +586,47 @@ describe("DashboardNew", () => {
     expect(screen.getByRole("button", { name: "Never heard back" })).toBeInTheDocument();
     expect(screen.queryByText(/Top of your list right now/)).not.toBeInTheDocument();
     expect(screen.getByText("Tailor resume before applying to Datadog")).toBeInTheDocument();
+    // Short enough that the answer buttons sit above the fold on a phone (persona review,
+    // 2026-10-14): the long explanation is behind "Why am I being asked?", not in the card.
+    expect(screen.queryByText(/14 went quiet after the interview/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/one tap each, no typing/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("debrief-why")).toHaveTextContent("Why am I being asked?");
+    const hero = screen.getByRole("heading", { name: /You have reached 23 interviews/ }).closest("section")!;
+    const visibleWords = Array.from(hero.querySelectorAll("h2, p, button, summary, span"))
+      .filter((node) => !node.closest("details") || node.tagName === "SUMMARY")
+      .filter((node) => node.children.length === 0)
+      .map((node) => node.textContent || "").join(" ").split(/\s+/).filter(Boolean);
+    expect(visibleWords.length).toBeLessThanOrEqual(55);
   });
 
+  // Under HTTP 429 the panels said "Nothing tracked yet" and "No roles checked yet" (engineer
+  // persona, 2026-10-14). A failed request shows an error with Retry, never a fake empty state.
+  test("a failed request shows an error with Retry, never an empty state", async () => {
+    const limited = Object.assign(new Error("Too many requests right now. Wait a minute, then try again."), { status: 429 });
+    fetchEmailMetrics.mockRejectedValue(limited);
+    fetchApplyGateHistory.mockRejectedValue(limited);
+    fetchWeeklyHighlights.mockRejectedValue(limited);
+    fetchStrategyAlerts.mockRejectedValue(limited);
+
+    renderDashboard();
+
+    expect(await screen.findByText("Your search numbers did not load")).toBeInTheDocument();
+    expect(await screen.findByText("Your Apply Gate checks did not load")).toBeInTheDocument();
+    expect(await screen.findByText("Recent outcomes did not load")).toBeInTheDocument();
+    expect(await screen.findByText("Your search read is not available right now")).toBeInTheDocument();
+    expect(screen.queryByText("Nothing tracked yet")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nothing is tracked yet")).not.toBeInTheDocument();
+    expect(screen.queryByText("No roles checked yet")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Try again" }).length).toBeGreaterThanOrEqual(4);
+  });
+
+  // One week summary with Offers, the same component Next Actions used to show (2026-10-14).
   test("shows this week against last week, and names an outcome by its subject when no company is known", async () => {
     renderDashboard();
     expect(await screen.findByText("1 interview move this week, alongside 7 new applications.")).toBeInTheDocument();
-    expect(screen.getByText("down from 12")).toBeInTheDocument();
-    expect(screen.getByText("up from 3")).toBeInTheDocument();
+    expect(screen.getByText("12 last week")).toBeInTheDocument();
+    expect(screen.getByText("3 last week")).toBeInTheDocument();
+    expect(screen.getByTestId("week-counts")).toHaveTextContent("Offers");
     // Never "Unknown company": the email's own subject says which one it was.
     expect(screen.getByText("“Stacey Brinkley: 30 min meeting”")).toBeInTheDocument();
     expect(screen.queryByText(/Unknown company/)).not.toBeInTheDocument();

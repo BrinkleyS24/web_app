@@ -23,7 +23,11 @@ import { STATUS_TONE } from "@/lib/statusTone";
 import { parseApiDate } from "@/lib/apiDate";
 
 /**
- * The week in review, folded into Next Actions (2026-10-04). It used to be its own Weekly Summary
+ * The one week summary, on the Dashboard since 2026-10-14. Next Actions and the Dashboard each had
+ * their own (4 tiles with Offers there, 3 rows without them here), so the persona review read two
+ * different weeks; now there is one component in one place.
+ *
+ * History: the week in review, folded into Next Actions (2026-10-04). It used to be its own Weekly Summary
  * page beside Next Actions and the Dashboard's "This week" panel: three places for one week. Here it
  * is context for the actions, collapsed to the headline and four counts; Details opens the read and
  * the week's emails. /weekly-summary redirects to #this-week, which opens it.
@@ -193,7 +197,16 @@ function EventGroup({ icon: Icon, tone, title, description, children }: {
   );
 }
 
-export function WeekInReview({ defaultOpen = false, className }: { defaultOpen?: boolean; className?: string }) {
+export function WeekInReview({
+  defaultOpen = false,
+  className,
+  compact = false,
+}: {
+  defaultOpen?: boolean;
+  className?: string;
+  /** Narrow column: tiles two by two and event groups stacked. */
+  compact?: boolean;
+}) {
   const { user } = useAuth();
   const location = useLocation();
   const linkedHere = location.hash === `#${WEEK_ANCHOR}`;
@@ -268,7 +281,7 @@ export function WeekInReview({ defaultOpen = false, className }: { defaultOpen?:
           <ErrorState title="This week did not load" detail="Your data is safe. Try again in a moment." onRetry={() => void highlightsQuery.refetch()} />
         ) : (
           <div className="space-y-5">
-            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="week-counts">
+            <dl className={cn("grid grid-cols-2 gap-3", !compact && "sm:grid-cols-4")} data-testid="week-counts">
               {stats.map((stat) => (
                 <div key={stat.label} className="rounded-lg border border-border px-3 py-2">
                   <dt className="text-[11.5px] text-muted-foreground">{stat.label}</dt>
@@ -291,7 +304,7 @@ export function WeekInReview({ defaultOpen = false, className }: { defaultOpen?:
                 ) : null}
 
                 {h && hasEvents ? (
-                  <div className="grid items-start gap-5 lg:grid-cols-2">
+                  <div className={cn("grid items-start gap-5", !compact && "lg:grid-cols-2")}>
                     {h.newOffers.length ? (
                       <EventGroup icon={Sparkles} tone="positive" title="Offers">
                         {h.newOffers.map((item, idx) => <EventRow key={`offer-${idx}`} item={item} tone="positive" label="Offer" />)}

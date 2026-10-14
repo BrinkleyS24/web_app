@@ -65,6 +65,6 @@ export function friendlyErrorMessage(error: unknown, fallback = "Something went 
     return isHumanMessage(message) ? message.trim() : messageForStatus(err.status);
   }
   if (isHumanMessage(message)) return message.trim();
-  if (message) console.warn("[api] error replaced with a friendly message", message.slice(0, 120));
+  if (message) console.warn("[api] error replaced with a friendly message", String(message).slice(0, 120));
   return fallback;
 }

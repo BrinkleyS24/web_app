@@ -205,8 +205,8 @@ export default function App() {
                   </RequirePremiumUser>
                 }
               />
-              {/* Folded into Next Actions (2026-10-04); old links and emails land on the week card. */}
-              <Route path="/weekly-summary" element={<Navigate to="/next-actions#this-week" replace />} />
+              {/* Old links and emails land on the week card, on the Dashboard since 2026-10-14. */}
+              <Route path="/weekly-summary" element={<Navigate to="/dashboard#this-week" replace />} />
               <Route
                 path="/settings"
                 element={

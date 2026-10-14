@@ -39,7 +39,6 @@ import { BUTTON, CARD, EYEBROW, TONES } from "@/components/premium/tone";
 import { OutreachDraftEditor } from "@/components/premium/OutreachDraftEditor";
 import { useDraftSession } from "@/hooks/useDraftSession";
 import { WhyLine } from "@/components/premium/WhyLine";
-import { WeekInReview } from "@/components/premium/WeekInReview";
 import { describeActionIdentity, describeActionKind, resolveActionCta } from "@/lib/actionPresentation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -1848,9 +1847,8 @@ const FixSuggestions = () => {
           {moreItems.length === 0 ? heldBackNote : null}
         </section>
 
-        {/* The week in review, folded in from the old Weekly Summary page (2026-10-04): context for
-            the actions above, collapsed to its headline and four counts. */}
-        <WeekInReview />
+        {/* The week summary moved to the Dashboard (2026-10-14): it appeared on both pages with
+            different metrics. One week, one place. */}
 
         {moreItems.length > 0 ? (
           <Panel
