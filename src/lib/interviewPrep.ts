@@ -25,9 +25,33 @@ export async function buildInterviewPractice(input: PracticeInput): Promise<Prac
   return response.pack;
 }
 
-/** Calendar values are floating wall-clock values in this application's storage. Do not shift them. */
+/**
+ * The backend stores a true instant when the invitation names a zone (10:00 America/New_York is
+ * stored as 14:00Z), and a floating wall clock written as UTC only when it names none
+ * (utils/scheduledEventExtraction.js). Showing every value as a floating clock printed "14:00
+ * (America/New_York)" for a 10:00 AM ET interview (A+ review, 2026-10-15). A zoned instant is shown
+ * in its own zone; a floating one is shown as written.
+ */
+function zonedScheduleLabel(schedule: NonNullable<InterviewSource["schedule"]>): string | null {
+  if (!schedule.timeZone || !schedule.hasTime) return null;
+  // Stored timestamps can arrive without an offset ("2026-10-08T14:30:00"); they are UTC, and a bare
+  // Date() would read them in the viewer's zone instead.
+  const iso = /(?:Z|[+-]\d{2}:?\d{2})$/.test(schedule.startAt) ? schedule.startAt : `${schedule.startAt.replace(" ", "T")}Z`;
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return null;
+  try {
+    const date = new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: schedule.timeZone }).format(at);
+    const time = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: schedule.timeZone, timeZoneName: "short" }).format(at);
+    return `${date}, ${time}.`;
+  } catch {
+    return null;
+  }
+}
+
 export function invitationScheduleLabel(schedule: InterviewSource["schedule"]): string {
   if (!schedule) return "Date and time are unconfirmed. Check the invitation in Gmail.";
+  const zoned = zonedScheduleLabel(schedule);
+  if (zoned) return zoned;
   const match = schedule.startAt.match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?/);
   if (!match || Number.isNaN(new Date(`${match[1]}T00:00:00Z`).getTime()) || new Date(`${match[1]}T00:00:00Z`).toISOString().slice(0,10)!==match[1]) return "Date and time are unconfirmed. Check the invitation in Gmail.";
   const date = new Intl.DateTimeFormat("en-US",{year:"numeric",month:"short",day:"numeric",timeZone:"UTC"}).format(new Date(`${match[1]}T00:00:00Z`));
