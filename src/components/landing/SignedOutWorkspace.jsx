@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Chrome, RefreshCw } from "lucide-react";
 import PublicShell from "./PublicShell.jsx";
 import { CHROME_WEB_STORE_URL } from "../../lib/publicSiteConfig.js";
 import { premiumUpdatesHref } from "../../lib/premiumLaunchContent.js";
+import { firebaseConfigured, signInWithGoogle } from "../../lib/firebase.js";
 
 /**
  * What a signed-out visitor sees on a workspace URL such as /dashboard (2026-10-14). It used to be a
@@ -13,6 +14,19 @@ import { premiumUpdatesHref } from "../../lib/premiumLaunchContent.js";
  */
 export default function SignedOutWorkspace({ checking = false, upgradeHref = "/upgrade" }) {
   const chromeHref = CHROME_WEB_STORE_URL || premiumUpdatesHref;
+  // The landing page's "Sign in" now lands here (2026-10-15). Someone who already set up the
+  // extension can sign in on this site with the same Google account; the workspace then renders in
+  // place. New visitors still start with the extension, because that is where Gmail is connected.
+  const [signInState, setSignInState] = useState({ busy: false, error: "" });
+  async function handleWebSignIn() {
+    setSignInState({ busy: true, error: "" });
+    try {
+      await signInWithGoogle();
+      setSignInState({ busy: false, error: "" });
+    } catch {
+      setSignInState({ busy: false, error: "Sign-in did not finish. Try again, or sign in from the extension." });
+    }
+  }
   return (
     <PublicShell>
       <main className="mx-auto max-w-[720px] px-4 py-14 sm:px-6 md:py-20" data-testid="signed-out-workspace">
@@ -66,6 +80,23 @@ export default function SignedOutWorkspace({ checking = false, upgradeHref = "/u
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>
+
+        {firebaseConfigured ? (
+          <div className="mt-6 rounded-[12px] border border-[#E5E7E3] bg-white px-4 py-3" data-testid="signed-out-web-sign-in">
+            <p className="text-[14px] leading-[1.6] text-[#0B1220]">
+              Already use the extension? Sign in here with the same Google account.
+            </p>
+            <button
+              type="button"
+              onClick={handleWebSignIn}
+              disabled={signInState.busy}
+              className="mt-2 inline-flex min-h-[44px] items-center justify-center rounded-[10px] border border-[#D8DAD3] bg-white px-5 text-sm font-semibold text-[#0B1220] transition-colors hover:border-[#0B1220] disabled:opacity-60"
+            >
+              {signInState.busy ? "Signing in..." : "Sign in with Google"}
+            </button>
+            {signInState.error ? <p className="mt-2 text-[13px] text-[#B42318]" role="alert">{signInState.error}</p> : null}
+          </div>
+        ) : null}
 
         <p className="mt-6 text-[14px] leading-[1.6] text-[#5C6470]">
           On a phone? Chrome extensions install on a computer only. Open applendium.com there.

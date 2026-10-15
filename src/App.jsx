@@ -36,6 +36,43 @@ function AccountQueryScope({ children }) {
   return <QueryClientProvider key={accountId} client={queryClient}>{children}</QueryClientProvider>;
 }
 
+/**
+ * Every workspace page gets its own browser tab title (designer review, 2026-10-15): all of them
+ * used to keep the marketing title, so five open tabs read the same. Public pages (landing,
+ * upgrade, privacy, terms, goodbye) still set their own titles through usePageMetadata.
+ */
+export const APP_PAGE_TITLES = {
+  "/dashboard": "Dashboard",
+  "/next-actions": "Next Actions",
+  "/strategy-alerts": "Strategy Alerts",
+  "/interview-prep": "Interview Prep",
+  "/apply-gate": "Apply Gate",
+  "/resumes": "Resumes",
+  "/ask": "Ask Applendium",
+  "/settings": "Settings",
+  "/admin/review": "Admin review",
+  "/admin/analytics": "Admin analytics",
+  "/admin/jobs": "Admin jobs",
+  "/admin/users": "Admin users",
+  "/admin/debug": "Admin debug",
+};
+
+export function appPageTitle(pathname) {
+  const path = String(pathname || "").replace(/\/+$/, "") || "/";
+  const name = APP_PAGE_TITLES[path];
+  return name ? `${name} · Applendium` : null;
+}
+
+function useAppPageTitle(pathname) {
+  useEffect(() => {
+    const title = appPageTitle(pathname);
+    if (!title || typeof document === "undefined") return undefined;
+    const previous = document.title;
+    document.title = title;
+    return () => { document.title = previous; };
+  }, [pathname]);
+}
+
 const DASHBOARD_ROUTES = [
   "/admin",
   "/dashboard",
@@ -161,6 +198,7 @@ function RequireAdminEmail({ children }) {
 
 export default function App() {
   const location = useLocation();
+  useAppPageTitle(location.pathname);
   const isDashboard = DASHBOARD_ROUTES.some((route) =>
     location.pathname.startsWith(route)
   );
@@ -185,6 +223,8 @@ export default function App() {
               <Route path="/goodbye" element={<Goodbye />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/upgrade" element={<Upgrade />} />
+              {/* /pricing was a 404 (designer review, 2026-10-15); plans live on /upgrade. */}
+              <Route path="/pricing" element={<Navigate to="/upgrade?source=pricing_url" replace />} />
               <Route path="/support" element={<Navigate to="/#support" replace />} />
               <Route
                 path="/account"
