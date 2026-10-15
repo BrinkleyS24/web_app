@@ -627,11 +627,15 @@ function explanationActionSteps(explanation: ApplyGateResult["explanation"] | nu
 
   if (!explanation) return [];
 
+  // Step labels follow the call (2026-10-15): "Fix first" steps under "Apply now" read as a second,
+  // contradicting verdict. Only a Fix-first call says "Fix first".
+  const action = String(explanation.strategic_decision || "").toUpperCase();
+  const fixFirst = action === "FIX_THEN_APPLY";
   const groups: Array<{ label: string; items: string[] }> = [
-    { label: "Fix first", items: normalize(explanation.action_plan?.quick_fixes) },
-    { label: "Fix first", items: normalize(explanation.action_plan?.resume_proof_improvements) },
+    { label: fixFirst ? "Fix first" : "Before you send", items: normalize(explanation.action_plan?.quick_fixes) },
+    { label: fixFirst ? "Fix first" : "Strengthen", items: normalize(explanation.action_plan?.resume_proof_improvements) },
     { label: "Plan", items: normalize(explanation.path_to_win?.strategy) },
-    { label: "Fix first", items: normalize(explanation.action_plan?.long_term_gaps) },
+    { label: "Longer term", items: normalize(explanation.action_plan?.long_term_gaps) },
     { label: "Hard requirement", items: normalize(explanation.action_plan?.not_fixable_for_this_posting) },
   ];
   return groups.flatMap((group, groupIndex) => group.items.map((text, index) => ({
