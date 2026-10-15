@@ -162,10 +162,12 @@ describe("sentence dedupe", () => {
     expect(occurrences(card.textContent || "", REPEATED)).toBe(1);
     // The whole page, not just the card: history and details included.
     expect(occurrences(document.body.textContent || "", REPEATED)).toBe(1);
-    // The learnable gap is a "Fix first" step in the visible checklist.
+    // The learnable gap is a step in the visible checklist, labeled for the call: under a Skip it
+    // is "Strengthen", never "Fix first" (2026-10-15: step labels follow the verdict).
     const steps = within(screen.getByTestId("apply-gate-steps"));
     expect(steps.getByText(/Build one short Articulate Rise sample module/)).toBeInTheDocument();
-    expect(steps.getAllByText(/^Fix first:/).length).toBeGreaterThan(0);
+    expect(steps.getAllByText(/^Strengthen:/).length).toBeGreaterThan(0);
+    expect(steps.queryByText(/^Fix first:/)).not.toBeInTheDocument();
     // No empty sections: nothing survives under "Hard requirement", so it is not rendered.
     expect(screen.queryByText(/^Hard requirement:/)).not.toBeInTheDocument();
   });
