@@ -44,6 +44,7 @@ import { friendlyErrorMessage } from "@/lib/apiErrors";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useCanonicalQueueImpressions } from "@/hooks/useCanonicalQueueImpressions";
+import { useApplyGateTaskAlignment } from "@/hooks/useApplyGateTaskAlignment";
 import { useAuth } from "@/lib/AuthContext.jsx";
 import { ApiRequestError } from "@/lib/api.js";
 import {
@@ -242,7 +243,9 @@ function UpcomingFollowupWindowList({
               <p className="text-sm font-semibold text-foreground">{window.title}</p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">{window.description}</p>
             </div>
-            <span className="shrink-0 rounded-full bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent">
+            {/* Green text on a white chip (5.35:1). The 10% green tint over this translucent card
+                measured 4.47:1, just under AA (persona contrast scan, 2026-10-15). */}
+            <span className="shrink-0 rounded-full bg-card px-2.5 py-1 text-xs font-semibold text-accent ring-1 ring-accent/30" data-testid="followup-window-countdown">
               {window.opensInDays <= 0 ? "due now" : `${window.opensInDays}d`}
             </span>
           </div>
@@ -1058,6 +1061,8 @@ const FixSuggestions = () => {
   useEffect(() => { setPendingLogicalKeys({}); }, [user?.uid]);
 
   const isAuthed = Boolean(user);
+  // Apply Gate tasks follow their posting's latest check and open it (teacher review, 2026-10-15).
+  const { align: alignApplyGateTasks } = useApplyGateTaskAlignment(isAuthed);
 
   const queueQuery = useQuery({
     queryKey: ["fix-suggestions", "queue", user?.uid],
@@ -1197,12 +1202,12 @@ const FixSuggestions = () => {
   // appeared twice (founder's queue, 2026-09-25: 7 blocked rows, one role duplicated) and this page
   // said "22 more" where the Dashboard said "14 more". A blocked step appears once its blocker is done.
   const combinedSuggestions = useMemo(
-    () => suppressAlreadyHandledGmailActions(
+    () => alignApplyGateTasks(suppressAlreadyHandledGmailActions(
       buildDashboardMoveQueue(buildQueueItemsFromRankedQueue(rankedQueue)),
       storedEmails,
       user?.email,
-    ),
-    [rankedQueue, storedEmails, user?.email],
+    )),
+    [alignApplyGateTasks, rankedQueue, storedEmails, user?.email],
   );
   const daqInboxSuggestions = useMemo(
     () => buildDaqV1InboxQueue(combinedSuggestions),

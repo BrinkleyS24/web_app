@@ -704,6 +704,13 @@ describe("DashboardNew", () => {
     expect(await screen.findByText("Where your 20 applications stand")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Still interviewing: 2, No word since the interview \(30\+ days\): 5/ })).toBeInTheDocument();
     expect(screen.getByText(/Counted from your inbox and applications you added, plus 3 endings you told us about\./)).toBeInTheDocument();
+    // "Ever" and "now" are labelled side by side so 9 and 7 cannot read as a contradiction (2026-10-15).
+    const counts = screen.getByTestId("interview-counts");
+    expect(counts).toHaveTextContent("Reached an interview (ever)9 · 45.0% of applications");
+    expect(counts).toHaveTextContent("In interviews (now)7 · 2 still interviewing, 5 no word in 30+ days");
+    // The legend wraps instead of truncating at 768 px, and the footnote sentences have a space.
+    expect(screen.getByText("No word since the interview (30+ days)").className).not.toContain("truncate");
+    expect(screen.getByText(/whatever happened next\. “In interviews”/)).toBeInTheDocument();
   });
 
   test("keeps the separate rows when an older backend sends no stages", async () => {

@@ -88,6 +88,13 @@ test('free users manage a default without making premium requests', async () => 
   expect(fetchApplicationStats).not.toHaveBeenCalled();
 });
 
+test('the page uses the shared app width, not a narrower column of its own (2026-10-15)', async () => {
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [] });
+  renderPage();
+  const page = await screen.findByTestId('resumes-page');
+  expect(page.className).not.toMatch(/max-w-/);
+});
+
 test('removing the default explains the consequence and waits for confirmation', async () => {
   fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'QA', isDefault: true }] });
   renderPage();
