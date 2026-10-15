@@ -1,2 +1,6 @@
 [build.environment]
 VITE_API_BASE_URL = "https://applendium-backend-277330820484.us-central1.run.app"
+# Firebase web config is public by design (it ships in every page's JS), so the secrets scanner
+# must not treat it as a secret. Without this the build failed on the /__/auth proxy rule in
+# _redirects, which names the Firebase auth host (2026-10-14).
+SECRETS_SCAN_OMIT_KEYS = "VITE_FIREBASE_AUTH_DOMAIN,VITE_FIREBASE_PROJECT_ID"
