@@ -919,14 +919,36 @@ export async function fetchApplicationStats(): Promise<ApplicationStatsResponse>
   return apiFetch("/api/emails/applications/stats", { method: "GET" });
 }
 
+/** Where a sync stands (backend services/syncStatusState.js, 2026-10-15). Older backends omit it. */
+export type SyncState = "running" | "stalled" | "failed" | "needs_reconnect" | "idle";
+
+export type StartEmailSyncResponse = {
+  success: boolean;
+  newEmailsCount?: number;
+  sync?: {
+    /** What this request did: ran and finished, found another sync running, or handed off. */
+    outcome?: "finished" | "already_running" | "queued";
+    state?: SyncState;
+    finishedAt?: string | null;
+    inProgress?: boolean;
+  };
+};
+
+/**
+ * An inline sync can take longer than the default 15 s request timeout. A timeout is not a failure:
+ * the sync keeps going on the server, so the caller switches to polling /sync-status (2026-10-15).
+ */
+export const SYNC_REQUEST_TIMEOUT_MS = 45_000;
+
 export async function startEmailSync(options: {
   fullRefresh?: boolean;
   fetchOnlyQuota?: boolean;
-} = {}): Promise<{ success: boolean; newEmailsCount?: number }> {
+} = {}): Promise<StartEmailSyncResponse> {
   // `source=web` labels the usage event (backend services/activityLog.js) as a website sync.
   return apiFetch("/api/emails?source=web", {
     method: "POST",
     body: JSON.stringify(options),
+    timeoutMs: SYNC_REQUEST_TIMEOUT_MS,
   });
 }
 
@@ -939,6 +961,12 @@ export type SyncStatusResponse = {
     lastSyncAt?: string | null;
     /** When a sync last finished, from any client. Null until the backend has recorded one. */
     lastRunAt?: string | null;
+    state?: SyncState;
+    runningForSeconds?: number | null;
+    leaseExpiresAt?: string | null;
+    lastError?: { code?: string | null; at?: string | null } | null;
+    /** Poll again after this many seconds while state is 'running'. */
+    pollAfterSeconds?: number | null;
   };
   gmailAuth?: { requiresReconnect: boolean };
 };
