@@ -5,6 +5,7 @@ import { ApiRequestError } from "@/lib/api.js";
 
 import {
   recordInterviewDebrief,
+  recordInterviewStillLive,
   type InterviewDebriefAnswer,
   type InterviewDebriefItem,
 } from "@/lib/emails";
@@ -31,9 +32,10 @@ type Outcome = InterviewDebriefAnswer | "live";
 const CHOICES: Array<{ outcome: Outcome; label: string }> = [
   { outcome: "no_response", label: "Never heard back" },
   { outcome: "rejected", label: "Rejected" },
-  // "Still live" writes NOTHING. A process the user says is alive is a censored observation,
-  // not an outcome, and recording it as one would put a fictional ending into the same funnel
-  // this feature exists to stop guessing about. It only dismisses the card for this session.
+  // "Still live" is never an outcome: a process the user says is alive is a censored observation,
+  // and recording an ending would put a fictional one into the funnel. Since 2026-10-15 it is saved
+  // as a 14-day snooze (POST /applications/interview-debrief) so the question does not return on
+  // reload (engineer review: it used to write nothing and loop).
   { outcome: "live", label: "Still live" },
 ];
 
@@ -78,10 +80,24 @@ export function InterviewDebriefCards({
     const name = item.company || item.label;
 
     if (outcome === "live") {
-      const next = new Set(handled).add(item.key);
-      setHandled(next);
-      setConfirmation(`Noted. ${name} stays open.`);
-      if (next.size >= batch.length) refreshDependentViews();
+      saving.current = true;
+      setPending(item.key);
+      try {
+        const result = await recordInterviewStillLive({ emailId: item.emailId,
+          ...(item.actionReference !== undefined && item.actionReference !== null ? { actionReference: item.actionReference } : {}) });
+        if (result?.success !== true || result.closed === true) throw new Error("Save was not confirmed");
+        const next = new Set(handled).add(item.key);
+        setHandled(next);
+        const days = result.askAgainAfterDays ?? 14;
+        setConfirmation(`Noted. ${name} stays open. I'll ask again in ${days} days.`);
+        if (next.size >= batch.length) refreshDependentViews();
+      } catch {
+        // Never fall back to close-by-email: that would record an ending for a live process.
+        setError("Couldn't save, try again.");
+      } finally {
+        saving.current = false;
+        setPending(null);
+      }
       return;
     }
 

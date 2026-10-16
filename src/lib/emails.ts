@@ -284,6 +284,30 @@ export async function recordInterviewDebrief(params: {
   });
 }
 
+/**
+ * "Still live" on an interview card (engineer review, 2026-10-15: the tap saved nothing, so the same
+ * question returned on reload). The backend stores it as a 14-day snooze, never a close. An older
+ * backend answers 404 here, and the caller must NOT fall back to close-by-email: that would record
+ * an ending for a process the user just said is alive.
+ */
+export async function recordInterviewStillLive(params: { emailId: number; actionReference?: string }): Promise<{
+  success: boolean;
+  recorded?: boolean;
+  answer?: "still_live";
+  closed?: boolean;
+  snoozedUntil?: string | null;
+  askAgainAfterDays?: number;
+}> {
+  return apiFetch("/api/emails/applications/interview-debrief", {
+    method: "POST",
+    body: {
+      emailId: params.emailId,
+      answer: "still_live",
+      ...(params.actionReference !== undefined ? { actionReference: params.actionReference } : {}),
+    },
+  });
+}
+
 export type StrategyAlertsResponse = {
   success: boolean;
   alerts?: StrategyAlert[];
@@ -394,6 +418,8 @@ export type RankedAction = {
   lastShownAt?: string | null;
   timesShown?: number;
   createdAt?: string | null;
+  /** When the user marked it done (backend, 2026-10-15). */
+  completedAt?: string | null;
   evidence?: string[];
   rankScore?: number;
   effectiveStatus?: "open" | "blocked" | "done" | "dismissed" | "expired";
