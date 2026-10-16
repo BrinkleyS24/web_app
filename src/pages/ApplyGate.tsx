@@ -627,11 +627,15 @@ function explanationActionSteps(explanation: ApplyGateResult["explanation"] | nu
 
   if (!explanation) return [];
 
+  // Step labels follow the call (2026-10-15): "Fix first" steps under "Apply now" read as a second,
+  // contradicting verdict. Only a Fix-first call says "Fix first".
+  const action = String(explanation.strategic_decision || "").toUpperCase();
+  const fixFirst = action === "FIX_THEN_APPLY";
   const groups: Array<{ label: string; items: string[] }> = [
-    { label: "Fix first", items: normalize(explanation.action_plan?.quick_fixes) },
-    { label: "Fix first", items: normalize(explanation.action_plan?.resume_proof_improvements) },
+    { label: fixFirst ? "Fix first" : "Before you send", items: normalize(explanation.action_plan?.quick_fixes) },
+    { label: fixFirst ? "Fix first" : "Strengthen", items: normalize(explanation.action_plan?.resume_proof_improvements) },
     { label: "Plan", items: normalize(explanation.path_to_win?.strategy) },
-    { label: "Fix first", items: normalize(explanation.action_plan?.long_term_gaps) },
+    { label: "Longer term", items: normalize(explanation.action_plan?.long_term_gaps) },
     { label: "Hard requirement", items: normalize(explanation.action_plan?.not_fixable_for_this_posting) },
   ];
   return groups.flatMap((group, groupIndex) => group.items.map((text, index) => ({
@@ -1350,6 +1354,11 @@ const ApplyGateWorkspace = () => {
   );
 
   const rawHistory: ApplyGateHistoryItem[] = historyQuery.data?.history ?? [];
+  // A Next Actions link names the check it came from (?verdict=<id>). History carries no posting
+  // text, so the form cannot be refilled; instead the saved check is offered for a one-tap re-check
+  // (the server reuses the posting it stored). Before 2026-10-15 the link opened an empty form.
+  const linkedVerdictId = useMemo(() => new URLSearchParams(location.search).get("verdict"), [location.search]);
+  const linkedCheck = linkedVerdictId ? rawHistory.find((item) => item.id === linkedVerdictId) ?? null : null;
   const currentHistoryProjection = useMemo(
     () => buildHistoryDisplayItemFromResult(result, jobTitle, companyName, null),
     [companyName, jobTitle, result],
@@ -1883,6 +1892,30 @@ const ApplyGateWorkspace = () => {
           title="Apply Gate"
           description="Paste a job and get a clear call — apply, fix first, or skip — with the reasons behind it and what to fix before you spend the time."
         />
+
+        {linkedCheck ? (
+          <div className={cn(CARD, "flex flex-wrap items-center justify-between gap-3 p-4")} data-testid="apply-gate-linked-check">
+            <div className="min-w-0">
+              <p className="text-[13px] font-semibold text-foreground">
+                From Next Actions: {linkedCheck.job_title}{linkedCheck.company_name ? ` at ${linkedCheck.company_name}` : ""}
+              </p>
+              <p className="text-[13px] text-muted-foreground">Re-check it against your current resume. It uses the posting you already checked.</p>
+              {recheckError?.id === linkedCheck.id ? <p role="alert" className="mt-1 text-[13px] text-destructive">{recheckError.message}</p> : null}
+            </div>
+            <button
+              type="button"
+              className={BUTTON.primary}
+              disabled={recheckingId === linkedCheck.id}
+              onClick={() => handleRecheck(linkedCheck.id)}
+            >
+              {recheckingId === linkedCheck.id ? "Checking…" : "Re-check this posting"}
+            </button>
+          </div>
+        ) : linkedVerdictId && historyQuery.isSuccess ? (
+          <p className="text-[13px] text-muted-foreground" data-testid="apply-gate-linked-check-missing">
+            That check is no longer in your history. Paste the posting below to check it again.
+          </p>
+        ) : null}
 
         <div ref={resultTopRef} className="grid scroll-mt-20 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]">
           <div className={cn(CARD, "space-y-3 p-5")}>

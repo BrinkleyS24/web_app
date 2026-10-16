@@ -72,4 +72,12 @@ describe("Landing (2026-10-14 persona findings)", () => {
     await waitFor(() => expect(screen.getByTestId("landing-price-note")).toHaveTextContent("or $59/3 mo"));
     expect(screen.getByTestId("footer-privacy-link")).toHaveAttribute("href", "/privacy");
   });
+  test("Sign in follows the extension-first story and the wordmark has one spelling (2026-10-15)", () => {
+    renderLanding();
+    // It used to open /upgrade (a price list) while workspace pages said to sign in through the extension.
+    expect(screen.getByTestId("nav-sign-in")).toHaveAttribute("href", "/dashboard");
+    expect(screen.getAllByRole("link", { name: /^Sign in$/ }).every((link) => link.getAttribute("href") === "/dashboard")).toBe(true);
+    expect(document.body.textContent).not.toContain("applendium™");
+    expect(screen.getByTestId("logo-link")).toHaveTextContent("Applendium™");
+  });
 });

@@ -435,7 +435,7 @@ export default function LandingHero({ chromeHref }) {
                 <span className="grid h-5 w-5 place-items-center rounded-[6px] bg-[#0B1220]">
                   <img src="/logo-transparent.png" alt="" className="h-3.5 w-3.5" />
                 </span>
-                <span className="text-[13px] font-semibold lowercase text-white">applendium™</span>
+                <span className="text-[13px] font-semibold text-white">Applendium™</span>
                 <span className="landingMono rounded bg-white/[0.06] px-1.5 py-0.5 text-[9px] text-[#9AA7BD]">Free</span>
                 <span className="landingMono rounded bg-white/[0.06] px-1.5 py-0.5 text-[9px] text-[#9AA7BD]">128/500</span>
               </div>

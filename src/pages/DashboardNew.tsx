@@ -37,9 +37,9 @@ import { useInboxSync } from "@/hooks/useInboxSync";
 import { describeActionIdentity, resolveActionCta } from "@/lib/actionPresentation";
 import { splitRoleAndCompany } from "@/lib/applyGateDisplay";
 import { useAuth } from "@/lib/AuthContext.jsx";
+import { useApplyGateTaskAlignment } from "@/hooks/useApplyGateTaskAlignment";
 import { buildDashboardAnswer, findAnswerMove, type DashboardAnswer } from "@/lib/dashboardAnswer";
 import {
-  fetchApplyGateHistory,
   fetchEmailMetrics,
   fetchRankedActionQueue,
   fetchStrategyAlerts,
@@ -106,18 +106,15 @@ const Dashboard = () => {
     enabled: isAuthed,
     staleTime: 60_000,
   });
-  const historyQuery = useQuery({
-    queryKey: ["dashboard", "apply-gate-history"],
-    queryFn: fetchApplyGateHistory,
-    enabled: isAuthed,
-    staleTime: 60_000,
-  });
+  // Apply Gate history (also the "Recent Apply Gate checks" panel) and resume versions, so Apply Gate
+  // tasks follow their posting's latest check and link to it (2026-10-15).
+  const { align: alignApplyGateTasks, history: historyQuery } = useApplyGateTaskAlignment(isAuthed);
 
   const cohortMetrics = metricsQuery.data?.cohortMetrics;
   const alerts = useMemo(() => alertsQuery.data?.alerts || [], [alertsQuery.data]);
   const moveQueue = useMemo(
-    () => buildDashboardMoveQueue(buildQueueItemsFromRankedQueue(queueQuery.data?.queue || null)),
-    [queueQuery.data],
+    () => alignApplyGateTasks(buildDashboardMoveQueue(buildQueueItemsFromRankedQueue(queueQuery.data?.queue || null))),
+    [alignApplyGateTasks, queueQuery.data],
   );
 
   // The lead card waits for its data. Rendering it early showed "Your search read is not available
@@ -478,14 +475,34 @@ function StageBar({
   const count = (key: keyof Stages) => stages[key] ?? 0;
   const hasQuietBreakdown = typeof stages.interviewQuiet === "number";
   const label = (segment: (typeof STAGE_SEGMENTS)[number]) => segment.key === "interviewing" && !hasQuietBreakdown ? "Interview outcome unknown" : segment.label;
+  // Interviews with no decision yet, whether recent or quiet: the extension's "In interviews" tile.
+  const inInterviewsNow = count("interviewing") + (hasQuietBreakdown ? count("interviewQuiet") : 0);
   const segments = STAGE_SEGMENTS.filter((segment) => count(segment.key) > 0 || segment.key === "offer");
   const summary = segments.map((segment) => `${label(segment)}: ${count(segment.key)}`).join(", ");
   return (
     <div className="space-y-3.5">
       <p className={SUBHEAD}>Where your {applied} applications stand</p>
+      {/* "Ever" and "now" side by side, each labelled (persona review, 2026-10-15): "6 reached an
+          interview" next to "4 interviews need your answer" read as a contradiction when only one
+          number said which question it answered. */}
+      <dl className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2" data-testid="interview-counts">
+        <div className="rounded-lg bg-muted/50 px-3 py-2">
+          <dt className="text-[12px] text-muted-foreground">Reached an interview <span className="font-medium text-foreground/80">(ever)</span></dt>
+          <dd className="mt-0.5 text-[13px] text-muted-foreground">
+            <span className="text-[20px] font-semibold tabular-nums text-foreground">{reachedInterview}</span>
+            {ratePct ? ` · ${ratePct} of applications` : ""}
+          </dd>
+        </div>
+        <div className="rounded-lg bg-muted/50 px-3 py-2">
+          <dt className="text-[12px] text-muted-foreground">In interviews <span className="font-medium text-foreground/80">(now)</span></dt>
+          <dd className="mt-0.5 text-[13px] text-muted-foreground">
+            <span className="text-[20px] font-semibold tabular-nums text-foreground">{inInterviewsNow}</span>
+            {hasQuietBreakdown ? ` · ${count("interviewing")} still interviewing, ${count("interviewQuiet")} no word in 30+ days` : " · no decision recorded yet"}
+          </dd>
+        </div>
+      </dl>
       <p className="text-[13px] leading-relaxed text-muted-foreground">
-        <span className="font-semibold text-foreground">{reachedInterview}</span> reached an interview
-        {ratePct ? ` (${ratePct})` : ""} and <span className="font-semibold text-foreground">{reachedOffer}</span>{" "}
+        <span className="font-semibold text-foreground">{reachedOffer}</span>{" "}
         {reachedOffer === 1 ? "became an offer" : "became offers"}.
       </p>
       <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted" role="img" aria-label={summary}>
@@ -503,10 +520,12 @@ function StageBar({
       </div>
       <ul className="space-y-1.5">
         {segments.map((segment) => (
-          <li key={segment.key} className="flex items-center justify-between gap-2 text-[13px]">
-            <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
-              <span className={cn("h-2 w-2 shrink-0 rounded-full", segment.dot)} aria-hidden />
-              <span className="truncate">{label(segment)}</span>
+          <li key={segment.key} className="flex items-start justify-between gap-2 text-[13px]">
+            {/* Wraps instead of truncating (2026-10-15): at 768 px the sidebar leaves this column
+                narrow and "No word since the interview (30+ days)" was cut to "(30+ da…". */}
+            <span className="flex min-w-0 items-start gap-1.5 text-muted-foreground">
+              <span className={cn("mt-[5px] h-2 w-2 shrink-0 rounded-full", segment.dot)} aria-hidden />
+              <span className="min-w-0 break-words">{label(segment)}</span>
             </span>
             <span className="font-semibold tabular-nums text-foreground">{count(segment.key)}</span>
           </li>
@@ -515,9 +534,9 @@ function StageBar({
       {/* Two interview counts that can differ, each named, and where the bar's counts come from
           (Codex audit + founder, 2026-10-06). */}
       <p className="text-[12px] leading-snug text-muted-foreground">
-        &ldquo;Reached an interview&rdquo; counts every application that got one, whatever happened next.
+        &ldquo;Reached an interview&rdquo; counts every application that got one, whatever happened next.{" "}
         {hasQuietBreakdown
-          ? "“Still interviewing” counts those with no decision and an email in the last 30 days. "
+          ? "“In interviews” counts those with no decision yet; “Still interviewing” are the ones with an email in the last 30 days. "
           : "“Interview outcome unknown” means no decision is recorded; this result does not separate recent updates from older silence. "}
         {fromAnswers
           ? `Counted from your inbox and applications you added, plus ${fromAnswers} ${fromAnswers === 1 ? "ending" : "endings"} you told us about.`

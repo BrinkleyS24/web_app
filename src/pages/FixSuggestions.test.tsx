@@ -17,8 +17,10 @@ const {
   closeApplication,
   closeQueueOutcome,
   completeQueueAction,
+  fetchApplyGateHistory,
   fetchFollowupSuggestions,
   fetchRankedActionQueue,
+  fetchResumeVariants,
   fetchStoredEmails,
   fetchSuggestionActionStates,
   fetchWeeklyHighlights,
@@ -27,6 +29,8 @@ const {
   recordQueueActionImpression,
   recordSuggestionDraftFeedback,
 } = vi.hoisted(() => ({
+  fetchApplyGateHistory: vi.fn(),
+  fetchResumeVariants: vi.fn(),
   closeApplication: vi.fn(),
   closeQueueOutcome: vi.fn(),
   completeQueueAction: vi.fn(),
@@ -67,6 +71,8 @@ vi.mock("@/lib/emails", async () => {
     closeApplication,
     closeQueueOutcome,
     completeQueueAction,
+    fetchApplyGateHistory,
+    fetchResumeVariants,
     fetchFollowupSuggestions,
     fetchRankedActionQueue,
     fetchStoredEmails,
@@ -329,6 +335,8 @@ beforeEach(() => {
   });
 
   fetchRankedActionQueue.mockResolvedValue(buildQueueResponse());
+  fetchApplyGateHistory.mockResolvedValue({ success: true, history: [] });
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [] });
 
   // The week card (folded in from Weekly Summary) loads on this page too.
   fetchWeeklyHighlights.mockResolvedValue({
@@ -875,5 +883,68 @@ describe("Next Actions", () => {
     await waitFor(() => {
       expect(generateSuggestionDraft).toHaveBeenCalledWith(expect.objectContaining({ threadId: "wf-thread", actionType: "thank_you" }), expect.anything());
     });
+  });
+});
+
+describe("Apply Gate tasks and countdown chips (persona review, 2026-10-15)", () => {
+  const resumeId = "6f1c2d3e-4a5b-4c6d-8e7f-001122334455";
+  function applyGateAction(kind: "tailor" | "apply") {
+    return {
+      id: `apply-gate:${kind}:verdict-9`,
+      logicalKey: kind === "tailor" ? "0123456789abcdef" : "abcdef0123456789",
+      dedupeKey: kind === "tailor" ? "fedcba9876543210" : "9876543210fedcba",
+      primaryEntityId: "job:harborview:clinical operations coordinator",
+      evidenceVersion: "v1",
+      actionType: kind === "tailor" ? "tailor_resume" : "apply",
+      actionCategory: "optimization",
+      title: kind === "tailor" ? "Tailor resume before applying to Clinical Operations Coordinator" : "Apply to Clinical Operations Coordinator at Harborview",
+      whyNow: "Missing: Epic",
+      targetOutcome: "Raise fit before applying",
+      effortMinutes: 15,
+      urgencyLevel: "medium",
+      confidenceLevel: "moderate",
+      source: "apply_gate",
+      status: "open",
+      effectiveStatus: "open",
+      createdAt: "2026-04-10T12:00:00.000Z",
+      evidence: ["Missing: Epic"],
+      threadId: "job:harborview:clinical operations coordinator",
+      applicationId: "verdict-9",
+      suggestionSource: "apply_gate_action_plan",
+      queueSource: kind === "tailor" ? "resume" : "apply_gate",
+      intent: kind === "tailor" ? "TAILOR_RESUME" : "APPLY_TO_ROLE",
+      intentLabel: kind === "tailor" ? "Tailor resume" : "Apply",
+      playbook: [],
+      sourceLabel: "Apply Gate",
+      draftEligible: false,
+      routeHref: "/apply-gate",
+      routeLabel: "Review in Apply Gate",
+      stageLabel: "Apply Gate",
+    };
+  }
+
+  test("the tailor task opens the checked posting with the resume it used, and Apply follows the Fix first verdict", async () => {
+    fetchRankedActionQueue.mockResolvedValue(buildQueueResponse({ doToday: [applyGateAction("tailor"), applyGateAction("apply")], thisWeek: [] }));
+    fetchApplyGateHistory.mockResolvedValue({ success: true, history: [{
+      id: "verdict-9", job_title: "Clinical Operations Coordinator", company_name: "Harborview", job_url: null,
+      verdict: "risky", score: 40, reasons: "", fix_suggestion: null, user_action: null, created_at: "2026-04-10T12:00:00",
+      resume_variant_id: resumeId, explanation_payload: { decision: "fix_first" },
+    }] });
+    fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: resumeId, name: "RN to Ops", isDefault: false, createdAt: "2026-04-01", charCount: 2000 }] });
+    renderPage();
+
+    await waitFor(() => expect(screen.getByRole("link", { name: "Tailor in Apply Gate" })).toHaveAttribute("href", `/apply-gate?verdict=verdict-9&resume=${resumeId}&action=0123456789abcdef&version=fedcba9876543210`));
+    expect(await screen.findByText("Recheck Clinical Operations Coordinator at Harborview before you apply")).toBeInTheDocument();
+    expect(screen.queryByText("Apply to Clinical Operations Coordinator at Harborview")).toBeNull();
+  });
+
+  test("the coming-up countdown chip is green on white, not on a translucent tint (4.47:1)", async () => {
+    renderPage();
+    const chips = await screen.findAllByTestId("followup-window-countdown");
+    expect(chips.length).toBeGreaterThan(0);
+    for (const chip of chips) {
+      expect(chip.className).toContain("bg-card");
+      expect(chip.className).not.toContain("bg-accent/10");
+    }
   });
 });

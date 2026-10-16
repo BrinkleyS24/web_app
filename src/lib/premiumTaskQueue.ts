@@ -47,6 +47,8 @@ export type QueueItem = {
   stageLabel?: string | null;
   routeHref?: string | null;
   routeLabel?: string | null;
+  /** Button words set on the web when the item is aligned with its latest Apply Gate check. */
+  ctaLabel?: string | null;
   blockerTitles?: string[];
   blockingReason?: string | null;
   // Display-only cleaned snippet of the latest inbound message, shown in the

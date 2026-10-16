@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen, cleanup } from '@testing-library/react';
+import { act, fireEvent, render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, test, expect, vi } from 'vitest';
 import App, { SIGNED_OUT_GRACE_MS } from './App.jsx';
@@ -77,4 +77,19 @@ test('a signed-in free user on a Premium page still goes to Upgrade', () => {
   authState.current = { ...base, user: { uid: 'u1' }, plan: 'free', bridgeDone: true };
   renderAt('/dashboard');
   expect(screen.getByText('Upgrade page')).toBeInTheDocument();
+});
+
+test('someone who already uses the extension can sign in on the signed-out page (2026-10-15)', async () => {
+  vi.resetModules();
+  vi.doMock('./lib/firebase.js', () => ({ firebaseConfigured: true, signInWithGoogle: vi.fn(() => Promise.reject(new Error('popup closed'))), auth: null }));
+  const { default: SignedOutWorkspace } = await import('./components/landing/SignedOutWorkspace.jsx');
+  const firebase = await import('./lib/firebase.js');
+  vi.useRealTimers();
+  render(<MemoryRouter><SignedOutWorkspace /></MemoryRouter>);
+  const panel = screen.getByTestId('signed-out-web-sign-in');
+  expect(panel).toHaveTextContent('Already use the extension?');
+  fireEvent.click(screen.getByRole('button', { name: 'Sign in with Google' }));
+  expect(firebase.signInWithGoogle).toHaveBeenCalledTimes(1);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Sign-in did not finish');
+  vi.doUnmock('./lib/firebase.js');
 });

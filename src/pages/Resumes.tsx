@@ -431,8 +431,9 @@ const Resumes = () => {
     <DashboardLayout>
       {/* break-words, not overflow-wrap:anywhere (2026-10-14): "anywhere" lowers every flex child's
           minimum width to one character, so at 768px the resume title rendered one letter per line
-          and table headers split mid-word ("SE NT", "OUTCOM E"). */}
-      <div className="max-w-4xl min-w-0 space-y-6 break-words">
+          and table headers split mid-word ("SE NT", "OUTCOM E"). No max-w-4xl of its own
+          (2026-10-15): the page uses the shared app width like every other page (was 896 vs 1056 px). */}
+      <div className="min-w-0 space-y-6 break-words" data-testid="resumes-page">
         <PageHeader
           eyebrow="Your resume library"
           title="Resumes"
