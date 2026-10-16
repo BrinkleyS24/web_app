@@ -2430,13 +2430,23 @@ const ApplyGateWorkspace = () => {
                             {currentLedgerRows.map(({ item, sentence }) => (
                               <div key={item.id || `${item.type}-${item.label}`} className="space-y-1">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <span className={`rounded border px-2 py-0.5 text-[11px] font-medium ${requirementStatusClass(item.candidate_status)}`}>
-                                    {requirementStatusLabel(item.candidate_status)}
+                                  <span className={`rounded border px-2 py-0.5 text-[11px] font-medium ${requirementStatusClass(item.evidence_state === "not_established" ? "unclear" : item.candidate_status)}`}>
+                                    {item.evidence_state === "explicitly_absent" ? "Not met"
+                                      : requirementStatusLabel(item.evidence_state === "not_established" ? "unclear" : item.candidate_status)}
                                   </span>
                                   <span className="min-w-0 text-xs font-medium text-foreground">{item.label}</span>
                                 </div>
                                 {sentence ? (
                                   <p className="text-xs leading-relaxed text-muted-foreground">{sentence}</p>
+                                ) : null}
+                                {item.candidate_source?.quote ? (
+                                  <p className="text-xs leading-relaxed text-muted-foreground">
+                                    Your resume: “{item.candidate_source.quote}”
+                                  </p>
+                                ) : item.evidence_state === "not_established" ? (
+                                  <p className="text-xs leading-relaxed text-muted-foreground">
+                                    Your resume does not establish this. Confirm it before adding it.
+                                  </p>
                                 ) : null}
                               </div>
                             ))}
