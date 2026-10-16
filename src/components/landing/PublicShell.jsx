@@ -34,7 +34,7 @@ export function PublicHeader() {
       <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between px-4 sm:px-6 md:px-8">
         <Link to="/" className="flex min-h-[44px] items-center gap-2.5" data-testid="logo-link" aria-label="Applendium home">
           <BrandMark />
-          <span className="landingDisplay text-lg font-bold tracking-[-0.02em] text-[#0B1220]">applendium™</span>
+          <span className="landingDisplay text-lg font-bold tracking-[-0.02em] text-[#0B1220]">Applendium™</span>
         </Link>
 
         <nav className="hidden items-center gap-7 md:flex" aria-label="Primary">

@@ -7,11 +7,11 @@ import { InterviewDebriefCards } from "./InterviewDebriefCards";
 import { INTERVIEW_DEBRIEF_ANSWERS } from "@/lib/emails";
 import { ApiRequestError } from "@/lib/api.js";
 
-const { recordInterviewDebrief } = vi.hoisted(() => ({ recordInterviewDebrief: vi.fn() }));
+const { recordInterviewDebrief, recordInterviewStillLive } = vi.hoisted(() => ({ recordInterviewDebrief: vi.fn(), recordInterviewStillLive: vi.fn() }));
 
 vi.mock("@/lib/emails", async () => {
   const actual = await vi.importActual<typeof import("@/lib/emails")>("@/lib/emails");
-  return { ...actual, recordInterviewDebrief };
+  return { ...actual, recordInterviewDebrief, recordInterviewStillLive };
 });
 
 const items = [
@@ -48,6 +48,7 @@ function renderCards(total = items.length) {
 
 beforeEach(() => {
   recordInterviewDebrief.mockResolvedValue({ success: true });
+  recordInterviewStillLive.mockResolvedValue({ success: true, recorded: true, answer: "still_live", closed: false, snoozedUntil: "2026-10-29T00:00:00Z", askAgainAfterDays: 14 });
 });
 
 afterEach(() => {
@@ -90,7 +91,7 @@ describe("InterviewDebriefCards", () => {
     expect(screen.getByTestId("debrief-progress")).toHaveTextContent("4 more");
 
     await user.click(screen.getByRole("button", { name: "Still live" }));
-    expect(await screen.findByRole("status")).toHaveTextContent("Noted. Verisk stays open.");
+    expect(await screen.findByRole("status")).toHaveTextContent("Noted. Verisk stays open. I'll ask again in 14 days.");
     expect(screen.getByTestId("debrief-progress")).toHaveTextContent("3 more");
   });
 
@@ -108,16 +109,35 @@ describe("InterviewDebriefCards", () => {
     }));
   });
 
-  test("a process the user says is still alive writes nothing at all", async () => {
+  test("Still live is saved as a snooze so it sticks, never as an ending (2026-10-15)", async () => {
     const user = userEvent.setup();
     renderCards();
 
     await user.click(screen.getByRole("button", { name: "Still live" }));
 
-    // A live process is a censored observation, not an ending. Recording one would put a
-    // fictional outcome into the funnel this feature exists to stop guessing about.
+    // A live process is a censored observation, not an ending: it goes to the snooze endpoint,
+    // never through the close path. It used to save nothing, so the question looped on reload.
     expect(await screen.findByText("Onebrief · QA Engineer")).toBeInTheDocument();
+    expect(recordInterviewStillLive).toHaveBeenCalledWith({ emailId: 101 });
     expect(recordInterviewDebrief).not.toHaveBeenCalled();
+  });
+
+  test("an older backend without the snooze route keeps the card and never closes instead", async () => {
+    recordInterviewStillLive.mockRejectedValue(new ApiRequestError("Not found", { status: 404, payload: {} }));
+    const user = userEvent.setup();
+    renderCards();
+    await user.click(screen.getByRole("button", { name: "Still live" }));
+    expect(await screen.findByText("Couldn't save, try again.")).toBeInTheDocument();
+    expect(screen.getByText("Verisk · Software Engineer in Test")).toBeInTheDocument();
+    expect(recordInterviewDebrief).not.toHaveBeenCalled();
+  });
+
+  test("a snooze response that claims a close is not accepted", async () => {
+    recordInterviewStillLive.mockResolvedValue({ success: true, closed: true });
+    const user = userEvent.setup();
+    renderCards();
+    await user.click(screen.getByRole("button", { name: "Still live" }));
+    expect(await screen.findByText("Couldn't save, try again.")).toBeInTheDocument();
   });
 
   test("a failed save keeps the card instead of pretending it landed", async () => {

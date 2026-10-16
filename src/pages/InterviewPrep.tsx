@@ -1,26 +1,29 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { EmptyState, ErrorState, LoadingRows, PageHeader, Panel } from "@/components/premium/PremiumUI";
 import { BUTTON } from "@/components/premium/tone";
 import { useAuth } from "@/lib/AuthContext.jsx";
-import { fetchRankedActionQueue, fetchResumeVariants, fetchStoredEmails } from "@/lib/emails";
+import { fetchApplyGateHistory, fetchRankedActionQueue, fetchResumeVariants, fetchStoredEmails, type ApplyGateHistoryItem, type ResumeVariant } from "@/lib/emails";
+import { ActionWorkspaceBanner } from "@/components/premium/ActionWorkspaceBanner";
 import { actionToolHref, readActionContext, type ActionContext } from "@/lib/actionWorkspace";
 import { deriveLiveInterviews, LIVE_INTERVIEW_WINDOW_DAYS, type LiveInterview } from "@/lib/liveInterviews";
 import { buildQueueItemsFromRankedQueue } from "@/lib/premiumTaskQueue";
-import { buildInterviewPractice, fetchInterviewSource, invitationScheduleLabel, splitFocusAreas, type PracticePack } from "@/lib/interviewPrep";
+import { buildInterviewPractice, fetchInterviewSource, interviewHasPassed, invitationPracticeInput, invitationScheduleLabel, pickFocusAreas, splitFocusAreas, type InterviewSource, type PracticePack } from "@/lib/interviewPrep";
 import { useDraftSession } from "@/hooks/useDraftSession";
 import { friendlyErrorMessage } from "@/lib/apiErrors";
 
-type PrepSession = { variantId:string; posting:string; focus:string; pack?:PracticePack; builtInput?:string; notes:Record<string,string> };
+type PrepSession = { variantId:string; posting:string; focus:string; pack?:PracticePack; builtInput?:string; builtFrom?:"invitation"|"posting"; notes:Record<string,string> };
 const empty:PrepSession = {variantId:"",posting:"",focus:"",notes:{}};
 const field="w-full min-w-0 rounded-xl border border-border bg-background p-3 text-sm text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary";
 const noteFields = ["Situation", "My responsibility", "What I did", "Result and what I learned"];
 
 export default function InterviewPrep() {
   const {user}=useAuth(); const location=useLocation(); const context=readActionContext(location.search);
-  return <DashboardLayout><PageHeader eyebrow="Practice with your evidence" title="Interview preparation" description="Prepare truthful examples for this role, with the invitation and the resume you choose in view." />
+  // The task card follows the page heading (designer review, 2026-10-15: it rendered above the H1).
+  return <DashboardLayout actionBannerInPage><PageHeader eyebrow="Practice with your evidence" title="Interview preparation" description="Prepare truthful examples for this role, with the invitation and the resume you choose in view." />
+    <ActionWorkspaceBanner />
     {context && user ? <PrepWorkspace key={`${user.uid}:${context.logicalKey}:${context.dedupeKey}`} context={context} owner={user.uid} />
       : user ? <LiveInterviewList owner={user.uid} /> : null}
   </DashboardLayout>;
@@ -71,6 +74,30 @@ function LiveInterviewRow({item,queueLoading}:{item:LiveInterview;queueLoading:b
   </li>;
 }
 
+/**
+ * The resume prep starts with (2026-10-15: prep used to require a choice before anything happened).
+ * The version this role was last checked with in Apply Gate, else the default. Always changeable.
+ */
+export function suggestPrepResume(variants: ResumeVariant[] | undefined, history: ApplyGateHistoryItem[] | undefined, source: Pick<InterviewSource,"company"|"role"> | undefined): { id: string; why: string } | null {
+  if (!variants?.length) return null;
+  const known = new Set(variants.map(v => v.id));
+  const same = (a?: string | null, b?: string | null) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+  const checked = source?.company ? (history || [])
+    .filter(item => same(item.company_name, source.company) && (!source.role || same(item.job_title, source.role)) && item.resume_variant_id && known.has(item.resume_variant_id))
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0] : undefined;
+  if (checked?.resume_variant_id) return { id: checked.resume_variant_id, why: "the resume you checked this role with in Apply Gate" };
+  const fallback = variants.find(v => v.isDefault);
+  return fallback ? { id: fallback.id, why: "your default resume" } : null;
+}
+
+/** The posting and quotes a build uses: what was typed, else the invitation's own words. */
+function effectiveInputs(session: Pick<PrepSession,"posting"|"focus">, invitation: ReturnType<typeof invitationPracticeInput>) {
+  const typedPosting = session.posting.trim();
+  const typedFocus = splitFocusAreas(session.focus);
+  if (!typedPosting) return { from: "invitation" as const, posting: invitation?.posting || "", focusAreas: typedFocus.length ? typedFocus : invitation?.focusAreas || [] };
+  return { from: "posting" as const, posting: session.posting, focusAreas: typedFocus.length ? typedFocus : pickFocusAreas(session.posting) };
+}
+
 function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
   const sessionKey=`${context.logicalKey}:${context.dedupeKey}`;
   const [sessions,updateSessions]=useDraftSession<PrepSession>("interview-prep");
@@ -87,8 +114,22 @@ function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
   const resumes=useQuery({queryKey:["interview-prep","resumes",owner],queryFn:async()=>{
     const response=await fetchResumeVariants();if(!response.success||!Array.isArray(response.variants))throw new Error("Your resumes could not be loaded.");return response.variants;
   },retry:false});
-  const focuses=splitFocusAreas(session.focus);
-  const inputValid=Boolean(session.variantId && resumes.data?.some(r=>r.id===session.variantId) && session.posting.trim().length>=100 && focuses.length>=1 && focuses.length<=5 && focuses.every(f=>f.length>=10&&f.length<=600));
+  const history=useQuery({queryKey:["apply-gate-history"],queryFn:fetchApplyGateHistory,retry:false,staleTime:30_000});
+  const suggested=useMemo(()=>suggestPrepResume(resumes.data,history.data?.history,source.data),[resumes.data,history.data,source.data]);
+  // Preselect once; the user can change it, and a choice already made is never replaced.
+  useEffect(()=>{if(!sessionRef.current.variantId&&suggested)update({variantId:suggested.id});},[suggested?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const invitation=useMemo(()=>invitationPracticeInput(source.data),[source.data]);
+  const effective=effectiveInputs(session,invitation);
+  const focuses=effective.focusAreas;
+  const inputValid=Boolean(session.variantId && resumes.data?.some(r=>r.id===session.variantId) && effective.posting.trim().length>=100 && focuses.length>=1 && focuses.length<=5 && focuses.every(f=>f.length>=10&&f.length<=600));
+  const passed=interviewHasPassed(source.data?.schedule??null);
+  const [checkNote,setCheckNote]=useState("");
+  async function checkForChanges(){
+    const before=source.data?.sourceVersion;setCheckNote("");
+    const result=await source.refetch();
+    if(!mounted.current||result.isError||!result.data)return;
+    setCheckNote(result.data.sourceVersion===before?"No changes since you opened this.":"The invitation changed. Review it above.");
+  }
   const hasNotes=Object.values(session.notes).some(note=>note.trim());
   const packStale=Boolean(session.pack && (session.pack.sourceVersion!==source.data?.sourceVersion || session.pack.resume.id!==session.variantId));
   // Store the inputs that actually generated a pack; typing later never silently changes its meaning.
@@ -100,10 +141,11 @@ function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
     if(guard.current||!inputValid||!sourceAvailable||(session.pack&&hasNotes&&!resetAllowed))return;
     guard.current=true;setPending(true);setError("");setCopied("");
     const snapshot=sessionRef.current;const signature=JSON.stringify([snapshot.variantId,snapshot.posting,snapshot.focus]);
+    const inputs=effectiveInputs(snapshot,invitation);
     try {
-      const pack=await buildInterviewPractice({...context,sourceVersion:source.data!.sourceVersion,variantId:snapshot.variantId,jobDescription:snapshot.posting,focusAreas:splitFocusAreas(snapshot.focus)});
+      const pack=await buildInterviewPractice({...context,sourceVersion:source.data!.sourceVersion,variantId:snapshot.variantId,jobDescription:inputs.posting,focusAreas:inputs.focusAreas});
       if(!mounted.current||JSON.stringify([sessionRef.current.variantId,sessionRef.current.posting,sessionRef.current.focus])!==signature)return;
-      update({pack,builtInput:signature,notes:{}});setResetAllowed(false);setFocusNewPack(true);
+      update({pack,builtInput:signature,builtFrom:inputs.from,notes:{}});setResetAllowed(false);setFocusNewPack(true);
     }catch(err){if(mounted.current)setError(friendlyErrorMessage(err,"Practice could not be built. Your inputs remain here."));}
     finally{guard.current=false;if(mounted.current)setPending(false);}
   }
@@ -115,26 +157,41 @@ function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
     catch{if(mounted.current)setCopied("Copy failed. Your notes are still here; select and copy them manually.");}
   }
   return <div className="mt-5 min-w-0 space-y-5 [overflow-wrap:anywhere]">
-    <Panel title="1. Confirm the invitation">
+    <Panel title={passed?"1. Your interview":"1. Confirm the invitation"}>
       {source.isPending?<p role="status">Loading your interview source…</p>:source.isError?<><p role="alert">{friendlyErrorMessage(source.error,"Your interview source could not be loaded.")}</p><button className={BUTTON.secondary} onClick={()=>void source.refetch()}>Reload interview source</button></>:source.data?<>
         <p className="font-semibold">{[source.data.company,source.data.role].filter(Boolean).join(" · ")||"Interview conversation"}</p>
         <p className="mt-2 text-sm">{invitationScheduleLabel(source.data.schedule)}</p>
-        <p className="mt-2 text-sm text-muted-foreground">Confirm the time, timezone, interview format and contact in the original invitation. These may change.</p>
+        {/* A past interview is not "confirmed" (2026-10-15); prep then serves the next conversation. */}
+        {passed
+          ?<p className="mt-2 text-sm text-muted-foreground">This interview has already happened. Prepare for a next round or a follow-up conversation, and check Gmail for anything newer from them.</p>
+          :<p className="mt-2 text-sm text-muted-foreground">Confirm the time, timezone, interview format and contact in the original invitation. These may change.</p>}
         <a href={`https://mail.google.com/mail/u/0/#all/${encodeURIComponent(source.data.threadId)}`} target="_blank" rel="noreferrer" className={`${BUTTON.secondary} mt-3`}>Read invitation in Gmail</a>
         <details className="mt-3"><summary className="cursor-pointer text-sm font-medium">Invitation evidence</summary>{source.data.excerpts.map(email=><div key={email.id} className="mt-3 border-t border-border pt-3 text-sm"><p className="font-medium">{email.subject}</p><p className="text-muted-foreground">Invitation sender: {email.sender}</p><p className="mt-2 whitespace-pre-wrap">{email.text||"No readable message text; check Gmail."}</p></div>)}</details>
-        <button className={`${BUTTON.secondary} mt-3`} disabled={source.isFetching||pending} onClick={()=>void source.refetch()}>Check for invitation changes</button>
+        <button className={`${BUTTON.secondary} mt-3`} disabled={source.isFetching||pending} onClick={()=>void checkForChanges()}>Check for invitation changes</button>
+        {checkNote?<p role="status" className="mt-2 text-sm">{checkNote}</p>:null}
       </>:null}
     </Panel>
-    <Panel title="2. Choose what to practice" description="Use the resume you intend to discuss and the actual posting for this interview.">
+    {/* One tap on a phone (mobile + teacher review, 2026-10-15): the resume is preselected and, with
+        no posting pasted, practice comes from the invitation's own words. The posting is optional. */}
+    <Panel title="2. Build your practice" description="Starts from the invitation and your resume. Add the posting if you want practice on its duties.">
       <div className="space-y-4">
         {resumes.isError?<><p role="alert">Your resumes could not be loaded. Your other inputs remain here.</p><button className={BUTTON.secondary} onClick={()=>void resumes.refetch()}>Reload resumes</button></>:null}
-        <div><label htmlFor="prep-resume" className="block text-sm font-medium">Resume for this interview</label><select id="prep-resume" className={`${field} mt-1`} disabled={pending||resumes.isPending} value={session.variantId} onChange={e=>{update({variantId:e.target.value});setResetAllowed(false);}}><option value="">Choose a resume — no automatic selection</option>{resumes.data?.map(resume=><option key={resume.id} value={resume.id}>{resume.name}</option>)}</select>
+        <div><label htmlFor="prep-resume" className="block text-sm font-medium">Resume for this interview</label><select id="prep-resume" className={`${field} mt-1`} disabled={pending||resumes.isPending} value={session.variantId} onChange={e=>{update({variantId:e.target.value});setResetAllowed(false);}}><option value="">Choose a resume</option>{resumes.data?.map(resume=><option key={resume.id} value={resume.id}>{resume.name}</option>)}</select>
+          {suggested&&session.variantId===suggested.id?<p className="mt-1 text-xs text-muted-foreground" data-testid="prep-resume-why">Picked: {suggested.why}. Change it if you will discuss another version.</p>:null}
           {resumes.data?.length===0?<p className="mt-2 text-sm">Add a readable resume before building your practice.</p>:null}<Link to="/resumes" className="mt-2 inline-block text-sm font-medium underline">Manage resumes</Link></div>
-        <div><label htmlFor="prep-posting" className="block text-sm font-medium">Posting for this role</label><textarea id="prep-posting" className={`${field} mt-1 min-h-[160px]`} maxLength={25000} disabled={pending} value={session.posting} onChange={e=>{update({posting:e.target.value});setResetAllowed(false);}}/><p className="mt-1 text-xs text-muted-foreground">Paste the posting text, at least 100 characters. Confirm it is the role above; we have not linked a saved posting automatically.</p></div>
-        <div><label htmlFor="prep-focus" className="block text-sm font-medium">Responsibilities or requirements to practice</label><textarea id="prep-focus" className={`${field} mt-1 min-h-[100px]`} maxLength={3004} disabled={pending} value={session.focus} onChange={e=>{update({focus:e.target.value});setResetAllowed(false);}}/><p className="mt-1 text-xs text-muted-foreground">Copy 1–5 exact quotes from this posting, one per line (10–600 characters each). Choose duties or qualifications, excluding headings and benefits.</p></div>
+        <p className="text-sm" data-testid="prep-basis">{effective.from==="invitation"
+          ?(invitation?`Practice comes from the invitation's own words, starting with “${invitation.focusAreas[0]}”`:"The invitation is too short to practice from. Add the posting below.")
+          :"Practice comes from the posting you added."}</p>
         {session.pack&&hasNotes?<label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={resetAllowed} disabled={pending} onChange={e=>setResetAllowed(e.target.checked)}/>I understand rebuilding replaces this practice and clears its rehearsal notes.</label>:null}
         <button className={BUTTON.primary} disabled={pending||!inputValid||!sourceAvailable||Boolean(session.pack&&hasNotes&&!resetAllowed)} onClick={()=>void generate()}>{pending?"Building practice…":session.pack?"Rebuild practice":"Build my practice"}</button>
         {error?<p role="alert" className="text-sm text-destructive">{error}</p>:null}
+        <details className="rounded-xl border border-border p-3" open={Boolean(session.posting||session.focus)||(!invitation&&Boolean(source.data))}>
+          <summary className="cursor-pointer text-sm font-medium">Add the posting (optional)</summary>
+          <div className="mt-3 space-y-4">
+            <div><label htmlFor="prep-posting" className="block text-sm font-medium">Posting for this role</label><textarea id="prep-posting" className={`${field} mt-1 min-h-[160px]`} maxLength={25000} disabled={pending} value={session.posting} onChange={e=>{update({posting:e.target.value});setResetAllowed(false);}}/><p className="mt-1 text-xs text-muted-foreground">Paste the posting text, at least 100 characters. Confirm it is the role above.</p></div>
+            <div><label htmlFor="prep-focus" className="block text-sm font-medium">Responsibilities or requirements to practice</label><textarea id="prep-focus" className={`${field} mt-1 min-h-[100px]`} maxLength={3004} disabled={pending} value={session.focus} onChange={e=>{update({focus:e.target.value});setResetAllowed(false);}}/><p className="mt-1 text-xs text-muted-foreground">Optional. Copy 1–5 exact lines from the posting, one per line. Leave it empty and we pick up to 3 duties from it.</p></div>
+          </div>
+        </details>
         <p className="text-xs text-muted-foreground">Inputs and rehearsal notes stay in memory in this tab for up to 30 minutes after leaving this page. Reloading or signing out clears them.</p>
       </div>
     </Panel>
@@ -142,7 +199,7 @@ function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
       {packStale||inputsChanged?<p role="alert" className="mb-3 text-sm text-warning">This practice uses an earlier invitation or earlier inputs. Review the source and rebuild before using it.</p>:null}
       <p className="mb-4 text-sm text-muted-foreground">{session.pack.disclosure}</p>
       <div className="space-y-5">{session.pack.practice.map(item=><section key={item.id} className="min-w-0 rounded-xl border border-border p-4">
-        <p className="text-xs font-medium uppercase text-muted-foreground">From your posting</p><blockquote className="mt-1 text-sm font-semibold">{item.quote}</blockquote>
+        <p className="text-xs font-medium uppercase text-muted-foreground">{session.builtFrom==="invitation"?"From the invitation":"From your posting"}</p><blockquote className="mt-1 text-sm font-semibold">{item.quote}</blockquote>
         <p className="mt-3 font-medium">{item.question}</p><p className="mt-2 text-sm text-muted-foreground">{item.guidance}</p>
         <details className="mt-3"><summary className="cursor-pointer text-sm font-medium">Possible examples from your selected resume</summary>{item.possibleExamples.length?item.possibleExamples.map((text,index)=><blockquote key={index} className="mt-2 whitespace-pre-wrap text-sm">{text}</blockquote>):<p className="mt-2 text-sm">No closely worded example was found. That does not establish a skill gap. Choose a truthful example from your own experience.</p>}</details>
         <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">{(item.kind==="eligibility"?["My current status"]:noteFields).map(label=>{const key=`${item.id}:${item.kind==="eligibility"?"status":label}`;return <div key={key}><label htmlFor={`prep-${key}`} className="block text-sm font-medium">{label}</label><textarea id={`prep-${key}`} className={`${field} mt-1 min-h-[90px]`} maxLength={2000} value={session.notes[key]||""} disabled={pending} onChange={e=>setNote(key,e.target.value)}/></div>;})}</div>

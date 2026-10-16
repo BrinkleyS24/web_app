@@ -865,7 +865,7 @@ function LoggedOutView({ isLoginPending, onLogin }) {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/15">
             <img src="/logo-transparent.png" alt="" className="h-10 w-10" />
           </div>
-          <h1 className="text-2xl font-bold lowercase text-foreground">applendium™</h1>
+          <h1 className="text-2xl font-bold text-foreground">Applendium™</h1>
           <p className="mt-2 text-sm text-muted-foreground">Track your job search from your inbox.</p>
         </div>
 
@@ -1092,7 +1092,7 @@ export default function LandingExtensionDemo() {
                 </button>
               ) : null}
               <img src="/logo-transparent.png" alt="" className="h-5 w-5 shrink-0" />
-              <span className="truncate text-sm font-semibold lowercase text-primary-foreground">applendium™</span>
+              <span className="truncate text-sm font-semibold text-primary-foreground">Applendium™</span>
               <span className="rounded bg-primary-foreground/10 px-1.5 py-0.5 text-[10px] text-primary-foreground/75">
                 Free
               </span>

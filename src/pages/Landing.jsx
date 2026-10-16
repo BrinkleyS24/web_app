@@ -13,6 +13,8 @@ import { premiumUpdatesHref } from "../lib/premiumLaunchContent.js";
 import { CHROME_WEB_STORE_URL, FOUNDING_CHECKOUT_URL } from "../lib/publicSiteConfig.js";
 import { fetchPremiumPrice, formatPremiumPrice } from "../lib/premiumCheckout.js";
 
+const SIGN_IN_HREF = "/dashboard";
+
 const NAV_LINKS = [
   { href: "#demo", label: "Demo" },
   { href: "#how-it-works", label: "How it works" },
@@ -227,7 +229,7 @@ export default function Landing() {
             onClick={closeMobileMenu}
           >
             <BrandMark />
-            <span className="landingDisplay text-lg font-bold tracking-[-0.02em]">applendium™</span>
+            <span className="landingDisplay text-lg font-bold tracking-[-0.02em]">Applendium™</span>
           </a>
 
           <nav className="hidden items-center gap-7 md:flex" aria-label="Primary">
@@ -241,9 +243,13 @@ export default function Landing() {
             >
               Support
             </a>
+            {/* Sign in follows the extension-first story (2026-10-15): /dashboard opens the
+                workspace for a signed-in visitor and otherwise explains install, open, sign in.
+                It used to go to /upgrade, a price list, which contradicted that page. */}
             <Link
-              to="/upgrade?source=landing"
+              to={SIGN_IN_HREF}
               className="text-sm font-semibold text-[#0B1220] transition-colors hover:text-[#0A7A55]"
+              data-testid="nav-sign-in"
             >
               Sign in
             </Link>
@@ -302,7 +308,7 @@ export default function Landing() {
                 Support
               </a>
               <Link
-                to="/upgrade?source=landing"
+                to={SIGN_IN_HREF}
                 className="flex min-h-[44px] items-center text-base font-semibold text-[#0B1220]"
                 onClick={closeMobileMenu}
               >

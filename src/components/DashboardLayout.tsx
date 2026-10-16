@@ -6,7 +6,11 @@ import { ActionWorkspaceBanner } from "@/components/premium/ActionWorkspaceBanne
 /** The one content width every signed-in page uses (designer review, 2026-10-14: there were three). */
 export const APP_CONTENT_WIDTH = "max-w-[1120px]";
 
-export function DashboardLayout({ children }: { children: React.ReactNode }) {
+/**
+ * `actionBannerInPage`: the page places <ActionWorkspaceBanner /> itself, below its heading. Interview
+ * Prep does (designer review, 2026-10-15: the task card sat above the page H1).
+ */
+export function DashboardLayout({ children, actionBannerInPage = false }: { children: React.ReactNode; actionBannerInPage?: boolean }) {
   return (
     <SidebarProvider>
       {/* Keyboard users skip the sidebar and top bar on every page (2026-10-14). */}
@@ -22,7 +26,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             tabIndex={-1}
             className={`flex-1 px-4 py-6 sm:p-6 md:p-8 ${APP_CONTENT_WIDTH} w-full mx-auto animate-fade-in outline-none`}
           >
-            <ActionWorkspaceBanner />
+            {actionBannerInPage ? null : <ActionWorkspaceBanner />}
             {children}
           </div>
         </main>
