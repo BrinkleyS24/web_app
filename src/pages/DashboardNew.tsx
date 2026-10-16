@@ -489,14 +489,14 @@ function StageBar({
         <div className="rounded-lg bg-muted/50 px-3 py-2">
           <dt className="text-[12px] text-muted-foreground">Reached an interview <span className="font-medium text-foreground/80">(ever)</span></dt>
           <dd className="mt-0.5 text-[13px] text-muted-foreground">
-            <span className="text-[18px] font-semibold tabular-nums text-foreground">{reachedInterview}</span>
+            <span className="text-[20px] font-semibold tabular-nums text-foreground">{reachedInterview}</span>
             {ratePct ? ` · ${ratePct} of applications` : ""}
           </dd>
         </div>
         <div className="rounded-lg bg-muted/50 px-3 py-2">
           <dt className="text-[12px] text-muted-foreground">In interviews <span className="font-medium text-foreground/80">(now)</span></dt>
           <dd className="mt-0.5 text-[13px] text-muted-foreground">
-            <span className="text-[18px] font-semibold tabular-nums text-foreground">{inInterviewsNow}</span>
+            <span className="text-[20px] font-semibold tabular-nums text-foreground">{inInterviewsNow}</span>
             {hasQuietBreakdown ? ` · ${count("interviewing")} still interviewing, ${count("interviewQuiet")} no word in 30+ days` : " · no decision recorded yet"}
           </dd>
         </div>
