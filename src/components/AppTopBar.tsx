@@ -27,12 +27,18 @@ export function AppTopBar() {
       <SidebarTrigger className="size-10 sm:size-8" />
       {premium ? (
         <div className="ml-auto flex items-center gap-2">
-          <span className="hidden text-[12px] text-muted-foreground sm:inline" aria-live="polite">
-            {inbox.isSyncing ? "Checking your inbox…" : inbox.lastCheckedLabel ? `Inbox checked ${inbox.lastCheckedLabel}` : null}
+          {/* Every sync ends in words: what changed, still running in the background, failed, or
+              reconnect (2026-10-15). Problems show at every width; the routine line from sm up. */}
+          <span
+            className={cn("text-[12px]", inbox.statusTone === "risk" ? "font-medium text-destructive" : "hidden text-muted-foreground sm:inline")}
+            aria-live="polite"
+            data-testid="sync-status-line"
+          >
+            {inbox.statusLine}
           </span>
           <button type="button" onClick={inbox.syncNow} disabled={inbox.isSyncing} className={BUTTON.ghost}>
             <RefreshCw className={cn("h-3.5 w-3.5", inbox.isSyncing && "animate-spin")} aria-hidden />
-            Sync now
+            {inbox.phase.kind === "failed" ? "Try again" : "Sync now"}
           </button>
           {location.pathname !== "/apply-gate" ? (
             <Link to="/apply-gate" className={cn(BUTTON.primary, "px-3 py-1.5")}>
