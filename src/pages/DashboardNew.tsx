@@ -50,7 +50,7 @@ import {
   type WeeklyHighlightEmail,
   type WeeklyHighlightsResponse,
 } from "@/lib/emails";
-import { isPlaceholderAlert } from "@/lib/strategyAlertVisibility";
+import { findDebriefAlert, isDebriefAlert, isPlaceholderAlert } from "@/lib/strategyAlertVisibility";
 import {
   buildDashboardMoveQueue,
   buildGmailThreadUrl,
@@ -146,8 +146,12 @@ const Dashboard = () => {
     () => moveQueue.filter((item) => item.id !== heroMove?.id).slice(0, 3),
     [heroMove?.id, moveQueue],
   );
+  // The debrief is answered on this page. When "Coming up" holds the hero, it gets its own panel;
+  // it used to fall into "Other patterns" as a link to a Strategy Alerts anchor that page hides,
+  // a loop with no exit (2026-10-16 persona review).
+  const sideDebrief = useMemo(() => (answer.debriefItems.length > 0 ? null : findDebriefAlert(alerts)), [alerts, answer.debriefItems.length]);
   const patterns = useMemo(
-    () => alerts.filter((alert) => alert.id !== answer.alertId && !isPlaceholderAlert(alert)).slice(0, 2),
+    () => alerts.filter((alert) => alert.id !== answer.alertId && !isPlaceholderAlert(alert) && !isDebriefAlert(alert)).slice(0, 2),
     [alerts, answer.alertId],
   );
 
@@ -238,6 +242,19 @@ const Dashboard = () => {
               onRetry={() => void historyQuery.refetch()}
               history={historyQuery.data?.history || []}
             />
+            {sideDebrief ? (
+              <section id="interview-debrief" aria-labelledby="interview-debrief-title" className={cn(CARD, "space-y-3 p-5")}>
+                <div>
+                  <p className={EYEBROW}>Needs your input</p>
+                  <h2 id="interview-debrief-title" className="mt-1 text-[15px] font-semibold leading-snug text-foreground">{sideDebrief.title}</h2>
+                  {sideDebrief.description ? <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{sideDebrief.description}</p> : null}
+                </div>
+                <InterviewDebriefCards
+                  items={(sideDebrief.debrief?.items || []).filter((item) => item?.emailId != null)}
+                  total={Math.max(sideDebrief.debrief?.total ?? 0, (sideDebrief.debrief?.items || []).length)}
+                />
+              </section>
+            ) : null}
             {patterns.length ? <PatternsPanel alerts={patterns} /> : null}
           </div>
         </div>

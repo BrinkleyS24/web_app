@@ -599,6 +599,38 @@ describe("DashboardNew", () => {
     expect(visibleWords.length).toBeLessThanOrEqual(55);
   });
 
+  test("when Coming up holds the hero, the debrief gets its own panel, not a dead link (2026-10-16)", async () => {
+    fetchStrategyAlerts.mockResolvedValue({
+      success: true,
+      alerts: [
+        {
+          id: "commitment-interview-maple", kind: "performance", severity: "high",
+          title: "3 things on your plate right now", description: "Maple Testing sent an assessment.",
+          recommendation: null, supporting_stat: null, timeframe_label: "Today",
+        },
+        {
+          id: "performance-interview-debrief", kind: "performance", severity: "medium",
+          title: "You have reached 9 interviews. I know the decision on only 4.",
+          description: "Tell me how the others ended.", recommendation: null, supporting_stat: "4 of 9 endings visible",
+          timeframe_label: "Across your whole tracked search",
+          debrief: {
+            kind: "interview_outcome", total: 5,
+            items: [{ key: "acme||sdet", emailId: 17101, label: "Acme AI · SDET", company: "Acme AI", position: "SDET",
+              interviewedAt: "2026-04-14T00:00:00.000Z", daysSilent: 180, silentLabel: "6 months ago" }],
+          },
+        },
+      ],
+    });
+
+    const { container } = renderDashboard();
+
+    expect(await screen.findByRole("heading", { name: "3 things on your plate right now" })).toBeInTheDocument();
+    const panel = await screen.findByRole("region", { name: /You have reached 9 interviews/ });
+    expect(panel).toHaveAttribute("id", "interview-debrief");
+    expect(screen.getByRole("button", { name: "Never heard back" })).toBeInTheDocument();
+    expect(container.querySelector('a[href*="performance-interview-debrief"]')).toBeNull();
+  });
+
   // Under HTTP 429 the panels said "Nothing tracked yet" and "No roles checked yet" (engineer
   // persona, 2026-10-14). A failed request shows an error with Retry, never a fake empty state.
   test("a failed request shows an error with Retry, never an empty state", async () => {
