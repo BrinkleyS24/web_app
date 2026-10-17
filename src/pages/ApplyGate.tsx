@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { readResumeChoice, resumeToolHref, RESUME_ID } from "@/lib/resumeWorkspace";
 import { useDraftSession } from "@/hooks/useDraftSession";
 import { readActionContext } from "@/lib/actionWorkspace";
@@ -1207,6 +1207,7 @@ const ApplyGate = () => {
 const ApplyGateWorkspace = () => {
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const actionContext = readActionContext(location.search);
   const choice=readResumeChoice(location.search);
   const formKey=actionContext?`${actionContext.logicalKey}:${actionContext.dedupeKey}`:'standalone';
@@ -1340,6 +1341,16 @@ const ApplyGateWorkspace = () => {
       try {
         const data = await recheckApplyGateVerdict(verdictId);
         setResult(data);
+        // A re-check is a new check of the same posting; history keeps the newest one. Point the
+        // page at it, or the banner says the old check "is no longer in your history" (2026-10-16).
+        const nextId = (data as { id?: string } | null)?.id;
+        if (nextId) {
+          const params = new URLSearchParams(location.search);
+          if (params.get("verdict") === verdictId) {
+            params.set("verdict", String(nextId));
+            navigate({ search: `?${params}` }, { replace: true });
+          }
+        }
         setIsCurrentWarningExpanded(false);
         setActionConfirmation(null);
         await queryClient.invalidateQueries({ queryKey: ["apply-gate-history"] });
@@ -1350,7 +1361,7 @@ const ApplyGateWorkspace = () => {
         setRecheckingId(null);
       }
     },
-    [queryClient],
+    [queryClient, location.search, navigate],
   );
 
   const rawHistory: ApplyGateHistoryItem[] = historyQuery.data?.history ?? [];

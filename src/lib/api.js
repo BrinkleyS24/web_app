@@ -73,6 +73,14 @@ export async function apiFetch(path, options = {}) {
 
   const url = `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
   const headers = new Headers(incomingHeaders || {});
+  // "N days ago" is counted on this person's calendar, not UTC's (2026-10-16: after 8 PM in New
+  // York every count was one day high).
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (zone && !headers.has("X-Time-Zone")) headers.set("X-Time-Zone", zone);
+  } catch {
+    // No Intl time zone: the server counts on UTC.
+  }
 
   const user = auth?.currentUser;
   if (user) {
