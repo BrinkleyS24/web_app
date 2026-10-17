@@ -159,9 +159,9 @@ export function VariantStrategyCard({ strategy, onDraftDecisionsChange, classNam
             {documentNote}
           </p>
         ) : null}
-        {strategy.pendingCredentialNote ? (
+        {strategy.eligibilityNote || strategy.pendingCredentialNote ? (
           <p className="mt-2 rounded-md border border-warning/25 bg-warning/5 px-2.5 py-2 text-xs leading-relaxed text-foreground">
-            {strategy.pendingCredentialNote}
+            {strategy.eligibilityNote || strategy.pendingCredentialNote}
           </p>
         ) : null}
       </div>

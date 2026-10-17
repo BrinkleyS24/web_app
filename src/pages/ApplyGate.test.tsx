@@ -457,6 +457,8 @@ describe("ApplyGate current UI", () => {
               evidence_needed: ["nurse", "aide"],
               candidate_status: "missing",
               candidate_evidence: null,
+              evidence_state: "explicitly_absent",
+              candidate_source: { quote: "I do not have Nurse's Aide experience.", start: 0, end: 37 },
               confidence: "high",
               blocks_application: true,
             },
@@ -536,6 +538,7 @@ describe("ApplyGate current UI", () => {
       expect(screen.getByText(/Must-haves not on your resume/i)).toBeInTheDocument();
       expect(screen.getByText("Requirement check")).toBeInTheDocument();
       expect(screen.getByText("Nurse's Aide experience")).toBeInTheDocument();
+      expect(screen.getByText(/Your resume:.*I do not have Nurse's Aide experience/)).toBeInTheDocument();
       expect(screen.getByText(/Apply anyway only if you already meet these requirements/i)).toBeInTheDocument();
       // The technical readout ("Decision confidence: …") is gone; the coach line says it in words.
       expect(screen.queryByText(/Decision confidence:/i)).not.toBeInTheDocument();

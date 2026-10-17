@@ -1030,6 +1030,9 @@ export type ApplyGateRequirementLedgerItem = {
   evidence_needed: string[];
   candidate_status: "satisfied" | "missing" | "unclear";
   candidate_evidence: string | null;
+  evidence_state?: "explicitly_present" | "explicitly_absent" | "not_established";
+  candidate_source?: { quote: string; start: number; end: number } | null;
+  modality?: string;
   confidence: "high" | "medium" | "low" | string;
   blocks_application: boolean;
 };
@@ -1477,6 +1480,7 @@ export type VariantStrategy = {
   /** Final analysis wording. Null explicitly means there is no closing note. */
   noGapsNote?: string | null;
   pendingCredentialNote?: string | null;
+  eligibilityNote?: string | null;
   /**
    * True when every resume scored the same coverage and the pick fell through to the default flag.
    * The card must not present a tie-break as a finding — that is what made a user ask why it had

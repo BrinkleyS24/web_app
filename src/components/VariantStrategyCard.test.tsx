@@ -332,6 +332,15 @@ describe("variantStrategyNoGapsNote", () => {
     expect(variantStrategyNoGapsNote({ ...strategy, gaps: [], noGapsNote: null })).toBeNull();
   });
 
+  test("an explicitly absent credential stays an eligibility issue when recommending another resume", () => {
+    const blocked: VariantStrategy = { ...strategy, gaps: [],
+      noGapsNote: "A resume edit cannot resolve the required credential.",
+      eligibilityNote: "Your selected resume explicitly lacks the required mathematics certificate. Editing or switching resume versions cannot grant that qualification." };
+    render(<VariantStrategyCard strategy={blocked} />);
+    expect(screen.getByText(blocked.eligibilityNote!)).toBeInTheDocument();
+    expect(screen.queryByText(/send it as it is/i)).not.toBeInTheDocument();
+  });
+
   test("Apply-now wording only appears when the backend supplies it", () => {
     const note = "Nothing to fix on QA-Focused for this posting — send it as it is.";
     expect(variantStrategyNoGapsNote({ ...strategy, gaps: [], noGapsNote: note })).toBe(note);
