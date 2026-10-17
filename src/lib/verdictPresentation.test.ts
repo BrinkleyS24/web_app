@@ -8,7 +8,7 @@ describe("describeVerdictDecision", () => {
     expect(describeVerdictDecision({ verdict: "risky", explanation_payload: { decision: "fix_first" } as never }))
       .toEqual({ key: "fix_first", label: "Fix first", tone: "attention" });
     expect(describeVerdictDecision({ verdict: "strong_fit" })).toEqual({ key: "apply", label: "Apply", tone: "positive" });
-    expect(describeVerdictDecision({ verdict: "potential_fit" }).label).toBe("Apply with care");
+    expect(describeVerdictDecision({ verdict: "potential_fit" }).label).toBe("Tailor first");
     expect(describeVerdictDecision({ verdict: "not_recommended" })).toEqual({ key: "skip", label: "Skip", tone: "risk" });
   });
 });

@@ -11,7 +11,7 @@ type VerdictLike = {
 
 const DECISIONS: Record<VerdictDecisionKey, { label: string; tone: Tone }> = {
   apply: { label: "Apply", tone: "positive" },
-  apply_with_care: { label: "Apply with care", tone: "brand" },
+  apply_with_care: { label: "Tailor first", tone: "brand" },
   fix_first: { label: "Fix first", tone: "attention" },
   skip: { label: "Skip", tone: "risk" },
 };
@@ -22,7 +22,9 @@ export function describeVerdictDecision(item: VerdictLike): { key: VerdictDecisi
   const keys: Record<string, VerdictDecisionKey> = { APPLY: "apply", APPLY_WITH_STRATEGY: "apply_with_care", FIX_THEN_APPLY: "fix_first", SKIP: "skip" };
   if (resolved && keys[resolved.action]) {
     const key = keys[resolved.action];
-    return { key, ...DECISIONS[key], label: resolved.label };
+    // Checks saved before 2026-10-16 carry "Apply with care" over the "Apply, but tailor first"
+    // heading: one verdict, two names. Show the current name.
+    return { key, ...DECISIONS[key], label: resolved.label === "Apply with care" ? DECISIONS[key].label : resolved.label };
   }
   const decision = String(item?.explanation_payload?.decision || "").toLowerCase();
   let key: VerdictDecisionKey;
