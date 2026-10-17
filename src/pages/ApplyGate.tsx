@@ -1829,9 +1829,18 @@ const ApplyGateWorkspace = () => {
   const currentMemorySignals = (currentSearchMemory?.patternSignals || [])
     .slice(0, 3)
     .filter((signal) => keepCurrentSentence(signal));
+  // "3+ years experience" beside "3+ years of a healthcare setting" is one requirement shown twice
+  // (2026-10-16): the specific row says what the years must be in, so the generic one yields.
+  const yearsOf = (label: string | null | undefined) => /^\s*(\d+)\s*\+?\s*years?\b/i.exec(String(label || ""))?.[1] ?? null;
+  const specificYears = new Set(currentRequirementLedgerItems
+    .filter((item) => item.type !== "years_experience")
+    .map((item) => yearsOf(item.label))
+    .filter((years): years is string => years != null));
   const currentLedgerRows = currentIsCompressedDecision
     ? []
-    : currentRequirementLedgerItems.map((item) => ({
+    : currentRequirementLedgerItems
+      .filter((item) => !(item.type === "years_experience" && specificYears.has(yearsOf(item.label) ?? "")))
+      .map((item) => ({
       item,
       sentence: item.source_sentence && item.source_sentence !== item.label && keepCurrentSentence(item.source_sentence)
         ? item.source_sentence
