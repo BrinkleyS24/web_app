@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 import { OutreachDraftEditor } from "./OutreachDraftEditor";
@@ -34,6 +34,21 @@ test("fill-in placeholders and empty messages block copy",async()=>{
   const {rerender,view}=setup(); rerender(view("job-v2",{...draft,body:"I liked [your project].\nBest,"}));
   expect(screen.getByRole("button",{name:"Copy draft"})).toBeDisabled();
   await userEvent.clear(screen.getByLabelText("Message")); expect(screen.getByText(/Add a message/)).toBeInTheDocument();
+});
+
+test("reply blanks must all be replaced before the edited answer can be copied",async()=>{
+  const user=userEvent.setup(); Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText:clipboard}});
+  const {rerender,view}=setup();
+  rerender(view("reply-v1",{...draft,context:"reply_scheduling",actionType:"reply",body:"Hello,\nMy availability:\n[Add available dates, time windows and your time zone]\n\n[Add answers to the other requests in the original email]\nBest,"}));
+  expect(screen.getByRole("button",{name:"Copy draft"})).toBeDisabled();
+  await user.clear(screen.getByLabelText("Message"));
+  fireEvent.change(screen.getByLabelText("Message"),{target:{value:"Hello,\nI can meet on November 2, 2–4 pm America/New_York.\n[Add answers to the other requests in the original email]\nBest,"}});
+  expect(screen.getByRole("button",{name:"Copy draft"})).toBeDisabled();
+  expect(clipboard).not.toHaveBeenCalled();
+  await user.clear(screen.getByLabelText("Message"));
+  await user.type(screen.getByLabelText("Message"),"Hello,\nI can meet on November 2, 2–4 pm America/New_York. My portfolio is https://example.test/portfolio.\nBest,");
+  await user.click(screen.getByRole("button",{name:"Copy draft"}));
+  expect(clipboard).toHaveBeenCalledWith("Hello,\nI can meet on November 2, 2–4 pm America/New_York. My portfolio is https://example.test/portfolio.\nBest,\nStacey");
 });
 test("task versions and presets keep separate edits and restore the original",async()=>{
   const {rerender,view}=setup(); await userEvent.clear(screen.getByLabelText("Message")); await userEvent.type(screen.getByLabelText("Message"),"My first edited version");

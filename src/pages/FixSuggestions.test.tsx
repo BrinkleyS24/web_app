@@ -886,6 +886,27 @@ describe("Next Actions", () => {
   });
 });
 
+test("reply presets and original-email labeling preserve reply purpose", async () => {
+  const response = buildQueueResponse();
+  const reply = { ...response.queue.doToday[0], actionType: "reply", intent: "REPLY_TO_THREAD", title: "Reply with interview availability" };
+  fetchRankedActionQueue.mockResolvedValue({ ...response, queue: { ...response.queue,
+    doToday: [reply], doNext: [], resolvedActions: [reply] } });
+  generateSuggestionDraft.mockResolvedValue({success:true,draft:{
+    subject:"Re: Interview availability",body:"Hello,\n[Add available dates, time windows and your time zone]\nBest,",
+    context:"reply_scheduling",contextLabel:"Warm scheduling reply",actionType:"reply",confidence:"low",
+    threadPreview:"Please share your availability for an interview.",coachingPoints:["Add your own dates and time zone."],
+  }});
+  renderPage();
+  await userEvent.click(await screen.findByRole("button", {name:"Draft reply"}));
+  expect(await screen.findByText("Original email")).toBeInTheDocument();
+  expect(screen.getByLabelText("Preset")).toHaveTextContent("Warm replyConcise replyDirect reply");
+  expect(screen.queryByRole("option", {name:"Direct status check"})).not.toBeInTheDocument();
+  expect((screen.getByLabelText("Message") as HTMLTextAreaElement).value).toContain("[Add available dates");
+  await userEvent.selectOptions(screen.getByLabelText("Preset"),"direct");
+  await waitFor(()=>expect(generateSuggestionDraft).toHaveBeenLastCalledWith(
+    expect.objectContaining({actionType:"reply",tone:"direct"}),expect.anything()));
+});
+
 describe("Apply Gate tasks and countdown chips (persona review, 2026-10-15)", () => {
   const resumeId = "6f1c2d3e-4a5b-4c6d-8e7f-001122334455";
   function applyGateAction(kind: "tailor" | "apply") {

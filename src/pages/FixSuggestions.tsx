@@ -305,6 +305,13 @@ const draftFeedbackOptions: DraftFeedbackOption[] = [
 const draftToneOptionByValue = new Map(draftToneOptions.map((option) => [option.value, option]));
 
 function getDraftToneOptionsForItem(item: QueueItem): DraftToneOption[] {
+  if (item.actionType === 'reply') {
+    return draftToneOptions.filter(option => ['warm', 'concise', 'direct'].includes(option.value))
+      .map(option => ({ ...option,
+        label: option.value === 'direct' ? 'Direct reply' : option.value === 'concise' ? 'Concise reply' : 'Warm reply',
+        description: 'Answer the employer’s request; review and supply your own missing details.',
+      }));
+  }
   switch (item.intent) {
     case "SEND_THANK_YOU":
       return draftToneOptions.filter((option) => ["post_interview", "warm", "concise"].includes(option.value));
@@ -904,7 +911,7 @@ function SuggestionDraftPanel({
               ) : null}
               {draft.threadPreview ? (
                 <div className="mt-2 rounded-xl border border-border/70 bg-card/70 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Preview</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Original email</p>
                   <p className="mt-1 max-h-24 overflow-y-auto text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]">{draft.threadPreview}</p>
                 </div>
               ) : null}
