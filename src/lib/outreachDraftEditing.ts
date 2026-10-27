@@ -26,6 +26,12 @@ export function draftEditingError(edits: DraftEdits): string | null {
 export function editedDraftText(edits: DraftEdits, includeSubject = false): string {
   const error = draftEditingError(edits);
   if (error) throw new Error(error);
-  const body = `${edits.body.trim()}\n${edits.signature.trim()}`;
+  const message = edits.body.trim();
+  const signature = edits.signature.trim();
+  // A pasted complete reply may already contain its closing. Keep the user's
+  // text intact and append only when its final line is not this exact signature.
+  const lines = message.split(/\r?\n/);
+  const lastLine = lines[lines.length - 1]?.trim();
+  const body = lastLine === signature ? message : `${message}\n${signature}`;
   return includeSubject ? `Subject: ${edits.subject.trim()}\n\n${body}` : body;
 }

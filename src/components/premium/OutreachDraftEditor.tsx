@@ -59,7 +59,7 @@ export function OutreachDraftEditor({ draft, draftKey, gmailUrl }: { draft: Sugg
     <div><label htmlFor={`${fieldId}-signature`} className="block text-sm font-medium">Your signature</label>
       <input id={`${fieldId}-signature`} value={edits.signature} maxLength={100} autoComplete="name" className={fieldClass} onChange={event => change("signature", event.target.value)} />
     </div>
-    <p className="text-xs text-muted-foreground">Your signature is added below the message when copied. Each preset keeps its own edits in this tab for up to 30 minutes after you leave this page. Reloading or signing out clears them.</p>
+    <p className="text-xs text-muted-foreground">Your signature is added below the message when copied, unless the message already ends with that exact signature. Each preset keeps its own edits in this tab for up to 30 minutes after you leave this page. Reloading or signing out clears them.</p>
     {error ? <p className="text-sm text-warning" role="status">{error}</p> : null}
     <div className="flex flex-wrap gap-2">
       <Button variant="outline" size="sm" disabled={Boolean(error) || copying} onClick={() => void copy(false)}>Copy draft</Button>

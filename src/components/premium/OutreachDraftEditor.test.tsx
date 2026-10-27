@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 import { OutreachDraftEditor } from "./OutreachDraftEditor";
 import type { SuggestionDraft } from "@/lib/emails";
+import { editedDraftText } from "@/lib/outreachDraftEditing";
 const auth=vi.hoisted(()=>vi.fn());
 vi.mock("@/lib/AuthContext.jsx",()=>({useAuth:()=>auth()}));
 const draft={subject:"Follow-up",body:"Hello,\n\nAny updates?\n\nBest,\n[Your Name]",context:"warm",actionType:"follow_up",confidence:"medium"} as SuggestionDraft;
@@ -99,4 +100,20 @@ test("a late clipboard result from another preset does not label the current pre
   await act(async()=>finish());
   expect(screen.queryByText(/Edited message copied/)).not.toBeInTheDocument();
   expect(screen.getByRole("button",{name:"Copy draft"})).toBeEnabled();
+});
+
+test.each(["Copy draft","Copy subject + body"])("%s preserves a pasted closing without duplicating the exact signature",async label=>{
+  setup();
+  fireEvent.change(screen.getByLabelText("Message"),{target:{value:"Hello,\nMy completed reply.\nBest,\nStacey"}});
+  await userEvent.click(screen.getByRole("button",{name:label}));
+  expect(clipboard).toHaveBeenCalledWith(`${label==="Copy subject + body"?"Subject: Follow-up\n\n":""}Hello,\nMy completed reply.\nBest,\nStacey`);
+  expect(screen.getByLabelText("Message")).toHaveValue("Hello,\nMy completed reply.\nBest,\nStacey");
+});
+
+test("signature matching handles trailing CRLF but preserves other names and body mentions",()=>{
+  const edits={subject:"Reply",body:"Hello,\r\nBest,\r\nAlex Morgan  \r\n  ",signature:" Alex Morgan "};
+  expect(editedDraftText(edits)).toBe("Hello,\r\nBest,\r\nAlex Morgan");
+  expect(editedDraftText({...edits,body:"I spoke with Alex Morgan.\nBest,"})).toBe("I spoke with Alex Morgan.\nBest,\nAlex Morgan");
+  expect(editedDraftText({...edits,body:"Hello,\nBest,\nAlex"})).toBe("Hello,\nBest,\nAlex\nAlex Morgan");
+  expect(editedDraftText({...edits,body:"Hello,\nBest,\nALEX MORGAN"})).toBe("Hello,\nBest,\nALEX MORGAN\nAlex Morgan");
 });
