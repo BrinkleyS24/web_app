@@ -504,6 +504,12 @@ const Resumes = () => {
           </div>
         ) : null}
 
+        {premium && (scoreboardQuery.data?.scoreboard?.ambiguousCohorts ?? 0) > 0 ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            Some application outcomes are excluded because multiple resume versions or applications match the same role. We cannot tell which resume to credit.
+          </p>
+        ) : null}
+
         {premium && variants.length >= 2 ? (
           <VariantComparison
             variants={variants}

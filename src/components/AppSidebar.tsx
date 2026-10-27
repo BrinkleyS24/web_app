@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   CalendarCheck,
+  BriefcaseBusiness,
   Crown,
   FileText,
   LayoutDashboard,
@@ -35,6 +36,7 @@ type NavItem = { title: string; url: string; icon: LucideIcon };
 // at all, and Ask existed only as a card on the Dashboard. The same list renders in the mobile drawer.
 const searchNav: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Jobs", url: "/jobs", icon: BriefcaseBusiness },
   { title: "Next Actions", url: "/next-actions", icon: ListChecks },
   { title: "Strategy Alerts", url: "/strategy-alerts", icon: Radar },
   { title: "Interview Prep", url: "/interview-prep", icon: CalendarCheck },

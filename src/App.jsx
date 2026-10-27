@@ -11,6 +11,7 @@ import PaymentSuccess from "./pages/PaymentSuccess.tsx";
 import PaymentCancel from "./pages/PaymentCancel.tsx";
 import ApplyGate from "./pages/ApplyGate.tsx";
 import Resumes from "./pages/Resumes.tsx";
+import Jobs from "./pages/Jobs.tsx";
 import FixSuggestions from "./pages/FixSuggestions.tsx";
 import InterviewPrep from "./pages/InterviewPrep.tsx";
 import AskPage from "./pages/Ask.tsx";
@@ -48,6 +49,7 @@ export const APP_PAGE_TITLES = {
   "/interview-prep": "Interview Prep",
   "/apply-gate": "Apply Gate",
   "/resumes": "Resumes",
+  "/jobs": "Jobs",
   "/ask": "Ask Applendium",
   "/settings": "Settings",
   "/admin/review": "Admin review",
@@ -78,6 +80,7 @@ const DASHBOARD_ROUTES = [
   "/dashboard",
   "/apply-gate",
   "/resumes",
+  "/jobs",
   "/next-actions",
   "/interview-prep",
   "/ask",
@@ -243,6 +246,7 @@ export default function App() {
                 }
               />
               <Route path="/payment/success" element={<PaymentSuccess />} />
+              <Route path="/jobs" element={<RequirePremiumUser><Jobs /></RequirePremiumUser>} />
               <Route path="/payment/cancel" element={<PaymentCancel />} />
               <Route
                 path="/apply-gate"

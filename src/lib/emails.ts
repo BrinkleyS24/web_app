@@ -65,21 +65,21 @@ export type MetricsResponse = {
     ungroupableEmails: number;
   };
   // The Signal Layer (backend `services/searchSignalsService.js`), derived from the SAME
-  // rows as `cohortMetrics` in the same request. `funnel` returns the identical counts â€”
-  // `applied` is `applicationsSent`, `reachedInterview` matches â€” so a surface can render a
+  // rows as `cohortMetrics` in the same request. `funnel` returns the identical counts —
+  // `applied` is `applicationsSent`, `reachedInterview` matches — so a surface can render a
   // count from one block and a read from the other without them disagreeing.
   searchSignals?: {
     funnel: {
       applied: number;
       settled: number;
-      /** Still inside the response window â€” censored observations, not failures. */
+      /** Still inside the response window — censored observations, not failures. */
       pending: number;
       silent: number;
       rejected: number;
       reachedInterview: number;
       reachedOffer: number;
       /**
-       * Where each application stands now, one bucket each, summing to `applied` â€” the only
+       * Where each application stands now, one bucket each, summing to `applied` — the only
        * counts that can be drawn as one bar. Absent from backends older than 2026-09-26.
        */
       stages?: {
@@ -182,7 +182,7 @@ export type FollowupSuggestionsResponse = {
 /**
  * One interview whose ending we never saw, offered back to the user as a question.
  *
- * `emailId` is the row the answer is written against â€” the backend only sends items it can
+ * `emailId` is the row the answer is written against — the backend only sends items it can
  * actually persist, so a card on screen is always answerable.
  */
 export type InterviewDebriefItem = {
@@ -190,7 +190,7 @@ export type InterviewDebriefItem = {
   emailId: number;
   /** View precondition; null means this history needs review. Absent on older backends. */
   actionReference?: string | null;
-  /** "Verisk Â· Software Engineer in Test", pre-composed by the backend. */
+  /** "Verisk · Software Engineer in Test", pre-composed by the backend. */
   label: string;
   company?: string | null;
   position?: string | null;
@@ -245,7 +245,7 @@ export type StrategyAlert = {
   /**
    * Present only on commitment alerts: the thread the recommendation is about. Commitments never
    * become queue rows of their own (`queue.exclude`), so this is how the dashboard finds the card
-   * that IS the commitment â€” the interview prep card, the assessment card â€” for its hero button.
+   * that IS the commitment — the interview prep card, the assessment card — for its hero button.
    */
   anchor?: { threadId: string; kind: "interview" | "assessment" | string } | null;
 };
@@ -476,7 +476,7 @@ export type RankedActionQueue = {
     nextSteps: string[];
   } | null;
   // Repeat actions the backend deliberately did not ask for yet, grouped by intent. These are not
-  // lost â€” each is promoted as soon as one of the surfaced actions ahead of it is completed.
+  // lost — each is promoted as soon as one of the surfaced actions ahead of it is completed.
   heldBackSimilarActions?: { intent: string | null; intentLabel: string; count: number }[];
   heldBackSimilarCount?: number;
   // Housekeeping (fix missing data, link emails, close out quiet roles). Kept out of the advice
@@ -985,7 +985,7 @@ export type SyncStatusResponse = {
   sync?: {
     inProgress: boolean;
     startedAt?: string | null;
-    /** Date of the newest email a sync has seen â€” not when a sync ran. */
+    /** Date of the newest email a sync has seen — not when a sync ran. */
     lastSyncAt?: string | null;
     /** When a sync last finished, from any client. Null until the backend has recorded one. */
     lastRunAt?: string | null;
@@ -1003,7 +1003,7 @@ export async function fetchSyncStatus(): Promise<SyncStatusResponse> {
   return apiFetch("/api/emails/sync-status", { method: "GET" });
 }
 
-// â”€â”€ Apply Gate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Apply Gate ────────────────────────────────────────────────────────
 
 export type ApplyGateVerdict = "strong_fit" | "good_fit" | "potential_fit" | "risky" | "not_recommended";
 export type ApplyGateConfidence = "high" | "medium" | "low";
@@ -1362,7 +1362,7 @@ export type ApplyGateSearchMemory = {
     offered: number;
     rejected: number;
     noResponse: number;
-    /** Tracked roles with no ending on record â€” neither finished nor old enough to call ghosted. */
+    /** Tracked roles with no ending on record — neither finished nor old enough to call ghosted. */
     unresolved?: number;
     sameCompanyRejected?: number;
     sameCompanyRejectedRole?: string | null;
@@ -1463,8 +1463,8 @@ export type ApplyGateScoringBreakdown = {
   totalScore: number;
 };
 
-// â”€â”€ Variant Strategy â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-/** `before` is null for a reframe â€” there is no existing resume line to replace. */
+// ── Variant Strategy ──────────────────────────────────────────────────
+/** `before` is null for a reframe — there is no existing resume line to replace. */
 export type VariantStrategyGapDraft = { target: "summary" | "bullet"; before: string | null; after: string };
 export type VariantStrategyGap = {
   type: "missing" | "buried" | "reframe";
@@ -1485,7 +1485,7 @@ export type VariantStrategy = {
   eligibilityNote?: string | null;
   /**
    * True when every resume scored the same coverage and the pick fell through to the default flag.
-   * The card must not present a tie-break as a finding â€” that is what made a user ask why it had
+   * The card must not present a tie-break as a finding — that is what made a user ask why it had
    * "analysed a resume he didn't use", when in fact all six of his covered the posting equally.
    */
   isTieBreak?: boolean;
@@ -1493,13 +1493,13 @@ export type VariantStrategy = {
   tiedCount?: number;
   /**
    * Which document these gaps were actually read out of. The card enumerates every saved resume and
-   * recommends one, so it is frequently a different file than the verdict above it scored â€” and a
+   * recommends one, so it is frequently a different file than the verdict above it scored — and a
    * requirement the verdict counted as covered can then appear here as a gap. Naming both is the
    * difference between a second opinion and a contradiction.
    */
   analyzedVariant?: { variantId: string; name: string; isDefault: boolean } | null;
   scoredVariant?: { variantId: string; name: string } | null;
-  /** Only set when BOTH documents can be named â€” see buildVariantStrategy. */
+  /** Only set when BOTH documents can be named — see buildVariantStrategy. */
   analyzedDifferentDocument?: boolean;
 };
 
@@ -1520,7 +1520,7 @@ export type ApplyGateResult = {
   jobUrl?: string | null;
   /**
    * Which resume this verdict was actually computed from. A verdict is advice about one specific
-   * document, and Apply Gate once scored a variant the user had not chosen â€” reporting a gap the
+   * document, and Apply Gate once scored a variant the user had not chosen — reporting a gap the
    * selected resume did not contain, with nothing on screen able to reveal it. Fingerprint only:
    * resume text is encrypted at rest.
    */
@@ -1685,7 +1685,7 @@ export interface ApplyGatePriorHistory {
   rejectionSampleSize?: number | null;
   /**
    * Which loader produced `rejectionCount`. This banner and Search Memory used to count different
-   * things â€” rejection EMAILS vs rejected APPLICATIONS â€” and rendered 32 and 25 on one screen.
+   * things — rejection EMAILS vs rejected APPLICATIONS — and rendered 32 and 25 on one screen.
    * "applications" is the canonical source every other surface uses.
    */
   rejectionCountSource?: "applications" | "emails";
@@ -1716,7 +1716,7 @@ export type ApplyGateHistoryItem = {
   created_at: string;
   /** Made before Apply Gate's current scoring went live; re-check to get today's read. */
   outdated?: boolean;
-  /** What the inbox showed happened after the check, when Applendiumâ„¢ could link it. */
+  /** What the inbox showed happened after the check, when Applendium™ could link it. */
   derived_outcome_label?: string | null;
   derived_outcome_at?: string | null;
   application_id?: string | number | null;
@@ -1746,7 +1746,7 @@ export async function analyzeJobAlignment(params: {
     body: JSON.stringify(params),
     // The premium verdict runs a full LLM pass over the resume + JD, which takes
     // ~30s end-to-end. The default 15s client timeout aborts mid-flight while the
-    // backend keeps running and still persists a verdict â€” surfacing a false
+    // backend keeps running and still persists a verdict — surfacing a false
     // "timed out" error to the user (and stacking duplicate verdicts on retry).
     // Give the request enough headroom for the real AI latency plus scoring.
     timeoutMs: 45_000,
@@ -1782,7 +1782,7 @@ export async function updateApplyGateAction(
   });
 }
 
-// â”€â”€â”€ Resume / Profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Resume / Profile ────────────────────────────────────────────────
 
 export async function saveResume(
   resumeText: string
@@ -1804,7 +1804,7 @@ export async function deleteResume(): Promise<{ success: boolean }> {
   return apiFetch("/api/emails/profile/resume", { method: "DELETE" });
 }
 
-// â”€â”€ Resume variants + outcome scoreboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Resume variants + outcome scoreboard ─────────────────────────────
 export type ResumeVariant = {
   id: string;
   name: string;
@@ -1832,7 +1832,7 @@ export type VariantBreakdownRow = {
   outcome: "interviewed" | "offered" | "rejected" | "no_response" | "pending";
 };
 
-export type VariantScoreboard = { perVariant: VariantScoreRow[]; minSample: number };
+export type VariantScoreboard = { perVariant: VariantScoreRow[]; minSample: number; ambiguousCohorts?: number };
 export type VariantRecommendation = { variantId: string; name: string; interviewRate: number } | null;
 
 export async function fetchLegacyResumeForReview(): Promise<{ success: boolean; resumeText: string | null }> {
@@ -1859,9 +1859,9 @@ export async function archiveResumeVariant(id: string): Promise<{ success: boole
   return apiFetch(`/api/resumes/${id}`, { method: "DELETE" });
 }
 
-// â”€â”€ Resume health â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Resume health ────────────────────────────────────────────────────
 // Findings about a document, not about a posting. They used to be mixed into every Apply Gate
-// verdict, where â€” being derived from the resume alone â€” they came out identical on every run.
+// verdict, where — being derived from the resume alone — they came out identical on every run.
 export type ResumeHealthFinding = {
   key: string;
   title: string;

@@ -145,6 +145,15 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+test('shared core qualification evidence is visible separately from application strategy',async()=>{
+ analyzeJobAlignment.mockResolvedValue({...skipResult,qualificationAssessment:{version:1,decision:'excluded',exclusionKind:'requirement_blocker',reasons:['A completed degree is required; your degree is still in progress.'],requirements:[]}});
+ renderPage();await runAnalyze();
+ const assessment=await screen.findByTestId('apply-gate-core-qualification');
+ expect(within(assessment).getByText('An explicit requirement blocks this application')).toBeInTheDocument();
+ expect(within(assessment).getByText(/your degree is still in progress/)).toBeInTheDocument();
+ expect(screen.getByTestId('apply-gate-call').compareDocumentPosition(assessment)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
 describe("sentence dedupe", () => {
   test("case, spacing and punctuation do not make a sentence new", () => {
     const keep = createSentenceFilter();

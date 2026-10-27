@@ -78,6 +78,13 @@ beforeEach(() => {
 
 afterEach(() => { vi.clearAllMocks(); });
 
+test('ambiguous attribution is explained instead of displaying inflated resume outcomes', async () => {
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'QA', isDefault: true }] });
+  fetchVariantScoreboard.mockResolvedValue({ success: true, scoreboard: { minSample: 5, perVariant: [], ambiguousCohorts: 1 }, recommendation: null });
+  renderPage();
+  expect(await screen.findByText(/We cannot tell which resume to credit/)).toBeInTheDocument();
+});
+
 test('free users manage a default without making premium requests', async () => {
   useAuth.mockReturnValue({ plan: 'free' });
   fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'QA', isDefault: false }] });

@@ -28,6 +28,7 @@ describe("AppSidebar", () => {
     renderSidebar();
     expect(screen.getByRole("link", { name: /Interview Prep/ })).toHaveAttribute("href", "/interview-prep");
     expect(screen.getByRole("link", { name: /Ask Applendium/ })).toHaveAttribute("href", "/ask");
+    expect(screen.getByRole("link", { name: /^Jobs$/ })).toHaveAttribute("href", "/jobs");
   });
 
   test("the Strategy Alerts badge names a count of alerts", () => {
