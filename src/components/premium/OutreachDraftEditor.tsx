@@ -14,6 +14,14 @@ export function OutreachDraftEditor({ draft, draftKey, gmailUrl }: { draft: Sugg
   const [message, setMessage] = useState("");
   const [copying, setCopying] = useState(false);
   const copyPending = useRef(false);
+  const currentDraft = useRef<string | null>(key);
+  const editRevision = useRef(0);
+  useLayoutEffect(() => {
+    currentDraft.current = key;
+    editRevision.current += 1;
+    setMessage("");
+    return () => { currentDraft.current = null; };
+  }, [key]);
   const error = draftEditingError(edits);
   const subjectField = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
@@ -22,16 +30,24 @@ export function OutreachDraftEditor({ draft, draftKey, gmailUrl }: { draft: Sugg
   }, [edits.subject]);
   const fieldClass = "w-full min-w-0 rounded-xl border border-border bg-background p-3 text-sm text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary";
   const change = (field: keyof DraftEdits, value: string) => {
+    editRevision.current += 1;
     updateSession(current => ({ ...current, [key]: { ...(current[key] || edits), [field]: value } }));
     setMessage("");
   };
   async function copy(includeSubject: boolean) {
     if (error || copyPending.current) return;
     copyPending.current = true;
+    const copiedRevision = editRevision.current;
     setCopying(true); setMessage("");
-    try { await navigator.clipboard.writeText(editedDraftText(edits, includeSubject)); setMessage(includeSubject ? "Edited subject and message copied. Paste into the conversation and review before sending." : "Edited message copied. Paste into the conversation and review before sending."); }
-    catch { setMessage("Copy failed. Select the message and signature below and copy them manually."); }
-    finally { copyPending.current = false; setCopying(false); }
+    try {
+      await navigator.clipboard.writeText(editedDraftText(edits, includeSubject));
+      if (currentDraft.current !== key) return;
+      setMessage(editRevision.current !== copiedRevision
+        ? "An earlier version was copied. Copy again to include your latest edits."
+        : includeSubject ? "Edited subject and message copied. Paste into the conversation and review before sending." : "Edited message copied. Paste into the conversation and review before sending.");
+    }
+    catch { if (currentDraft.current === key) setMessage("Copy failed. Select the message and signature below and copy them manually."); }
+    finally { copyPending.current = false; if (currentDraft.current !== null) setCopying(false); }
   }
   return <div className="min-w-0 space-y-3">
     <div><label htmlFor={`${fieldId}-subject`} className="block text-sm font-medium">Subject</label>

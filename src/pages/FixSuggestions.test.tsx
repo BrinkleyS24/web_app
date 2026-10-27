@@ -477,7 +477,7 @@ describe("Next Actions", () => {
     renderPage();
     expect(await screen.findByText(/Application link not confirmed/)).toBeVisible();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "More options" }));
+    await user.click(screen.getByRole("button", { name: /^More options for / }));
     await user.click(screen.getByRole("menuitem", { name: "Why this, and how" }));
     await user.click(screen.getByText("Source check"));
     expect(screen.getByRole("link", { name: "Read the source conversation in Gmail" })).toHaveAttribute("href", expect.stringContaining("mail.google.com"));
@@ -515,7 +515,7 @@ describe("Next Actions", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: /Already handled/ }));
+    await user.click(await screen.findByRole("button", { name: /^Mark handled:/ }));
 
     await waitFor(() => {
       expect(completeQueueAction).toHaveBeenCalledWith({ logicalKey: "followup:wf-thread", dedupeKey: "followup:wf-thread:v1" });
@@ -597,7 +597,7 @@ describe("Next Actions", () => {
     expect(await screen.findByRole("heading", { name: "Apply to QA Engineer" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open in Apply Gate" })).toHaveAttribute("href", "/apply-gate");
 
-    await user.click(screen.getByRole("button", { name: "More options" }));
+    await user.click(screen.getByRole("button", { name: /^More options for / }));
     await user.click(screen.getByRole("menuitem", { name: "Why this, and how" }));
 
     expect(screen.getByText("Apply Gate context")).toBeInTheDocument();
@@ -629,7 +629,7 @@ describe("Next Actions", () => {
   test("the options menu is a real menu and Escape closes it", async () => {
     const user = userEvent.setup();
     renderPage();
-    const [trigger] = await screen.findAllByRole("button", { name: "More options" });
+    const [trigger] = await screen.findAllByRole("button", { name: /^More options for / });
     await user.click(trigger);
     expect(screen.getByRole("menu")).toBeInTheDocument();
     expect(screen.getAllByRole("menuitem").length).toBeGreaterThan(0);
@@ -894,7 +894,7 @@ test("reply presets and original-email labeling preserve reply purpose", async (
   generateSuggestionDraft.mockResolvedValue({success:true,draft:{
     subject:"Re: Interview availability",body:"Hello,\n[Add available dates, time windows and your time zone]\nBest,",
     context:"reply_scheduling",contextLabel:"Warm scheduling reply",actionType:"reply",confidence:"low",
-    threadPreview:"Please share your availability for an interview.",coachingPoints:["Add your own dates and time zone."],
+    threadPreview:"Please share your availability for an interview.",sourceMessage:{emailId:"request-1",from:"Recruiter <recruiter@example.test>",text:"Please share your availability for an interview.",truncated:false},coachingPoints:["Add your own dates and time zone."],
   }});
   renderPage();
   await userEvent.click(await screen.findByRole("button", {name:"Draft reply"}));
@@ -905,6 +905,46 @@ test("reply presets and original-email labeling preserve reply purpose", async (
   await userEvent.selectOptions(screen.getByLabelText("Preset"),"direct");
   await waitFor(()=>expect(generateSuggestionDraft).toHaveBeenLastCalledWith(
     expect.objectContaining({actionType:"reply",tone:"direct"}),expect.anything()));
+});
+
+test("the original reply source includes late questions, rather than a different short preview", async () => {
+  const response = buildQueueResponse();
+  const reply = { ...response.queue.doToday[0], actionType:"reply", intent:"REPLY_TO_THREAD", title:"Reply with interview availability" };
+  fetchRankedActionQueue.mockResolvedValue({...response,queue:{...response.queue,doToday:[reply],doNext:[],resolvedActions:[reply]}});
+  const text = 'Please share your availability.\n' + 'Team context. '.repeat(40) + '\nPlease also send a portfolio link.';
+  generateSuggestionDraft.mockResolvedValue({success:true,draft:{subject:"Re: Interview",body:"[Add your answers]",context:"reply_scheduling",actionType:"reply",confidence:"low",
+    threadPreview:"Thank you, I will reply soon.",sourceMessage:{emailId:"inbound-1",from:"Hiring <hiring@example.test>",text,truncated:false}}});
+  renderPage();
+  const card = await screen.findByRole("article",{name:new RegExp(reply.title)});
+  expect(within(card).getByRole("button",{name:new RegExp(`^Mark handled: ${reply.title}`)})).toHaveTextContent("Mark handled");
+  expect(within(card).getByRole("button",{name:new RegExp(`^More options for ${reply.title}`)})).toBeInTheDocument();
+  await userEvent.click(within(card).getByRole("button",{name:"Draft reply"}));
+  const source = await screen.findByRole("region",{name:"Original email"});
+  expect(source).toHaveTextContent("Please also send a portfolio link.");
+  expect(source).toHaveTextContent("Hiring <hiring@example.test>");
+  expect(source).not.toHaveTextContent("Thank you, I will reply soon.");
+  expect(completeQueueAction).not.toHaveBeenCalled();
+});
+
+test("a legacy reply preview is disclosed as an excerpt", async () => {
+  renderPage();
+  await userEvent.click(await screen.findByRole("button",{name:"Draft thank-you note"}));
+  expect(await screen.findByText("Email excerpt")).toBeInTheDocument();
+  expect(screen.getByText("Read the original conversation for the full request.")).toBeInTheDocument();
+});
+
+test("assessment cards with source IDs containing spaces have distinct employer and role names", async () => {
+  const response=buildQueueResponse();
+  const actions=["QA Engineer","Support Specialist"].map((role,index)=>({...response.queue.doToday[0],
+    id:`assessment:amber analytics:${role.toLowerCase()}`,logicalKey:`assessment-${index}`,dedupeKey:`assessment-version-${index}`,
+    applicationId:index+100,actionType:"complete_assessment",intent:"COMPLETE_ASSESSMENT",company:"Amber Analytics",roleTitle:role,
+    title:"Finish the Amber Analytics assessment"}));
+  fetchRankedActionQueue.mockResolvedValue({...response,queue:{...response.queue,doToday:actions,doNext:[],resolvedActions:actions}});
+  renderPage();
+  for(const role of ["QA Engineer","Support Specialist"]){
+    const card=await screen.findByRole("article",{name:new RegExp(`Finish the Amber Analytics assessment.*${role}`)});
+    expect(within(card).getByRole("button",{name:new RegExp(`More options for.*${role}`)})).toBeInTheDocument();
+  }
 });
 
 describe("Apply Gate tasks and countdown chips (persona review, 2026-10-15)", () => {

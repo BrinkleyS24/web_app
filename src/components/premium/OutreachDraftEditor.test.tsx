@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 import { OutreachDraftEditor } from "./OutreachDraftEditor";
@@ -11,7 +11,7 @@ const url="https://mail.google.com/mail/u/0/#all/thread-id";
 const clipboard=vi.fn();
 function setup() {
   const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
-  const view=(key="job-v1",value=draft)=><QueryClientProvider client={client}><OutreachDraftEditor key={key} draft={value} draftKey={key} gmailUrl={url}/></QueryClientProvider>;
+  const view=(key="job-v1",value=draft)=><QueryClientProvider client={client}><OutreachDraftEditor draft={value} draftKey={key} gmailUrl={url}/></QueryClientProvider>;
   return {view,...render(view())};
 }
 beforeEach(()=>{auth.mockReturnValue({user:{uid:"owner",displayName:"Stacey"}}); clipboard.mockReset().mockResolvedValue(undefined); Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText:clipboard}});});
@@ -68,4 +68,35 @@ test("switching owners cannot render the previous owner's edits",async()=>{
 test("clipboard rejection preserves edits and offers manual copy",async()=>{
   setup(); clipboard.mockRejectedValue(new Error("denied")); await userEvent.click(screen.getByRole("button",{name:"Copy draft"}));
   expect(await screen.findByText(/Copy failed/)).toBeInTheDocument(); expect(screen.getByLabelText("Your signature")).toHaveValue("Stacey");
+});
+
+test("copy success belongs to the preset that was actually copied",async()=>{
+  const {rerender,view}=setup();
+  fireEvent.click(screen.getByRole("button",{name:"Copy draft"}));
+  expect(await screen.findByText(/Edited message copied/)).toBeInTheDocument();
+  rerender(view("job-v1:direct",{...draft,context:"direct",body:"A different preset."}));
+  expect(screen.queryByText(/Edited message copied/)).not.toBeInTheDocument();
+});
+
+test("a late clipboard result cannot claim a newer edit was copied",async()=>{
+  let finish!:()=>void;
+  clipboard.mockImplementation(()=>new Promise<void>(resolve=>{finish=resolve;}));
+  setup();
+  fireEvent.click(screen.getByRole("button",{name:"Copy draft"}));
+  fireEvent.change(screen.getByLabelText("Message"),{target:{value:"My newer message"}});
+  await act(async()=>finish());
+  expect(screen.queryByText(/Edited message copied/)).not.toBeInTheDocument();
+  expect(screen.getByText(/earlier version was copied/i)).toBeInTheDocument();
+  expect(clipboard).toHaveBeenCalledWith("Hello,\n\nAny updates?\n\nBest,\nStacey");
+});
+
+test("a late clipboard result from another preset does not label the current preset",async()=>{
+  let finish!:()=>void;
+  clipboard.mockImplementation(()=>new Promise<void>(resolve=>{finish=resolve;}));
+  const {rerender,view}=setup();
+  fireEvent.click(screen.getByRole("button",{name:"Copy draft"}));
+  rerender(view("job-v1:direct",{...draft,context:"direct",body:"A different preset."}));
+  await act(async()=>finish());
+  expect(screen.queryByText(/Edited message copied/)).not.toBeInTheDocument();
+  expect(screen.getByRole("button",{name:"Copy draft"})).toBeEnabled();
 });

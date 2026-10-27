@@ -137,6 +137,11 @@ function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
   const inputSignature=JSON.stringify([session.variantId,session.posting,session.focus]);
   const inputsChanged=Boolean(session.pack && builtInput!==inputSignature);
   const sourceAvailable=Boolean(source.data&&!source.isError&&!source.isFetching);
+  const inputIssue=!session.variantId||!resumes.data?.some(resume=>resume.id===session.variantId)?"Choose a saved resume before building practice."
+    :effective.posting.trim().length<100?"Add the posting below, at least 100 characters, so practice has enough source detail."
+    :focuses.length===0?"We could not identify practice topics. Copy one to five exact responsibilities from the posting into the field below."
+    :focuses.length>5?"Choose up to five practice topics, one exact source sentence per line."
+    :focuses.some(focus=>focus.length<10||focus.length>600)?"Use practice topics between 10 and 600 characters, one exact source sentence per line.":null;
   async function generate() {
     if(guard.current||!inputValid||!sourceAvailable||(session.pack&&hasNotes&&!resetAllowed))return;
     guard.current=true;setPending(true);setError("");setCopied("");
@@ -183,10 +188,11 @@ function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
           ?(invitation?`Practice comes from the invitation's own words, starting with “${invitation.focusAreas[0]}”`:"The invitation is too short to practice from. Add the posting below.")
           :"Practice comes from the posting you added."}</p>
         {session.pack&&hasNotes?<label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={resetAllowed} disabled={pending} onChange={e=>setResetAllowed(e.target.checked)}/>I understand rebuilding replaces this practice and clears its rehearsal notes.</label>:null}
-        <button className={BUTTON.primary} disabled={pending||!inputValid||!sourceAvailable||Boolean(session.pack&&hasNotes&&!resetAllowed)} onClick={()=>void generate()}>{pending?"Building practice…":session.pack?"Rebuild practice":"Build my practice"}</button>
+        {sourceAvailable&&!resumes.isPending&&inputIssue?<p id="prep-input-help" role="status" className="text-sm text-warning">{inputIssue}</p>:null}
+        <button className={BUTTON.primary} aria-describedby={inputIssue?"prep-input-help":undefined} disabled={pending||!inputValid||!sourceAvailable||Boolean(session.pack&&hasNotes&&!resetAllowed)} onClick={()=>void generate()}>{pending?"Building practice…":session.pack?"Rebuild practice":"Build my practice"}</button>
         {error?<p role="alert" className="text-sm text-destructive">{error}</p>:null}
         <details className="rounded-xl border border-border p-3" open={Boolean(session.posting||session.focus)||(!invitation&&Boolean(source.data))}>
-          <summary className="cursor-pointer text-sm font-medium">Add the posting (optional)</summary>
+          <summary className="cursor-pointer text-sm font-medium">{invitation?"Add the posting (optional)":"Add the posting to build practice"}</summary>
           <div className="mt-3 space-y-4">
             <div><label htmlFor="prep-posting" className="block text-sm font-medium">Posting for this role</label><textarea id="prep-posting" className={`${field} mt-1 min-h-[160px]`} maxLength={25000} disabled={pending} value={session.posting} onChange={e=>{update({posting:e.target.value});setResetAllowed(false);}}/><p className="mt-1 text-xs text-muted-foreground">Paste the posting text, at least 100 characters. Confirm it is the role above.</p></div>
             <div><label htmlFor="prep-focus" className="block text-sm font-medium">Responsibilities or requirements to practice</label><textarea id="prep-focus" className={`${field} mt-1 min-h-[100px]`} maxLength={3004} disabled={pending} value={session.focus} onChange={e=>{update({focus:e.target.value});setResetAllowed(false);}}/><p className="mt-1 text-xs text-muted-foreground">Optional. Copy 1–5 exact lines from the posting, one per line. Leave it empty and we pick up to 3 duties from it.</p></div>

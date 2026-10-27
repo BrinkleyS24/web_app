@@ -82,7 +82,7 @@ export function interviewHasPassed(schedule: InterviewSource["schedule"], now = 
 // What an employer asks a candidate to prepare or bring ("have an example of a lesson or unit you
 // designed ready to walk through"): the most useful thing to practice first (teacher review, 2026-10-15).
 const PREP_CUE = /\b(prepare|bring|ready to|be ready|walk (?:us |me )?through|example|portfolio|sample|presentation|present|case study|exercise|assessment|discuss|talk about|tell us about|questions? about|demonstrat|show us)\b/i;
-const DUTY_CUE = /\b(responsib|you will|you'll|require|qualif|experience (?:with|in)|ability to|skills?|duties|manage|support|lead|develop|design|coordinate|teach|plan)\b/i;
+const DUTY_CUE = /\b(responsib|you will|you'll|require|qualif|experience (?:with|in)|ability to|skills?|duties|manage|support|lead|develop|design|coordinate|teach|plan|build|validate|maintain|investigate|implement|test)\b/i;
 const LOGISTICS = /(https?:|www\.|@|\b(?:zoom|teams|google meet|calendar invit\w*|reschedul\w*|unsubscribe|parking|dial[- ]in|meeting id|passcode|privacy (?:policy|notice)|confirm (?:your|the) (?:time|availability)|let us know if|reply to this|this email)\b)/i;
 const CLOCK_OR_DAY = /\b(\d{1,2}(?::\d{2})?\s?(?:am|pm)|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i;
 const SALUTATION = /^(hi|hello|dear|hey|thanks|thank you|best|regards|sincerely|cheers|good (?:morning|afternoon))\b/i;

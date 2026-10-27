@@ -24,8 +24,11 @@ for(const width of [320,1280])test(`grounded interview prep and retained notes f
   await page.goto("/next-actions");await page.getByRole("link",{name:"Prepare for interview"}).click();
   await expect(page).toHaveURL(new RegExp(`/interview-prep\\?action=${logicalKey}&version=${dedupeKey}`));
   await expect(page.getByText(/Oct 8, 2026. Time is unconfirmed/)).toBeVisible();
-  await expect(page.getByLabel("Resume for this interview")).toHaveValue("");await expect(page.getByRole("button",{name:"Build my practice"})).toBeDisabled();
-  await page.getByLabel("Resume for this interview").selectOption(variantId);await page.getByLabel("Posting for this role").fill(posting);await page.getByLabel("Responsibilities or requirements to practice").fill(focus);
+  await expect(page.getByLabel("Resume for this interview")).toHaveValue(variantId);
+  await expect(page.getByTestId("prep-resume-why")).toContainText("your default resume");
+  await expect(page.getByRole("button",{name:"Build my practice"})).toBeDisabled();
+  await expect(page.getByRole("status")).toContainText("Add the posting below, at least 100 characters");
+  await page.getByLabel("Posting for this role").fill(posting);await page.getByLabel("Responsibilities or requirements to practice").fill(focus);
   await page.getByRole("button",{name:"Build my practice"}).click();await expect(page.getByText(pack.practice[0].question)).toBeVisible();
   expect(builds).toEqual([{logicalKey,dedupeKey,sourceVersion:source.sourceVersion,variantId,jobDescription:posting,focusAreas:[focus]}]);expect(completions).toEqual([]);
   await page.getByLabel("What I did",{exact:true}).fill("I verified appointment times and corrected the records.");await page.getByRole("button",{name:"Copy practice notes"}).click();

@@ -535,6 +535,7 @@ export type SuggestionDraft = {
   warning?: string | null;
   evidence?: string[];
   threadPreview?: string | null;
+  sourceMessage?: { emailId: string | null; from: string; text: string; truncated: boolean } | null;
   coachingPoints?: string[];
   sendStrategy?: string | null;
   sendStrategyLabel?: string | null;

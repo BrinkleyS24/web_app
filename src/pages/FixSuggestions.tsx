@@ -909,12 +909,20 @@ function SuggestionDraftPanel({
                   ))}
                 </div>
               ) : null}
-              {draft.threadPreview ? (
-                <div className="mt-2 rounded-xl border border-border/70 bg-card/70 p-3">
+              {draft.sourceMessage?.text ? (
+                <section aria-label="Original email" className="mt-2 rounded-xl border border-border/70 bg-card/70 p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Original email</p>
+                  {draft.sourceMessage.from ? <p className="mt-1 text-xs text-muted-foreground [overflow-wrap:anywhere]">From: {draft.sourceMessage.from}</p> : null}
+                  <p className="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]">{draft.sourceMessage.text}</p>
+                  {draft.sourceMessage.truncated ? <p className="mt-2 text-xs text-warning">Only the first 20,000 characters are shown. Read the full conversation before replying.</p> : null}
+                </section>
+              ) : draft.threadPreview ? (
+                <div className="mt-2 rounded-xl border border-border/70 bg-card/70 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Email excerpt</p>
                   <p className="mt-1 max-h-24 overflow-y-auto text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]">{draft.threadPreview}</p>
+                  <p className="mt-2 text-xs text-muted-foreground">Read the original conversation for the full request.</p>
                 </div>
-              ) : null}
+              ) : draft.actionType === "reply" ? <p className="mt-2 text-xs text-warning">Original email unavailable. Review the conversation before replying.</p> : null}
             </div>
           </div>
         </div>
@@ -1629,6 +1637,9 @@ const FixSuggestions = () => {
       cta = gmailUrl ? { kind: "gmail", label: "Open in Gmail", href: gmailUrl } : { kind: "complete", label: "Mark done" };
     }
     const identity = describeActionIdentity(item);
+    const titleId = `action-title-${encodeURIComponent(item.id)}`;
+    const identityId = `action-identity-${encodeURIComponent(item.id)}`;
+    const controlIdentity = identity ? `${item.title} (${identity})` : item.title;
     const { kind } = actionVisual(item);
     const detailsOpen = expandedDetailsId === item.id;
     const menuOpen = openActionMenuId === item.id;
@@ -1659,6 +1670,7 @@ const FixSuggestions = () => {
       <article
         key={item.id}
         id={`action-${item.id}`}
+        aria-labelledby={`${titleId} ${identityId}`}
         className={cn(
           "scroll-mt-24",
           variant === "today" ? cn(CARD, "px-5 py-4") : "px-1 py-3.5",
@@ -1670,12 +1682,12 @@ const FixSuggestions = () => {
           <ActionIcon item={item} />
           <div className="min-w-0 grow basis-[calc(100%-52px)] sm:basis-0">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <h3 className={cn("font-semibold leading-snug tracking-[-0.01em] text-foreground", variant === "today" ? "text-[15px]" : "text-[15px]")}>
+              <h3 id={titleId} className={cn("font-semibold leading-snug tracking-[-0.01em] text-foreground", variant === "today" ? "text-[15px]" : "text-[15px]")}>
                 {item.title}
               </h3>
               {variant === "more" && item.urgency === "high" ? <ToneChip tone="attention">Time-sensitive</ToneChip> : null}
             </div>
-            <p className="mt-0.5 text-[13px] text-muted-foreground">
+            <p id={identityId} className="mt-0.5 text-[13px] text-muted-foreground">
               <span className="font-medium text-foreground/70">{kind}</span>
               {identity ? ` · ${identity}` : ""}
               {item.estimatedTime ? ` · ${item.estimatedTime}` : ""}
@@ -1703,11 +1715,12 @@ const FixSuggestions = () => {
                 type="button"
                 onClick={() => void completeQueueItem(item, isHandledInGmail ? "Removed from today's list." : undefined)}
                 disabled={mutationBusy}
-                className={cn(BUTTON.ghost, "min-w-10 px-2 sm:min-w-8")}
-                aria-label={isHandledInGmail ? "Already handled — remove from list" : "Mark done"}
-                title={isHandledInGmail ? "Already handled" : "Mark done"}
+                className={cn(BUTTON.ghost, "min-w-10 gap-1 px-2 text-xs sm:min-w-8")}
+                aria-label={isHandledInGmail ? `Mark handled: ${controlIdentity}` : "Mark done"}
+                title={isHandledInGmail ? "Remove this task after handling it outside Applendium" : "Mark done"}
               >
                 <Check className="h-4 w-4" aria-hidden />
+                {isHandledInGmail ? <span>Mark handled</span> : null}
               </button>
             ) : null}
             <div className="relative" data-action-menu>
@@ -1715,7 +1728,7 @@ const FixSuggestions = () => {
                 type="button"
                 onClick={() => setOpenActionMenuId((current) => (current === item.id ? "" : item.id))}
                 className={cn(BUTTON.ghost, "min-w-10 px-2 sm:min-w-8")}
-                aria-label="More options"
+                aria-label={`More options for ${controlIdentity}`}
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
               >

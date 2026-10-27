@@ -13,6 +13,12 @@ test("missing schedule remains unconfirmed, focus quotes split only by line",()=
 
 // 2026-10-15: past interviews, and practice from the invitation when no posting is pasted.
 import {interviewHasPassed,invitationPracticeInput,pickFocusAreas} from "./interviewPrep";
+
+test("QA duties beginning with build, validate and maintain stay exact-source topics",()=>{
+  const lines=['Build Python and Pytest automated tests for REST APIs.','Validate SQL database records.','Maintain Selenium regression suites and CI/CD with GitHub Actions.'];
+  expect(pickFocusAreas(lines.join(' '))).toEqual(lines);
+  expect(pickFocusAreas('Please maintain this calendar invitation in Zoom. Privacy policy: we maintain records.')).toEqual([]);
+});
 test("an interview in the past is recognised, with or without a time",()=>{
   const now=Date.parse("2026-10-15T16:00:00Z");
   expect(interviewHasPassed({startAt:"2026-09-30T14:00:00",timeZone:"America/New_York",hasTime:true,source:"body"},now)).toBe(true);
