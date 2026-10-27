@@ -10,18 +10,19 @@ export function OutreachDraftEditor({ draft, draftKey, gmailUrl }: { draft: Sugg
   const fieldId = useId();
   const [session, updateSession] = useDraftSession<DraftEdits>("edits");
   const key = `${draftKey}:${draft.context}`;
+  const copyIdentity = `${user?.uid || "signed-out"}:${key}`;
   const edits = session[key] || initialDraftEdits(draft, user?.displayName);
   const [message, setMessage] = useState("");
   const [copying, setCopying] = useState(false);
   const copyPending = useRef(false);
-  const currentDraft = useRef<string | null>(key);
+  const currentDraft = useRef<string | null>(copyIdentity);
   const editRevision = useRef(0);
   useLayoutEffect(() => {
-    currentDraft.current = key;
+    currentDraft.current = copyIdentity;
     editRevision.current += 1;
     setMessage("");
     return () => { currentDraft.current = null; };
-  }, [key]);
+  }, [copyIdentity]);
   const error = draftEditingError(edits);
   const subjectField = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
@@ -41,12 +42,12 @@ export function OutreachDraftEditor({ draft, draftKey, gmailUrl }: { draft: Sugg
     setCopying(true); setMessage("");
     try {
       await navigator.clipboard.writeText(editedDraftText(edits, includeSubject));
-      if (currentDraft.current !== key) return;
+      if (currentDraft.current !== copyIdentity) return;
       setMessage(editRevision.current !== copiedRevision
         ? "An earlier version was copied. Copy again to include your latest edits."
         : includeSubject ? "Edited subject and message copied. Paste into the conversation and review before sending." : "Edited message copied. Paste into the conversation and review before sending.");
     }
-    catch { if (currentDraft.current === key) setMessage("Copy failed. Select the message and signature below and copy them manually."); }
+    catch { if (currentDraft.current === copyIdentity) setMessage("Copy failed. Select the message and signature below and copy them manually."); }
     finally { copyPending.current = false; if (currentDraft.current !== null) setCopying(false); }
   }
   return <div className="min-w-0 space-y-3">

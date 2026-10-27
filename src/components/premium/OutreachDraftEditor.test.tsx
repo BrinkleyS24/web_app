@@ -117,3 +117,18 @@ test("signature matching handles trailing CRLF but preserves other names and bod
   expect(editedDraftText({...edits,body:"Hello,\nBest,\nAlex"})).toBe("Hello,\nBest,\nAlex\nAlex Morgan");
   expect(editedDraftText({...edits,body:"Hello,\nBest,\nALEX MORGAN"})).toBe("Hello,\nBest,\nALEX MORGAN\nAlex Morgan");
 });
+
+test.each(["completed","pending"])("copy feedback cannot cross owners (%s)",async state=>{
+  let finish!:()=>void;
+  if(state==="pending")clipboard.mockImplementation(()=>new Promise<void>(resolve=>{finish=resolve;}));
+  const {rerender,view}=setup();
+  fireEvent.change(screen.getByLabelText("Message"),{target:{value:"Owner A private edit"}});
+  fireEvent.click(screen.getByRole("button",{name:"Copy draft"}));
+  if(state==="completed")expect(await screen.findByText(/Edited message copied/)).toBeInTheDocument();
+  auth.mockReturnValue({user:{uid:"other",displayName:"Other"}});rerender(view());
+  if(state==="pending")await act(async()=>finish());
+  expect(screen.queryByText(/Edited message copied|earlier version was copied/i)).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Message")).not.toHaveValue("Owner A private edit");
+  expect(screen.getByLabelText("Your signature")).toHaveValue("Other");
+  expect(screen.getByRole("button",{name:"Copy draft"})).toBeEnabled();
+});
