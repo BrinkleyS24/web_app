@@ -34,6 +34,20 @@ function task(overrides: Partial<QueueItem>): QueueItem {
 }
 
 describe("Apply Gate tasks follow the posting's latest check", () => {
+  test("an application id cannot override the distinct saved check id", () => {
+    const item = task({ applicationId: 62, applyGateVerdictId: "check-uuid" });
+    const [aligned] = alignApplyGateActions([item], [check({ id: "check-uuid" }), check({ id: "62", job_title: "Unrelated role" })], variants);
+    expect(aligned.routeHref).toBe(`/apply-gate?verdict=check-uuid&resume=${MARIA_ID}`);
+    expect(aligned.applicationId).toBe(62);
+  });
+
+  test("qualification verification keeps its cautious wording when old strategy said apply", () => {
+    const item = task({ actionType: "fix_targeting", intent: "FIX_TARGETING", title: "Review qualification evidence", applicationId: null, applyGateVerdictId: "v1" });
+    const [aligned] = alignApplyGateActions([item], [check({})], variants);
+    expect(aligned.title).toBe("Review qualification evidence");
+    expect(aligned.routeHref).toBe(`/apply-gate?verdict=v1&resume=${MARIA_ID}`);
+  });
+
   test("the tailor link carries the check and the resume version it used", () => {
     const [aligned] = alignApplyGateActions([task({})], [check({ explanation_payload: { decision: "fix_first" } as never })], variants);
     expect(aligned.routeHref).toBe(`/apply-gate?verdict=v1&resume=${MARIA_ID}`);

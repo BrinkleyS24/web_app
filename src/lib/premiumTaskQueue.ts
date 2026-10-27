@@ -40,6 +40,7 @@ export type QueueItem = {
   threadId?: string | null;
   emailId?: string | number | null;
   applicationId?: string | number | null;
+  applyGateVerdictId?: string | null;
   intent?: RankedAction["intent"];
   intentLabel?: string | null;
   actionType?: string | null;
@@ -1069,7 +1070,9 @@ export function buildUpcomingFollowupWindows(params: {
   storedEmails: StoredEmail[];
   followupSuggestions?: FollowupSuggestion[];
   actionStates?: SuggestionActionState[];
+  historyComplete?: boolean;
 }) {
+  if (params.historyComplete === false) return [];
   const activeKeys = new Set(
     (params.followupSuggestions || [])
       .filter((item) => item.threadId && item.actionType)
@@ -1206,7 +1209,7 @@ export function buildUpcomingFollowupWindows(params: {
           description:
             age >= 6
               ? `${company} is inside the post-interview status-check window.`
-              : `${company} is ${daysLabel(age)} after the interview. If no timeline was given, status checks become more appropriate after several business days.`,
+              : `${company}'s latest interview-stage update was ${daysLabel(age)} ago. Check the original conversation for its schedule and promised timeline.`,
           sourceDescription: age >= 6 ? "Interview status check due now" : "Interview status check opens soon",
         });
       } else if (
@@ -1222,9 +1225,9 @@ export function buildUpcomingFollowupWindows(params: {
           opensInDays: Math.max(0, 21 - age),
           windowStartDay: 21,
           windowEndDay: 21,
-          title: `Close-loop window for ${role}`,
-          description: `${company} is ${daysLabel(age)} after the interview. If silence continues, this should move from follow-up to close-out.`,
-          sourceDescription: "Interview close-out window approaching",
+          title: `Review the conversation for ${role}`,
+          description: `${company}'s latest interview-stage update was ${daysLabel(age)} ago. If nothing changes, review the original thread before deciding whether to follow up or close it.`,
+          sourceDescription: "Conversation review approaching",
         });
       }
     }
@@ -1488,6 +1491,7 @@ function mapRankedActionToQueueItem(
     threadId: action.threadId || null,
     emailId: action.emailId ?? null,
     applicationId: action.applicationId ?? null,
+    applyGateVerdictId: action.applyGateVerdictId ?? null,
     intent,
     intentLabel,
     actionType: action.legacyActionType || action.actionType,

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { invalidateApplyGateViews } from "@/lib/taskQueries";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { readResumeChoice, resumeToolHref, RESUME_ID } from "@/lib/resumeWorkspace";
 import { useDraftSession } from "@/hooks/useDraftSession";
@@ -950,6 +951,7 @@ function statusFromDisplayDecision(displayDecision: ApplyGateDisplayDecision | n
   if (displayDecision?.action === "APPLY") return "strong";
   if (displayDecision?.action === "APPLY_WITH_STRATEGY") return "potential";
   if (displayDecision?.action === "FIX_THEN_APPLY") return "risky";
+  if (displayDecision?.action === "CHECK_REQUIREMENTS") return "risky";
   return "not-recommended";
 }
 
@@ -973,6 +975,12 @@ function decisionCopyForDisplayDecision(displayDecision: ApplyGateDisplayDecisio
 }
 
 function decisionActionsForDisplayDecision(displayDecision: ApplyGateDisplayDecision): DecisionAction[] {
+  if (displayDecision.action === "CHECK_REQUIREMENTS") {
+    return [
+      { action: "applied", label: "Record as applied", variant: "outline" },
+      { action: "skipped", label: "Not applying", variant: "ghost", className: "text-muted-foreground" },
+    ];
+  }
   if (displayDecision.action === "APPLY") {
     return [
       { action: "applied", label: "I'm applying", className: "bg-accent text-accent-foreground hover:bg-accent/90" },
@@ -1353,7 +1361,7 @@ const ApplyGateWorkspace = () => {
         }
         setIsCurrentWarningExpanded(false);
         setActionConfirmation(null);
-        await queryClient.invalidateQueries({ queryKey: ["apply-gate-history"] });
+        await invalidateApplyGateViews(queryClient);
         resultTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       } catch (error) {
         setRecheckError({ id: verdictId, message: error instanceof Error ? error.message : "Could not re-check this role." });
@@ -1423,7 +1431,7 @@ const ApplyGateWorkspace = () => {
           };
         });
       }
-      queryClient.invalidateQueries({ queryKey: ["apply-gate-history"] });
+      void invalidateApplyGateViews(queryClient);
     },
     onError: () => {
       setResult(null);
@@ -1559,7 +1567,7 @@ const ApplyGateWorkspace = () => {
         try {
           await updateApplyGateAction(result.id, action, { feedback });
           markVerdictActionInCache(result.id, action);
-          await queryClient.invalidateQueries({ queryKey: ["apply-gate-history"] });
+          await invalidateApplyGateViews(queryClient);
           if (action === "applied" && targetUrl) {
             if (pendingApplyWindow) {
               pendingApplyWindow.location.href = targetUrl;
@@ -1621,7 +1629,7 @@ const ApplyGateWorkspace = () => {
       try {
         await updateApplyGateAction(item.id, action, { feedback });
         markVerdictActionInCache(item.id, action);
-        await queryClient.invalidateQueries({ queryKey: ["apply-gate-history"] });
+        await invalidateApplyGateViews(queryClient);
       } catch {
         setActionSaveError({
           verdictId: item.id,
@@ -2177,6 +2185,12 @@ const ApplyGateWorkspace = () => {
                     ) : null}
                   </div>
                 </section>
+
+                {result.qualificationAssessment && <div className="rounded-lg border border-border bg-background p-3 text-sm" data-testid="apply-gate-core-qualification">
+                  <p className="font-medium">{result.qualificationAssessment.decision === 'supported' ? 'Your resume supports the core requirements' : result.qualificationAssessment.decision === 'review' ? 'Core experience has support; some requirements need confirmation' : result.qualificationAssessment.decision === 'unavailable' ? 'Core qualification evidence could not be checked' : result.qualificationAssessment.exclusionKind === 'requirement_blocker' ? 'An explicit requirement blocks this application' : 'Core qualification evidence is incomplete'}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Application strategy and verified requirements are different. This requirement assessment also drives your Jobs feed; location preferences are checked separately there.</p>
+                  {result.qualificationAssessment.decision !== 'supported' && <ul className="mt-2 list-disc pl-4 text-muted-foreground">{result.qualificationAssessment.reasons.slice(0,3).map((reason,index)=><li key={index}>{reason}</li>)}</ul>}
+                </div>}
 
                 {currentShowWarning || currentVisibleSteps.length > 0 || currentStatus === "strong" || currentStatus === "potential" ? (
                   <section ref={actionPlanRef} data-testid="apply-gate-todo" aria-label="What to do" className="scroll-mt-4 space-y-3">

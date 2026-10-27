@@ -4,7 +4,7 @@ const base={effortMinutes:5,urgencyLevel:"medium",confidenceLevel:"strong",statu
 const tool={...base,id:"tool-task",logicalKey,dedupeKey,primaryEntityId:"job:https://jobs.example.test/receptionist",actionType:"tailor_resume",actionCategory:"optimization",source:"apply_gate",queueSource:"resume",intent:"TAILOR_RESUME",intentLabel:"Tailor resume",title:"Show your scheduling experience",company:"Example Health",roleTitle:"Receptionist",whyNow:"This posting asks for front-desk scheduling.",targetOutcome:"Show your relevant experience.",draftEligible:false,routeHref:"/apply-gate"};
 const outreach={...base,id:"outreach-task",logicalKey:"aaaaaaaaaaaaaaaa",dedupeKey:"bbbbbbbbbbbbbbbb",primaryEntityId:"thread",threadId:"thread",emailId:"email",applicationId:"app",actionType:"thank_you",actionCategory:"communication",source:"followup_engine",queueSource:"followup",intent:"SEND_THANK_YOU",intentLabel:"Thank-you",title:"Send a thank-you to Example Health",company:"Example Health",roleTitle:"Receptionist",whyNow:"The interview is fresh.",targetOutcome:"Reply to the interview contact.",draftEligible:true,routeHref:"/next-actions",suggestionSource:"email_followup"};
 
-for(const width of [390,1280]) test(`action context and editable drafts finish coherently at ${width}px`,async({page})=>{
+for(const width of [320,390,1280]) test(`action context and editable drafts finish coherently at ${width}px`,async({page})=>{
   await page.setViewportSize({width,height:1000});
   const errors:string[]=[]; page.on("pageerror",err=>errors.push(err.message));
   let completed=false; const completions:unknown[]=[]; let copied="";

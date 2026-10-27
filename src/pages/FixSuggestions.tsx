@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { invalidateTaskViews } from "@/lib/taskQueries";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -921,13 +922,7 @@ function SuggestionDraftPanel({
 }
 
 function invalidateSuggestionQueries(queryClient: ReturnType<typeof useQueryClient>) {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: ["fix-suggestions", "queue"] }),
-    queryClient.invalidateQueries({ queryKey: ["fix-suggestions", "followup"] }),
-    queryClient.invalidateQueries({ queryKey: ["fix-suggestions", "states"] }),
-    queryClient.invalidateQueries({ queryKey: ["fix-suggestions", "stored-emails"] }),
-    queryClient.invalidateQueries({ queryKey: ["dashboard", "queue"] }),
-  ]);
+  return invalidateTaskViews(queryClient);
 }
 
 function getRankedQueueActiveActions(queue?: RankedActionQueue | null): RankedAction[] {
@@ -1093,7 +1088,7 @@ const FixSuggestions = () => {
   });
 
   const followupQuery = useQuery({
-    queryKey: ["fix-suggestions", "followup"],
+    queryKey: ["fix-suggestions", "followup", user?.uid],
     queryFn: async () => {
       try {
         return await fetchFollowupSuggestions();
@@ -1110,7 +1105,7 @@ const FixSuggestions = () => {
   });
 
   const statesQuery = useQuery({
-    queryKey: ["fix-suggestions", "states"],
+    queryKey: ["fix-suggestions", "states", user?.uid],
     queryFn: async () => {
       try {
         return await fetchSuggestionActionStates();
@@ -1118,6 +1113,7 @@ const FixSuggestions = () => {
         return {
           success: false,
           actions: [],
+          historyComplete: false,
           error: err instanceof Error ? err.message : "Unable to load suggestion states",
         };
       }
@@ -1127,7 +1123,7 @@ const FixSuggestions = () => {
   });
 
   const storedEmailsQuery = useQuery({
-    queryKey: ["fix-suggestions", "stored-emails"],
+    queryKey: ["fix-suggestions", "stored-emails", user?.uid],
     queryFn: async () => {
       try {
         return await fetchStoredEmails({ limit: 200, offset: 0 });
@@ -1259,17 +1255,19 @@ const FixSuggestions = () => {
       storedEmails,
       followupSuggestions: activeFollowupSuggestions,
       actionStates,
+      historyComplete: statesQuery.isSuccess && statesQuery.data?.success !== false && statesQuery.data?.historyComplete !== false,
     });
-  }, [actionStates, activeFollowupSuggestions, storedEmails]);
+  }, [actionStates, activeFollowupSuggestions, storedEmails, statesQuery.isSuccess, statesQuery.data]);
 
   const outreachDiagnostics = useMemo(() => {
+    if (!statesQuery.isSuccess || statesQuery.data?.success === false || statesQuery.data?.historyComplete === false) return [];
     return buildOutreachDiagnostics({
       storedEmails,
       followupSuggestions: activeFollowupSuggestions,
       actionStates,
       upcomingWindows: upcomingFollowupWindows,
     });
-  }, [actionStates, activeFollowupSuggestions, storedEmails, upcomingFollowupWindows]);
+  }, [actionStates, activeFollowupSuggestions, storedEmails, upcomingFollowupWindows, statesQuery.isSuccess, statesQuery.data]);
 
   const hasDueFollowupWindow = upcomingFollowupWindows.some((item) => item.opensInDays <= 0);
   const followupSuppressionReason = followupQuery.data && 'meta' in followupQuery.data
@@ -1361,47 +1359,65 @@ const FixSuggestions = () => {
   };
 
   const isStaleQueueActionError = (error: unknown) =>
-    error instanceof ApiRequestError && Boolean(error.payload?.stale && error.payload?.requiresRefresh);
+    error instanceof ApiRequestError && error.status === 409 && Boolean(error.payload?.requiresRefresh);
 
   const completeQueueItem = async (item: QueueItem, successMessage = "Suggestion marked complete.") => {
     if (!item.logicalKey) return;
-
+    const owner = currentOwner.current;
+    const isCurrent = () => mounted.current && currentOwner.current === owner;
     await withPendingLogicalKey(item.logicalKey, async () => {
       try {
-        await completeQueueAction({
+        const result = await completeQueueAction({
           logicalKey: item.logicalKey,
           dedupeKey: item.dedupeKey,
         });
-        await refreshQueueState();
+          if (!isCurrent()) {
+            if (result.success && result.state === 'completed') void invalidateTaskViews(queryClient, owner).catch(() => {});
+            return;
+          }
+        if (!result.success || result.state !== 'completed') throw new Error('The task was not confirmed as saved. Retry this same task.');
         toast.success(successMessage);
       } catch (error) {
+        if (!isCurrent()) return;
         if (isStaleQueueActionError(error)) {
-          await refreshQueueState();
+          toast.error('This task changed. Review the refreshed task before trying again.');
+          try { await refreshQueueState(); } catch { if (isCurrent()) toast.error('Could not refresh the task. Try again.'); }
           return;
         }
         toast.error(friendlyErrorMessage(error, "That did not save. Try again."));
+        return;
       }
+      try { await refreshQueueState(); } catch { if (isCurrent()) toast.error('Saved. Refresh Next Actions to see its updated state.'); }
     });
   };
 
   const dismissQueueItem = async (item: QueueItem) => {
     if (!item.logicalKey || !item.dedupeKey) return;
-
+    const owner = currentOwner.current;
+    const isCurrent = () => mounted.current && currentOwner.current === owner;
     await withPendingLogicalKey(item.logicalKey, async () => {
       try {
-        await dismissQueueAction({
+        const result = await dismissQueueAction({
           logicalKey: item.logicalKey,
           dedupeKey: item.dedupeKey,
         });
-        await refreshQueueState();
+          if (!isCurrent()) {
+            if (result.success && result.state === 'snoozed') void invalidateTaskViews(queryClient, owner).catch(() => {});
+            return;
+          }
+        if (!result.success || result.state !== 'snoozed') throw new Error('The snooze was not confirmed as saved. Retry this same task.');
         toast.success("Suggestion snoozed for a day.");
       } catch (error) {
+        if (!isCurrent()) return;
         if (isStaleQueueActionError(error)) {
-          await refreshQueueState();
+          toast.error('This task changed. Review the refreshed task before trying again.');
+          try { await refreshQueueState(); } catch { if (isCurrent()) toast.error('Could not refresh the task. Try again.'); }
           return;
         }
         toast.error(friendlyErrorMessage(error, "The snooze did not save. Try again."));
+        return;
       }
+      try { await refreshQueueState(); } catch { if (isCurrent()) toast.error('Saved. Refresh Next Actions to see its updated state.'); }
     });
   };
 
@@ -1421,7 +1437,10 @@ const FixSuggestions = () => {
           dedupeKey: item.dedupeKey,
           actionReference: item.actionReference,
         });
-        if (!isCurrent()) return;
+        if (!isCurrent()) {
+          void invalidateTaskViews(queryClient, owner).catch(() => {});
+          return;
+        }
         toast.success("Application closed and removed from active focus.");
       } catch (error) {
         if (!isCurrent()) return;
@@ -1626,7 +1645,7 @@ const FixSuggestions = () => {
               : cta.kind === "close" && !item.actionReference ? "Refresh role" : cta.label;
     // One button look for every action. Close-out used to be red, which on the dark Today button was
     // red-on-ink (hard to read) and framed the recommended move for a long-quiet thread as a warning.
-    const ctaClass = cn(variant === "today" ? BUTTON.primary : BUTTON.secondary, "shrink-0");
+    const ctaClass = cn(variant === "today" ? BUTTON.primary : BUTTON.secondary, "min-w-0 max-w-full whitespace-normal sm:shrink-0 sm:whitespace-nowrap");
     const ctaDisabled = cta.kind === "draft" ? draftMutation.isPending : (cta.kind === "close" || cta.kind === "complete") ? mutationBusy : false;
 
     return (
@@ -1655,7 +1674,7 @@ const FixSuggestions = () => {
               {item.estimatedTime ? ` · ${item.estimatedTime}` : ""}
             </p>
             <WhyLine why={item.why} className="mt-1" />
-            {item.threadId && !item.applicationId && item.source !== "cleanup" ? (
+            {item.threadId && !item.applicationId && item.source === "followup" ? (
               <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
                 Application link not confirmed. This action uses the email conversation; updates on other threads may be missing.
               </p>
@@ -1664,7 +1683,7 @@ const FixSuggestions = () => {
               <p className="mt-2 max-w-[72ch] text-[13px] leading-relaxed text-foreground/80">{reason}</p>
             ) : null}
           </div>
-          <div className="ml-[50px] flex shrink-0 items-center gap-1 sm:ml-0">
+          <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1 sm:flex sm:w-auto sm:shrink-0">
             {cta.kind === "external" || cta.kind === "gmail" || cta.kind === "route" ? (
               <ActionCtaButton item={item} cta={cta} className={ctaClass} />
             ) : (
@@ -1924,7 +1943,7 @@ const FixSuggestions = () => {
         ) : null}
 
         {upcomingFollowupWindows.length > 0 ? (
-          <Panel icon={Clock3} tone="upcoming" title="Coming up" description="Follow-ups that open in the next few days.">
+          <Panel icon={Clock3} tone="upcoming" title="Coming up" description="Conversations to review in the next few days.">
             <UpcomingFollowupWindowList windows={upcomingFollowupWindows.slice(0, 5)} compact />
           </Panel>
         ) : null}

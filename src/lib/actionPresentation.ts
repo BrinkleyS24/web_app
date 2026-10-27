@@ -106,6 +106,10 @@ export function resolveActionCta(item: QueueItem, gmailUrl: string | null): Acti
     if (alertId) return { kind: "route", label: "See the details", href: `/strategy-alerts#${encodeURIComponent(alertId)}` };
   }
 
+  if (type === "fix_targeting" || intent === "FIX_TARGETING") {
+    return { kind: "route", label: item.ctaLabel || "Review qualifications", href: routeHref && routeHref.startsWith("/apply-gate") ? routeHref : "/apply-gate" };
+  }
+
   if (RESUME_TYPES.has(type) || intent === "TAILOR_RESUME" || item.source === "resume") {
     // The label follows the destination: tailoring for one posting happens in Apply Gate.
     const href = routeHref || "/resumes";
@@ -113,7 +117,7 @@ export function resolveActionCta(item: QueueItem, gmailUrl: string | null): Acti
     return { kind: "route", label: item.ctaLabel || (href.startsWith("/apply-gate") ? "Tailor in Apply Gate" : "Update your resume"), href };
   }
 
-  if (APPLY_GATE_TYPES.has(type) || intent === "FIX_TARGETING" || intent === "APPLY_TO_ROLE" || item.source === "apply_gate") {
+  if (APPLY_GATE_TYPES.has(type) || intent === "APPLY_TO_ROLE" || item.source === "apply_gate") {
     return { kind: "route", label: item.ctaLabel || "Open in Apply Gate", href: routeHref && routeHref.startsWith("/apply-gate") ? routeHref : "/apply-gate" };
   }
 

@@ -25,6 +25,10 @@ function item(overrides: Partial<QueueItem> = {}): QueueItem {
 const GMAIL = "https://mail.google.com/mail/u/0/#all/t1";
 
 describe("resolveActionCta", () => {
+  test("qualification review takes precedence over a resume-source label", () => {
+    const cta=resolveActionCta(item({source:'resume',actionType:'fix_targeting',intent:'FIX_TARGETING',routeHref:'/apply-gate?verdict=check',hasDraft:false}),null);
+    expect(cta).toEqual({kind:'route',label:'Review qualifications',href:'/apply-gate?verdict=check'});
+  });
   // "Work the offer -> Open in Apply Gate" went to /fix-suggestions, which redirects to Next Actions:
   // a dead loop (persona review, 2026-10-14). No action links back to the action list.
   test("an action never links back to the action list", () => {

@@ -32,13 +32,17 @@ function isApplyGateTask(item: QueueItem) {
   // The tailor task's queue source is "resume", so the Apply Gate origin is read from the
   // suggestion source the backend stamps on both tasks.
   const fromApplyGate = item.suggestionSource === "apply_gate_action_plan" || item.source === "apply_gate";
-  return fromApplyGate && (type === "tailor_resume" || type === "apply");
+  return fromApplyGate && (type === "tailor_resume" || type === "apply" || type === "fix_targeting");
 }
 
 /** The newest check of the posting this task's check was about, or null when it is not in history. */
 export function latestCheckForTask(item: QueueItem, history: ApplyGateHistoryItem[]): ApplyGateHistoryItem | null {
-  if (!isApplyGateTask(item) || item.applicationId == null) return null;
-  const source = history.find((entry) => String(entry.id) === String(item.applicationId));
+  if (!isApplyGateTask(item)) return null;
+  // Legacy servers put check IDs in applicationId. New servers send a separate
+  // identity; never let a genuine application reference replace that check.
+  const checkId = item.applyGateVerdictId ?? item.applicationId;
+  if (checkId == null) return null;
+  const source = history.find((entry) => String(entry.id) === String(checkId));
   if (!source) return null;
   const key = postingKey(source);
   return history
@@ -96,7 +100,7 @@ export function alignApplyGateActions<T extends QueueItem>(
     if (!check) return item;
     const type = String(item.actionType || "").toLowerCase();
     const decision = describeVerdictDecision(check);
-    const wording = wordingFor(type, decision.key, decision.label, roleName(check));
+    const wording = type === "fix_targeting" ? null : wordingFor(type, decision.key, decision.label, roleName(check));
     return {
       ...item,
       routeHref: applyGateHrefForCheck(check, variants ?? null),

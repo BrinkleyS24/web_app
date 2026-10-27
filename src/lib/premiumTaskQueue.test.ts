@@ -24,6 +24,16 @@ const baseAppliedEmail: StoredEmail = {
 };
 
 describe("premiumTaskQueue outreach timing", () => {
+  test("does not plan reminders from incomplete task history", () => {
+    expect(buildUpcomingFollowupWindows({storedEmails:[baseAppliedEmail],historyComplete:false})).toEqual([]);
+  });
+  test("an undated interview update does not establish the interview date", () => {
+    vi.setSystemTime(new Date('2026-04-27T12:00:00Z'));
+    const windows=buildUpcomingFollowupWindows({storedEmails:[{...baseAppliedEmail,category:'interviewed',subject:'Interview update',body:'Thank you for speaking with us. We will share a decision.'}],followupSuggestions:[],actionStates:[]});
+    expect(windows).toHaveLength(1);
+    expect(windows[0].description).toContain('latest interview-stage update');
+    expect(windows[0].description).not.toMatch(/after the interview/);
+  });
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-11T12:00:00.000Z"));

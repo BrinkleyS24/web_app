@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext.jsx";
@@ -8,6 +8,7 @@ import { useWorkspaceAction } from "@/hooks/useWorkspaceAction";
 import { fetchInterviewSource } from "@/lib/interviewPrep";
 import { BUTTON, CARD, EYEBROW } from "./tone";
 import { cn } from "@/lib/utils";
+import { invalidateTaskViews } from "@/lib/taskQueries";
 
 export function ActionWorkspaceBanner() {
   const location = useLocation();
@@ -28,6 +29,8 @@ function ResolvedActionContext({ logicalKey, dedupeKey, ownerId, interview }: { 
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const submitting = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current=true; return () => { mounted.current=false; }; }, []);
   const { queue, action } = useWorkspaceAction(logicalKey, ownerId);
   const interviewSource = useQuery({queryKey:["interview-prep","source",ownerId,logicalKey,dedupeKey],queryFn:()=>fetchInterviewSource({logicalKey,dedupeKey}),enabled:interview,retry:false,staleTime:0});
   const status = action?.effectiveStatus || action?.status;
@@ -43,15 +46,15 @@ function ResolvedActionContext({ logicalKey, dedupeKey, ownerId, interview }: { 
     try {
       const result = await completeQueueAction({ logicalKey, dedupeKey, ...(interview ? {sourceVersion:interviewSource.data!.sourceVersion}: {}) });
       if (!result.success || result.state !== "completed") throw new Error("The task was not confirmed as saved. Retry or review it in Next Actions.");
-      setSaved(true);
       // A failed refresh cannot undo a confirmed write or turn it into a failed-save message.
-      void Promise.all([
-        client.invalidateQueries({ queryKey: ["fix-suggestions", "queue"] }),
-        client.invalidateQueries({ queryKey: ["dashboard", "queue"] }),
-      ]).catch(() => {});
+      // Navigation can unmount this banner while the save is in flight. Its
+      // owner's cached views still need the result; another owner's do not.
+      void invalidateTaskViews(client, ownerId).catch(() => {});
+      if (!mounted.current) return;
+      setSaved(true);
     } catch {
-      setError("That did not confirm a save. The task may have changed. Retry loading it or review Next Actions before trying again.");
-    } finally { submitting.current = false; setPending(false); }
+      if (mounted.current) setError("That did not confirm a save. The task may have changed. Retry loading it or review Next Actions before trying again.");
+    } finally { submitting.current = false; if (mounted.current) setPending(false); }
   }
 
   return <section className={cn(CARD, "mb-5 space-y-3 p-4 sm:p-5 [overflow-wrap:anywhere]")} aria-label="Action context">
