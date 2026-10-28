@@ -2,6 +2,14 @@ import { describe, expect, test } from "vitest";
 import { describeVerdictDecision, describeVerdictOutcome } from "./verdictPresentation";
 
 describe("describeVerdictDecision", () => {
+  test("canonical requirement review never falls back to a fix-first badge", () => {
+    expect(describeVerdictDecision({verdict:'potential_fit',explanation_payload:{decision:'fix_first',presentation:{decision:{action:'CHECK_REQUIREMENTS',label:'Review qualifications'}}}}))
+      .toEqual({key:'review_requirements',label:'Review qualifications',tone:'attention'});
+  });
+  test("legacy explicit requirement review keeps its meaning without a canonical projection", () => {
+    expect(describeVerdictDecision({verdict:'risky',explanation_payload:{decision:'check_requirements'}}))
+      .toEqual({key:'review_requirements',label:'Review qualifications',tone:'attention'});
+  });
   // One decision per verdict. Cards used to say it twice: a "Risky" badge and a "Fix first before
   // applying" chip, or "Not Recommended" beside "Skip this role".
   test("the explanation's decision wins, the verdict fills in when it is missing", () => {

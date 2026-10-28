@@ -1214,7 +1214,7 @@ describe("ApplyGate current UI", () => {
     });
     renderPage();
 
-    expect(await screen.findByText(/Checked before Apply Gate's Sep 24 update/)).toBeInTheDocument();
+    expect(await screen.findByText(/Checked with an earlier version of Apply Gate/)).toBeInTheDocument();
     // No "Choose what you did" chore on any card.
     expect(screen.queryByText(/Choose what you did/)).not.toBeInTheDocument();
     // The old read is folded away until asked for: Re-check is the action on an outdated card.

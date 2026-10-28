@@ -67,6 +67,7 @@ export function variantStrategyDocumentNote(strategy: VariantStrategy): string |
  * tie-break dressed as a finding is the thing to avoid here, so it gets its own label.
  */
 export function variantStrategyPickLabel(strategy: VariantStrategy): string {
+  if(strategy.eligibilityRestricted)return strategy.recommended.basis==='your_outcomes'?"Past results only":"Content comparison";
   if (strategy.recommended.basis === "your_outcomes") return "Best results so far";
   if (strategy.recommended.requiredCount === 0) return "Your default";
   return strategy.isTieBreak ? "Any of these work" : "Best match";

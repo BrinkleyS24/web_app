@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import {mockApplyGateWorkspace} from './helpers/applyGateApi';
 
 type RequirementStatus = "missing" | "satisfied" | "unclear";
 type RequirementPriority = "hard" | "preferred";
@@ -55,7 +56,7 @@ Requirements:
     decision: "apply_now",
     confidence: "high",
     expectedHeading: "Apply now",
-    expectedPrimaryAction: "Apply now",
+    expectedPrimaryAction: "I'm applying",
     risk: 18,
     riskSummary: "Overall fit score: low risk.",
     reasons: [
@@ -87,8 +88,8 @@ Preferred:
     verdict: "potential_fit",
     decision: "apply_with_caveats",
     confidence: "medium",
-    expectedHeading: "Apply with caveats",
-    expectedPrimaryAction: "Apply with caveats",
+    expectedHeading: "Apply, but tailor first",
+    expectedPrimaryAction: "I'm applying",
     risk: 38,
     riskSummary: "Required evidence coverage: moderate risk.",
     reasons: [
@@ -129,7 +130,7 @@ Requirements:
     decision: "apply_now",
     confidence: "high",
     expectedHeading: "Apply now",
-    expectedPrimaryAction: "Apply now",
+    expectedPrimaryAction: "I'm applying",
     risk: 22,
     riskSummary: "Overall fit score: low risk.",
     reasons: [
@@ -161,7 +162,7 @@ Requirements:
     decision: "apply_now",
     confidence: "medium",
     expectedHeading: "Apply now",
-    expectedPrimaryAction: "Apply now",
+    expectedPrimaryAction: "I'm applying",
     risk: 26,
     riskSummary: "Overall fit score: low risk.",
     reasons: [
@@ -191,8 +192,8 @@ Requirements:
     verdict: "potential_fit",
     decision: "apply_with_caveats",
     confidence: "medium",
-    expectedHeading: "Apply with caveats",
-    expectedPrimaryAction: "Apply with caveats",
+    expectedHeading: "Apply, but tailor first",
+    expectedPrimaryAction: "I'm applying",
     risk: 44,
     riskSummary: "Overall fit score: moderate risk.",
     reasons: [
@@ -232,8 +233,8 @@ Requirements:
     verdict: "not_recommended",
     decision: "skip",
     confidence: "high",
-    expectedHeading: "Skip this posting",
-    expectedPrimaryAction: "Skip this role",
+    expectedHeading: "Skip this role",
+    expectedPrimaryAction: "Not applying",
     risk: 95,
     riskSummary: "Non-negotiable requirement risk: severe risk.",
     reasons: [
@@ -412,6 +413,7 @@ function buildAnalyzeResponse(scenario: PersonaScenario) {
 }
 
 async function mockApplyGate(page: Page, scenario: PersonaScenario) {
+  await mockApplyGateWorkspace(page,scenario.resumeText);
   let analyzeRequestBody: Record<string, unknown> | null = null;
 
   await page.route("http://127.0.0.1:4010/api/emails/profile/resume", async (route) => {
@@ -455,32 +457,23 @@ test.describe("Apply Gate persona matrix", () => {
       await page.goto("/apply-gate");
 
       await expect(page.getByRole("heading", { name: "Apply Gate" })).toBeVisible();
-      await expect(page.getByRole("button", { name: "Get decision" })).toBeDisabled();
+      await expect(page.getByRole("button", { name: "Check this role" })).toBeDisabled();
 
-      await page.getByLabel("Job Title").fill(scenario.jobTitle);
-      await page.getByLabel("Company Name (optional)").fill(scenario.companyName);
-      await page.getByLabel("Job Description").fill(scenario.jobDescription);
-      await page.getByRole("button", { name: "Get decision" }).click();
+      await page.getByLabel("Job title").fill(scenario.jobTitle);
+      await page.getByLabel("Company (optional)").fill(scenario.companyName);
+      await page.getByLabel("Job description").fill(scenario.jobDescription);
+      await page.getByRole("button", { name: "Check this role" }).click();
 
-      const resultPanel = page.locator(".glass-card").filter({
-        has: page.getByRole("heading", { name: scenario.expectedHeading }),
-      });
-
-      await expect(resultPanel.getByText("Application risk:")).toBeVisible();
-      await expect(resultPanel.getByText(`${scenario.risk}%`)).toBeVisible();
-      await expect(resultPanel.getByText("Risk breakdown")).toBeVisible();
-      await expect(resultPanel.getByText("Occupation grounding")).toBeVisible();
-      await expect(resultPanel.getByText(`${scenario.occupationScore}/100`)).toBeVisible();
-      if (scenario.postingOccupation.title === scenario.profileOccupation.title) {
-        await expect(resultPanel.getByText(scenario.postingOccupation.title)).toHaveCount(2);
-      } else {
-        await expect(resultPanel.getByText(scenario.postingOccupation.title)).toBeVisible();
-        await expect(resultPanel.getByText(scenario.profileOccupation.title)).toBeVisible();
-      }
-      await expect(resultPanel.getByRole("button", { name: scenario.expectedPrimaryAction })).toBeVisible();
+      const resultPanel = page.getByTestId("apply-gate-current-result");
+      await expect(resultPanel.getByRole("heading", { name: scenario.expectedHeading, exact: true })).toBeVisible();
+      await expect(resultPanel.getByTestId("risk-band")).toBeVisible();
+      await expect(resultPanel.getByRole("button", { name: scenario.expectedPrimaryAction, exact: true })).toBeVisible();
+      // Customer evidence is deliberately collapsed; internal occupation scores
+      // and uncalibrated percentages are not the customer's primary decision.
+      await resultPanel.getByTestId("apply-gate-details").locator("summary").click();
 
       if (scenario.expectRequirementCheck) {
-        await expect(resultPanel.getByText("Requirement check")).toBeVisible();
+        await expect(resultPanel.getByText("Requirement check", {exact:true})).toBeVisible();
         for (const item of scenario.requirementItems || []) {
           await expect(resultPanel.getByText(item.label, { exact: true }).first()).toBeVisible();
         }

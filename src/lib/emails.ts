@@ -1476,6 +1476,7 @@ export type VariantStrategyGap = {
   skipSignal: boolean;                      // true only for missing gaps
 };
 export type VariantStrategy = {
+  eligibilityRestricted?: boolean;
   recommended: { variantId: string; name: string; basis: "requirements" | "your_outcomes"; sampleSize: number; reason: string; requiredCount?: number; outcomeBand?: { kind: "stronger" | "tracked"; sampleSize: number; comparison: string } | null };
   alternatives: { variantId: string; name: string; contentMatch: { coverage: number | null; matchedCount: number; requiredCount: number; missing: string[] } }[];
   gaps: VariantStrategyGap[];
@@ -1504,8 +1505,15 @@ export type VariantStrategy = {
   analyzedDifferentDocument?: boolean;
 };
 
+export type ApplyGateQualificationAssessment = {
+  version:number;decision:'supported'|'review'|'excluded'|'unavailable';exclusionKind?:string|null;reasons:string[];
+  requirementCount?:number;requirementsTruncated?:boolean;
+  requirements:{label:string;quote:string|null;status:string;evidence:string|null;evidenceState?:string;source?:{quote:string;start:number;end:number}|null;evidenceSources?:{quote:string;start:number;end:number}[];components?:{id:string;status:string;evidenceSourceIndexes:number[]}[]}[];
+};
 export type ApplyGateResult = {
-  qualificationAssessment?: {version:number;decision:'supported'|'review'|'excluded'|'unavailable';exclusionKind?:string|null;reasons:string[];requirements:{label:string;quote:string|null;status:string;evidence:string|null}[]};
+  qualificationAssessment?: ApplyGateQualificationAssessment;
+  historySaved?: boolean;
+  historyWarning?: string | null;
   success: boolean;
   /**
    * Set when the backend had no usable profile (no resume text + no history) and
@@ -1556,6 +1564,7 @@ export type ApplyGateResult = {
   reasons: string[];
   explanation?: {
     presentation?: ApplyGatePresentation | null;
+    qualification_assessment?: ApplyGateQualificationAssessment;
     resume_document?: ApplyGateResult['resumeDocument'];
     hard_blockers: string[];
     display_decision?: ApplyGateDisplayDecision | null;

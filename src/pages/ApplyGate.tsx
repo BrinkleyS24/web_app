@@ -37,6 +37,7 @@ import {
 } from "@/lib/emails";
 import { VariantStrategyCard, type VariantDraftDecisions } from "@/components/VariantStrategyCard";
 import { ReferralNudge } from "@/components/ReferralNudge";
+import { QualificationEvidence } from "@/components/QualificationEvidence";
 
 const APPLY_GATE_STAGES = [
   "Reading the job description",
@@ -2186,11 +2187,8 @@ const ApplyGateWorkspace = () => {
                   </div>
                 </section>
 
-                {result.qualificationAssessment && <div className="rounded-lg border border-border bg-background p-3 text-sm" data-testid="apply-gate-core-qualification">
-                  <p className="font-medium">{result.qualificationAssessment.decision === 'supported' ? 'Your resume supports the core requirements' : result.qualificationAssessment.decision === 'review' ? 'Core experience has support; some requirements need confirmation' : result.qualificationAssessment.decision === 'unavailable' ? 'Core qualification evidence could not be checked' : result.qualificationAssessment.exclusionKind === 'requirement_blocker' ? 'An explicit requirement blocks this application' : 'Core qualification evidence is incomplete'}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Application strategy and verified requirements are different. This requirement assessment also drives your Jobs feed; location preferences are checked separately there.</p>
-                  {result.qualificationAssessment.decision !== 'supported' && <ul className="mt-2 list-disc pl-4 text-muted-foreground">{result.qualificationAssessment.reasons.slice(0,3).map((reason,index)=><li key={index}>{reason}</li>)}</ul>}
-                </div>}
+                <QualificationEvidence assessment={result.qualificationAssessment} />
+                {result.historySaved===false&&<p role="alert" className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-sm">{result.historyWarning||'This check was not saved to history. Keep the posting and try again before leaving this page.'}</p>}
 
                 {currentShowWarning || currentVisibleSteps.length > 0 || currentStatus === "strong" || currentStatus === "potential" ? (
                   <section ref={actionPlanRef} data-testid="apply-gate-todo" aria-label="What to do" className="scroll-mt-4 space-y-3">
@@ -2736,7 +2734,7 @@ const ApplyGateWorkspace = () => {
                 {item.outdated ? (
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3">
                     <p className="text-[13px] leading-snug text-muted-foreground">
-                      Checked before Apply Gate's Sep 24 update, so this read may be out of date.
+                      Checked with an earlier version of Apply Gate. Re-check this posting for a current decision.
                     </p>
                     <button
                       type="button"
@@ -2758,6 +2756,7 @@ const ApplyGateWorkspace = () => {
                 {(() => {
                   const oldRead = (
                     <>
+                <QualificationEvidence assessment={item.explanation_payload?.qualification_assessment} />
                 {historyVisibleReasons.map((reason, index) => (
                   <p key={index} className="text-sm text-muted-foreground leading-relaxed">• {reason}</p>
                 ))}

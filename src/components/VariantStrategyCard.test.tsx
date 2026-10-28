@@ -58,6 +58,15 @@ const outcomeStrategy: VariantStrategy = {
 };
 
 describe("VariantStrategyCard", () => {
+  test("a held application decision cannot be relabeled as a best-match resume", () => {
+    const held={...strategy,eligibilityRestricted:true,eligibilityNote:'Qualification evidence still needs confirmation.'};
+    expect(variantStrategyPickLabel(held)).toBe('Content comparison');
+    expect(variantStrategyPickLabel({...outcomeStrategy,eligibilityRestricted:true})).toBe('Past results only');
+    render(<VariantStrategyCard strategy={held}/>);
+    expect(screen.getByText('Qualification evidence still needs confirmation.')).toBeVisible();
+    expect(screen.queryByText('Best match')).not.toBeInTheDocument();
+    expect(screen.queryByText('Any of these work')).not.toBeInTheDocument();
+  });
   test("renders the recommended variant name and basis label", () => {
     render(<VariantStrategyCard strategy={strategy} />);
     expect(screen.getByText("QA-Focused")).toBeInTheDocument();

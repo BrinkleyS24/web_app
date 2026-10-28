@@ -2,7 +2,7 @@ import type { Tone } from "@/components/premium/tone";
 import type { ApplyGateVerdict } from "@/lib/emails";
 import { STATUS_TONE } from "@/lib/statusTone";
 
-export type VerdictDecisionKey = "apply" | "apply_with_care" | "fix_first" | "skip";
+export type VerdictDecisionKey = "apply" | "apply_with_care" | "fix_first" | "review_requirements" | "skip";
 
 type VerdictLike = {
   verdict?: ApplyGateVerdict | string | null;
@@ -13,15 +13,17 @@ const DECISIONS: Record<VerdictDecisionKey, { label: string; tone: Tone }> = {
   apply: { label: "Apply", tone: "positive" },
   apply_with_care: { label: "Tailor first", tone: "brand" },
   fix_first: { label: "Fix first", tone: "attention" },
+  review_requirements: { label: "Review qualifications", tone: "attention" },
   skip: { label: "Skip", tone: "risk" },
 };
 
 /** The one decision a verdict stands for, in plain words. */
 export function describeVerdictDecision(item: VerdictLike): { key: VerdictDecisionKey; label: string; tone: Tone } {
   const resolved = item?.explanation_payload?.presentation?.decision;
-  const keys: Record<string, VerdictDecisionKey> = { APPLY: "apply", APPLY_WITH_STRATEGY: "apply_with_care", FIX_THEN_APPLY: "fix_first", SKIP: "skip" };
+  const keys: Record<string, VerdictDecisionKey> = { APPLY: "apply", APPLY_WITH_STRATEGY: "apply_with_care", FIX_THEN_APPLY: "fix_first", CHECK_REQUIREMENTS: "review_requirements", SKIP: "skip" };
   if (resolved && keys[resolved.action]) {
     const key = keys[resolved.action];
+    if(key==='review_requirements')return {key,...DECISIONS[key]};
     // Checks saved before 2026-10-16 carry "Apply with care" over the "Apply, but tailor first"
     // heading: one verdict, two names. Show the current name.
     return { key, ...DECISIONS[key], label: resolved.label === "Apply with care" ? DECISIONS[key].label : resolved.label };
@@ -29,6 +31,7 @@ export function describeVerdictDecision(item: VerdictLike): { key: VerdictDecisi
   const decision = String(item?.explanation_payload?.decision || "").toLowerCase();
   let key: VerdictDecisionKey;
   if (decision === "apply_now") key = "apply";
+  else if (decision === "check_requirements") key = "review_requirements";
   else if (decision === "apply_with_caveats") key = "apply_with_care";
   else if (decision === "fix_first") key = "fix_first";
   else if (decision === "skip") key = "skip";

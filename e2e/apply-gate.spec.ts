@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import {mockApplyGateWorkspace} from './helpers/applyGateApi';
 
 const onebriefJobDescription = `Software Development Engineer in Test
 
@@ -16,6 +17,7 @@ Containerization and orchestration experience (Docker, Kubernetes).
 Familiarity with observability stacks like Grafana, Kibana, or Prometheus.`;
 
 test("Apply Gate pasted JD flow hides preferred-only gaps from requirement check", async ({ page }) => {
+  await mockApplyGateWorkspace(page,'QA engineer with Python, Selenium, Pytest, API testing, CI/CD, k6, JMeter, and test automation experience.');
   let analyzeRequestBody: Record<string, unknown> | null = null;
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
@@ -176,19 +178,17 @@ test("Apply Gate pasted JD flow hides preferred-only gaps from requirement check
   await page.goto("/apply-gate", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByRole("heading", { name: "Apply Gate" })).toBeVisible();
-  await expect(page.getByLabel("Job URL")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Get decision" })).toBeDisabled();
+  await expect(page.getByLabel("Job posting link (optional)")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Check this role" })).toBeDisabled();
 
-  await page.getByLabel("Job Title").fill("Software Development Engineer in Test");
-  await page.getByLabel("Company Name (optional)").fill("Onebrief");
-  await page.getByLabel("Job Description").fill(onebriefJobDescription);
-  await page.getByRole("button", { name: "Get decision" }).click();
+  await page.getByLabel("Job title").fill("Software Development Engineer in Test");
+  await page.getByLabel("Company (optional)").fill("Onebrief");
+  await page.getByLabel("Job description").fill(onebriefJobDescription);
+  await page.getByRole("button", { name: "Check this role" }).click();
 
   await expect(page.getByRole("heading", { name: "Apply now" })).toBeVisible();
-  const resultPanel = page.locator(".glass-card").filter({
-    has: page.getByRole("heading", { name: "Apply now" }),
-  });
-  await expect(resultPanel.getByText("Why this recommendation")).toBeVisible();
+  const resultPanel = page.getByTestId("apply-gate-current-result");
+  await expect(resultPanel.getByTestId("apply-gate-call")).toBeVisible();
   await expect(resultPanel.getByText("Requirement check")).toHaveCount(0);
   await expect(resultPanel.getByText(/observability stacks like Grafana/i)).toHaveCount(0);
 
@@ -208,6 +208,7 @@ test("Apply Gate pasted JD flow hides preferred-only gaps from requirement check
 });
 
 test("Apply Gate keeps the decision visible when saving the action fails", async ({ page }) => {
+  await mockApplyGateWorkspace(page,'Automation Engineer with Python automation and robotics validation experience.');
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
   page.on("console", (msg) => {
@@ -335,13 +336,13 @@ test("Apply Gate keeps the decision visible when saving the action fails", async
   });
 
   await page.goto("/apply-gate", { waitUntil: "domcontentloaded" });
-  await page.getByLabel("Job Title").fill("Automation Engineer");
-  await page.getByLabel("Company Name (optional)").fill("Acme Robotics");
-  await page.getByLabel("Job Description").fill("Requires Python automation and robotics validation.");
-  await page.getByRole("button", { name: "Get decision" }).click();
+  await page.getByLabel("Job title").fill("Automation Engineer");
+  await page.getByLabel("Company (optional)").fill("Acme Robotics");
+  await page.getByLabel("Job description").fill("Requires Python automation and robotics validation.");
+  await page.getByRole("button", { name: "Check this role" }).click();
 
   await expect(page.getByRole("heading", { name: "Fix first before applying" })).toBeVisible();
-  await page.getByRole("button", { name: "I'll fix first" }).click();
+  await page.getByRole("button", { name: "Fixing resume first" }).click();
 
   await expect(page.getByRole("alert")).toContainText("Choice not saved. Try again.");
   await expect(page.getByRole("heading", { name: "Fix first before applying" })).toBeVisible();

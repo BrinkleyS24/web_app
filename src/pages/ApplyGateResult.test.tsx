@@ -225,6 +225,13 @@ describe("risk pill", () => {
 });
 
 describe("three blocks", () => {
+  test("an available result explicitly discloses that its history save failed", async () => {
+    analyzeJobAlignment.mockResolvedValue({...skipResult,id:null,historySaved:false,historyWarning:'This check could not be saved to history. Keep the posting and try again.'});
+    renderPage();await runAnalyze();
+    const card=await screen.findByTestId('apply-gate-current-result');
+    expect(within(card).getByRole('alert')).toHaveTextContent('could not be saved to history');
+    expect(within(card).getByTestId('apply-gate-call')).toBeVisible();
+  });
   test("the call and what to do come first; details are collapsed by default", async () => {
     analyzeJobAlignment.mockResolvedValue(skipResult);
     renderPage();
