@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api";
+import { isConfirmedResumeOutcomes, OUTCOME_CONTRACT_MESSAGE } from './resumeOutcomesContract';
 
 export type StoredEmail = {
   id: string;
@@ -1837,13 +1838,15 @@ export type VariantScoreRow = {
 };
 
 export type VariantBreakdownRow = {
+  applicationId: string;
   role: string | null;
   company: string | null;
   outcome: "interviewed" | "offered" | "rejected" | "no_response" | "pending";
 };
 
-export type VariantScoreboard = { perVariant: VariantScoreRow[]; minSample: number; ambiguousCohorts?: number; unknownApplications?: number; unlinkedSubmissions?: number };
-export type VariantRecommendation = { variantId: string; name: string; interviewRate: number; sampleSize?: number; kind?: 'tracked' | 'stronger' } | null;
+export type VariantScoreboard = { basis: 'confirmed_application_outcomes'; perVariant: VariantScoreRow[]; minSample: number; ambiguousCohorts?: number; unknownApplications?: number; unlinkedSubmissions?: number };
+export type VariantRecommendation = { variantId: string; name: string; interviewRate: number; sampleSize: number; kind: 'tracked' | 'stronger'; basis: 'confirmed_application_outcomes' } | null;
+export type VariantScoreboardResponse = { success: true; scoreboard: VariantScoreboard; recommendation: VariantRecommendation; breakdown?: { [variantId: string]: VariantBreakdownRow[] } };
 
 export type ResumeSubmissionApplication = {
   id: string; company: string; role: string; source: string; appliedAt: string | null;
@@ -1921,7 +1924,9 @@ export async function setResumeHealthFinding(body: {
   return apiFetch("/api/resumes/health/dismiss", { method: "POST", body: JSON.stringify(body) });
 }
 
-export async function fetchVariantScoreboard(title?: string): Promise<{ success: boolean; scoreboard: VariantScoreboard; recommendation: VariantRecommendation; breakdown?: { [variantId: string]: VariantBreakdownRow[] } }> {
+export async function fetchVariantScoreboard(title?: string): Promise<VariantScoreboardResponse> {
   const qs = title ? `?title=${encodeURIComponent(title)}` : "";
-  return apiFetch(`/api/resumes/scoreboard${qs}`, { method: "GET" });
+  const response: unknown = await apiFetch(`/api/resumes/scoreboard${qs}`, { method: "GET" });
+  if (!isConfirmedResumeOutcomes(response)) throw new Error(OUTCOME_CONTRACT_MESSAGE);
+  return response;
 }

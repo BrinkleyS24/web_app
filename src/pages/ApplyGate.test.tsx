@@ -1299,8 +1299,10 @@ describe("ApplyGate current UI", () => {
     });
     fetchVariantScoreboard.mockResolvedValue({
       success: true,
-      scoreboard: { minSample: 5, perVariant: [] },
-      recommendation: { variantId: "A", name: "QA-focused", interviewRate: 43 },
+      scoreboard: { basis: 'confirmed_application_outcomes', minSample: 5, perVariant: [
+        { variantId: 'A', name: 'QA-focused', sent: 7, matchedToOutcome: 7, interviewed: 3, offered: 0, rejected: 4, noResponse: 0, interviewRate: 42.9, sufficientSample: true },
+      ] },
+      recommendation: { basis: 'confirmed_application_outcomes', variantId: "A", name: "QA-focused", interviewRate: 42.9, sampleSize: 7, kind: 'tracked' },
     });
     analyzeJobAlignment.mockResolvedValue(baseResult);
     renderPage();
@@ -1308,7 +1310,7 @@ describe("ApplyGate current UI", () => {
     await runAnalyze({ jobTitle: "QA Engineer" });
 
     await waitFor(() => {
-      expect(screen.getByText(/43% of its confirmed applications with tracked outcomes/i)).toBeInTheDocument();
+      expect(screen.getByText(/42\.9% of its confirmed applications with tracked outcomes/i)).toBeInTheDocument();
       expect(screen.getByText(/Past outcomes do not establish qualification/i)).toBeInTheDocument();
       expect(screen.queryByText(/Consider sending that one/i)).not.toBeInTheDocument();
     });

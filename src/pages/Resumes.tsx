@@ -29,6 +29,7 @@ import { STATUS_TONE } from "@/lib/statusTone";
 import { ResumeEditor, ResumeTextComparison } from "@/components/ResumeEditor";
 import { ResumeSubmissions } from "@/components/ResumeSubmissions";
 import { readResumeChoice, resumeToolHref, RESUME_ID } from "@/lib/resumeWorkspace";
+import { isConfirmedResumeOutcomes, OUTCOME_CONTRACT_MESSAGE } from '@/lib/resumeOutcomesContract';
 
 const VARIANT_NUDGE_DISMISS_KEY = "variantNudge.dismissed";
 
@@ -349,7 +350,9 @@ const ResumeWorkspace = () => {
   const [comparisonTitle, setComparisonTitle] = useState('');
   const variantsQuery = useQuery({ queryKey: ["resume-variants", user?.uid], queryFn: fetchResumeVariants });
   const scoreboardQuery = useQuery({ queryKey: ["variant-scoreboard", user?.uid, comparisonTitle], queryFn: () => fetchVariantScoreboard(comparisonTitle || undefined), enabled: premium });
-  const outcomeData = scoreboardQuery.isError ? undefined : scoreboardQuery.data;
+  const incompatibleOutcomes = scoreboardQuery.isSuccess && !isConfirmedResumeOutcomes(scoreboardQuery.data);
+  const outcomesUnavailable = scoreboardQuery.isError || incompatibleOutcomes;
+  const outcomeData = !outcomesUnavailable && variantsQuery.isSuccess && isConfirmedResumeOutcomes(scoreboardQuery.data) ? scoreboardQuery.data : undefined;
   const statsQuery = useQuery({ queryKey: ["application-stats", user?.uid], queryFn: fetchApplicationStats, enabled: premium });
   const healthQuery = useQuery({ queryKey: ["resume-health", user?.uid], queryFn: fetchResumeHealth, enabled: premium });
 
@@ -496,17 +499,19 @@ const ResumeWorkspace = () => {
         ) : null}
 
         {premium && user?.uid ? <ResumeSubmissions key={user.uid} owner={user.uid} variants={variants} /> : null}
-        {premium && variants.length > 0 ? <form className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-end" onSubmit={event => { event.preventDefault(); setComparisonTitle(comparisonDraft.trim()); }}>
-          <label className="w-full min-w-0 text-sm sm:flex-1">Compare outcomes for a role (optional)
-            <input className="mt-1 w-full rounded-lg border border-border bg-background p-2" maxLength={200} value={comparisonDraft} onChange={event => setComparisonDraft(event.target.value)} placeholder="For example, QA Engineer" />
-          </label><button className={BUTTON.secondary} type="submit">Compare this role</button>
-          <p className="basis-full text-xs text-muted-foreground">{comparisonTitle ? `Showing the role family for ${comparisonTitle}.` : 'Showing all roles. Choose a role for a recommendation based on relevant confirmed outcomes.'} This comparison never establishes job qualification.</p>
+        {premium && variants.length > 0 ? <form className="space-y-2" aria-label="Compare resume outcomes" onSubmit={event => { event.preventDefault(); setComparisonTitle(comparisonDraft.trim()); }}>
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <label className="block min-w-0 text-sm">Compare outcomes for a role (optional)
+              <input className="mt-1 block w-full rounded-lg border border-border bg-background p-2" maxLength={200} value={comparisonDraft} onChange={event => setComparisonDraft(event.target.value)} placeholder="For example, QA Engineer" />
+            </label><button className={cn(BUTTON.secondary, 'justify-self-start whitespace-nowrap')} type="submit">Compare this role</button>
+          </div>
+          <p className="text-xs text-muted-foreground">{comparisonTitle ? `Showing the role family for ${comparisonTitle}.` : 'Showing all roles. Choose a role for a recommendation based on relevant confirmed outcomes.'} This comparison never establishes job qualification.</p>
         </form> : null}
         {premium && (outcomeData?.scoreboard?.perVariant ?? []).some(row => !variants.some(v => v.id === row.variantId)) ? <Panel title="Confirmed outcomes for past versions">
           <p className="mb-3 text-sm text-muted-foreground">Archived versions retain their confirmed history. They are excluded from new version recommendations.</p>
           <ul className="space-y-2">{(outcomeData?.scoreboard?.perVariant ?? []).filter(row => !variants.some(v => v.id === row.variantId)).map(row => <li key={row.variantId} className="text-sm"><strong>{row.name}</strong>: {row.sent} confirmed application(s), {row.matchedToOutcome} with tracked outcomes, {row.interviewed} reaching interview stage and {row.offered} offer(s).</li>)}</ul>
         </Panel> : null}
-        {premium && scoreboardQuery.isError ? <ErrorState title="Resume outcomes could not be loaded" detail="No partial recommendation is shown. Your resume library is still available." onRetry={() => scoreboardQuery.refetch()} /> : null}
+        {premium && outcomesUnavailable ? <ErrorState title="Resume outcomes could not be loaded" detail={incompatibleOutcomes || scoreboardQuery.error?.message === OUTCOME_CONTRACT_MESSAGE ? OUTCOME_CONTRACT_MESSAGE : "No partial recommendation is shown. Your resume library is still available."} onRetry={() => scoreboardQuery.refetch()} /> : null}
         {premium && (outcomeData?.scoreboard?.unknownApplications ?? 0) > 0 ? <p role="status" className="text-sm text-muted-foreground">{outcomeData?.scoreboard?.unknownApplications} application(s) have no confirmed saved resume. No version receives credit for them.</p> : null}
         {premium && (outcomeData?.scoreboard?.ambiguousCohorts ?? 0) > 0 ? (
           <p role="status" className="text-sm text-muted-foreground">
@@ -514,7 +519,7 @@ const ResumeWorkspace = () => {
           </p>
         ) : null}
 
-        {premium && variants.length >= 2 && !scoreboardQuery.isError && !scoreboardQuery.isPending ? (
+        {premium && variants.length >= 2 && outcomeData ? (
           <VariantComparison
             variants={variants}
             scoreByVariant={scoreByVariant}
@@ -604,7 +609,7 @@ const ResumeWorkspace = () => {
                         <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-foreground">{v.name}</h2>
                         {v.isDefault ? <ToneChip tone="brand">Default</ToneChip> : null}
                       </div>
-                      <p className="mt-0.5 text-[13px] text-muted-foreground">{premium ? (scoreboardQuery.isError ? "Resume outcomes are unavailable. Your saved resume is still available." : scoreboardQuery.isPending ? "Loading confirmed outcomes..." : recordLine(scoreByVariant.get(v.id))) : (v.isDefault ? "Used for your extension job checks." : "Available to choose as your default.")}</p>
+                      <p className="mt-0.5 text-[13px] text-muted-foreground">{premium ? (outcomesUnavailable ? "Resume outcomes are unavailable. Your saved resume is still available." : !outcomeData ? "Loading confirmed outcomes..." : recordLine(scoreByVariant.get(v.id))) : (v.isDefault ? "Used for your extension job checks." : "Available to choose as your default.")}</p>
                     </div>
                   </div>
                   <div className="-ml-2 flex min-w-0 flex-wrap items-center gap-1">

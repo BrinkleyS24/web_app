@@ -64,7 +64,7 @@ function renderPage() {
 beforeEach(() => {
   useAuth.mockReturnValue({ plan: "premium" });
   fetchLegacyResumeForReview.mockResolvedValue({ success: true, resumeText: null });
-  fetchVariantScoreboard.mockResolvedValue({ success: true, scoreboard: { minSample: 5, perVariant: [] }, recommendation: null });
+  fetchVariantScoreboard.mockResolvedValue({ success: true, scoreboard: { basis: "confirmed_application_outcomes", minSample: 5, perVariant: [] }, recommendation: null });
   fetchApplicationStats.mockResolvedValue({
     success: true,
     stats: { applications: { applied: 0, interviewed: 0, offered: 0, rejected: 0, total: 0 }, emails: { linked: 0, total: 0, ungrouped: 0 } },
@@ -87,7 +87,7 @@ test('empty version outcomes point to application confirmation without requiring
 
 test('a failed refresh hides cached outcome rates and does not claim zero submissions', async () => {
   fetchResumeVariants.mockResolvedValue({ variants: [{ id: 'A', name: 'QA A', isDefault: true }, { id: 'B', name: 'QA B' }] });
-  fetchVariantScoreboard.mockResolvedValueOnce({ scoreboard: { minSample: 5, perVariant: [{ variantId: 'A', name: 'QA A', sent: 5, matchedToOutcome: 5, interviewed: 5, offered: 0, rejected: 0, noResponse: 0, interviewRate: 100, sufficientSample: true }] }, recommendation: null }).mockRejectedValue(new Error('Outage after initial data'));
+  fetchVariantScoreboard.mockResolvedValueOnce({ success: true, scoreboard: { basis: "confirmed_application_outcomes", minSample: 5, perVariant: [{ variantId: 'A', name: 'QA A', sent: 5, matchedToOutcome: 5, interviewed: 5, offered: 0, rejected: 0, noResponse: 0, interviewRate: 100, sufficientSample: true }] }, recommendation: null }).mockRejectedValue(new Error('Outage after initial data'));
   const { queryClient } = renderPage();
   expect(await screen.findByText('100%')).toBeInTheDocument();
   await act(async () => { await queryClient.invalidateQueries({ queryKey: ['variant-scoreboard'] }); });
@@ -98,9 +98,35 @@ test('a failed refresh hides cached outcome rates and does not claim zero submis
 
 test('ambiguous attribution is explained instead of displaying inflated resume outcomes', async () => {
   fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'QA', isDefault: true }] });
-  fetchVariantScoreboard.mockResolvedValue({ success: true, scoreboard: { minSample: 5, perVariant: [], ambiguousCohorts: 1 }, recommendation: null });
+  fetchVariantScoreboard.mockResolvedValue({ success: true, scoreboard: { basis: "confirmed_application_outcomes", minSample: 5, perVariant: [], ambiguousCohorts: 1 }, recommendation: null });
   renderPage();
   expect(await screen.findByText(/We cannot tell which resume to credit/)).toBeInTheDocument();
+});
+
+test('a legacy backend response is not relabeled as confirmed history, counts or a recommendation', async () => {
+  fetchResumeVariants.mockResolvedValue({ variants: [{ id: 'A', name: 'Current version', isDefault: true }, { id: 'B', name: 'Other version' }] });
+  fetchVariantScoreboard.mockResolvedValue({ success: true, scoreboard: { basis: 'applied_verdict_vs_email_cohort_outcome', minSample: 5,
+    perVariant: [{ variantId: 'old', name: 'Resume', sent: 12, matchedToOutcome: 5, interviewed: 1, interviewRate: 20 }] },
+    recommendation: { variantId: 'old', name: 'Resume', interviewRate: 20 } });
+  renderPage();
+  expect(await screen.findByText('Resume outcomes could not be loaded')).toBeInTheDocument();
+  expect(screen.getByText(/Past checks alone do not confirm which resume you submitted/)).toBeInTheDocument();
+  expect(screen.queryByText('Confirmed outcomes for past versions')).not.toBeInTheDocument();
+  expect(screen.queryByText('Which version works')).not.toBeInTheDocument();
+  expect(screen.queryByText(/12 confirmed/)).not.toBeInTheDocument();
+  expect(screen.queryByText('20%')).not.toBeInTheDocument();
+  expect(screen.queryByText(/No confirmed submissions for this version/)).not.toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Current version' })).toBeInTheDocument();
+});
+
+test('a scoreboard arriving before the library does not identify every version as archived', async () => {
+  fetchResumeVariants.mockReturnValue(new Promise(() => {}));
+  fetchVariantScoreboard.mockResolvedValue({ success: true, scoreboard: { basis: 'confirmed_application_outcomes', minSample: 5,
+    perVariant: [{ variantId: 'A', name: 'Still loading', sent: 1, matchedToOutcome: 0, interviewed: 0, offered: 0,
+      rejected: 0, noResponse: 0, interviewRate: null, sufficientSample: false }] }, recommendation: null });
+  renderPage();
+  await waitFor(() => expect(fetchVariantScoreboard).toHaveBeenCalled());
+  expect(screen.queryByText('Confirmed outcomes for past versions')).not.toBeInTheDocument();
 });
 
 test('free users manage a default without making premium requests', async () => {
@@ -163,7 +189,7 @@ describe("Resumes page", () => {
     });
     fetchVariantScoreboard.mockResolvedValue({
       success: true,
-      scoreboard: {
+      scoreboard: { basis: "confirmed_application_outcomes",
         minSample: 5,
         perVariant: [{ variantId: "A", name: "QA-focused", sent: 2, matchedToOutcome: 2, interviewed: 1, offered: 0, rejected: 1, noResponse: 0, interviewRate: 50, sufficientSample: false }],
       },
@@ -195,9 +221,9 @@ describe("Resumes page", () => {
     });
     fetchVariantScoreboard.mockResolvedValue({
       success: true,
-      scoreboard: {
+      scoreboard: { basis: "confirmed_application_outcomes",
         minSample: 5,
-        perVariant: [{ variantId: "A", name: "QA-focused", sent: 8, matchedToOutcome: 7, interviewed: 3, offered: 1, rejected: 2, noResponse: 1, interviewRate: 57.1, sufficientSample: true }],
+        perVariant: [{ variantId: "A", name: "QA-focused", sent: 8, matchedToOutcome: 7, interviewed: 3, offered: 1, rejected: 3, noResponse: 0, interviewRate: 57.1, sufficientSample: true }],
       },
       recommendation: null,
     });
@@ -216,15 +242,15 @@ describe("Resumes page", () => {
     });
     fetchVariantScoreboard.mockResolvedValue({
       success: true,
-      scoreboard: {
+      scoreboard: { basis: "confirmed_application_outcomes",
         minSample: 5,
-        perVariant: [{ variantId: "V1", name: "SWE-generic", sent: 2, matchedToOutcome: 1, interviewed: 1, offered: 0, rejected: 0, noResponse: 0, interviewRate: null, sufficientSample: false }],
+        perVariant: [{ variantId: "V1", name: "SWE-generic", sent: 2, matchedToOutcome: 1, interviewed: 1, offered: 0, rejected: 0, noResponse: 0, interviewRate: 100, sufficientSample: false }],
       },
       recommendation: null,
       breakdown: {
         V1: [
-          { role: "QA Engineer", company: "Acme Corp", outcome: "interviewed" },
-          { role: "Software Tester", company: "Beta Inc", outcome: "pending" },
+          { applicationId: "1", role: "QA Engineer", company: "Acme Corp", outcome: "interviewed" },
+          { applicationId: "2", role: "Software Tester", company: "Beta Inc", outcome: "pending" },
         ],
       },
     });
@@ -259,21 +285,21 @@ describe("Resumes page", () => {
     });
     fetchVariantScoreboard.mockResolvedValue({
       success: true,
-      scoreboard: {
+      scoreboard: { basis: "confirmed_application_outcomes",
         minSample: 5,
         perVariant: [
-          { variantId: "A", name: "QA-focused", sent: 9, matchedToOutcome: 7, interviewed: 3, offered: 1, rejected: 2, noResponse: 1, interviewRate: 42.9, sufficientSample: true },
-          { variantId: "B", name: "Generic", sent: 3, matchedToOutcome: 2, interviewed: 0, offered: 0, rejected: 2, noResponse: 0, interviewRate: null, sufficientSample: false },
+          { variantId: "A", name: "QA-focused", sent: 20, matchedToOutcome: 20, interviewed: 17, offered: 1, rejected: 2, noResponse: 0, interviewRate: 90, sufficientSample: true },
+          { variantId: "B", name: "Generic", sent: 3, matchedToOutcome: 0, interviewed: 0, offered: 0, rejected: 0, noResponse: 0, interviewRate: null, sufficientSample: false },
         ],
       },
-      recommendation: { variantId: "A", name: "QA-focused", interviewRate: 42.9 },
+      recommendation: { basis: 'confirmed_application_outcomes', variantId: "A", name: "QA-focused", interviewRate: 90, sampleSize: 20, kind: 'tracked' },
     });
     renderPage();
 
     expect(await screen.findByText("Which version works")).toBeInTheDocument();
     expect(screen.getByText(/reached interview stage or offer in/)).toBeInTheDocument();
-    expect(screen.getAllByText("43%")).toHaveLength(2); // the answer line and its row
-    expect(screen.getByText("needs 3 more")).toBeInTheDocument();
+    expect(screen.getAllByText("90%")).toHaveLength(2); // the answer line and its row
+    expect(screen.getByText("needs 5 more")).toBeInTheDocument();
     expect(screen.getByText("Tracked results")).toBeInTheDocument();
   });
 

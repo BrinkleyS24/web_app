@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isConfirmedResumeOutcomes } from '@/lib/resumeOutcomesContract';
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invalidateApplyGateViews } from "@/lib/taskQueries";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -1313,7 +1314,7 @@ const ApplyGateWorkspace = () => {
     enabled: Boolean(result) && !result?.insufficientProfile && variants.length > 1,
     staleTime: 30_000,
   });
-  const variantRecommendation = guidanceQuery.data?.recommendation ?? null;
+  const variantRecommendation = !guidanceQuery.isError && isConfirmedResumeOutcomes(guidanceQuery.data) ? guidanceQuery.data.recommendation : null;
 
   // Resume-level findings deliberately do NOT appear in the verdict — they are the same on every
   // run, so putting them there is what made the advice read as boilerplate. All that crosses over
