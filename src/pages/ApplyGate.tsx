@@ -1192,7 +1192,7 @@ function actionConfirmationCopy(action: ApplyGateAction): { title: string; body:
   if (action === "applied") {
     return {
       title: "Marked as applied — good luck.",
-      body: "Logged against your outcome history, so your next verdicts get sharper as results come in.",
+      body: "Your applying intent is recorded. Confirm the resume you actually submitted on the tracked application before its outcome can count toward a resume version.",
     };
   }
   if (action === "fixed") {
@@ -2254,6 +2254,7 @@ const ApplyGateWorkspace = () => {
                       {actionConfirmationCopy(actionConfirmation.action).body}
                     </p>
                     <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                      {actionConfirmation.action === "applied" ? <Link className="text-xs underline" to="/resumes#submitted-resumes">Confirm submitted resume on the application</Link> : null}
                       {actionConfirmation.action === "applied" && (result?.jobUrl || jobUrl).trim() ? (
                         <Button
                           size="sm"
@@ -2405,9 +2406,8 @@ const ApplyGateWorkspace = () => {
 
                       {variantRecommendation ? (
                         <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 text-xs leading-relaxed text-muted-foreground">
-                          <span className="font-semibold text-foreground">{variantRecommendation.name}</span> has your best
-                          track record on roles like this: {variantRecommendation.interviewRate}% reach an interview. Consider
-                          sending that one.
+                          <span className="font-semibold text-foreground">{variantRecommendation.name}</span>: {variantRecommendation.interviewRate}% of its confirmed applications with tracked outcomes in this role family reached interview stage or an offer.
+                          Past outcomes do not establish qualification. Check this version against the posting before using it.
                         </div>
                       ) : null}
 

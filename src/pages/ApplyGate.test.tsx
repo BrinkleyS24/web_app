@@ -1308,8 +1308,9 @@ describe("ApplyGate current UI", () => {
     await runAnalyze({ jobTitle: "QA Engineer" });
 
     await waitFor(() => {
-      expect(screen.getByText(/best\s+track record on roles like this/i)).toBeInTheDocument();
-      expect(screen.getByText(/43% reach an interview/i)).toBeInTheDocument();
+      expect(screen.getByText(/43% of its confirmed applications with tracked outcomes/i)).toBeInTheDocument();
+      expect(screen.getByText(/Past outcomes do not establish qualification/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Consider sending that one/i)).not.toBeInTheDocument();
     });
   });
 });

@@ -1842,8 +1842,26 @@ export type VariantBreakdownRow = {
   outcome: "interviewed" | "offered" | "rejected" | "no_response" | "pending";
 };
 
-export type VariantScoreboard = { perVariant: VariantScoreRow[]; minSample: number; ambiguousCohorts?: number };
-export type VariantRecommendation = { variantId: string; name: string; interviewRate: number } | null;
+export type VariantScoreboard = { perVariant: VariantScoreRow[]; minSample: number; ambiguousCohorts?: number; unknownApplications?: number; unlinkedSubmissions?: number };
+export type VariantRecommendation = { variantId: string; name: string; interviewRate: number; sampleSize?: number; kind?: 'tracked' | 'stronger' } | null;
+
+export type ResumeSubmissionApplication = {
+  id: string; company: string; role: string; source: string; appliedAt: string | null;
+  outcomeEvidenceLimited?: boolean;
+  outcomeLabel: 'pending' | 'interviewed' | 'offered' | 'rejected';
+  submission: { variantId: string | null; name: string | null; revision: number; confirmedAt: string;
+    source: 'user_confirmed'; documentAvailable: boolean; archived: boolean } | null;
+};
+export async function fetchResumeSubmissions(before?: string): Promise<{
+  success: boolean; applications: ResumeSubmissionApplication[]; nextCursor: string | null; unlinkedSubmissions: number;
+}> {
+  return apiFetch(`/api/resumes/submissions${before ? '?before=' + encodeURIComponent(before) : ''}`);
+}
+export async function confirmSubmittedResume(applicationId: string, body: {
+  variantId: string | null; expectedRevision: number; requestId: string;
+}): Promise<{ success: boolean }> {
+  return apiFetch(`/api/resumes/submissions/${encodeURIComponent(applicationId)}`, { method: 'PUT', body: JSON.stringify(body) });
+}
 
 export async function fetchLegacyResumeForReview(): Promise<{ success: boolean; resumeText: string | null }> {
   return apiFetch("/api/resumes/legacy-review", { method: "GET" });

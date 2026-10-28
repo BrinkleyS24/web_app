@@ -27,6 +27,7 @@ import { useAuth } from "@/lib/AuthContext.jsx";
 import { cn } from "@/lib/utils";
 import { STATUS_TONE } from "@/lib/statusTone";
 import { ResumeEditor, ResumeTextComparison } from "@/components/ResumeEditor";
+import { ResumeSubmissions } from "@/components/ResumeSubmissions";
 import { readResumeChoice, resumeToolHref, RESUME_ID } from "@/lib/resumeWorkspace";
 
 const VARIANT_NUDGE_DISMISS_KEY = "variantNudge.dismissed";
@@ -57,23 +58,12 @@ const OUTCOME_CHIP: Record<VariantBreakdownRow["outcome"], { label: string; tone
 
 function recordLine(score: VariantScoreRow | undefined) {
   const sent = score?.sent ?? 0;
-  if (sent === 0) {
-    return "No applications through this resume yet — pick it in Apply Gate when you apply.";
-  }
-  // The headline count is the real number of applications sent through this
-  // resume (sent), NOT matchedToOutcome. matchedToOutcome only counts the
-  // applications we've since been able to attribute an inbox outcome to, so
-  // showing it as "applications" undercounts (5 applies could read as "1").
-  const sentLabel = `${sent} application${sent === 1 ? "" : "s"} through this resume`;
-  if (!score || !score.sufficientSample) {
-    const matched = score?.matchedToOutcome ?? 0;
-    if (matched === 0) {
-      return `${sentLabel} — waiting on inbox replies before we can call it.`;
-    }
-    return `${sentLabel} · ${matched} with a tracked outcome so far — not enough to call it yet.`;
-  }
-  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
-  return `${sentLabel} · ${plural(score.interviewed, "interview")} · ${plural(score.offered, "offer")} · ${plural(score.rejected, "rejected")} · ${score.noResponse} no response`;
+  if (sent === 0) return 'No confirmed submissions for this version yet. Confirm it on a tracked application; Apply Gate is optional.';
+  const sentLabel = `${sent} confirmed submission${sent === 1 ? '' : 's'}`;
+  const matched = score?.matchedToOutcome ?? 0;
+  if (!matched) return `${sentLabel} - no established outcome yet.`;
+  if (!score?.sufficientSample) return `${sentLabel} - ${matched} with a tracked outcome so far; not enough to call it yet.`;
+  return `${sentLabel} - ${score.interviewed} interview-stage outcomes, ${score.offered} offers, ${score.rejected} rejections; ${sent - matched} without an established outcome.`;
 }
 
 /**
@@ -270,14 +260,14 @@ function VariantComparison({
         recommendation
           ? undefined
           : minSample
-            ? `A version gets a rate once ${minSample} of its applications have an outcome from your inbox.`
+            ? `A version gets a rate after ${minSample} confirmed applications have a tracked outcome. Waiting applications and unknown versions are excluded.`
             : undefined
       }
     >
       {recommendation ? (
         <p className="mb-3 text-[14px] leading-relaxed text-foreground">
-          <span className="font-semibold">{recommendation.name}</span> is getting the most interviews:{" "}
-          <span className="font-semibold">{Math.round(recommendation.interviewRate)}%</span> of its applications with an outcome.
+          <span className="font-semibold">{recommendation.name}</span>: reached interview stage or offer in{" "}
+          <span className="font-semibold">{Math.round(recommendation.interviewRate)}%</span> of confirmed applications with a tracked outcome. This association does not establish why employers responded.
         </p>
       ) : null}
       <div className="-mx-1 overflow-x-auto">
@@ -291,7 +281,7 @@ function VariantComparison({
               <th scope="col" className={cn(th, "hidden text-right lg:table-cell")}>With an outcome</th>
               <th scope="col" className={cn(th, "hidden text-right lg:table-cell")}>Interviews</th>
               <th scope="col" className={cn(th, "text-right")}>Interview rate</th>
-              <th scope="col" className={th}>Resume health</th>
+              <th scope="col" className={cn(th, "hidden sm:table-cell")}>Resume health</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -307,7 +297,7 @@ function VariantComparison({
                       {variant.name}
                     </a>
                     <span className="ml-2 inline-flex gap-1.5 align-middle">
-                      {variant.id === recommendation?.variantId ? <ToneChip tone="positive">Most interviews</ToneChip> : null}
+                      {variant.id === recommendation?.variantId ? <ToneChip tone="positive">Tracked results</ToneChip> : null}
                       {variant.isDefault ? <ToneChip tone="brand">Default</ToneChip> : null}
                     </span>
                   </th>
@@ -324,7 +314,7 @@ function VariantComparison({
                       <span className="text-[12px] text-muted-foreground">{needed ? `needs ${needed} more` : "—"}</span>
                     )}
                   </td>
-                  <td className={cn(td, "text-[12.5px]")}>
+                  <td className={cn(td, "hidden text-[12.5px] sm:table-cell")}>
                     {open == null ? (
                       <span className="text-muted-foreground">—</span>
                     ) : open === 0 ? (
@@ -345,7 +335,7 @@ function VariantComparison({
   );
 }
 
-const Resumes = () => {
+const ResumeWorkspace = () => {
   const queryClient = useQueryClient();
   const { plan, user } = useAuth();
   const location = useLocation();
@@ -355,10 +345,13 @@ const Resumes = () => {
   const requestedSignature=new URLSearchParams(location.search).getAll('resume').join('|');
   useEffect(()=>{if(requested.present)setEditorId(requested.id);},[requested.present,requestedSignature]);
   const premium = plan === "premium";
-  const variantsQuery = useQuery({ queryKey: ["resume-variants"], queryFn: fetchResumeVariants });
-  const scoreboardQuery = useQuery({ queryKey: ["variant-scoreboard"], queryFn: () => fetchVariantScoreboard(), enabled: premium });
-  const statsQuery = useQuery({ queryKey: ["application-stats"], queryFn: fetchApplicationStats, enabled: premium });
-  const healthQuery = useQuery({ queryKey: ["resume-health"], queryFn: fetchResumeHealth, enabled: premium });
+  const [comparisonDraft, setComparisonDraft] = useState('');
+  const [comparisonTitle, setComparisonTitle] = useState('');
+  const variantsQuery = useQuery({ queryKey: ["resume-variants", user?.uid], queryFn: fetchResumeVariants });
+  const scoreboardQuery = useQuery({ queryKey: ["variant-scoreboard", user?.uid, comparisonTitle], queryFn: () => fetchVariantScoreboard(comparisonTitle || undefined), enabled: premium });
+  const outcomeData = scoreboardQuery.isError ? undefined : scoreboardQuery.data;
+  const statsQuery = useQuery({ queryKey: ["application-stats", user?.uid], queryFn: fetchApplicationStats, enabled: premium });
+  const healthQuery = useQuery({ queryKey: ["resume-health", user?.uid], queryFn: fetchResumeHealth, enabled: premium });
 
   const pendingSave = useRef<{ payload: string; requestId: string } | null>(null);
   const [useAsDefault, setUseAsDefault] = useState(false);
@@ -373,9 +366,9 @@ const Resumes = () => {
     enabled: variantsQuery.isSuccess && variants.length === 0 });
   const beginAdd = () => { pendingSave.current = null; setUseAsDefault(variants.length === 0); setAdding(true); };
   const scoreByVariant = new Map(
-    (scoreboardQuery.data?.scoreboard?.perVariant ?? []).map((r) => [r.variantId, r]),
+    (outcomeData?.scoreboard?.perVariant ?? []).map((r) => [r.variantId, r]),
   );
-  const breakdown = scoreboardQuery.data?.breakdown ?? {};
+  const breakdown = outcomeData?.breakdown ?? {};
 
   // Nudge toward a second variant: with only one resume on file, Apply Gate has
   // nothing to compare and the outcome-steering guidance can never fire. A
@@ -489,12 +482,10 @@ const Resumes = () => {
               </span>
               <div>
                 <p className="text-[14px] font-semibold leading-snug text-foreground">
-                  {rejectedCount === 1
-                    ? "You've had a rejection. Try a different resume next time."
-                    : `You've had ${rejectedCount} rejections. Try a different resume next time.`}
+                  You can compare another resume version.
                 </p>
                 <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-                  Save a second version and Apply Gate will start tracking which one actually gets responses.
+                  A rejection does not tell us which resume caused it. Save another version if useful, then confirm what you submitted on each application.
                 </p>
                 <button type="button" className={cn(BUTTON.accent, "mt-3")} onClick={beginAdd}>
                   <Plus className="h-3.5 w-3.5" aria-hidden /> Add a resume version
@@ -504,13 +495,26 @@ const Resumes = () => {
           </div>
         ) : null}
 
-        {premium && (scoreboardQuery.data?.scoreboard?.ambiguousCohorts ?? 0) > 0 ? (
+        {premium && user?.uid ? <ResumeSubmissions key={user.uid} owner={user.uid} variants={variants} /> : null}
+        {premium && variants.length > 0 ? <form className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-end" onSubmit={event => { event.preventDefault(); setComparisonTitle(comparisonDraft.trim()); }}>
+          <label className="w-full min-w-0 text-sm sm:flex-1">Compare outcomes for a role (optional)
+            <input className="mt-1 w-full rounded-lg border border-border bg-background p-2" maxLength={200} value={comparisonDraft} onChange={event => setComparisonDraft(event.target.value)} placeholder="For example, QA Engineer" />
+          </label><button className={BUTTON.secondary} type="submit">Compare this role</button>
+          <p className="basis-full text-xs text-muted-foreground">{comparisonTitle ? `Showing the role family for ${comparisonTitle}.` : 'Showing all roles. Choose a role for a recommendation based on relevant confirmed outcomes.'} This comparison never establishes job qualification.</p>
+        </form> : null}
+        {premium && (outcomeData?.scoreboard?.perVariant ?? []).some(row => !variants.some(v => v.id === row.variantId)) ? <Panel title="Confirmed outcomes for past versions">
+          <p className="mb-3 text-sm text-muted-foreground">Archived versions retain their confirmed history. They are excluded from new version recommendations.</p>
+          <ul className="space-y-2">{(outcomeData?.scoreboard?.perVariant ?? []).filter(row => !variants.some(v => v.id === row.variantId)).map(row => <li key={row.variantId} className="text-sm"><strong>{row.name}</strong>: {row.sent} confirmed application(s), {row.matchedToOutcome} with tracked outcomes, {row.interviewed} reaching interview stage and {row.offered} offer(s).</li>)}</ul>
+        </Panel> : null}
+        {premium && scoreboardQuery.isError ? <ErrorState title="Resume outcomes could not be loaded" detail="No partial recommendation is shown. Your resume library is still available." onRetry={() => scoreboardQuery.refetch()} /> : null}
+        {premium && (outcomeData?.scoreboard?.unknownApplications ?? 0) > 0 ? <p role="status" className="text-sm text-muted-foreground">{outcomeData?.scoreboard?.unknownApplications} application(s) have no confirmed saved resume. No version receives credit for them.</p> : null}
+        {premium && (outcomeData?.scoreboard?.ambiguousCohorts ?? 0) > 0 ? (
           <p role="status" className="text-sm text-muted-foreground">
             Some application outcomes are excluded because multiple resume versions or applications match the same role. We cannot tell which resume to credit.
           </p>
         ) : null}
 
-        {premium && variants.length >= 2 ? (
+        {premium && variants.length >= 2 && !scoreboardQuery.isError && !scoreboardQuery.isPending ? (
           <VariantComparison
             variants={variants}
             scoreByVariant={scoreByVariant}
@@ -520,8 +524,8 @@ const Resumes = () => {
                 return [v.id, entry?.document ? entry.findings.filter((f) => !f.dismissed).length : null];
               }))
             }
-            minSample={scoreboardQuery.data?.scoreboard?.minSample ?? null}
-            recommendation={scoreboardQuery.data?.recommendation ?? null}
+            minSample={outcomeData?.scoreboard?.minSample ?? null}
+            recommendation={outcomeData?.recommendation ?? null}
           />
         ) : null}
 
@@ -600,7 +604,7 @@ const Resumes = () => {
                         <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-foreground">{v.name}</h2>
                         {v.isDefault ? <ToneChip tone="brand">Default</ToneChip> : null}
                       </div>
-                      <p className="mt-0.5 text-[13px] text-muted-foreground">{premium ? recordLine(scoreByVariant.get(v.id)) : (v.isDefault ? "Used for your extension job checks." : "Available to choose as your default.")}</p>
+                      <p className="mt-0.5 text-[13px] text-muted-foreground">{premium ? (scoreboardQuery.isError ? "Resume outcomes are unavailable. Your saved resume is still available." : scoreboardQuery.isPending ? "Loading confirmed outcomes..." : recordLine(scoreByVariant.get(v.id))) : (v.isDefault ? "Used for your extension job checks." : "Available to choose as your default.")}</p>
                     </div>
                   </div>
                   <div className="-ml-2 flex min-w-0 flex-wrap items-center gap-1">
@@ -646,4 +650,8 @@ const Resumes = () => {
   );
 };
 
+const Resumes = () => {
+  const { user } = useAuth();
+  return <ResumeWorkspace key={user?.uid || 'signed-out'} />;
+};
 export default Resumes;

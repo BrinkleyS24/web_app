@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -52,13 +52,13 @@ vi.mock("@/lib/emails", async () => {
 
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  return render(
+  return { queryClient, ...render(
     <MemoryRouter>
       <QueryClientProvider client={queryClient}>
         <Resumes />
       </QueryClientProvider>
     </MemoryRouter>,
-  );
+  ) };
 }
 
 beforeEach(() => {
@@ -77,6 +77,24 @@ beforeEach(() => {
 });
 
 afterEach(() => { vi.clearAllMocks(); });
+
+test('empty version outcomes point to application confirmation without requiring Apply Gate', async () => {
+  fetchResumeVariants.mockResolvedValue({ variants: [{ id: 'A', name: 'QA version', isDefault: true }] });
+  renderPage();
+  expect(await screen.findByText(/No confirmed submissions for this version/)).toBeInTheDocument();
+  expect(screen.queryByText(/pick it in Apply Gate when you apply/)).not.toBeInTheDocument();
+});
+
+test('a failed refresh hides cached outcome rates and does not claim zero submissions', async () => {
+  fetchResumeVariants.mockResolvedValue({ variants: [{ id: 'A', name: 'QA A', isDefault: true }, { id: 'B', name: 'QA B' }] });
+  fetchVariantScoreboard.mockResolvedValueOnce({ scoreboard: { minSample: 5, perVariant: [{ variantId: 'A', name: 'QA A', sent: 5, matchedToOutcome: 5, interviewed: 5, offered: 0, rejected: 0, noResponse: 0, interviewRate: 100, sufficientSample: true }] }, recommendation: null }).mockRejectedValue(new Error('Outage after initial data'));
+  const { queryClient } = renderPage();
+  expect(await screen.findByText('100%')).toBeInTheDocument();
+  await act(async () => { await queryClient.invalidateQueries({ queryKey: ['variant-scoreboard'] }); });
+  expect(await screen.findByText('Resume outcomes could not be loaded')).toBeInTheDocument();
+  expect(screen.queryByText('100%')).not.toBeInTheDocument();
+  expect(screen.queryByText(/No confirmed submissions for this version/)).not.toBeInTheDocument();
+});
 
 test('ambiguous attribution is explained instead of displaying inflated resume outcomes', async () => {
   fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'QA', isDefault: true }] });
@@ -186,7 +204,7 @@ describe("Resumes page", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText(/3 interviews/i)).toBeInTheDocument();
+      expect(screen.getByText(/3 interview-stage outcomes/i)).toBeInTheDocument();
     });
     expect(screen.queryByText(/not enough to call it yet/i)).not.toBeInTheDocument();
   });
@@ -253,10 +271,10 @@ describe("Resumes page", () => {
     renderPage();
 
     expect(await screen.findByText("Which version works")).toBeInTheDocument();
-    expect(screen.getByText(/is getting the most interviews/)).toBeInTheDocument();
+    expect(screen.getByText(/reached interview stage or offer in/)).toBeInTheDocument();
     expect(screen.getAllByText("43%")).toHaveLength(2); // the answer line and its row
     expect(screen.getByText("needs 3 more")).toBeInTheDocument();
-    expect(screen.getByText("Most interviews")).toBeInTheDocument();
+    expect(screen.getByText("Tracked results")).toBeInTheDocument();
   });
 
   test("tablet layout: titles and headers never break per letter, actions sit under the title", async () => {
@@ -323,7 +341,7 @@ describe("Resumes page", () => {
       });
       renderPage();
 
-      expect(await screen.findByText(/You've had 2 rejections\. Try a different resume next time\./i)).toBeInTheDocument();
+      expect(await screen.findByText(/You can compare another resume version/i)).toBeInTheDocument();
     });
 
     test("stays hidden with zero rejections", async () => {
@@ -358,7 +376,7 @@ describe("Resumes page", () => {
       });
       renderPage();
 
-      const nudge = await screen.findByText(/You've had a rejection\. Try a different resume next time\./i);
+      const nudge = await screen.findByText(/You can compare another resume version/i);
       expect(nudge).toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: /Dismiss/i }));
       expect(screen.queryByText(/Try a different resume next time/i)).not.toBeInTheDocument();
@@ -375,7 +393,7 @@ describe("Resumes page", () => {
       });
       renderPage();
 
-      await screen.findByText(/You've had a rejection\. Try a different resume next time\./i);
+      await screen.findByText(/You can compare another resume version/i);
       const [nudgeCta] = screen.getAllByRole("button", { name: /Add a resume version/i });
       await userEvent.click(nudgeCta);
       expect(screen.getByPlaceholderText(/Name/i)).toBeInTheDocument();
