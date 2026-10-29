@@ -129,7 +129,7 @@ function SkillGapsPanel({ data }: { data: ResumeGapInsightsResponse }) {
       icon={FileText}
       tone="brand"
       title="Requirements that keep coming up"
-      description={`Latest current Apply Gate checks for ${data.resume?.name || "your default resume"}. These are gaps in the checked wording, not proof that you lack a skill.`}
+      description={`Unresolved requirements from the latest current Apply Gate checks for ${data.resume?.name || "your default resume"}. Review the quoted requirement and add only details you can support.`}
     >
       <p className="mb-3 text-[13px] leading-relaxed text-muted-foreground">
         {data.resume ? <>Using <strong>{data.resume.name}</strong>, your default resume. <Link className="underline underline-offset-2" to={`/resumes#resume-${data.resume.variantId}`}>View or change your resume</Link>.</>
@@ -180,7 +180,7 @@ function SkillGapsPanel({ data }: { data: ResumeGapInsightsResponse }) {
               </div>
               <div className="flex items-center gap-2">
                 <ToneChip tone={gap.category === "preferred" ? "neutral" : "attention"}>
-                  {gap.category === "required" ? "Required" : gap.category === "evidence" ? "Needs proof" : "Nice to have"}
+                  {gap.category === "required" ? "Requirement blocker" : gap.category === "evidence" ? "Review requirement" : "Nice to have"}
                 </ToneChip>
                 <span className="text-[12px] font-medium text-muted-foreground">{gap.occurrences} roles</span>
               </div>
