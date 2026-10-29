@@ -79,3 +79,21 @@ test("a link to a check that is gone says so instead of an empty form", async ()
   renderAt("/apply-gate?verdict=verdict-missing");
   expect(await screen.findByTestId("apply-gate-linked-check-missing")).toHaveTextContent("no longer in your history");
 });
+
+test("an older linked check is visible even outside the five newest postings", async () => {
+  const newer = Array.from({length:7},(_,i)=>({...savedCheck,id:`newer-${i}`,company_name:`Other employer ${i}`,created_at:`2026-10-${28-i}T12:00:00Z`}));
+  fetchApplyGateHistory.mockResolvedValue({success:true,history:[...newer,savedCheck]});
+  renderAt("/apply-gate?verdict=verdict-42");
+  expect(await screen.findByTestId("apply-gate-history-verdict-42")).toHaveTextContent("Linked source check");
+  expect(screen.getAllByTestId(/^apply-gate-history-(?!count)/)[0]).toHaveAttribute("data-testid","apply-gate-history-verdict-42");
+  expect(screen.getByRole("link",{name:"Show latest checks"})).toHaveAttribute("href","/apply-gate");
+  expect(recheckApplyGateVerdict).not.toHaveBeenCalled();
+});
+
+test("a source link retains the exact older run instead of substituting a newer decision on that posting", async () => {
+  fetchApplyGateHistory.mockResolvedValue({success:true,history:[{...savedCheck,id:"newer-same-posting",created_at:"2026-10-28T12:00:00Z",verdict:"not_recommended"},savedCheck]});
+  renderAt("/apply-gate?verdict=verdict-42");
+  expect(await screen.findByTestId("apply-gate-history-verdict-42")).toBeInTheDocument();
+  expect(screen.queryByTestId("apply-gate-history-newer-same-posting")).not.toBeInTheDocument();
+  expect(recheckApplyGateVerdict).not.toHaveBeenCalled();
+});

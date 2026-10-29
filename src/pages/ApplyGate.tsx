@@ -1389,6 +1389,13 @@ const ApplyGateWorkspace = () => {
     if (!currentHistoryProjection) return grouped;
     return grouped.filter((item) => !sameHistoryPosting(item, currentHistoryProjection));
   }, [currentHistoryProjection, rawHistory]);
+  const visibleHistory = useMemo<Array<GroupedHistoryItem<ApplyGateHistoryDisplayItem>>>(() => {
+    if (!linkedCheck) return history.slice(0, 5);
+    // A source link identifies a specific run, including one superseded on the
+    // same posting. Never silently replace it with the newest grouped decision.
+    const source = { ...linkedCheck, _checkCount: 1, _earlierChecks: [] };
+    return [source, ...history.filter(item => !sameHistoryPosting(item, linkedCheck))].slice(0, 5);
+  }, [history, linkedCheck]);
   // Earlier runs of the posting on screen now. They are hidden from "Roles you checked" (the
   // current result stands for them), so they are listed in its details instead of vanishing.
   const currentEarlierChecks = useMemo<ApplyGateHistoryDisplayItem[]>(() => {
@@ -2619,10 +2626,13 @@ const ApplyGateWorkspace = () => {
           </div>
         </div>
 
-        {history.length > 0 && (
+        {visibleHistory.length > 0 && (
           <div className="space-y-3">
-            <p className={EYEBROW}>Roles you checked</p>
-            {history.slice(0, 5).map((item) => (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className={EYEBROW}>{linkedCheck ? "Source check and other postings" : "Roles you checked"}</p>
+              {linkedCheck ? <Link to="/apply-gate" className="inline-flex min-h-11 items-center text-[13px] underline underline-offset-2">Show latest checks</Link> : null}
+            </div>
+            {visibleHistory.map((item) => (
               <div key={item.id} data-testid={`apply-gate-history-${item.id}`} className={cn(CARD, "space-y-3 p-5")}>
                 {(() => {
                   const displayDecision = displayDecisionFromHistory(item);
@@ -2706,7 +2716,7 @@ const ApplyGateWorkspace = () => {
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-                    {item._checkCount > 1 ? (
+                    {linkedCheck?.id === item.id ? <ToneChip tone="neutral">Linked source check</ToneChip> : item._checkCount > 1 ? (
                       <span data-testid={`apply-gate-history-count-${item.id}`}>
                         <ToneChip tone="neutral">{checkedTimesLabel(item._checkCount)}</ToneChip>
                       </span>
