@@ -1,4 +1,5 @@
 [build.environment]
+NODE_VERSION = "24.22.2"
 VITE_API_BASE_URL = "https://applendium-backend-277330820484.us-central1.run.app"
 # Jobs remains a local pilot until both its API and UI are explicitly enabled.
 VITE_JOB_FEED_ENABLED = "false"
