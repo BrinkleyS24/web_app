@@ -1477,6 +1477,7 @@ export type VariantStrategyGap = {
   skipSignal: boolean;                      // true only for missing gaps
 };
 export type VariantStrategy = {
+  outcomeAdvicePaused?: boolean;
   eligibilityRestricted?: boolean;
   recommended: { variantId: string; name: string; basis: "requirements" | "your_outcomes"; sampleSize: number; reason: string; requiredCount?: number; outcomeBand?: { kind: "stronger" | "tracked"; sampleSize: number; comparison: string } | null };
   alternatives: { variantId: string; name: string; contentMatch: { coverage: number | null; matchedCount: number; requiredCount: number; missing: string[] } }[];

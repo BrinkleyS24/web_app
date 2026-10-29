@@ -15,6 +15,7 @@ vi.mock('./pages/DashboardNew.tsx', () => ({ default: () => <div>Dashboard</div>
 vi.mock('./pages/PaymentSuccess.tsx', () => ({ default: () => <div>PaymentSuccess</div> }));
 vi.mock('./pages/PaymentCancel.tsx', () => ({ default: () => <div>PaymentCancel</div> }));
 vi.mock('./pages/ApplyGate.tsx', () => ({ default: () => <div>ApplyGate</div> }));
+vi.mock('./pages/Jobs.tsx', () => ({ default: () => <div>Jobs pilot</div> }));
 vi.mock('./pages/Resumes.tsx', () => ({ default: () => {
   const client = useQueryClient();
   authState.clients.push(client);
@@ -32,9 +33,29 @@ vi.mock('./pages/AdminJobs.tsx', () => ({ default: () => <div>AdminJobs</div> })
 vi.mock('./pages/AdminReview.tsx', () => ({ default: () => <div>AdminReview</div> }));
 vi.mock('./pages/AdminUsers.tsx', () => ({ default: () => <div>AdminUsers</div> }));
 vi.mock('./pages/NotFound.tsx', () => ({ default: () => <div>NotFound</div> }));
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllEnvs(); });
 const signedIn = (uid = 'account-a') => ({ user: { uid }, plan: 'free', loading: false, planLoading: false, bridgeDone: true });
 function tree() { return <MemoryRouter initialEntries={['/resumes']}><App /></MemoryRouter>; }
+test('a production direct Jobs URL does not mount the pilot without opt-in', () => {
+  vi.stubEnv('DEV', false); vi.stubEnv('VITE_JOB_FEED_ENABLED', undefined);
+  authState.current = { ...signedIn(), plan: 'premium' };
+  render(<MemoryRouter initialEntries={['/jobs']}><App /></MemoryRouter>);
+  expect(screen.getByText('NotFound')).toBeInTheDocument();
+  expect(screen.queryByText('Jobs pilot')).not.toBeInTheDocument();
+});
+test('an explicit production pilot opt-in still requires premium access', () => {
+  vi.stubEnv('DEV', false); vi.stubEnv('VITE_JOB_FEED_ENABLED', 'true');
+  authState.current = signedIn();
+  render(<MemoryRouter initialEntries={['/jobs']}><App /></MemoryRouter>);
+  expect(screen.getByText('Upgrade')).toBeInTheDocument();
+  expect(screen.queryByText('Jobs pilot')).not.toBeInTheDocument();
+});
+test('an explicit production pilot opt-in admits the premium account', () => {
+  vi.stubEnv('DEV', false); vi.stubEnv('VITE_JOB_FEED_ENABLED', 'true');
+  authState.current = { ...signedIn(), plan: 'premium' };
+  render(<MemoryRouter initialEntries={['/jobs']}><App /></MemoryRouter>);
+  expect(screen.getByText('Jobs pilot')).toBeInTheDocument();
+});
 test('a signed-in free user can reach resume management', () => {
   authState.current = signedIn(); render(tree());
   expect(screen.getByText('Resumes empty')).toBeInTheDocument();

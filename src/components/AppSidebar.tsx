@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useNavCounts } from "@/hooks/useNavCounts";
 import { useAuth } from "@/lib/AuthContext.jsx";
+import { isJobFeedEnabled } from "@/lib/jobFeedAvailability";
 
 type NavItem = { title: string; url: string; icon: LucideIcon };
 
@@ -118,7 +119,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="px-2.5 py-3">
-        <NavGroup label="Your search" items={searchNav} counts={counts} />
+        <NavGroup label="Your search" items={searchNav.filter(item => item.url !== '/jobs' || isJobFeedEnabled())} counts={counts} />
         <NavGroup label="Tools" items={toolsNav} />
       </SidebarContent>
 

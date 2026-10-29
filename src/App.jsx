@@ -12,6 +12,7 @@ import PaymentCancel from "./pages/PaymentCancel.tsx";
 import ApplyGate from "./pages/ApplyGate.tsx";
 import Resumes from "./pages/Resumes.tsx";
 import Jobs from "./pages/Jobs.tsx";
+import { isJobFeedEnabled } from "./lib/jobFeedAvailability.ts";
 import FixSuggestions from "./pages/FixSuggestions.tsx";
 import InterviewPrep from "./pages/InterviewPrep.tsx";
 import AskPage from "./pages/Ask.tsx";
@@ -246,7 +247,7 @@ export default function App() {
                 }
               />
               <Route path="/payment/success" element={<PaymentSuccess />} />
-              <Route path="/jobs" element={<RequirePremiumUser><Jobs /></RequirePremiumUser>} />
+              <Route path="/jobs" element={isJobFeedEnabled() ? <RequirePremiumUser><Jobs /></RequirePremiumUser> : <NotFound />} />
               <Route path="/payment/cancel" element={<PaymentCancel />} />
               <Route
                 path="/apply-gate"

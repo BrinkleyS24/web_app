@@ -352,6 +352,7 @@ const ResumeWorkspace = () => {
   const scoreboardQuery = useQuery({ queryKey: ["variant-scoreboard", user?.uid, comparisonTitle], queryFn: () => fetchVariantScoreboard(comparisonTitle || undefined), enabled: premium });
   const incompatibleOutcomes = scoreboardQuery.isSuccess && !isConfirmedResumeOutcomes(scoreboardQuery.data);
   const outcomesUnavailable = scoreboardQuery.isError || incompatibleOutcomes;
+  const outcomesPaused = (scoreboardQuery.error as { payload?: { code?: string } } | null)?.payload?.code === 'resume_outcomes_paused';
   const outcomeData = !outcomesUnavailable && variantsQuery.isSuccess && isConfirmedResumeOutcomes(scoreboardQuery.data) ? scoreboardQuery.data : undefined;
   const statsQuery = useQuery({ queryKey: ["application-stats", user?.uid], queryFn: fetchApplicationStats, enabled: premium });
   const healthQuery = useQuery({ queryKey: ["resume-health", user?.uid], queryFn: fetchResumeHealth, enabled: premium });
@@ -506,7 +507,7 @@ const ResumeWorkspace = () => {
           </div>
           <p className="text-xs text-muted-foreground">{comparisonTitle ? `Showing the role family for ${comparisonTitle}.` : 'Showing all roles. Choose a role for a recommendation based on relevant confirmed outcomes.'} This comparison never establishes job qualification.</p>
         </form> : null}
-        {premium && outcomesUnavailable ? <ErrorState title="Resume outcomes could not be loaded" detail={incompatibleOutcomes || scoreboardQuery.error?.message === OUTCOME_CONTRACT_MESSAGE ? OUTCOME_CONTRACT_MESSAGE : "No partial recommendation is shown. Your resume library is still available."} onRetry={() => scoreboardQuery.refetch()} /> : null}
+        {premium && outcomesUnavailable ? <ErrorState title={outcomesPaused ? 'Resume outcomes are temporarily paused' : 'Resume outcomes could not be loaded'} detail={outcomesPaused ? 'Your saved resumes and submitted-version confirmations are still available.' : incompatibleOutcomes || scoreboardQuery.error?.message === OUTCOME_CONTRACT_MESSAGE ? OUTCOME_CONTRACT_MESSAGE : "No partial recommendation is shown. Your resume library is still available."} onRetry={() => scoreboardQuery.refetch()} /> : null}
         {premium && (outcomeData?.scoreboard?.unknownApplications ?? 0) > 0 ? <p role="status" className="text-sm text-muted-foreground">{outcomeData?.scoreboard?.unknownApplications} application(s) have no confirmed saved resume. No version receives credit for them.</p> : null}
         {premium && (outcomeData?.scoreboard?.ambiguousCohorts ?? 0) > 0 ? (
           <p role="status" className="text-sm text-muted-foreground">

@@ -67,6 +67,19 @@ function renderPage(entry = '/resumes') {
   ) };
 }
 
+test('a paused outcome response preserves the saved library and confirmation task without showing metrics', async () => {
+  useAuth.mockReturnValue({ plan: 'premium', user: { uid: 'owner' } });
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: '00000000-0000-4000-8000-000000000001', name: 'Saved QA', isDefault: true, charCount: 300 }] });
+  fetchVariantScoreboard.mockRejectedValue(Object.assign(new Error('Resume outcomes are temporarily paused.'), { status: 503, payload: { code: 'resume_outcomes_paused' } }));
+  renderPage();
+  expect(await screen.findByText('Resume outcomes are temporarily paused')).toBeInTheDocument();
+  expect(screen.getByText('Your saved resumes and submitted-version confirmations are still available.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Open and edit' })).toBeEnabled();
+  await userEvent.click(screen.getByRole('button', { name: 'Review submitted resumes' }));
+  expect(await screen.findByLabelText('Submitted resume for application 10')).toBeVisible();
+  expect(screen.queryByText('Which version works')).not.toBeInTheDocument();
+});
+
 beforeEach(() => {
   useAuth.mockReturnValue({ plan: "premium" });
   fetchLegacyResumeForReview.mockResolvedValue({ success: true, resumeText: null });

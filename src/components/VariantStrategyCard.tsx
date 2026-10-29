@@ -150,6 +150,7 @@ export function VariantStrategyCard({ strategy, onDraftDecisionsChange, classNam
           <p className="mt-1 text-xs leading-relaxed text-foreground">{strategy.recommended.reason}</p>
         ) : null}
         <p className="mt-0.5 text-xs text-muted-foreground">{strategy.basisLabel}</p>
+        {strategy.outcomeAdvicePaused ? <p role="status" className="mt-2 text-xs text-muted-foreground">Outcome-based resume advice is temporarily paused. This comparison uses the posting and your saved wording.</p> : null}
         {strategy.recommended.basis === "your_outcomes" && (
           <span className="mt-1.5 inline-flex items-center rounded border border-accent/20 bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
             Learning from your {strategy.recommended.outcomeBand?.sampleSize ?? strategy.recommended.sampleSize} outcomes

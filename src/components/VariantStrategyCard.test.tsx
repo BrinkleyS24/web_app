@@ -58,6 +58,11 @@ const outcomeStrategy: VariantStrategy = {
 };
 
 describe("VariantStrategyCard", () => {
+  test('a recovery content comparison explains that outcome-based advice is paused', () => {
+    render(<VariantStrategyCard strategy={{ ...strategy, outcomeAdvicePaused: true }} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Outcome-based resume advice is temporarily paused');
+    expect(screen.queryByText(/Learning from your/)).not.toBeInTheDocument();
+  });
   test("a held application decision cannot be relabeled as a best-match resume", () => {
     const held={...strategy,eligibilityRestricted:true,eligibilityNote:'Qualification evidence still needs confirmation.'};
     expect(variantStrategyPickLabel(held)).toBe('Content comparison');
