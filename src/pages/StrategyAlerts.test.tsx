@@ -92,6 +92,15 @@ afterEach(() => {
 });
 
 describe("StrategyAlerts", () => {
+  test("posting evidence opens its exact saved check without inventing a missing source identity", async () => {
+    fetchResumeGaps.mockResolvedValue({success:true,basis:"current_default_resume_checks",resume:{variantId:"resume-a",name:"QA current"},analyzedVerdicts:2,distinctRolesEvaluated:2,gaps:[{skill:"Degree",category:"required",label:"Explicit requirement blocker in the checked resume",occurrences:2,examples:[{company:"One",position:"QA",requirementQuote:"A completed degree is mandatory.",verdictId:"source/one"},{company:"Unknown attribution",position:"QA",requirementQuote:"A completed degree is mandatory."}]}]});
+    renderPage();
+    await screen.findByText("Requirements that keep coming up");
+    fireEvent.click(screen.getByText("See posting evidence"));
+    expect(screen.getByRole("link",{name:"One · QA"})).toHaveAttribute("href","/apply-gate?verdict=source%2Fone");
+    expect(screen.queryByRole("link",{name:"Unknown attribution · QA"})).not.toBeInTheDocument();
+    expect(screen.getByText("Explicit requirement blocker in the checked resume")).toBeInTheDocument();
+  });
   test("a capped set of source examples explains its relationship to the role count", async () => {
     fetchResumeGaps.mockResolvedValue({success:true,basis:"current_default_resume_checks",resume:{variantId:"resume-a",name:"QA current"},analyzedVerdicts:4,distinctRolesEvaluated:4,gaps:[{skill:"Degree",category:"required",label:"Requirement blocker",occurrences:4,examples:[{company:"One",position:"QA"},{company:"Two",position:"QA"},{company:"Three",position:"QA"}]}]});
     renderPage();

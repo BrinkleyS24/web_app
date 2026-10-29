@@ -76,7 +76,7 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
                 type="button"
                 onClick={() => setExpanded((open) => !open)}
                 aria-expanded={expanded}
-                className="mt-1 text-[13px] font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                className="mt-1 min-h-11 text-[13px] font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
               >
                 {expanded ? "Show less" : "Read more"}
               </button>
@@ -161,6 +161,7 @@ function SkillGapsPanel({ data }: { data: ResumeGapInsightsResponse }) {
             <li key={`${gap.category}-${gap.skill}`} className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
               <div className="min-w-0">
                 <p className="text-[15px] font-semibold text-foreground">{gap.skill}</p>
+                {gap.label ? <p className="mt-1 text-[13px] text-muted-foreground">{gap.label}</p> : null}
                 <p className="mt-0.5 text-[13px] text-muted-foreground">
                   {gap.examples
                     .map((example) => [example.company, example.position].filter(Boolean).join(" · "))
@@ -172,10 +173,14 @@ function SkillGapsPanel({ data }: { data: ResumeGapInsightsResponse }) {
                   <p className="mt-1 text-[12px] text-muted-foreground">Showing {Math.min(gap.examples.length, 3)} of {gap.occurrences} checked roles.</p>
                 ) : null}
                 {gap.examples.some(example => example.requirementQuote) ? <details className="mt-2 text-[13px] text-muted-foreground">
-                  <summary className="cursor-pointer">See posting evidence</summary>
+                  <summary className="min-h-11 cursor-pointer py-3">See posting evidence</summary>
                   <ul className="mt-2 space-y-2">
                     {gap.examples.filter(example => example.requirementQuote).map((example, index) => <li key={example.verdictId || index}>
-                      <span className="font-medium">{[example.company, example.position].filter(Boolean).join(" · ")}</span>
+                      {example.verdictId ? <Link
+                        to={`/apply-gate?verdict=${encodeURIComponent(example.verdictId)}`}
+                        className="inline-flex min-h-11 items-center font-medium underline underline-offset-2 hover:text-foreground"
+                      >{[example.company, example.position].filter(Boolean).join(" · ") || "View saved check"}</Link>
+                        : <span className="font-medium">{[example.company, example.position].filter(Boolean).join(" · ")}</span>}
                       <blockquote className="mt-1 border-l-2 border-border pl-3">{example.requirementQuote}</blockquote>
                     </li>)}
                   </ul>
