@@ -89,13 +89,13 @@ const Dashboard = () => {
     staleTime: 60_000,
   });
   const alertsQuery = useQuery({
-    queryKey: ["strategy-alerts", "dashboard"],
+    queryKey: ["strategy-alerts", "alerts", user?.uid],
     queryFn: fetchStrategyAlerts,
     enabled: isAuthed,
     staleTime: 120_000,
   });
   const queueQuery = useQuery({
-    queryKey: ["dashboard", "queue"],
+    queryKey: ["dashboard", "queue", user?.uid],
     queryFn: fetchRankedActionQueue,
     enabled: isAuthed,
     staleTime: 30_000,

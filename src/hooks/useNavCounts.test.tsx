@@ -71,21 +71,21 @@ describe("useNavCounts", () => {
   // The badge said 2 beside a page of 3 cards (persona review, 2026-10-14). It now counts exactly
   // the cards the page shows: good news included, floors and the dashboard-only debrief excluded.
   test("counts Today and exactly the alert cards Strategy Alerts shows", async () => {
-    const { result } = renderHook(() => useNavCounts(true), { wrapper });
+    const { result } = renderHook(() => useNavCounts(true, "test-user"), { wrapper });
     await waitFor(() => expect(result.current["/next-actions"]).toBe(4));
     await waitFor(() => expect(result.current["/strategy-alerts"]).toBe(3));
   });
 
   test("a malformed queue means no badge, not a broken page", async () => {
     fetchRankedActionQueue.mockResolvedValue({ success: true, queue: { doToday: [{ id: "bad" }], thisWeek: [], later: [], blocked: [] } });
-    const { result } = renderHook(() => useNavCounts(true), { wrapper });
+    const { result } = renderHook(() => useNavCounts(true, "test-user"), { wrapper });
     await waitFor(() => expect(fetchRankedActionQueue).toHaveBeenCalled());
     await waitFor(() => expect(result.current["/strategy-alerts"]).toBe(3));
     expect(result.current["/next-actions"]).toBe(0);
   });
 
   test("fetches nothing for a free user", () => {
-    const { result } = renderHook(() => useNavCounts(false), { wrapper });
+    const { result } = renderHook(() => useNavCounts(false, "test-user"), { wrapper });
     expect(result.current["/next-actions"]).toBe(0);
     expect(fetchRankedActionQueue).not.toHaveBeenCalled();
     expect(fetchStrategyAlerts).not.toHaveBeenCalled();

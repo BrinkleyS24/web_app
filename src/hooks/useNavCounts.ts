@@ -9,17 +9,17 @@ import { visibleStrategyAlerts } from "@/lib/strategyAlertVisibility";
  * nav gave no reason to click anything (review, 2026-09-26). Both read the Dashboard's own queries
  * (same keys), so on the Dashboard they cost nothing and elsewhere at most one fetch per 5 minutes.
  */
-export function useNavCounts(enabled: boolean) {
+export function useNavCounts(enabled: boolean, ownerId?: string) {
   const queueQuery = useQuery({
-    queryKey: ["dashboard", "queue"],
+    queryKey: ["dashboard", "queue", ownerId],
     queryFn: fetchRankedActionQueue,
-    enabled,
+    enabled: enabled && Boolean(ownerId),
     staleTime: 5 * 60_000,
   });
   const alertsQuery = useQuery({
-    queryKey: ["strategy-alerts", "dashboard"],
+    queryKey: ["strategy-alerts", "alerts", ownerId],
     queryFn: fetchStrategyAlerts,
-    enabled,
+    enabled: enabled && Boolean(ownerId),
     staleTime: 5 * 60_000,
   });
 

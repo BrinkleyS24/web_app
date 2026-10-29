@@ -101,7 +101,7 @@ function initialsFromUser(name?: string | null, email?: string | null) {
 export function AppSidebar() {
   const { user, plan, planLoading } = useAuth();
   const isPremium = plan === "premium";
-  const counts = useNavCounts(isPremium);
+  const counts = useNavCounts(isPremium, user?.uid);
   const displayName = user?.displayName || user?.email || "Signed in";
   const initials = initialsFromUser(user?.displayName, user?.email);
 

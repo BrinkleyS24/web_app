@@ -607,6 +607,8 @@ export interface ResumeGapExample {
   company: string | null;
   position: string | null;
   date: string | null;
+  requirementQuote?: string;
+  verdictId?: string;
 }
 
 export interface ResumeGap {
@@ -625,6 +627,14 @@ export interface ResumeGapInsightsResponse {
   gaps: ResumeGap[];
   /** Checks made before Apply Gate's current scoring, left out of the gaps above. */
   outdatedVerdictsExcluded?: number;
+  basis?: "current_default_resume_checks";
+  resume?: { variantId: string; name: string } | null;
+  unavailableReason?: "no_default_resume";
+  otherResumeVerdictsExcluded?: number;
+  changedResumeVerdictsExcluded?: number;
+  sampledChecks?: number;
+  sampleLimit?: number;
+  truncated?: boolean;
 }
 
 export async function fetchResumeGaps(): Promise<ResumeGapInsightsResponse> {

@@ -401,6 +401,7 @@ const ResumeWorkspace = () => {
     // A new or edited resume is a different document, so its findings are recomputed from
     // scratch — there is no stored "resolved" state that could go stale against the text.
     queryClient.invalidateQueries({ queryKey: ["resume-health"] });
+      queryClient.invalidateQueries({ queryKey: ["strategy-alerts", "skill-gaps", user?.uid] });
     if (user?.uid) {
       queryClient.invalidateQueries({ queryKey: ["interview-prep", "resumes", user.uid] });
       queryClient.invalidateQueries({ queryKey: ["resume-document", user.uid] });

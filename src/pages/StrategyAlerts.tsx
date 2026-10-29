@@ -19,7 +19,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { EmptyState, ErrorState, LoadingRows, PageHeader, Panel, SectionLabel, ToneChip } from "@/components/premium/PremiumUI";
 import { BUTTON, CARD, EYEBROW, TONES, type Tone } from "@/components/premium/tone";
 import { useAuth } from "@/lib/AuthContext.jsx";
-import { fetchResumeGaps, fetchStrategyAlerts, type ResumeGap, type StrategyAlert } from "@/lib/emails";
+import { fetchResumeGaps, fetchStrategyAlerts, type ResumeGapInsightsResponse, type StrategyAlert } from "@/lib/emails";
 import { findDebriefAlert, isPlaceholderAlert as isPlaceholder, visibleStrategyAlerts } from "@/lib/strategyAlertVisibility";
 import { cn } from "@/lib/utils";
 
@@ -38,7 +38,7 @@ function alertCta(alert: StrategyAlert): { to: string; label: string } {
   // You run an experiment by applying, so the next step is the next role.
   if (alert.kind === "experiment") return { to: "/apply-gate", label: "Check your next role" };
   if (alert.kind === "fit") return { to: "/apply-gate", label: "Check your next role" };
-  if (alert.kind === "commitment") return { to: "/next-actions", label: "Open the prep card" };
+  if (alert.kind === "commitment") return { to: "/next-actions", label: alert.anchor?.kind === "assessment" ? "Open assessment tasks" : "Open interview tasks" };
   if (alert.kind === "focus") return { to: "/next-actions", label: "See focused actions" };
   return { to: "/next-actions", label: "See what to do today" };
 }
@@ -121,25 +121,34 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
   );
 }
 
-function SkillGapsPanel({ gaps, outdatedExcluded }: { gaps: ResumeGap[]; outdatedExcluded: number }) {
+function SkillGapsPanel({ data }: { data: ResumeGapInsightsResponse }) {
+  const gaps = data.gaps || [];
+  const excluded = (data.outdatedVerdictsExcluded || 0) + (data.changedResumeVerdictsExcluded || 0);
   return (
     <Panel
       icon={FileText}
       tone="brand"
-      title="Skills that keep coming up"
-      description="Requirements from roles you checked in Apply Gate that your resume does not show yet — each seen in two or more roles."
+      title="Requirements that keep coming up"
+      description={`Latest current Apply Gate checks for ${data.resume?.name || "your default resume"}. These are gaps in the checked wording, not proof that you lack a skill.`}
     >
+      <p className="mb-3 text-[13px] leading-relaxed text-muted-foreground">
+        {data.resume ? <>Using <strong>{data.resume.name}</strong>, your default resume. <Link className="underline underline-offset-2" to={`/resumes#resume-${data.resume.variantId}`}>View or change your resume</Link>.</>
+          : <>Choose a default resume to see its recurring gaps. <Link className="underline underline-offset-2" to="/resumes">Open Resumes</Link>.</>}
+        {data.truncated ? ` This summary uses the latest ${data.sampledChecks} checks; older checks are outside this sample.` : ""}
+      </p>
+      {excluded > 0 ? <p className="mb-3 text-[13px] leading-relaxed text-muted-foreground">
+        {excluded} {excluded === 1 ? "check needs" : "checks need"} a fresh Apply Gate check to verify the current analysis and saved wording. <Link className="underline underline-offset-2" to="/apply-gate">Re-check in Apply Gate</Link>.
+      </p> : null}
+      {(data.otherResumeVerdictsExcluded || 0) > 0 ? <p className="mb-3 text-[13px] text-muted-foreground">{data.otherResumeVerdictsExcluded} checks for other resume versions are kept separate.</p> : null}
       {gaps.length === 0 ? (
         <EmptyState
           compact
-          title="No repeated gaps"
+          title={data.distinctRolesEvaluated ? "No repeated gaps" : "No current checks for this version"}
           body={
-            outdatedExcluded > 0
-              ? `${outdatedExcluded} older ${outdatedExcluded === 1 ? "check was" : "checks were"} made before Apply Gate's Sep 24 update and ${outdatedExcluded === 1 ? "is" : "are"} left out. Re-check them in Apply Gate to include them.`
-              : "When the same requirement shows up across the roles you check, it appears here so you can fix it once."
+            "A gap appears after it is seen in two distinct roles checked against this exact saved wording. Other resume versions are kept separate."
           }
           action={
-            outdatedExcluded > 0 ? (
+            excluded > 0 ? (
               <Link to="/apply-gate" className={BUTTON.secondary}>
                 Open Apply Gate
               </Link>
@@ -159,6 +168,15 @@ function SkillGapsPanel({ gaps, outdatedExcluded }: { gaps: ResumeGap[]; outdate
                     .slice(0, 3)
                     .join("; ")}
                 </p>
+                {gap.examples.some(example => example.requirementQuote) ? <details className="mt-2 text-[13px] text-muted-foreground">
+                  <summary className="cursor-pointer">See posting evidence</summary>
+                  <ul className="mt-2 space-y-2">
+                    {gap.examples.filter(example => example.requirementQuote).map((example, index) => <li key={example.verdictId || index}>
+                      <span className="font-medium">{[example.company, example.position].filter(Boolean).join(" · ")}</span>
+                      <blockquote className="mt-1 border-l-2 border-border pl-3">{example.requirementQuote}</blockquote>
+                    </li>)}
+                  </ul>
+                </details> : null}
               </div>
               <div className="flex items-center gap-2">
                 <ToneChip tone={gap.category === "preferred" ? "neutral" : "attention"}>
@@ -180,16 +198,18 @@ const StrategyAlerts = () => {
   const location = useLocation();
 
   const alertsQuery = useQuery({
-    queryKey: ["strategy-alerts", "page"],
+    queryKey: ["strategy-alerts", "alerts", user?.uid],
     queryFn: fetchStrategyAlerts,
     enabled: isAuthed,
     staleTime: 120_000,
+    refetchOnWindowFocus: "always",
   });
   const gapsQuery = useQuery({
-    queryKey: ["strategy-alerts", "skill-gaps"],
+    queryKey: ["strategy-alerts", "skill-gaps", user?.uid],
     queryFn: fetchResumeGaps,
     enabled: isAuthed,
     staleTime: 300_000,
+    refetchOnWindowFocus: "always",
   });
 
   const allAlerts = useMemo(() => alertsQuery.data?.alerts || [], [alertsQuery.data]);
@@ -208,14 +228,15 @@ const StrategyAlerts = () => {
   const working = findings.filter((alert) => alert.severity === "positive");
 
   useEffect(() => {
-    const id = decodeURIComponent((location.hash || "").replace(/^#/, ""));
+    let id: string;
+    try { id = decodeURIComponent((location.hash || "").replace(/^#/, "")); } catch { return; }
     if (!id || alerts.length === 0) return;
     window.requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }, [alerts.length, location.hash]);
 
-  const gaps = gapsQuery.data?.gaps || [];
-  const outdatedExcluded = gapsQuery.data?.outdatedVerdictsExcluded ?? 0;
-  const showGaps = !gapsQuery.isLoading && !gapsQuery.isError && (gaps.length > 0 || outdatedExcluded > 0 || (gapsQuery.data?.distinctRolesEvaluated ?? 0) > 0);
+  const gapsCompatible = gapsQuery.data?.basis === "current_default_resume_checks";
+  const showGaps = !gapsQuery.isLoading && !gapsQuery.isError && gapsCompatible && Boolean(gapsQuery.data);
+  const alertsPaused = (alertsQuery.error as {payload?: {code?: string}} | null)?.payload?.code === "strategy_alerts_paused";
 
   return (
     <DashboardLayout>
@@ -232,8 +253,8 @@ const StrategyAlerts = () => {
           </div>
         ) : alertsQuery.isError ? (
           <ErrorState
-            title="Your alerts did not load"
-            detail="Your data is safe. Try again in a moment."
+            title={alertsPaused ? "Strategy alerts are temporarily paused" : "Your alerts did not load"}
+            detail={alertsPaused ? "Your records are safe. Next Actions, Apply Gate, and your saved resumes remain available." : "Your data is safe. Try again in a moment."}
             onRetry={() => void alertsQuery.refetch()}
           />
         ) : null}
@@ -298,7 +319,11 @@ const StrategyAlerts = () => {
           </>
         )}
 
-        {showGaps ? <SkillGapsPanel gaps={gaps} outdatedExcluded={outdatedExcluded} /> : null}
+        {gapsQuery.isError || (gapsQuery.isSuccess && !gapsCompatible) ? <ErrorState
+          title="Your resume patterns did not load"
+          detail="Retry to load patterns for your current default resume. You can review your resume library separately."
+          onRetry={() => void gapsQuery.refetch()}
+        /> : showGaps ? <SkillGapsPanel data={gapsQuery.data!} /> : gapsQuery.isLoading && isAuthed ? <Panel title="Resume patterns"><LoadingRows rows={2} /></Panel> : null}
 
         <p className="px-1 text-[12px] leading-relaxed text-muted-foreground">
           Alerts describe patterns in your own results. They show what tends to go with what — not proof that one thing caused another.
