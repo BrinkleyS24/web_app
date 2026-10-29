@@ -168,6 +168,9 @@ function SkillGapsPanel({ data }: { data: ResumeGapInsightsResponse }) {
                     .slice(0, 3)
                     .join("; ")}
                 </p>
+                {gap.examples.length > 0 && gap.occurrences > Math.min(gap.examples.length, 3) ? (
+                  <p className="mt-1 text-[12px] text-muted-foreground">Showing {Math.min(gap.examples.length, 3)} of {gap.occurrences} checked roles.</p>
+                ) : null}
                 {gap.examples.some(example => example.requirementQuote) ? <details className="mt-2 text-[13px] text-muted-foreground">
                   <summary className="cursor-pointer">See posting evidence</summary>
                   <ul className="mt-2 space-y-2">
@@ -244,7 +247,7 @@ const StrategyAlerts = () => {
         <PageHeader
           eyebrow="Patterns in your search"
           title="Strategy Alerts"
-          description="What Applendium™ noticed across your inbox, why it matters, and what to do about it. An alert only appears when there is enough evidence behind it."
+          description="Patterns across your tracked applications and saved job checks, with the evidence and a next step. An alert only appears when there is enough evidence behind it."
         />
 
         {alertsQuery.isLoading ? (
