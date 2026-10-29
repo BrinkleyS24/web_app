@@ -2679,6 +2679,12 @@ const ApplyGateWorkspace = () => {
                   const historyShowsCopy = Boolean(item.explanation_payload?.presentation);
                   const historyTitle = historyShowsCopy && keepHistorySentence(decisionCopy.title) ? decisionCopy.title : null;
                   const historyBody = historyShowsCopy && keepHistorySentence(decisionCopy.body) ? decisionCopy.body : null;
+                  const historyCopy = historyTitle || historyBody ? (
+                    <div className="space-y-1">
+                      {historyTitle ? <p className="text-sm font-semibold">{historyTitle}</p> : null}
+                      {historyBody ? <p className="text-sm leading-relaxed text-muted-foreground">{historyBody}</p> : null}
+                    </div>
+                  ) : null;
                   const historyVisibleReasons = displayDecisionMissing ? [] : visibleReasons.filter((reason) => keepHistorySentence(reason));
                   const historyShowWarning = Boolean(warning && keepHistorySentence(warningFull));
                   const historySavePending = savingAction?.verdictId === item.id;
@@ -2705,19 +2711,14 @@ const ApplyGateWorkspace = () => {
                         <ToneChip tone="neutral">{checkedTimesLabel(item._checkCount)}</ToneChip>
                       </span>
                     ) : null}
-                    <ToneChip tone={item.outdated ? "neutral" : historyDecision.tone}>{historyDecision.label}</ToneChip>
+                    <ToneChip tone={item.outdated ? "neutral" : historyDecision.tone}>{item.outdated ? 'Re-check needed' : historyDecision.label}</ToneChip>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">{item.explanation_payload?.resume_document || item.resume_variant_id
                   ? `Checked against: ${item.explanation_payload?.resume_document?.name
                     || variants.find((v) => v.id === (item.resume_variant_id || item.explanation_payload?.resume_document?.variantId))?.name || 'a previously saved resume'}${['legacy', 'seeded_from_legacy'].includes(item.explanation_payload?.resume_document?.source || '') ? ' (from your old profile)' : ''}`
                   : 'Saved check · resume not identified'}</p>
-                {historyTitle || historyBody ? (
-                  <div className="space-y-1">
-                    {historyTitle ? <p className="text-sm font-semibold">{historyTitle}</p> : null}
-                    {historyBody ? <p className="text-sm leading-relaxed text-muted-foreground">{historyBody}</p> : null}
-                  </div>
-                ) : null}
+                {item.outdated ? <p className="text-sm font-semibold">Re-check for current advice</p> : historyCopy}
                 {item._earlierChecks.length > 0 ? (
                   // Earlier runs of this posting stay one tap away instead of vanishing (2026-10-14).
                   <details className="group">
@@ -2757,6 +2758,7 @@ const ApplyGateWorkspace = () => {
                 {(() => {
                   const oldRead = (
                     <>
+                {item.outdated ? <><p className="text-xs font-semibold text-muted-foreground">Historical advice</p>{historyCopy}</> : null}
                 <QualificationEvidence assessment={item.explanation_payload?.qualification_assessment} />
                 {historyVisibleReasons.map((reason, index) => (
                   <p key={index} className="text-sm text-muted-foreground leading-relaxed">• {reason}</p>

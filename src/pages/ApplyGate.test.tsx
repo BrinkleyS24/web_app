@@ -1226,6 +1226,23 @@ describe("ApplyGate current UI", () => {
     expect(await screen.findByText("Our call")).toBeInTheDocument();
   });
 
+  test.each(['APPLY', 'SKIP'])('outdated structured %s advice stays historical until explicitly opened', async action => {
+    const projected = projectApplyGatePresentation(buildApplyGatePresentation({ decision: { action }, facts: { matchedSkills: ['Python'] } }));
+    fetchApplyGateHistory.mockResolvedValue({ success: true, history: [{ id: 'stale-structured', job_title: 'QA Engineer',
+      company_name: 'Fictional Cedar', created_at: '2026-10-28T12:00:00Z', outdated: true,
+      verdict: action === 'APPLY' ? 'good_fit' : 'not_recommended', reasons: JSON.stringify(projected.reasons),
+      explanation_payload: projected.explanation, user_action: null }] });
+    renderPage();
+    expect(await screen.findByText('Re-check for current advice')).toBeVisible();
+    expect(screen.getByText('Re-check needed')).toBeVisible();
+    const oldHeading = action === 'APPLY' ? 'Apply now' : 'Skip this role';
+    expect(screen.getByText(oldHeading)).not.toBeVisible();
+    expect(screen.getByRole('button', { name: 'Re-check' })).toBeEnabled();
+    await userEvent.click(screen.getByText('Show the old read'));
+    expect(screen.getByText(oldHeading)).toBeVisible();
+    expect(screen.getByText('Historical advice')).toBeVisible();
+  });
+
   test("shows persisted company names in history and hides unresolved placeholders", async () => {
     fetchApplyGateHistory.mockResolvedValue({
       success: true,

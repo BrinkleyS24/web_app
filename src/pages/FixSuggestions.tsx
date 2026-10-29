@@ -777,19 +777,19 @@ function SuggestionDraftPanel({
             Check who it goes to, then copy it into Gmail.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        {!isGenerating && draft ? <div className="flex flex-wrap gap-2">
           <span className="rounded-full border border-primary/20 bg-background/80 px-2.5 py-1 text-xs font-medium text-primary">
             {draft?.contextLabel || draftToneMeta?.label || "Draft preset"}
           </span>
-          <span className="rounded-full border border-border bg-background/80 px-2.5 py-1 text-xs font-medium text-muted-foreground">
-            {draft?.confidence || "medium"} confidence
-          </span>
+          {draft.confidence ? <span className="rounded-full border border-border bg-background/80 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+            {draft.confidence} confidence
+          </span> : null}
           {draft?.sendStrategyLabel ? (
             <span className="rounded-full border border-border bg-background/80 px-2.5 py-1 text-xs font-medium text-muted-foreground">
               {draft.sendStrategyLabel}
             </span>
           ) : null}
-        </div>
+        </div> : null}
       </div>
 
       {isGenerating ? (

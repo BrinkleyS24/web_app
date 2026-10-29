@@ -11,6 +11,8 @@ const {
   useAuth,
   fetchLegacyResumeForReview,
   fetchResumeVariants,
+  fetchResumeSubmissions,
+  fetchResumeHealth,
   fetchVariantScoreboard,
   fetchApplicationStats,
   createResumeVariant,
@@ -21,6 +23,8 @@ const {
   useAuth: vi.fn(),
   fetchLegacyResumeForReview: vi.fn(),
   fetchResumeVariants: vi.fn(),
+  fetchResumeSubmissions: vi.fn(),
+  fetchResumeHealth: vi.fn(),
   fetchVariantScoreboard: vi.fn(),
   fetchApplicationStats: vi.fn(),
   createResumeVariant: vi.fn(),
@@ -41,6 +45,8 @@ vi.mock("@/lib/emails", async () => {
     ...actual,
     fetchLegacyResumeForReview,
     fetchResumeVariants,
+    fetchResumeSubmissions,
+    fetchResumeHealth,
     fetchVariantScoreboard,
     fetchApplicationStats,
     createResumeVariant,
@@ -50,10 +56,10 @@ vi.mock("@/lib/emails", async () => {
   };
 });
 
-function renderPage() {
+function renderPage(entry = '/resumes') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return { queryClient, ...render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[entry]}>
       <QueryClientProvider client={queryClient}>
         <Resumes />
       </QueryClientProvider>
@@ -64,6 +70,8 @@ function renderPage() {
 beforeEach(() => {
   useAuth.mockReturnValue({ plan: "premium" });
   fetchLegacyResumeForReview.mockResolvedValue({ success: true, resumeText: null });
+  fetchResumeHealth.mockResolvedValue({ success: true, resumes: [] });
+  fetchResumeSubmissions.mockResolvedValue({ success: true, applications: [{ id: '10', company: 'Fictional Cedar', role: 'QA Engineer', outcomeLabel: 'pending', submission: null }], nextCursor: null });
   fetchVariantScoreboard.mockResolvedValue({ success: true, scoreboard: { basis: "confirmed_application_outcomes", minSample: 5, perVariant: [] }, recommendation: null });
   fetchApplicationStats.mockResolvedValue({
     success: true,
@@ -77,6 +85,49 @@ beforeEach(() => {
 });
 
 afterEach(() => { vi.clearAllMocks(); });
+
+test('the saved library comes before collapsed application confirmations', async () => {
+  useAuth.mockReturnValue({ plan: 'premium', user: { uid: 'library-owner' } });
+  const versionId = '11111111-1111-4111-8111-111111111111';
+  fetchResumeVariants.mockResolvedValue({ variants: [{ id: versionId, name: 'QA version', isDefault: true }] });
+  const { container } = renderPage();
+  await screen.findByRole('button', { name: 'Review submitted resumes' });
+  await screen.findByRole('button', { name: 'Open and edit' });
+  const library = container.querySelector(`article#resume-${versionId}`)!;
+  const confirmations = container.querySelector('#submitted-resumes')!;
+  expect(library.compareDocumentPosition(confirmations) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Open and edit' })).toBeVisible();
+  expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+});
+
+test('Apply Gate application-confirmation links open the panel on arrival', async () => {
+  useAuth.mockReturnValue({ plan: 'premium', user: { uid: 'link-owner' } });
+  fetchResumeVariants.mockResolvedValue({ variants: [{ id: 'A', name: 'QA version', isDefault: true }] });
+  renderPage('/resumes#submitted-resumes');
+  expect(await screen.findByRole('combobox', { name: 'Submitted resume for application 10' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Hide application confirmations' })).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByRole('region', { name: 'Submitted resume confirmations' })).toHaveFocus();
+});
+
+test('late outcome tables and archived history do not move ahead of the saved library', async () => {
+  useAuth.mockReturnValue({ plan: 'premium', user: { uid: 'late-outcomes-owner' } });
+  fetchResumeVariants.mockResolvedValue({ variants: [
+    { id: '11111111-1111-4111-8111-111111111111', name: 'QA first', isDefault: true },
+    { id: '22222222-2222-4222-8222-222222222222', name: 'QA second', isDefault: false },
+  ] });
+  let finish: (value: unknown) => void;
+  fetchVariantScoreboard.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const { container } = renderPage();
+  await screen.findByRole('heading', { name: 'QA first' });
+  await act(async () => finish!({ success: true, scoreboard: { basis: 'confirmed_application_outcomes', minSample: 5,
+    perVariant: [{ variantId: 'archived', name: 'Archived QA', sent: 1, matchedToOutcome: 1, interviewed: 1, offered: 0, rejected: 0,
+      noResponse: 0, interviewRate: 100, sufficientSample: false }] }, recommendation: null }));
+  const comparison = (await screen.findByRole('heading', { name: 'Which version works' })).closest('section')!;
+  const archived = screen.getByRole('heading', { name: 'Confirmed outcomes for past versions' }).closest('section')!;
+  const library = container.querySelector('article')!;
+  expect(library.compareDocumentPosition(comparison) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(library.compareDocumentPosition(archived) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
 
 test('empty version outcomes point to application confirmation without requiring Apply Gate', async () => {
   fetchResumeVariants.mockResolvedValue({ variants: [{ id: 'A', name: 'QA version', isDefault: true }] });

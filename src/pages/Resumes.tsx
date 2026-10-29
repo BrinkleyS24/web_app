@@ -498,7 +498,6 @@ const ResumeWorkspace = () => {
           </div>
         ) : null}
 
-        {premium && user?.uid ? <ResumeSubmissions key={user.uid} owner={user.uid} variants={variants} /> : null}
         {premium && variants.length > 0 ? <form className="space-y-2" aria-label="Compare resume outcomes" onSubmit={event => { event.preventDefault(); setComparisonTitle(comparisonDraft.trim()); }}>
           <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
             <label className="block min-w-0 text-sm">Compare outcomes for a role (optional)
@@ -507,31 +506,12 @@ const ResumeWorkspace = () => {
           </div>
           <p className="text-xs text-muted-foreground">{comparisonTitle ? `Showing the role family for ${comparisonTitle}.` : 'Showing all roles. Choose a role for a recommendation based on relevant confirmed outcomes.'} This comparison never establishes job qualification.</p>
         </form> : null}
-        {premium && (outcomeData?.scoreboard?.perVariant ?? []).some(row => !variants.some(v => v.id === row.variantId)) ? <Panel title="Confirmed outcomes for past versions">
-          <p className="mb-3 text-sm text-muted-foreground">Archived versions retain their confirmed history. They are excluded from new version recommendations.</p>
-          <ul className="space-y-2">{(outcomeData?.scoreboard?.perVariant ?? []).filter(row => !variants.some(v => v.id === row.variantId)).map(row => <li key={row.variantId} className="text-sm"><strong>{row.name}</strong>: {row.sent} confirmed application(s), {row.matchedToOutcome} with tracked outcomes, {row.interviewed} reaching interview stage and {row.offered} offer(s).</li>)}</ul>
-        </Panel> : null}
         {premium && outcomesUnavailable ? <ErrorState title="Resume outcomes could not be loaded" detail={incompatibleOutcomes || scoreboardQuery.error?.message === OUTCOME_CONTRACT_MESSAGE ? OUTCOME_CONTRACT_MESSAGE : "No partial recommendation is shown. Your resume library is still available."} onRetry={() => scoreboardQuery.refetch()} /> : null}
         {premium && (outcomeData?.scoreboard?.unknownApplications ?? 0) > 0 ? <p role="status" className="text-sm text-muted-foreground">{outcomeData?.scoreboard?.unknownApplications} application(s) have no confirmed saved resume. No version receives credit for them.</p> : null}
         {premium && (outcomeData?.scoreboard?.ambiguousCohorts ?? 0) > 0 ? (
           <p role="status" className="text-sm text-muted-foreground">
             Some application outcomes are excluded because multiple resume versions or applications match the same role. We cannot tell which resume to credit.
           </p>
-        ) : null}
-
-        {premium && variants.length >= 2 && outcomeData ? (
-          <VariantComparison
-            variants={variants}
-            scoreByVariant={scoreByVariant}
-            openFindingsByVariant={
-              new Map(variants.map((v) => {
-                const entry = healthByVariant.get(v.id);
-                return [v.id, entry?.document ? entry.findings.filter((f) => !f.dismissed).length : null];
-              }))
-            }
-            minSample={outcomeData?.scoreboard?.minSample ?? null}
-            recommendation={outcomeData?.recommendation ?? null}
-          />
         ) : null}
 
         {adding ? (
@@ -650,6 +630,26 @@ const ResumeWorkspace = () => {
             ))}
           </div>
         )}
+        {premium && variants.length >= 2 && outcomeData ? (
+          <VariantComparison
+            variants={variants}
+            scoreByVariant={scoreByVariant}
+            openFindingsByVariant={
+              new Map(variants.map((v) => {
+                const entry = healthByVariant.get(v.id);
+                return [v.id, entry?.document ? entry.findings.filter((f) => !f.dismissed).length : null];
+              }))
+            }
+            minSample={outcomeData?.scoreboard?.minSample ?? null}
+            recommendation={outcomeData?.recommendation ?? null}
+          />
+        ) : null}
+
+        {premium && (outcomeData?.scoreboard?.perVariant ?? []).some(row => !variants.some(v => v.id === row.variantId)) ? <Panel title="Confirmed outcomes for past versions">
+          <p className="mb-3 text-sm text-muted-foreground">Archived versions retain their confirmed history. They are excluded from new version recommendations.</p>
+          <ul className="space-y-2">{(outcomeData?.scoreboard?.perVariant ?? []).filter(row => !variants.some(v => v.id === row.variantId)).map(row => <li key={row.variantId} className="text-sm"><strong>{row.name}</strong>: {row.sent} confirmed application(s), {row.matchedToOutcome} with tracked outcomes, {row.interviewed} reaching interview stage and {row.offered} offer(s).</li>)}</ul>
+        </Panel> : null}
+        {premium && user?.uid ? <ResumeSubmissions key={user.uid} owner={user.uid} variants={variants} openOnArrival={location.hash === '#submitted-resumes' && !variantsQuery.isPending && !scoreboardQuery.isPending} /> : null}
       </div>
     </DashboardLayout>
   );

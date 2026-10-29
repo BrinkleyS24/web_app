@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, expect, test, vi } from 'vitest';
@@ -7,9 +7,9 @@ const { fetchResumeSubmissions, confirmSubmittedResume } = vi.hoisted(() => ({ f
 vi.mock('@/lib/emails', async () => ({ ...await vi.importActual('@/lib/emails'), fetchResumeSubmissions, confirmSubmittedResume }));
 const variants = [{ id: 'A', name: 'Default QA', isDefault: true, createdAt: '', charCount: 100 }, { id: 'B', name: 'Other version', isDefault: false, createdAt: '', charCount: 100 }];
 const application = { id: '9007199254740993', company: 'Cedar', role: 'QA Engineer', source: 'manual', appliedAt: null, outcomeLabel: 'interviewed', submission: null };
-function setup(owner = 'owner-a') {
+function setup(owner = 'owner-a', openOnArrival = true) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const view = render(<QueryClientProvider client={client}><ResumeSubmissions key={owner} owner={owner} variants={variants} /></QueryClientProvider>);
+  const view = render(<QueryClientProvider client={client}><ResumeSubmissions key={owner} owner={owner} variants={variants} openOnArrival={openOnArrival} /></QueryClientProvider>);
   return { ...view, client };
 }
 beforeEach(() => {
@@ -76,8 +76,62 @@ test('switching account uses a separate cache and immediately removes the previo
   const { rerender, client } = setup();
   await userEvent.selectOptions(await screen.findByRole('combobox'), 'B');
   fetchResumeSubmissions.mockReturnValue(new Promise(() => {}));
-  rerender(<QueryClientProvider client={client}><ResumeSubmissions key="owner-b" owner="owner-b" variants={[]} /></QueryClientProvider>);
+  rerender(<QueryClientProvider client={client}><ResumeSubmissions key="owner-b" owner="owner-b" variants={[]} openOnArrival /></QueryClientProvider>);
   expect(screen.queryByText(/Cedar/)).not.toBeInTheDocument();
   expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   expect(await screen.findByRole('status')).toHaveTextContent('Loading');
+});
+
+test('application forms stay out of the default view until explicitly opened', async () => {
+  setup('owner-a', false);
+  const toggle = screen.getByRole('button', { name: 'Review submitted resumes' });
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  expect(await screen.findByText(/1 application on this page/)).toBeVisible();
+  expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  await userEvent.click(toggle);
+  expect(screen.getByRole('combobox')).toHaveValue('');
+});
+
+test('collapsing a pending confirmation preserves its request and retry after a lost response', async () => {
+  let rejectSave: (error: Error) => void;
+  confirmSubmittedResume.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectSave = reject; }))
+    .mockResolvedValueOnce({ success: true });
+  setup();
+  await userEvent.selectOptions(await screen.findByRole('combobox'), 'B');
+  await userEvent.click(screen.getByRole('button', { name: 'Confirm submitted resume' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Hide application confirmations' }));
+  expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  await act(async () => rejectSave!(new Error('Acknowledgement lost. Retry.')));
+  await userEvent.click(screen.getByRole('button', { name: 'Review submitted resumes' }));
+  expect(screen.getByRole('combobox')).toHaveValue('B');
+  expect(screen.getByRole('alert')).toHaveTextContent('Acknowledgement lost');
+  await userEvent.click(screen.getByRole('button', { name: 'Retry confirmation' }));
+  expect(confirmSubmittedResume.mock.calls[1]).toEqual(confirmSubmittedResume.mock.calls[0]);
+});
+
+test('a newly received application deep link opens a previously collapsed panel', async () => {
+  const { rerender, client } = setup('owner-a', false);
+  await screen.findByText(/1 application on this page/);
+  rerender(<QueryClientProvider client={client}><ResumeSubmissions key="owner-a" owner="owner-a" variants={variants} openOnArrival /></QueryClientProvider>);
+  expect(await screen.findByRole('combobox')).toBeVisible();
+});
+
+test('a deep link waits for the expanded application rows before scrolling, and does not force later manual expansion', async () => {
+  const originalScroll = HTMLElement.prototype.scrollIntoView;
+  const scrolledWhileHidden: boolean[] = [];
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: function(this: HTMLElement) {
+    scrolledWhileHidden.push(Boolean((this.querySelector('#resume-submission-choices') as HTMLElement)?.hidden));
+  } });
+  let finish: (value: unknown) => void;
+  fetchResumeSubmissions.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  try {
+    setup();
+    expect(scrolledWhileHidden).toEqual([]);
+    await act(async () => finish!({ applications: [application], nextCursor: null }));
+    await screen.findByRole('combobox');
+    expect(scrolledWhileHidden).toEqual([false]);
+    await userEvent.click(screen.getByRole('button', { name: 'Hide application confirmations' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Review submitted resumes' }));
+    expect(scrolledWhileHidden).toEqual([false]);
+  } finally { Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: originalScroll }); }
 });

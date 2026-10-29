@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -814,6 +814,29 @@ describe("Next Actions", () => {
     expect(screen.getByLabelText("Preset")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy subject + body" })).toBeInTheDocument();
     expect(screen.getByText("Suggested reply contact: Jordan Lee <jordan@example.test>")).toBeInTheDocument();
+  });
+
+  test('pending draft generation has no invented confidence or preset context', async () => {
+    let finish: (value: unknown) => void;
+    generateSuggestionDraft.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Draft thank-you note' }));
+    expect(await screen.findByText('Generating draft...')).toBeVisible();
+    expect(screen.queryByText('medium confidence')).not.toBeInTheDocument();
+    expect(screen.queryByText('Concise follow-up')).not.toBeInTheDocument();
+    await act(async () => finish!({ success: true, draft: { subject: 'Re: Interview', body: 'Thank you for meeting.',
+      context: 'post_interview', contextLabel: 'Completed thank-you draft', actionType: 'thank_you', confidence: 'low' } }));
+    expect(await screen.findByText('low confidence')).toBeVisible();
+    expect(screen.getByText('Completed thank-you draft')).toBeVisible();
+  });
+
+  test('a failed generation does not claim medium confidence for a missing draft', async () => {
+    generateSuggestionDraft.mockRejectedValueOnce(new Error('Provider unavailable'));
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Draft thank-you note' }));
+    expect(await screen.findByText('No draft is ready for this preset. Try generating it again.')).toBeVisible();
+    expect(screen.queryByText('medium confidence')).not.toBeInTheDocument();
+    expect(screen.queryByText('Concise follow-up')).not.toBeInTheDocument();
   });
 
   test("switching presets restores edits without regenerating the original draft", async () => {

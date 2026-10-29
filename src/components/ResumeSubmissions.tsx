@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { confirmSubmittedResume, fetchResumeSubmissions, type ResumeSubmissionApplication, type ResumeVariant } from '@/lib/emails';
 import { Panel } from '@/components/premium/PremiumUI';
@@ -47,16 +47,34 @@ function SubmissionChoice({ application: a, variants, saved, reload }: {
   </li>;
 }
 
-export function ResumeSubmissions({ owner, variants }: { owner: string; variants: ResumeVariant[] }) {
+export function ResumeSubmissions({ owner, variants, openOnArrival = false }: { owner: string; variants: ResumeVariant[]; openOnArrival?: boolean }) {
   const client = useQueryClient();
+  const panel = useRef<HTMLDivElement>(null);
+  const deepLinkHandled = useRef(false);
+  const [expanded, setExpanded] = useState(openOnArrival);
+  useEffect(() => {
+    if (openOnArrival) setExpanded(true);
+  }, [openOnArrival]);
   const [cursors, setCursors] = useState<Array<string | undefined>>([undefined]);
   const [refresh, setRefresh] = useState(0);
   const before = cursors[cursors.length - 1];
   const query = useQuery({ queryKey: ['resume-submissions', owner, before], queryFn: () => fetchResumeSubmissions(before), enabled: Boolean(owner), retry: false });
+  useEffect(() => {
+    if (!openOnArrival) { deepLinkHandled.current = false; return; }
+    if (!expanded || query.isPending || deepLinkHandled.current) return;
+    deepLinkHandled.current = true;
+    panel.current?.focus({ preventScroll: true });
+    panel.current?.scrollIntoView?.({ block: 'start' });
+  }, [openOnArrival, expanded, query.isPending]);
+  const applicationCount = query.data?.applications.length || 0;
   const saved = async () => {
     await Promise.all([['resume-submissions', owner], ['variant-scoreboard'], ['apply-gate-history'], ['fix-suggestions', 'queue', owner], ['dashboard', 'queue'], ['strategy-alerts']].map(queryKey => client.invalidateQueries({ queryKey })));
   };
-  return <div id="submitted-resumes"><Panel title="Which resume did you submit?" description="Confirm the version on each application, even when you did not use Apply Gate. Checks and defaults never count as a confirmed submission.">
+  return <div id="submitted-resumes" ref={panel} role="region" aria-label="Submitted resume confirmations" tabIndex={-1} className="scroll-mt-24"><Panel title="Which resume did you submit?" description="Confirm the version on each application, even when you did not use Apply Gate. Checks and defaults never count as a confirmed submission."
+    action={<button type="button" className={BUTTON.secondary} aria-expanded={expanded} aria-controls="resume-submission-choices" onClick={() => setExpanded(value => !value)}>{expanded ? 'Hide application confirmations' : 'Review submitted resumes'}</button>}>
+    {!expanded ? <p className="text-sm text-muted-foreground">{query.isError ? 'Application confirmations could not be loaded. Open this panel to retry; your resume library is still available.' : query.isPending ? 'Loading application confirmations…' : `${applicationCount} ${applicationCount === 1 ? 'application' : 'applications'} on this page. Open only when you want to confirm or correct a submitted version.`}</p> : null}
+    {/* Keep the forms mounted: collapsing must preserve pending saves, edits and retry IDs. */}
+    <div id="resume-submission-choices" hidden={!expanded}>
     <p className="text-sm text-muted-foreground">Rates describe reached-interview or offer outcomes among confirmed applications with tracked outcomes. Waiting and unknown versions are excluded. These associations do not explain why an employer responded.</p>
     {query.isPending ? <p role="status">Loading applications…</p> : query.isError ? <div role="alert"><p>Application confirmations could not be loaded. Your resumes are still available.</p><button className={BUTTON.secondary} onClick={() => query.refetch()}>Try loading applications again</button></div> : <>
       {(query.data?.unlinkedSubmissions || 0) > 0 ? <p role="status" className="mt-3 text-sm">{query.data?.unlinkedSubmissions} saved confirmation(s) have an application link that changed. They are retained without outcome credit. Confirm the version on the current application below; no transfer is guessed.</p> : null}
@@ -66,5 +84,6 @@ export function ResumeSubmissions({ owner, variants }: { owner: string; variants
         {query.data?.nextCursor ? <button className={BUTTON.secondary} onClick={() => setCursors(c => [...c, query.data!.nextCursor!])}>More applications</button> : null}
       </div>
     </>}
+    </div>
   </Panel></div>;
 }
