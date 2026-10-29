@@ -1927,7 +1927,7 @@ const ApplyGateWorkspace = () => {
           <div className={cn(CARD, "flex flex-wrap items-center justify-between gap-3 p-4")} data-testid="apply-gate-linked-check">
             <div className="min-w-0">
               <p className="text-[13px] font-semibold text-foreground">
-                From Next Actions: {linkedCheck.job_title}{linkedCheck.company_name ? ` at ${linkedCheck.company_name}` : ""}
+                Saved check: {linkedCheck.job_title}{linkedCheck.company_name ? ` at ${linkedCheck.company_name}` : ""}
               </p>
               <p className="text-[13px] text-muted-foreground">Re-check it against your current resume. It uses the posting you already checked.</p>
               {recheckError?.id === linkedCheck.id ? <p role="alert" className="mt-1 text-[13px] text-destructive">{recheckError.message}</p> : null}

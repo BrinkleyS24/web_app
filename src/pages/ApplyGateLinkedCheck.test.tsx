@@ -70,7 +70,7 @@ afterEach(() => {
 test("a Next Actions link opens its saved check with a one-tap re-check", async () => {
   renderAt("/apply-gate?verdict=verdict-42");
   const banner = await screen.findByTestId("apply-gate-linked-check");
-  expect(banner).toHaveTextContent("From Next Actions: Instructional Designer at Brightwell Learning");
+  expect(banner).toHaveTextContent("Saved check: Instructional Designer at Brightwell Learning");
   await userEvent.click(screen.getByRole("button", { name: "Re-check this posting" }));
   expect(recheckApplyGateVerdict).toHaveBeenCalledWith("verdict-42");
 });
