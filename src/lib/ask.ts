@@ -72,7 +72,7 @@ export type AskResponse = {
   totals?: AskTotals | null;
   applications: AskApplication[];
   quotes?: AskQuote[];
-  handoff?: { kind: "apply_gate" | "resumes" | "privacy" | "interview_prep"; label: string };
+  handoff?: { kind: "apply_gate" | "resumes" | "privacy" | "interview_prep"; label: string; source?: "confirmed_resume_outcomes" };
   basis?: { applications?: number; earliestTrackedOn?: string | null };
   /** A drafted email as fields, so it can be edited and copied; `answer` keeps the text too. */
   draft?: { subject?: string | null; body: string } | null;
@@ -95,12 +95,65 @@ export const ASK_HANDOFF_ROUTES: Record<NonNullable<AskResponse["handoff"]>["kin
 
 export const ASK_MAX_QUESTION_CHARS = 300;
 
+function readableResponse(value: unknown): value is AskResponse {
+  const object = (item: unknown): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item);
+  const optionalText = (item: unknown) => item == null || typeof item === "string";
+  const count = (item: unknown) => typeof item === "number" && Number.isSafeInteger(item) && item >= 0;
+  if (!object(value) || value.success !== true || typeof value.answer !== "string" || !value.answer.trim() || !Array.isArray(value.applications)) return false;
+  const stages = new Set(["waiting", "quiet", "interviewing", "interview_quiet", "offer", "rejected", "closed"]);
+  if (value.applications.some(item => !object(item) || typeof item.ref !== "string" || typeof item.company !== "string"
+    || typeof item.stage !== "string" || !stages.has(item.stage) || !optionalText(item.role) || !optionalText(item.why) || !optionalText(item.note))) return false;
+  if (value.quotes != null && (!Array.isArray(value.quotes) || value.quotes.some(item => !object(item)
+    || typeof item.ref !== "string" || typeof item.company !== "string" || typeof item.passage !== "string" || !optionalText(item.rejectionNote)))) return false;
+  if (value.draft != null && (!object(value.draft) || typeof value.draft.body !== "string" || !optionalText(value.draft.subject))) return false;
+  if (value.handoff != null && (!object(value.handoff) || typeof value.handoff.kind !== "string" || typeof value.handoff.label !== "string")) return false;
+  if (value.totals != null) {
+    if (!object(value.totals)) return false;
+    for (const key of ["applications", "open", "reachedInterview", "inInterviewStage", "offers", "rejected"]) {
+      if (!count(value.totals[key])) return false;
+    }
+    if (Object.entries(value.totals).some(([key, item]) => key === "interviewRate"
+      ? item != null && (typeof item !== "number" || !Number.isFinite(item) || item < 0 || item > 100)
+      : !count(item))) return false;
+  }
+  if (value.basis != null && (!object(value.basis) || (value.basis.applications != null && !count(value.basis.applications)) || !optionalText(value.basis.earliestTrackedOn))) return false;
+  if (value.list != null && (!object(value.list) || !Array.isArray(value.list.items)
+    || value.list.items.some(item => !object(item) || typeof item.ref !== "string" || typeof item.company !== "string" || !optionalText(item.role)))) return false;
+  return true;
+}
+
 /**
  * One question to Ask Applendium™. A lookup plus one or two AI calls usually takes a few seconds;
  * the wider timeout covers a slow model without leaving the member staring at a spinner forever.
  */
-export async function askApplendium(question: string): Promise<AskResponse> {
-  return apiFetch("/api/ask", { method: "POST", body: { question }, timeoutMs: 45_000 });
+export async function askApplendium(question: string, options: { signal?: AbortSignal } = {}): Promise<AskResponse> {
+  // Include token acquisition in the budget; apiFetch's own timer starts after it.
+  const controller = new AbortController();
+  let rejectAbort: (reason: Error) => void = () => {};
+  const interrupted = new Promise<never>((_, reject) => { rejectAbort = reject; });
+  const abort = (error: Error) => {
+    if (controller.signal.aborted) return;
+    controller.abort(error);
+    rejectAbort(error);
+  };
+  const onParentAbort = () => abort(new DOMException("Ask request cancelled.", "AbortError"));
+  const timer = setTimeout(() => abort(new Error("Ask took too long. Try again.")), 45_000);
+  options.signal?.addEventListener("abort", onParentAbort, { once: true });
+  try {
+    const result = Promise.race([
+      Promise.resolve().then(() => {
+        controller.signal.throwIfAborted();
+        return apiFetch("/api/ask", { method: "POST", body: { question }, timeoutMs: 45_000, signal: controller.signal });
+      }), interrupted,
+    ]);
+    if (options.signal?.aborted) onParentAbort();
+    const response: unknown = await result;
+    if (!readableResponse(response)) throw new Error("Ask returned an incomplete response. Try again.");
+    return response;
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener("abort", onParentAbort);
+  }
 }
 
 /** The words for codes an older backend's answer may still contain (backend askAnswerText.js). */

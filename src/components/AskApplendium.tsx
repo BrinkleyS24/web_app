@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ArrowUp, ExternalLink, Loader2, Sparkles } from "lucide-react";
@@ -12,6 +12,7 @@ import { buildGmailThreadUrl } from "@/lib/premiumTaskQueue";
 import { STATUS_TONE } from "@/lib/statusTone";
 import { cn } from "@/lib/utils";
 import { friendlyErrorMessage } from "@/lib/apiErrors";
+import { useAuth } from "@/lib/AuthContext.jsx";
 
 /**
  * Ask Applendium™ (2026-09-26): a question box that answers from the member's own tracked
@@ -110,13 +111,31 @@ function AskTotalsList({ totals }: { totals: AskTotals }) {
 }
 
 export function AskApplendium() {
+  const { user } = useAuth();
+  return <AskForOwner key={user?.uid || "signed-out"} ownerId={user?.uid || null} />;
+}
+
+function AskForOwner({ ownerId }: { ownerId: string | null }) {
   const [question, setQuestion] = useState("");
   const [asked, setAsked] = useState<string | null>(null);
-  const mutation = useMutation<AskResponse, Error, string>({ mutationFn: (text) => askApplendium(text) });
+  const pending = useRef(false);
+  const request = useRef<AbortController | null>(null);
+  const mutation = useMutation<AskResponse, Error, string>({
+    mutationKey: ["ask", ownerId],
+    gcTime: 0,
+    mutationFn: (text) => {
+      request.current?.abort();
+      request.current = new AbortController();
+      return askApplendium(text, { signal: request.current.signal });
+    },
+    onSettled: () => { pending.current = false; },
+  });
+  useEffect(() => () => { request.current?.abort(); }, []);
 
   const ask = (text: string) => {
     const trimmed = text.trim();
-    if (trimmed.length < 3 || mutation.isPending) return;
+    if (!ownerId || trimmed.length < 3 || pending.current) return;
+    pending.current = true;
     setAsked(trimmed);
     setQuestion("");
     mutation.mutate(trimmed);
@@ -158,7 +177,7 @@ export function AskApplendium() {
         <button
           type="submit"
           className={cn(BUTTON.primary, "shrink-0")}
-          disabled={question.trim().length < 3 || mutation.isPending}
+          disabled={!ownerId || question.trim().length < 3 || mutation.isPending}
           aria-label="Ask"
         >
           {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <ArrowUp className="h-4 w-4" aria-hidden />}
@@ -172,6 +191,7 @@ export function AskApplendium() {
             <button
               key={suggestion}
               type="button"
+              disabled={!ownerId || mutation.isPending}
               onClick={() => ask(suggestion)}
               className="rounded-full border border-border bg-muted/40 px-3 py-1.5 text-[13px] text-foreground/80 transition hover:bg-muted hover:text-foreground"
             >
@@ -195,10 +215,10 @@ export function AskApplendium() {
           ) : null}
 
           {mutation.isError ? (
-            <ErrorState title="No answer this time" detail={friendlyErrorMessage(mutation.error, "Applendium could not answer just now. Try again in a moment.")} onRetry={() => asked && ask(asked)} />
+            <ErrorState stackRetryOnMobile title="No answer this time" detail={friendlyErrorMessage(mutation.error, "Applendium could not answer just now. Try again later.")} onRetry={() => asked && ask(asked)} />
           ) : null}
 
-          {result && !mutation.isPending ? (
+          {result && !mutation.isPending && !mutation.isError ? (
             <>
               <AskAnswer result={result} />
               {result.totals ? <AskTotalsList totals={result.totals} /> : null}
@@ -292,7 +312,9 @@ export function AskApplendium() {
 
               <p className="text-[12px] leading-snug text-muted-foreground">
                 {typeof count === "number" ? `Based on ${count} tracked application${count === 1 ? "" : "s"}${since ? ` since ${since}` : ""}. ` : ""}
-                {result.handoff && ["apply_gate", "resumes"].includes(result.handoff.kind)
+                {result.handoff?.source === "confirmed_resume_outcomes"
+                  ? "This answer uses confirmed resume submissions and tracked outcomes. No resume content was sent to AI."
+                  : result.handoff && ["apply_gate", "resumes"].includes(result.handoff.kind)
                   ? "This handoff uses your saved resume list. No resume content was sent to AI."
                   : "The AI answers from company, role, stage and dates, never the text of your emails."}
               </p>

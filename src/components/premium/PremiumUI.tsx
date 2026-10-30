@@ -196,20 +196,24 @@ export function ErrorState({
   title = "This section did not load",
   detail,
   onRetry,
+  stackRetryOnMobile = false,
 }: {
   title?: ReactNode;
   detail?: ReactNode;
   onRetry?: () => void;
+  stackRetryOnMobile?: boolean;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/[0.04] px-4 py-3.5" role="alert">
+    <div className={cn("rounded-xl border border-destructive/20 bg-destructive/[0.04] px-4 py-3.5", stackRetryOnMobile
+      ? "grid grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2 sm:grid-cols-[1rem_minmax(0,1fr)_auto]"
+      : "flex items-start gap-3")} role="alert">
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
       <div className="min-w-0 flex-1">
         <p className="text-[13px] font-semibold text-foreground">{title}</p>
         {detail ? <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{detail}</p> : null}
       </div>
       {onRetry ? (
-        <button type="button" onClick={onRetry} className={BUTTON.ghost}>
+        <button type="button" onClick={onRetry} className={cn(BUTTON.ghost, stackRetryOnMobile && "col-start-2 justify-self-start sm:col-start-3 sm:row-start-1")}>
           <RotateCw className="h-3.5 w-3.5" aria-hidden />
           Try again
         </button>

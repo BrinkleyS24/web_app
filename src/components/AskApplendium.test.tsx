@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { AskApplendium, ASK_SUGGESTIONS } from "./AskApplendium";
 
 const { askApplendium } = vi.hoisted(() => ({ askApplendium: vi.fn() }));
+vi.mock("@/lib/AuthContext.jsx", () => ({ useAuth: () => ({ user: { uid: "ask-test-owner" } }) }));
 vi.mock("@/lib/ask", async () => {
   const actual = await vi.importActual("@/lib/ask");
   return { ...actual, askApplendium };
@@ -63,7 +64,7 @@ describe("AskApplendium", () => {
 
     await userEvent.click(screen.getByRole("button", { name: ASK_SUGGESTIONS[0] }));
 
-    expect(askApplendium).toHaveBeenCalledWith(ASK_SUGGESTIONS[0]);
+    expect(askApplendium).toHaveBeenCalledWith(ASK_SUGGESTIONS[0], { signal: expect.any(AbortSignal) });
     expect(await screen.findByTestId("ask-answer")).toHaveTextContent("Acme Corp and Initech");
     expect(screen.getByText(ASK_SUGGESTIONS[0], { selector: "span" })).toBeInTheDocument();
   });
@@ -150,7 +151,7 @@ describe("AskApplendium", () => {
     askApplendium.mockResolvedValueOnce(ANSWER);
     await userEvent.click(screen.getByRole("button", { name: /Try again/ }));
     expect(await screen.findByTestId("ask-answer")).toBeInTheDocument();
-    expect(askApplendium).toHaveBeenLastCalledWith("Anything new?");
+    expect(askApplendium).toHaveBeenLastCalledWith("Anything new?", { signal: expect.any(AbortSignal) });
   });
 
   test("a question too short to mean anything cannot be sent", async () => {

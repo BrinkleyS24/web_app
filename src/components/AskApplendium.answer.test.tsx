@@ -9,6 +9,7 @@ import { askAnswerLines } from "@/lib/ask";
 // Persona review round 2, 2026-10-15: Ask showed literal **Quillstone Learning**, the internal code
 // "interview_quiet", a numbered list crammed into one paragraph, and the draft twice.
 const { askApplendium } = vi.hoisted(() => ({ askApplendium: vi.fn() }));
+vi.mock("@/lib/AuthContext.jsx", () => ({ useAuth: () => ({ user: { uid: "ask-test-owner" } }) }));
 vi.mock("@/lib/ask", async () => ({ ...(await vi.importActual("@/lib/ask")), askApplendium }));
 
 function renderAsk() {

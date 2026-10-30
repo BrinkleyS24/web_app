@@ -13,7 +13,7 @@ export default function AskPage() {
         <PageHeader
           eyebrow="Your tracked applications"
           title="Ask Applendium"
-          description="Ask about your own applications, replies and interviews. Every application in an answer links back to its email."
+          description="Ask about your own applications, replies and interviews. Available source links help you check the details."
         />
         <AskApplendium />
       </div>

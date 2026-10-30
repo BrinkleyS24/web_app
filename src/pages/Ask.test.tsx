@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { describe, expect, test, vi } from "vitest";
 
 import AskPage from "./Ask";
+vi.mock("@/lib/AuthContext.jsx", () => ({ useAuth: () => ({ user: { uid: "ask-test-owner" } }) }));
 
 vi.mock("@/components/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children: ReactNode }) => <div>{children}</div>,
