@@ -4,6 +4,7 @@ import { auth, firebaseConfigured } from "./firebase.js";
 import { signInFromExtensionBridge, signOutFromExtensionBridge } from "./extensionBridge.js";
 import { apiFetch } from "./api.js";
 import { reportWebOpen } from "./activity";
+import { clearOtherPrepDrafts } from "./prepDraftStorage";
 
 const AUTH_STATE_PUSH = "APPLENDIUM_AUTH_STATE_PUSH";
 const EXTENSION_READY = "APPLENDIUM_EXTENSION_READY";
@@ -127,6 +128,7 @@ export function AuthProvider({ children }) {
   const [debugAdminAccess, setDebugAdminAccess] = useState(isLocalDevBypass && DEV_AUTH_BYPASS_ADMIN);
 
   async function logout() {
+    clearOtherPrepDrafts(null);
     let signedOut = false;
     let lastError = null;
     const shouldRequestExtensionLogout = extensionDetected;
@@ -383,6 +385,7 @@ export function AuthProvider({ children }) {
   }, [user, isLocalDevBypass]);
 
   const loading = !authReady || (extensionDetected && !extensionAuthResolved);
+  useEffect(() => { if (!loading) clearOtherPrepDrafts(user?.uid || null); }, [loading, user?.uid]);
   // Derived at render time, so a signed-in user whose plan has not been fetched yet is always
   // "loading" — there is no render in between for a route guard to act on.
   const planLoading = planLoadingState

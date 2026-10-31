@@ -9,6 +9,19 @@ const email = (over: Record<string, unknown>) => ({
 });
 
 describe("deriveLiveInterviews (Dashboard's 'Still interviewing' rule)", () => {
+  test("numeric API application IDs and string task IDs identify the same application",()=>{
+    const task={id:"numeric",actionType:"prep_interview",applicationId:"9918",threadId:"t1",company:"Quillstone",roleTitle:"Curriculum Developer"} as never;
+    expect(deriveLiveInterviews([email({category:"Interviewed",applicationId:9918})],[task],now)[0]).toMatchObject({applicationId:"9918",prepTask:task});
+  });
+  test("a single employer task for a different explicit application and role is never substituted", () => {
+    const task = { id: "other", actionType: "prep_interview", applicationId: "app-2", threadId: "other-thread", company: "Quillstone", roleTitle: "Designer" } as never;
+    expect(deriveLiveInterviews([email({category:"Interviewed"})], [task], now)[0].prepTask).toBeNull();
+  });
+
+  test("an unknown role does not authorize an employer-only task", () => {
+    const task = {id:"other",actionType:"prep_interview",company:"Quillstone",roleTitle:"Designer"} as never;
+    expect(deriveLiveInterviews([email({category:"Interviewed",applicationId:null,position:null})], [task], now)[0].prepTask).toBeNull();
+  });
   test("an interview with no decision and a recent email is live", () => {
     const live = deriveLiveInterviews([email({ date: "2026-09-20T12:00:00" }), email({ category: "Interviewed", date: "2026-09-30T12:00:00" })], [], now);
     expect(live).toHaveLength(1);

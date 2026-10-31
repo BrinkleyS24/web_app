@@ -5,17 +5,17 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { EmptyState, ErrorState, LoadingRows, PageHeader, Panel } from "@/components/premium/PremiumUI";
 import { BUTTON } from "@/components/premium/tone";
 import { useAuth } from "@/lib/AuthContext.jsx";
-import { fetchApplyGateHistory, fetchRankedActionQueue, fetchResumeVariants, fetchStoredEmails, type ApplyGateHistoryItem, type ResumeVariant } from "@/lib/emails";
+import { fetchRankedActionQueue, fetchResumeVariants, fetchStoredEmails, type ResumeVariant } from "@/lib/emails";
 import { ActionWorkspaceBanner } from "@/components/premium/ActionWorkspaceBanner";
 import { actionToolHref, readActionContext, type ActionContext } from "@/lib/actionWorkspace";
 import { deriveLiveInterviews, LIVE_INTERVIEW_WINDOW_DAYS, type LiveInterview } from "@/lib/liveInterviews";
-import { buildQueueItemsFromRankedQueue } from "@/lib/premiumTaskQueue";
-import { buildInterviewPractice, fetchInterviewSource, interviewHasPassed, invitationPracticeInput, invitationScheduleLabel, pickFocusAreas, splitFocusAreas, type InterviewSource, type PracticePack } from "@/lib/interviewPrep";
-import { useDraftSession } from "@/hooks/useDraftSession";
+import { buildQueueItemsFromRankedQueue, daysSince } from "@/lib/premiumTaskQueue";
+import { buildInterviewPractice, fetchInterviewSource, interviewHasPassed, invitationPracticeInput, invitationScheduleLabel, loadPrepInterviewEmails, pickFocusAreas, splitFocusAreas, type InterviewSource } from "@/lib/interviewPrep";
+import { usePrepDraftSessions } from "@/hooks/usePrepDraftSessions";
+import { emptyPrepSession, type PrepSession } from "@/lib/prepDraftStorage";
 import { friendlyErrorMessage } from "@/lib/apiErrors";
 
-type PrepSession = { variantId:string; posting:string; focus:string; pack?:PracticePack; builtInput?:string; builtFrom?:"invitation"|"posting"; notes:Record<string,string> };
-const empty:PrepSession = {variantId:"",posting:"",focus:"",notes:{}};
+const empty=emptyPrepSession;
 const field="w-full min-w-0 rounded-xl border border-border bg-background p-3 text-sm text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary";
 const noteFields = ["Situation", "My responsibility", "What I did", "Result and what I learned"];
 
@@ -25,7 +25,7 @@ export default function InterviewPrep() {
   return <DashboardLayout actionBannerInPage><PageHeader eyebrow="Practice with your evidence" title="Interview preparation" description="Prepare truthful examples for this role, with the invitation and the resume you choose in view." />
     <ActionWorkspaceBanner />
     {context && user ? <PrepWorkspace key={`${user.uid}:${context.logicalKey}:${context.dedupeKey}`} context={context} owner={user.uid} />
-      : user ? <LiveInterviewList owner={user.uid} /> : null}
+      : user ? <LiveInterviewList key={user.uid} owner={user.uid} /> : null}
   </DashboardLayout>;
 }
 
@@ -36,13 +36,9 @@ export default function InterviewPrep() {
  * its prep task when Next Actions has one. A failed request shows an error, never "no interviews".
  */
 function LiveInterviewList({owner}:{owner:string}) {
-  const emails=useQuery({queryKey:["interview-prep","stored-emails",owner],queryFn:async()=>{
-    const response=await fetchStoredEmails({limit:500,offset:0});
-    if(!response?.success||!Array.isArray(response.emails))throw new Error("Your interviews could not be loaded.");
-    return response.emails;
-  },retry:false,staleTime:60_000});
-  // Same key as the Dashboard and sidebar, so this is usually already loaded.
-  const queue=useQuery({queryKey:["dashboard","queue"],queryFn:fetchRankedActionQueue,retry:false,staleTime:30_000});
+  const emails=useQuery({queryKey:["interview-prep","stored-emails",owner],queryFn:()=>loadPrepInterviewEmails(fetchStoredEmails),retry:false,staleTime:60_000});
+  // Owner-bound like the workspace; shared task invalidation includes this prefix.
+  const queue=useQuery({queryKey:["interview-prep","queue",owner],queryFn:async()=>{const result=await fetchRankedActionQueue();if(!result?.success||!result.queue)throw new Error("Your prep tasks could not be loaded.");return result;},retry:false,staleTime:30_000});
   let queueItems:ReturnType<typeof buildQueueItemsFromRankedQueue>=[];
   try{queueItems=buildQueueItemsFromRankedQueue(queue.data?.queue||null);}catch{queueItems=[];}
   const interviews=emails.data?deriveLiveInterviews(emails.data,queueItems):[];
@@ -58,7 +54,7 @@ function LiveInterviewList({owner}:{owner:string}) {
 
 function LiveInterviewRow({item,queueLoading}:{item:LiveInterview;queueLoading:boolean}) {
   const title=[item.company,item.role].filter(Boolean).join(" · ")||"Interview";
-  const days=Math.max(0,Math.floor((Date.now()-item.lastEmailAt.getTime())/86_400_000));
+  const days=daysSince(item.lastEmailAt.toISOString())??0;
   const when=days===0?"today":days===1?"yesterday":`${days} days ago`;
   const task=item.prepTask;
   const href=task?actionToolHref("/interview-prep",task):null;
@@ -70,7 +66,7 @@ function LiveInterviewRow({item,queueLoading}:{item:LiveInterview;queueLoading:b
     </div>
     {task?(hasWorkspace?<Link to={href!} className={BUTTON.primary}>Prepare for this interview</Link>:<Link to="/next-actions" className={BUTTON.secondary}>Open the prep task</Link>)
       :queueLoading?<p className="text-[13px] text-muted-foreground">Checking for a prep task…</p>
-      :<p className="text-[13px] text-muted-foreground sm:max-w-[30ch] sm:text-right">Your prep task will appear in Next Actions.</p>}
+      :<div className="text-[13px] sm:max-w-[30ch] sm:text-right"><p className="text-muted-foreground">No current prep task was found for this interview.</p><Link to="/next-actions" className="font-medium underline">Review Next Actions</Link></div>}
   </li>;
 }
 
@@ -78,16 +74,13 @@ function LiveInterviewRow({item,queueLoading}:{item:LiveInterview;queueLoading:b
  * The resume prep starts with (2026-10-15: prep used to require a choice before anything happened).
  * The version this role was last checked with in Apply Gate, else the default. Always changeable.
  */
-export function suggestPrepResume(variants: ResumeVariant[] | undefined, history: ApplyGateHistoryItem[] | undefined, source: Pick<InterviewSource,"company"|"role"> | undefined): { id: string; why: string } | null {
+export function suggestPrepResume(variants: ResumeVariant[] | undefined, source: Pick<InterviewSource,"resumeSubmission"> | undefined): { id: string; why: string } | null {
   if (!variants?.length) return null;
   const known = new Set(variants.map(v => v.id));
-  const same = (a?: string | null, b?: string | null) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
-  const checked = source?.company ? (history || [])
-    .filter(item => same(item.company_name, source.company) && (!source.role || same(item.job_title, source.role)) && item.resume_variant_id && known.has(item.resume_variant_id))
-    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0] : undefined;
-  if (checked?.resume_variant_id) return { id: checked.resume_variant_id, why: "the resume you checked this role with in Apply Gate" };
+  const submitted=source?.resumeSubmission;
+  if(submitted?.status==="confirmed"&&submitted.variantId&&known.has(submitted.variantId))return {id:submitted.variantId,why:"the resume you confirmed submitting for this application"};
   const fallback = variants.find(v => v.isDefault);
-  return fallback ? { id: fallback.id, why: "your default resume" } : null;
+  return fallback ? { id: fallback.id, why: "your default resume for practice; this does not confirm what you submitted" } : null;
 }
 
 /** The posting and quotes a build uses: what was typed, else the invitation's own words. */
@@ -100,24 +93,25 @@ function effectiveInputs(session: Pick<PrepSession,"posting"|"focus">, invitatio
 
 function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
   const sessionKey=`${context.logicalKey}:${context.dedupeKey}`;
-  const [sessions,updateSessions]=useDraftSession<PrepSession>("interview-prep");
+  const [sessions,updateSessions,recovery]=usePrepDraftSessions(owner);
   const session=sessions[sessionKey]||empty;
   const sessionRef=useRef(session); sessionRef.current=session;
-  const update=(patch:Partial<PrepSession>)=>updateSessions(current=>({...current,[sessionKey]:{...(current[sessionKey]||empty),...patch}}));
+  const update=(patch:Partial<PrepSession>)=>{copyRevision.current++;setCopied("");updateSessions(current=>({...current,[sessionKey]:{...(current[sessionKey]||empty),...patch}}));};
   const [pending,setPending]=useState(false),[error,setError]=useState(""),[resetAllowed,setResetAllowed]=useState(false),[copied,setCopied]=useState("");
   const [focusNewPack,setFocusNewPack]=useState(false);
   const practiceRegion=useRef<HTMLDivElement>(null);
-  const guard=useRef(false),mounted=useRef(true);
-  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+  const guard=useRef(false),mounted=useRef(true),controller=useRef<AbortController|undefined>(undefined);
+  const copyRevision=useRef(0);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;controller.current?.abort();copyRevision.current++;};},[]);
   useEffect(()=>{if(focusNewPack&&session.pack){practiceRegion.current?.focus({preventScroll:true});practiceRegion.current?.scrollIntoView?.({block:"start",behavior:"smooth"});setFocusNewPack(false);}},[focusNewPack,session.pack]);
-  const source=useQuery({queryKey:["interview-prep","source",owner,context.logicalKey,context.dedupeKey],queryFn:()=>fetchInterviewSource(context),retry:false,staleTime:0});
+  const source=useQuery({queryKey:["interview-prep","source",owner,context.logicalKey,context.dedupeKey],queryFn:({signal})=>fetchInterviewSource(context,{signal}),retry:false,staleTime:0,gcTime:0});
+  const latestSource=useRef(source.data?.sourceVersion);latestSource.current=source.isError?undefined:source.data?.sourceVersion;
   const resumes=useQuery({queryKey:["interview-prep","resumes",owner],queryFn:async()=>{
     const response=await fetchResumeVariants();if(!response.success||!Array.isArray(response.variants))throw new Error("Your resumes could not be loaded.");return response.variants;
   },retry:false});
-  const history=useQuery({queryKey:["apply-gate-history"],queryFn:fetchApplyGateHistory,retry:false,staleTime:30_000});
-  const suggested=useMemo(()=>suggestPrepResume(resumes.data,history.data?.history,source.data),[resumes.data,history.data,source.data]);
+  const suggested=useMemo(()=>suggestPrepResume(resumes.data,source.data),[resumes.data,source.data]);
   // Preselect once; the user can change it, and a choice already made is never replaced.
-  useEffect(()=>{if(!sessionRef.current.variantId&&suggested)update({variantId:suggested.id});},[suggested?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>{if(source.data&&!source.isError&&!sessionRef.current.variantId&&suggested)update({variantId:suggested.id});},[suggested?.id,source.data,source.isError]); // eslint-disable-line react-hooks/exhaustive-deps
   const invitation=useMemo(()=>invitationPracticeInput(source.data),[source.data]);
   const effective=effectiveInputs(session,invitation);
   const focuses=effective.focusAreas;
@@ -131,12 +125,15 @@ function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
     setCheckNote(result.data.sourceVersion===before?"No changes since you opened this.":"The invitation changed. Review it above.");
   }
   const hasNotes=Object.values(session.notes).some(note=>note.trim());
-  const packStale=Boolean(session.pack && (session.pack.sourceVersion!==source.data?.sourceVersion || session.pack.resume.id!==session.variantId));
+  const currentResume=resumes.data?.find(resume=>resume.id===session.variantId);
+  const packStale=Boolean(session.pack && (source.data&&session.pack.sourceVersion!==source.data.sourceVersion || session.pack.resume.id!==session.variantId
+    ||resumes.data&&!currentResume||currentResume?.contentVersion&&currentResume.contentVersion!==session.pack.resume.version));
+  useEffect(()=>{if(!hasNotes||recovery.remember&&!recovery.storageError)return;const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue="";};window.addEventListener("beforeunload",warn);return()=>window.removeEventListener("beforeunload",warn);},[hasNotes,recovery.remember,recovery.storageError]);
   // Store the inputs that actually generated a pack; typing later never silently changes its meaning.
   const builtInput=session.builtInput;
   const inputSignature=JSON.stringify([session.variantId,session.posting,session.focus]);
   const inputsChanged=Boolean(session.pack && builtInput!==inputSignature);
-  const sourceAvailable=Boolean(source.data&&!source.isError&&!source.isFetching);
+  const sourceAvailable=Boolean(source.data&&!source.isError&&!source.isFetching&&resumes.data&&!resumes.isError&&!resumes.isFetching);
   const inputIssue=!session.variantId||!resumes.data?.some(resume=>resume.id===session.variantId)?"Choose a saved resume before building practice."
     :effective.posting.trim().length<100?"Add the posting below, at least 100 characters, so practice has enough source detail."
     :focuses.length===0?"We could not identify practice topics. Copy one to five exact responsibilities from the posting into the field below."
@@ -147,19 +144,27 @@ function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
     guard.current=true;setPending(true);setError("");setCopied("");
     const snapshot=sessionRef.current;const signature=JSON.stringify([snapshot.variantId,snapshot.posting,snapshot.focus]);
     const inputs=effectiveInputs(snapshot,invitation);
+    const sourceVersion=source.data!.sourceVersion;
+    controller.current=new AbortController();
     try {
-      const pack=await buildInterviewPractice({...context,sourceVersion:source.data!.sourceVersion,variantId:snapshot.variantId,jobDescription:inputs.posting,focusAreas:inputs.focusAreas});
-      if(!mounted.current||JSON.stringify([sessionRef.current.variantId,sessionRef.current.posting,sessionRef.current.focus])!==signature)return;
+      const pack=await buildInterviewPractice({...context,sourceVersion:source.data!.sourceVersion,variantId:snapshot.variantId,jobDescription:inputs.posting,focusAreas:inputs.focusAreas},{signal:controller.current.signal});
+      if(!mounted.current||latestSource.current!==sourceVersion||JSON.stringify([sessionRef.current.variantId,sessionRef.current.posting,sessionRef.current.focus])!==signature)return;
       update({pack,builtInput:signature,builtFrom:inputs.from,notes:{}});setResetAllowed(false);setFocusNewPack(true);
     }catch(err){if(mounted.current)setError(friendlyErrorMessage(err,"Practice could not be built. Your inputs remain here."));}
     finally{guard.current=false;if(mounted.current)setPending(false);}
   }
-  function setNote(key:string,value:string){ updateSessions(current=>{const previous=current[sessionKey]||empty;return {...current,[sessionKey]:{...previous,notes:{...previous.notes,[key]:value}}};});setCopied(""); }
+  function setNote(key:string,value:string){ copyRevision.current++;updateSessions(current=>{const previous=current[sessionKey]||empty;return {...current,[sessionKey]:{...previous,notes:{...previous.notes,[key]:value}}};});setCopied(""); }
+  function notesText(){return session.pack!.practice.map(item=>`${item.quote}\nPractice prompt: ${item.question}\n${item.kind==="eligibility"?`My current status: ${session.notes[`${item.id}:status`]||"Not written yet"}`:noteFields.map(label=>`${label}: ${session.notes[`${item.id}:${label}`]||"Not written yet"}`).join("\n")}\nQuestion to ask: ${item.askInterviewer}`).join("\n\n");}
+  function downloadNotes(){
+    if(!session.pack)return;
+    try{const blob=new Blob([`Interview practice notes\nResume: ${session.pack.resume.name}\n${session.pack.disclosure}\nSnapshot of practice and your notes; check the current invitation before using.\n\n${notesText()}`],{type:"text/plain;charset=utf-8"});const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download="applendium-interview-notes.txt";link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+    catch{setCopied("Download failed. Your notes remain here; select and copy them manually.");}
+  }
   async function copyNotes() {
     if(!session.pack||packStale||inputsChanged||!sourceAvailable)return;
-    const text=session.pack.practice.map(item=>`${item.quote}\nPractice prompt: ${item.question}\n${item.kind==="eligibility"?`My current status: ${session.notes[`${item.id}:status`]||"Not written yet"}`:noteFields.map(label=>`${label}: ${session.notes[`${item.id}:${label}`]||"Not written yet"}`).join("\n")}\nQuestion to ask: ${item.askInterviewer}`).join("\n\n");
-    try{await navigator.clipboard.writeText(text);if(mounted.current)setCopied("Practice notes copied. This did not mark the task done.");}
-    catch{if(mounted.current)setCopied("Copy failed. Your notes are still here; select and copy them manually.");}
+    const text=notesText(),revision=++copyRevision.current;
+    try{await navigator.clipboard.writeText(text);if(mounted.current&&copyRevision.current===revision)setCopied("Practice notes copied. This did not mark the task done.");}
+    catch{if(mounted.current&&copyRevision.current===revision)setCopied("Copy failed. Your notes are still here; select and copy them manually.");}
   }
   return <div className="mt-5 min-w-0 space-y-5 [overflow-wrap:anywhere]">
     <Panel title={passed?"1. Your interview":"1. Confirm the invitation"}>
@@ -167,11 +172,11 @@ function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
         <p className="font-semibold">{[source.data.company,source.data.role].filter(Boolean).join(" · ")||"Interview conversation"}</p>
         <p className="mt-2 text-sm">{invitationScheduleLabel(source.data.schedule)}</p>
         {/* A past interview is not "confirmed" (2026-10-15); prep then serves the next conversation. */}
-        {passed
-          ?<p className="mt-2 text-sm text-muted-foreground">This interview has already happened. Prepare for a next round or a follow-up conversation, and check Gmail for anything newer from them.</p>
+        {source.data.phase==="completed"?<p className="mt-2 text-sm text-muted-foreground">The latest interview message describes a completed conversation. Use this practice for reflection or a confirmed next round; check Gmail for newer instructions.</p>:passed
+          ?<p className="mt-2 text-sm text-muted-foreground">The scheduled time has passed. This does not confirm that the interview took place. Check the latest invitation before preparing for another round.</p>
           :<p className="mt-2 text-sm text-muted-foreground">Confirm the time, timezone, interview format and contact in the original invitation. These may change.</p>}
-        <a href={`https://mail.google.com/mail/u/0/#all/${encodeURIComponent(source.data.threadId)}`} target="_blank" rel="noreferrer" className={`${BUTTON.secondary} mt-3`}>Read invitation in Gmail</a>
-        <details className="mt-3"><summary className="cursor-pointer text-sm font-medium">Invitation evidence</summary>{source.data.excerpts.map(email=><div key={email.id} className="mt-3 border-t border-border pt-3 text-sm"><p className="font-medium">{email.subject}</p><p className="text-muted-foreground">Invitation sender: {email.sender}</p><p className="mt-2 whitespace-pre-wrap">{email.text||"No readable message text; check Gmail."}</p></div>)}</details>
+        <a href={`https://mail.google.com/mail/u/0/#all/${encodeURIComponent(source.data.threadId)}`} target="_blank" rel="noreferrer" className={`${BUTTON.secondary} mt-3`}>Read interview messages in Gmail</a>
+        <details className="mt-3"><summary className="cursor-pointer text-sm font-medium">Invitation evidence</summary>{source.data.excerpts.map(email=><div key={email.id} className="mt-3 border-t border-border pt-3 text-sm"><p className="font-medium">{email.subject}</p><p className="text-muted-foreground">Message sender: {email.sender}</p><p className="mt-2 whitespace-pre-wrap">{email.text||"No readable message text; check Gmail."}</p>{email.threadId?<a href={`https://mail.google.com/mail/u/0/#all/${encodeURIComponent(email.threadId)}`} target="_blank" rel="noreferrer" className="mt-2 inline-block font-medium underline">Open this message in Gmail</a>:null}</div>)}</details>
         <button className={`${BUTTON.secondary} mt-3`} disabled={source.isFetching||pending} onClick={()=>void checkForChanges()}>Check for invitation changes</button>
         {checkNote?<p role="status" className="mt-2 text-sm">{checkNote}</p>:null}
       </>:null}
@@ -183,8 +188,9 @@ function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
         {resumes.isError?<><p role="alert">Your resumes could not be loaded. Your other inputs remain here.</p><button className={BUTTON.secondary} onClick={()=>void resumes.refetch()}>Reload resumes</button></>:null}
         <div><label htmlFor="prep-resume" className="block text-sm font-medium">Resume for this interview</label><select id="prep-resume" className={`${field} mt-1`} disabled={pending||resumes.isPending} value={session.variantId} onChange={e=>{update({variantId:e.target.value});setResetAllowed(false);}}><option value="">Choose a resume</option>{resumes.data?.map(resume=><option key={resume.id} value={resume.id}>{resume.name}</option>)}</select>
           {suggested&&session.variantId===suggested.id?<p className="mt-1 text-xs text-muted-foreground" data-testid="prep-resume-why">Picked: {suggested.why}. Change it if you will discuss another version.</p>:null}
+          {source.data?.resumeSubmission?.status==="unavailable"?<p className="mt-2 text-sm" role="status">Your submitted resume could not be checked. The practice choice below does not establish what you sent.</p>:source.data?.resumeSubmission?.status==="unusable"?<p className="mt-2 text-sm">The confirmed submitted document is no longer available as an unchanged active version. Choose a practice resume, or review its history in Resumes.</p>:null}
           {resumes.data?.length===0?<p className="mt-2 text-sm">Add a readable resume before building your practice.</p>:null}<Link to="/resumes" className="mt-2 inline-block text-sm font-medium underline">Manage resumes</Link></div>
-        <p className="text-sm" data-testid="prep-basis">{effective.from==="invitation"
+        <p className="text-sm" data-testid="prep-basis">{source.isPending||source.isFetching||resumes.isFetching?"Checking the latest invitation and resume before building or reusing practice.":source.isError||resumes.isError?"Some practice evidence is unavailable. Your existing inputs and notes remain here.":effective.from==="invitation"
           ?(invitation?`Practice comes from the invitation's own words, starting with “${invitation.focusAreas[0]}”`:"The invitation is too short to practice from. Add the posting below.")
           :"Practice comes from the posting you added."}</p>
         {session.pack&&hasNotes?<label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={resetAllowed} disabled={pending} onChange={e=>setResetAllowed(e.target.checked)}/>I understand rebuilding replaces this practice and clears its rehearsal notes.</label>:null}
@@ -198,7 +204,9 @@ function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
             <div><label htmlFor="prep-focus" className="block text-sm font-medium">Responsibilities or requirements to practice</label><textarea id="prep-focus" className={`${field} mt-1 min-h-[100px]`} maxLength={3004} disabled={pending} value={session.focus} onChange={e=>{update({focus:e.target.value});setResetAllowed(false);}}/><p className="mt-1 text-xs text-muted-foreground">Optional. Copy 1–5 exact lines from the posting, one per line. Leave it empty and we pick up to 3 duties from it.</p></div>
           </div>
         </details>
-        <p className="text-xs text-muted-foreground">Inputs and rehearsal notes stay in memory in this tab for up to 30 minutes after leaving this page. Reloading or signing out clears them.</p>
+        <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={recovery.remember} onChange={event=>recovery.toggle(event.target.checked)}/>Keep a recovery copy of my posting, practice and notes in this tab on this device.</label>
+        <p className="text-xs text-muted-foreground">Optional, for a private device. The browser copy can survive reloads and expires after 30 minutes without edits. Signing out or switching accounts clears it in this tab. It does not sync to other devices. Download notes to keep a lasting copy.</p>
+        {recovery.storageError?<p role="alert" className="text-sm text-warning">{recovery.storageError}</p>:recovery.remember?<p role="status" className="text-xs">Recovery copy saved in this tab.</p>:<p className="text-xs text-muted-foreground">Recovery is off. Reloading or signing out clears notes that you have not copied or downloaded.</p>}
       </div>
     </Panel>
     {session.pack?<div ref={practiceRegion} role="region" aria-label="Interview practice" tabIndex={-1} className="scroll-mt-20 outline-none"><Panel title="3. Rehearse your answers" description={`Using ${session.pack.resume.name}`}>
@@ -213,6 +221,7 @@ function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
       </section>)}</div>
       <p className="mt-4 text-sm">Say each answer aloud once. Check that it explains your own contribution and uses only facts you can support.</p>
       <button className={`${BUTTON.secondary} mt-3`} disabled={packStale||inputsChanged||!sourceAvailable} onClick={()=>void copyNotes()}>Copy practice notes</button>{copied?<p role="status" className="mt-2 text-sm">{copied}</p>:null}
+      <button className={`${BUTTON.secondary} mt-3 ml-2`} onClick={downloadNotes}>Download practice notes</button>
       <p className="mt-3 text-xs text-muted-foreground">Building or editing practice does not mark the task done. Use the explicit task-completion button when you have finished.</p>
     </Panel></div>:null}
   </div>;

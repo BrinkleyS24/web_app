@@ -73,6 +73,13 @@ export default function Privacy() {
           We do not transfer your Google user data to any party for advertising, resale, or AI model training.
         </p>
 
+        <p>
+          Interview Prep can optionally keep a readable recovery copy of your posting, practice and notes
+          in your browser tab. Enable this only on a private device. This copy is not uploaded to our
+          servers, cannot be restored after 30 minutes without edits, and is cleared in that tab when
+          you sign out or switch accounts. Downloaded notes are files you control on your device.
+        </p>
+
         <h2>Data retention</h2>
         <p>
           We retain your data only while your account is active and as needed to provide the service. When

@@ -14,10 +14,25 @@ test("missing schedule remains unconfirmed, focus quotes split only by line",()=
 // 2026-10-15: past interviews, and practice from the invitation when no posting is pasted.
 import {interviewHasPassed,invitationPracticeInput,pickFocusAreas} from "./interviewPrep";
 
+test("an unzoned clock is not treated as a UTC instant on the same day",()=>{
+  expect(interviewHasPassed({startAt:"2026-10-30T10:00:00Z",timeZone:null,hasTime:true,source:"body"},Date.parse("2026-10-30T11:00:00Z"))).toBe(false);
+});
+
 test("QA duties beginning with build, validate and maintain stay exact-source topics",()=>{
   const lines=['Build Python and Pytest automated tests for REST APIs.','Validate SQL database records.','Maintain Selenium regression suites and CI/CD with GitHub Actions.'];
   expect(pickFocusAreas(lines.join(' '))).toEqual(lines);
   expect(pickFocusAreas('Please maintain this calendar invitation in Zoom. Privacy policy: we maintain records.')).toEqual([]);
+});
+
+test("automatic practice includes actual required qualifications and responsibilities, not just preparation requests",()=>{
+  const lines=['Please prepare a real example from your experience.','Active nursing license required before starting.','Responsibilities include monitoring patient vital signs.','A bachelor degree in nursing is required.'];
+  expect(pickFocusAreas(lines.join('\n'),5)).toEqual(lines.slice(1));
+});
+
+test("generic coaching does not duplicate the duty's rehearsal worksheet",()=>{
+  const quote='Manage appointment scheduling and maintain accurate patient records.';
+  expect(pickFocusAreas(`Please prepare a real example related to this responsibility.\n${quote}\nWe will discuss your own contribution and what you learned.`)).toEqual([quote]);
+  expect(pickFocusAreas('Bring a specific example from your previous work.')).toEqual([]);
 });
 test("an interview in the past is recognised, with or without a time",()=>{
   const now=Date.parse("2026-10-15T16:00:00Z");

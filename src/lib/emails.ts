@@ -1833,6 +1833,7 @@ export type ResumeVariant = {
   isDefault: boolean;
   createdAt: string;
   charCount: number;
+  contentVersion?: string;
 };
 
 export type VariantScoreRow = {

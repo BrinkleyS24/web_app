@@ -20,6 +20,7 @@ vi.mock("./api.js", () => ({ apiFetch }));
 
 import { AuthProvider, useAuth } from "./AuthContext.jsx";
 import { signInFromExtensionBridge } from "./extensionBridge.js";
+import {savePrepDrafts,loadPrepDrafts,emptyPrepSession} from "./prepDraftStorage";
 
 function Probe({ renders }) {
   const { user, loading, planLoading, plan, planError } = useAuth();
@@ -67,6 +68,19 @@ describe("AuthProvider plan loading", () => {
     render(<AuthProvider><Probe renders={renders} /></AuthProvider>);
     await act(async () => { authState.callback(null); });
     expect(renders.at(-1)).toEqual(expect.objectContaining({ user: false, planLoading: false, plan: null }));
+  });
+
+  test("prep recovery survives auth restoration but is cleared on account change and sign-out",async()=>{
+    sessionStorage.clear();const drafts={['0123456789abcdef:fedcba9876543210']:{...emptyPrepSession,notes:{'example:Situation':'Fictional private note'}}};
+    savePrepDrafts('u1',drafts);apiFetch.mockResolvedValue({plan:'premium'});
+    render(<AuthProvider><Probe renders={[]} /></AuthProvider>);
+    expect(loadPrepDrafts('u1').remember).toBe(true);
+    await act(async()=>{authState.callback({uid:'u1',email:'one@example.invalid'});});
+    expect(loadPrepDrafts('u1').remember).toBe(true);
+    await act(async()=>{authState.callback({uid:'u2',email:'two@example.invalid'});});
+    expect(loadPrepDrafts('u1').remember).toBe(false);
+    savePrepDrafts('u2',drafts);await act(async()=>{authState.callback(null);});
+    expect(loadPrepDrafts('u2').remember).toBe(false);
   });
 });
 
