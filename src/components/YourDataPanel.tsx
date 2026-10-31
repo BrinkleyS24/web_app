@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Download, ExternalLink, Loader2, ShieldCheck, Trash2, Unplug } from "lucide-react";
@@ -57,6 +57,11 @@ function downloadJson(data: unknown, filename: string) {
 }
 
 export function YourDataPanel() {
+  const { user } = useAuth();
+  return <YourDataAccount key={user?.uid || user?.email || "signed-out"} />;
+}
+
+function YourDataAccount() {
   const { user, logout } = useAuth() as { user?: { email?: string | null } | null; logout: () => Promise<void> };
   const navigate = useNavigate();
   const accountEmail = String(user?.email || "").trim();
@@ -74,36 +79,51 @@ export function YourDataPanel() {
   const [deleteStatus, setDeleteStatus] = useState<Status>(null);
   const deleteConfirmed = accountEmail !== "" && typedEmail.trim().toLowerCase() === accountEmail.toLowerCase();
 
+  const requests = useRef(new Map<string, AbortController>());
+  useEffect(() => () => { requests.current.forEach(controller => controller.abort()); }, []);
+  function begin(channel: string) {
+    if (requests.current.has(channel)) return null;
+    const controller = new AbortController(); requests.current.set(channel, controller);
+    return controller;
+  }
+
   async function exportData() {
+    const request = begin("export"); if (!request) return;
     setExporting(true);
     setExportStatus(null);
     try {
-      const data = await apiFetch("/api/user/export", { method: "GET", timeoutMs: 60_000 });
+      const data = await apiFetch("/api/user/export", { method: "GET", timeoutMs: 60_000, signal: request.signal });
+      if (request.signal.aborted) return;
       const day = new Date().toISOString().slice(0, 10);
       downloadJson(data, `applendium-data-${day}.json`);
       setExportStatus({ tone: "ok", text: "Your data was downloaded as a JSON file." });
     } catch (error) {
+      if (request.signal.aborted) return;
       setExportStatus(
         isNotAvailable(error)
           ? { tone: "info", text: "Not available yet. Export is coming soon." }
           : { tone: "error", text: friendlyErrorMessage(error, "The export did not complete. Try again.") },
       );
     } finally {
-      setExporting(false);
+      requests.current.delete("export");
+      if (!request.signal.aborted) setExporting(false);
     }
   }
 
   async function disconnectGmail() {
+    const request = begin("disconnect"); if (!request) return;
     setDisconnecting(true);
     setDisconnectStatus(null);
     try {
-      await apiFetch("/api/user/gmail/disconnect", { method: "POST", body: {} });
+      await apiFetch("/api/user/gmail/disconnect", { method: "POST", body: {}, signal: request.signal });
+      if (request.signal.aborted) return;
       setConfirmDisconnect(false);
       setDisconnectStatus({
         tone: "ok",
         text: "Gmail is disconnected. New emails stop coming in. What is already here stays until you delete your account.",
       });
     } catch (error) {
+      if (request.signal.aborted) return;
       setConfirmDisconnect(false);
       setDisconnectStatus(
         isNotAvailable(error)
@@ -111,27 +131,41 @@ export function YourDataPanel() {
           : { tone: "error", text: friendlyErrorMessage(error, "Gmail was not disconnected. Try again.") },
       );
     } finally {
-      setDisconnecting(false);
+      requests.current.delete("disconnect");
+      if (!request.signal.aborted) setDisconnecting(false);
     }
   }
 
   async function deleteAccount() {
     if (!deleteConfirmed || deleting) return;
+    const request = begin("delete"); if (!request) return;
     setDeleting(true);
     setDeleteStatus(null);
     try {
-      await apiFetch("/api/user/account", { method: "DELETE", body: { confirmEmail: typedEmail.trim() } });
-      toast.success("Your account and stored application data are deleted.");
+      const response = await apiFetch("/api/user/account", { method: "DELETE", body: { confirmEmail: typedEmail.trim() }, signal: request.signal, timeoutMs: 60_000 });
+      if (request.signal.aborted) return;
+      if (response?.success !== true) throw new Error("Account deletion could not be confirmed. Please retry or contact support.");
+      const billingPending = response?.billingCleanup?.status === "pending";
+      const gmailPending = response?.gmailCleanup?.status === "pending";
+      if (billingPending || gmailPending) {
+        const details = [billingPending ? "Billing cleanup is still pending; contact support to confirm that future charges have stopped." : "",
+          gmailPending ? "Google access revocation could not be confirmed. Remove Applendium on your Google permissions page." : ""].filter(Boolean).join(" ");
+        toast.warning(`Your account data is deleted. ${details}`, { duration: 20000,
+          ...(gmailPending ? { action: { label: "Google permissions", onClick: () => window.open(GOOGLE_PERMISSIONS_URL, "_blank", "noopener,noreferrer") } } : {}) });
+      } else {
+        toast.success("Your account and stored application data are deleted.");
+      }
       try {
         await logout();
       } catch {
         // The account is gone either way; a failed local sign-out must not hide that.
       }
-      navigate("/", { replace: true });
+      if (!request.signal.aborted) navigate("/", { replace: true });
     } catch (error) {
-      setDeleteStatus({ tone: "error", text: friendlyErrorMessage(error, "Your account was not deleted. Try again.") });
+      if (request.signal.aborted) return;
+      setDeleteStatus({ tone: "error", text: friendlyErrorMessage(error, "Account deletion could not be confirmed. Some steps may have completed. Please retry or contact support.") });
       setDeleting(false);
-    }
+    } finally { requests.current.delete("delete"); }
   }
 
   return (
@@ -192,8 +226,8 @@ export function YourDataPanel() {
           <div>
             <p className={EYEBROW}>Delete account</p>
             <p className="mt-1 text-[13px] text-muted-foreground">
-              Deletes your account, your tracked applications, resumes and settings, cancels any subscription and removes
-              Gmail access. This cannot be undone.
+              Deletes your account, tracked applications, resumes and settings, and requests Google access revocation and
+              billing closure. You will be told if either provider step is unconfirmed. This cannot be undone.
             </p>
             {deleteOpen ? (
               <div className="mt-2 max-w-md space-y-2">

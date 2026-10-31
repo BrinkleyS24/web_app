@@ -1,20 +1,21 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { YourDataPanel } from "./YourDataPanel";
 
-const { apiFetch, logout, navigate, toastSuccess } = vi.hoisted(() => ({
+const { apiFetch, logout, navigate, toastSuccess, toastWarning } = vi.hoisted(() => ({
   apiFetch: vi.fn(),
   logout: vi.fn(),
   navigate: vi.fn(),
   toastSuccess: vi.fn(),
+  toastWarning: vi.fn(),
 }));
 
 vi.mock("@/lib/api.js", () => ({ apiFetch }));
 vi.mock("@/lib/AuthContext.jsx", () => ({ useAuth: () => ({ user: { email: "maria@example.com" }, logout }) }));
-vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: toastSuccess, warning: toastWarning, error: vi.fn() } }));
 vi.mock("react-router-dom", async () => ({ ...(await vi.importActual("react-router-dom")), useNavigate: () => navigate }));
 
 const notFound = () => Object.assign(new Error("This is not available right now."), { status: 404 });
@@ -30,7 +31,7 @@ function renderPanel() {
 beforeEach(() => {
   logout.mockResolvedValue(undefined);
 });
-afterEach(() => { vi.clearAllMocks(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 // Settings had only Sign out: no disconnect, delete or export (mobile persona, 2026-10-14).
 describe("YourDataPanel", () => {
@@ -80,7 +81,7 @@ describe("YourDataPanel", () => {
     expect(confirm).toBeEnabled();
     await user.click(confirm);
     await waitFor(() =>
-      expect(apiFetch).toHaveBeenCalledWith("/api/user/account", { method: "DELETE", body: { confirmEmail: "maria@example.com" } }),
+      expect(apiFetch).toHaveBeenCalledWith("/api/user/account", expect.objectContaining({ method: "DELETE", body: { confirmEmail: "maria@example.com" } })),
     );
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/", { replace: true }));
     expect(logout).toHaveBeenCalled();
@@ -97,5 +98,39 @@ describe("YourDataPanel", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("problem on its side");
     expect(screen.queryByText(/ACCOUNT_DELETE_FAILED/)).not.toBeInTheDocument();
     expect(navigate).not.toHaveBeenCalled();
+  });
+  test("a late export cannot download private data after leaving the account screen",async()=>{
+    let finish!: (value: unknown)=>void;
+    apiFetch.mockReturnValue(new Promise(resolve=>{finish=resolve;}));
+    const createObjectURL=vi.fn();Object.assign(URL,{createObjectURL,revokeObjectURL:vi.fn()});
+    const view=renderPanel();await userEvent.click(screen.getByRole('button',{name:'Export my data'}));
+    view.unmount();await act(async()=>finish({private:'fictional previous owner data'}));
+    expect(createObjectURL).not.toHaveBeenCalled();
+  });
+  test('deletion reports pending billing cleanup instead of claiming all cancellation completed',async()=>{
+    apiFetch.mockResolvedValue({success:true,billingCleanup:{status:'pending',recoveryScheduled:true}});
+    renderPanel();await userEvent.click(screen.getByRole('button',{name:'Delete my account'}));
+    await userEvent.type(screen.getByLabelText(/Type your account email/),'maria@example.com');
+    await userEvent.click(screen.getByRole('button',{name:'Delete my account'}));
+    await waitFor(()=>expect(toastWarning).toHaveBeenCalledWith(expect.stringMatching(/Billing cleanup is still pending/),expect.any(Object)));
+    expect(toastSuccess).not.toHaveBeenCalled();expect(logout).toHaveBeenCalled();
+  });
+  test('an unconfirmed Google revocation provides the actual Google permissions fallback',async()=>{
+    apiFetch.mockResolvedValue({success:true,billingCleanup:{status:'complete'},gmailCleanup:{status:'pending'}});
+    const open=vi.spyOn(window,'open').mockImplementation(()=>null);
+    renderPanel();await userEvent.click(screen.getByRole('button',{name:'Delete my account'}));
+    await userEvent.type(screen.getByLabelText(/Type your account email/),'maria@example.com');
+    await userEvent.click(screen.getByRole('button',{name:'Delete my account'}));
+    await waitFor(()=>expect(toastWarning).toHaveBeenCalledWith(expect.stringMatching(/Google access revocation could not be confirmed/),expect.objectContaining({action:expect.any(Object)})));
+    const options=toastWarning.mock.calls[0][1];options.action.onClick();expect(open).toHaveBeenCalledWith('https://myaccount.google.com/permissions','_blank','noopener,noreferrer');open.mockRestore();
+  });
+  test("a late deletion acknowledgement cannot sign out a subsequently opened account",async()=>{
+    let finish!: (value: unknown)=>void;
+    apiFetch.mockReturnValue(new Promise(resolve=>{finish=resolve;}));
+    const view=renderPanel();await userEvent.click(screen.getByRole('button',{name:'Delete my account'}));
+    await userEvent.type(screen.getByLabelText(/Type your account email/),'maria@example.com');
+    await userEvent.click(screen.getByRole('button',{name:'Delete my account'}));
+    view.unmount();await act(async()=>finish({success:true}));
+    expect(logout).not.toHaveBeenCalled();expect(navigate).not.toHaveBeenCalled();expect(toastSuccess).not.toHaveBeenCalled();
   });
 });

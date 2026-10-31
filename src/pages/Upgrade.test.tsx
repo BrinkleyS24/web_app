@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
@@ -54,7 +54,7 @@ async function renderUpgrade({
   });
 
   const { default: Upgrade } = await import("./Upgrade.jsx");
-  render(
+  return render(
     <MemoryRouter>
       <Upgrade />
     </MemoryRouter>,
@@ -62,6 +62,7 @@ async function renderUpgrade({
 }
 
 beforeEach(() => {
+  startPremiumCheckout.mockReset();
   fetchPremiumPrice.mockResolvedValue({ unitAmount: 1499, currency: "usd" });
   formatPremiumPrice.mockReturnValue({ amount: "$14.99", suffix: "/mo" });
   getApiBaseUrl.mockReturnValue("https://api.example.com");
@@ -69,10 +70,19 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   vi.clearAllMocks();
 });
 
 describe("Upgrade — founding offer", () => {
+  test('duplicate checkout clicks share a request and leaving the page aborts its redirect',async()=>{
+    startPremiumCheckout.mockReturnValue(new Promise(()=>{}));
+    const view=await renderUpgrade({founding:'',plan:'free'});
+    const button=await screen.findByText('Start Premium');fireEvent.click(button);fireEvent.click(button);
+    expect(startPremiumCheckout).toHaveBeenCalledTimes(1);
+    const signal=startPremiumCheckout.mock.calls[0][0].signal;expect(signal.aborted).toBe(false);
+    view.unmount();expect(signal.aborted).toBe(true);
+  });
   test("a signed-out visitor sees the offer AND its anchor target actually exists", async () => {
     await renderUpgrade();
 
@@ -135,13 +145,13 @@ describe("Upgrade — quarterly plan and funnel events", () => {
 
     fireEvent.click(screen.getByText("Start Premium"));
     expect(trackFunnel).toHaveBeenCalledWith("upgrade_click", { source: "ext_search_read", plan: "quarterly" });
-    expect(startPremiumCheckout).toHaveBeenCalledWith({ plan: "quarterly" });
+    expect(startPremiumCheckout).toHaveBeenCalledWith(expect.objectContaining({ plan: "quarterly", signal: expect.any(AbortSignal) }));
   });
 
   test("monthly stays the default", async () => {
     await renderUpgrade({ founding: "", plan: "free" });
     fireEvent.click(await screen.findByText("Start Premium"));
-    expect(startPremiumCheckout).toHaveBeenCalledWith({ plan: "monthly" });
+    expect(startPremiumCheckout).toHaveBeenCalledWith(expect.objectContaining({ plan: "monthly", signal: expect.any(AbortSignal) }));
   });
 
   test("without a quarterly price the page offers monthly only", async () => {

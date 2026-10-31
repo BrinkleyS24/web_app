@@ -87,6 +87,12 @@ export default function Privacy() {
           copies in encrypted backups are purged within our standard backup-retention window. You can request
           deletion at any time.
         </p>
+        <p>
+          If Stripe is temporarily unavailable during deletion, a restricted billing cleanup record may remain
+          until billing closure is confirmed. It contains only Stripe customer or subscription identifiers and
+          retry information, with no Gmail content, resumes or account email. The record is removed after cleanup
+          is confirmed.
+        </p>
 
         <h2>Deletion</h2>
         <p>

@@ -1,4 +1,5 @@
 import { apiFetch } from "./api.js";
+import { auth } from "./firebase.js";
 
 const UPGRADE_SOURCE_PATTERN = /^[a-z0-9_]{1,40}$/;
 
@@ -11,7 +12,14 @@ export function readUpgradeSource(search = typeof window !== "undefined" ? windo
   return value && UPGRADE_SOURCE_PATTERN.test(value) ? value : null;
 }
 
-export async function createPremiumCheckoutSession({ source = null, plan = "monthly" } = {}) {
+function checkCheckoutOwner(owner, signal) {
+  if (signal?.aborted || auth?.currentUser?.uid !== owner) throw new DOMException("Checkout was canceled because the account or page changed.", "AbortError");
+}
+
+export async function createPremiumCheckoutSession({ source = null, plan = "monthly", signal } = {}) {
+  const owner = auth?.currentUser?.uid;
+  if (!owner) throw new Error("Sign in before starting checkout.");
+  checkCheckoutOwner(owner, signal);
   const response = await apiFetch("/api/subscriptions/create-checkout-session", {
     method: "POST",
     body: {
@@ -19,18 +27,21 @@ export async function createPremiumCheckoutSession({ source = null, plan = "mont
       ...(source ? { source } : {}),
     },
     timeoutMs: 30000,
+    signal,
   });
-
-  const url = response?.url;
-  if (!url) {
-    throw new Error("Backend did not return a checkout URL.");
+  checkCheckoutOwner(owner, signal);
+  let url;
+  try { url = new URL(response?.url || ""); } catch { throw new Error("Checkout could not be opened. Please retry."); }
+  if (url.protocol !== "https:" || url.hostname !== "checkout.stripe.com" || url.username || url.password) {
+    throw new Error("The checkout URL could not be verified. Please retry.");
   }
-
-  return url;
+  return url.href;
 }
 
-export async function startPremiumCheckout({ source = readUpgradeSource(), plan = "monthly" } = {}) {
-  const url = await createPremiumCheckoutSession({ source, plan });
+export async function startPremiumCheckout({ source = readUpgradeSource(), plan = "monthly", signal } = {}) {
+  const owner = auth?.currentUser?.uid;
+  const url = await createPremiumCheckoutSession({ source, plan, signal });
+  checkCheckoutOwner(owner, signal);
   window.location.assign(url);
 }
 

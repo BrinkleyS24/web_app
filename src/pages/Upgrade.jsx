@@ -39,6 +39,11 @@ export default function Upgrade() {
   const { user, loading, plan, planLoading, planError, accountStatus, logout } = useAuth();
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
+  const checkoutRequest = useRef(null);
+  useEffect(() => {
+    setCheckoutBusy(false); setCheckoutError("");
+    return () => { checkoutRequest.current?.abort(); checkoutRequest.current = null; };
+  }, [user?.uid]);
   const [signOutBusy, setSignOutBusy] = useState(false);
   const [premiumPrice, setPremiumPrice] = useState(null);
   const [billingPlan, setBillingPlan] = useState("monthly");
@@ -120,19 +125,26 @@ export default function Upgrade() {
   });
 
   async function handleCheckout() {
+    if (checkoutRequest.current) return;
+    const controller = new AbortController(); checkoutRequest.current = controller;
     setCheckoutError("");
     setCheckoutBusy(true);
     trackFunnel("upgrade_click", { source: upgradeSource, plan: selectedPlan });
     try {
-      await startPremiumCheckout({ plan: selectedPlan });
+      await startPremiumCheckout({ plan: selectedPlan, signal: controller.signal });
     } catch (error) {
+      if (controller.signal.aborted || checkoutRequest.current !== controller) return;
       trackFunnel("checkout_error", { source: upgradeSource, plan: selectedPlan });
       setCheckoutError(error instanceof Error ? error.message : "Unable to start checkout.");
       setCheckoutBusy(false);
+    } finally {
+      if (checkoutRequest.current === controller) checkoutRequest.current = null;
     }
   }
 
   async function handleSignOut() {
+    checkoutRequest.current?.abort(); checkoutRequest.current = null;
+    setCheckoutBusy(false);
     setSignOutBusy(true);
     setCheckoutError("");
     try {

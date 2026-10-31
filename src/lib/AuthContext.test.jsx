@@ -70,6 +70,40 @@ describe("AuthProvider plan loading", () => {
     expect(renders.at(-1)).toEqual(expect.objectContaining({ user: false, planLoading: false, plan: null }));
   });
 
+  test("a billing reconciliation can refresh shared access without unmounting settled feature screens",async()=>{
+    let context;
+    function AccessProbe(){context=useAuth();return null;}
+    apiFetch.mockResolvedValueOnce({plan:'premium'}).mockResolvedValueOnce({plan:'free'});
+    render(<AuthProvider><AccessProbe /></AuthProvider>);
+    await act(async()=>authState.callback({uid:'u1',email:'one@example.invalid'}));
+    expect(context.plan).toBe('premium');expect(context.planLoading).toBe(false);
+    await act(async()=>{await context.refreshPlan();});
+    expect(context.plan).toBe('free');expect(context.planLoading).toBe(false);
+  });
+
+  test("a late initial plan response cannot overwrite a newer explicit refresh",async()=>{
+    let context,resolveOld;
+    function AccessProbe(){context=useAuth();return null;}
+    apiFetch.mockReturnValueOnce(new Promise(resolve=>{resolveOld=resolve;})).mockResolvedValueOnce({plan:'free'});
+    render(<AuthProvider><AccessProbe /></AuthProvider>);
+    await act(async()=>authState.callback({uid:'u1',email:'one@example.invalid'}));
+    await act(async()=>{await context.refreshPlan();});
+    await act(async()=>resolveOld({plan:'premium'}));
+    expect(context.plan).toBe('free');expect(context.planLoading).toBe(false);
+  });
+
+  test("an old owner's refresh cannot change the signed-in owner's access",async()=>{
+    let context,resolveOld;
+    function AccessProbe(){context=useAuth();return null;}
+    apiFetch.mockResolvedValueOnce({plan:'premium'}).mockReturnValueOnce(new Promise(resolve=>{resolveOld=resolve;})).mockResolvedValueOnce({plan:'free'});
+    render(<AuthProvider><AccessProbe /></AuthProvider>);
+    await act(async()=>authState.callback({uid:'u1',email:'one@example.invalid'}));
+    let refreshing;await act(async()=>{refreshing=context.refreshPlan();});
+    await act(async()=>authState.callback({uid:'u2',email:'two@example.invalid'}));
+    await act(async()=>{resolveOld({plan:'premium'});await refreshing;});
+    expect(context.plan).toBe('free');expect(context.planError).toBe('');
+  });
+
   test("prep recovery survives auth restoration but is cleared on account change and sign-out",async()=>{
     sessionStorage.clear();const drafts={['0123456789abcdef:fedcba9876543210']:{...emptyPrepSession,notes:{'example:Situation':'Fictional private note'}}};
     savePrepDrafts('u1',drafts);apiFetch.mockResolvedValue({plan:'premium'});

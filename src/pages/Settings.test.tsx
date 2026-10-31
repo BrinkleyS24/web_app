@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -200,6 +200,49 @@ describe("Settings resume for free users", () => {
 
 // "Billing details did not load: BLOCKED_BY_QA_HARNESS" reached the screen (persona review, 2026-10-14).
 describe("Settings errors", () => {
+  test("an unavailable billing read does not claim active billing or the absence of a portal", async () => {
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path === "/api/subscriptions/status") throw new Error("Fictional provider timeout");
+      return { success: true, enabled: false, available: true, premium: true };
+    });
+    renderPage();await screen.findByText("Billing details did not load");
+    expect(screen.queryByText("Active")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Billing for this account is not managed through Stripe/)).not.toBeInTheDocument();
+    expect(screen.getByText("Unavailable")).toBeInTheDocument();
+  });
+  test("a past-due customer can manage the existing subscription without being directed to buy another", async () => {
+    apiFetch.mockImplementation(async (path: string) => path === "/api/subscriptions/status"
+      ? { subscription: { plan: "free", status: "past_due", billingPortalAvailable: true, billingSource: "stripe" } }
+      : { success: true, enabled: false, available: false, premium: false });
+    renderPage();await screen.findByText("Payment due");
+    expect(screen.getByRole("button", { name: "Manage billing" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Upgrade to Premium" })).not.toBeInTheDocument();
+  });
+  test("an unread coach preference remains unknown and disabled instead of pretending opt-in is confirmed", async () => {
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path === "/api/user/coach-preference") throw new Error("Fictional preference unavailable");
+      return { subscription: { plan: "premium", status: "active" } };
+    });
+    renderPage();await screen.findByText(/Fictional preference unavailable/);
+    expect(screen.getByRole("switch", { name: "Coach voice" })).toBeDisabled();
+    expect(screen.getByText(/could not confirm your coach setting/i)).toBeInTheDocument();
+  });
+  test("an old account's late billing response cannot replace the current account's state", async () => {
+    let resolveOld!: (value: unknown) => void;
+    const pending = new Promise(resolve => { resolveOld = resolve; });
+    let billingReads=0;
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path === "/api/subscriptions/status") return ++billingReads===1 ? pending : { subscription: { plan:"free",status:"inactive" } };
+      return { success:true,enabled:false,available:false,premium:false };
+    });
+    const view=renderPage();await waitFor(()=>expect(billingReads).toBe(1));
+    useAuth.mockReturnValue({ user:{uid:"different-owner",email:"different@example.invalid"},plan:"free",planLoading:false,logout:vi.fn() });
+    view.rerender(<MemoryRouter><QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><Settings /></QueryClientProvider></MemoryRouter>);
+    await screen.findByText("Not active");
+    await act(async()=>resolveOld({subscription:{plan:"premium",status:"active",current_period_end:"2031-01-01"}}));
+    expect(screen.queryByText("Active")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("coach-voice-settings")).not.toBeInTheDocument();
+  });
   test("a raw backend code is never shown; a sentence is", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     apiFetch.mockImplementation(async (path: string) => {

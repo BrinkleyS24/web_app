@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const apiFetch = vi.hoisted(() => vi.fn());
+const auth=vi.hoisted(()=>({currentUser:{uid:'checkout-owner'}}));
 vi.mock("./api.js", () => ({ apiFetch }));
+vi.mock('./firebase.js',()=>({auth}));
 
 import { createPremiumCheckoutSession, fetchPremiumPrice, formatPremiumPrice, readUpgradeSource } from "./premiumCheckout.js";
+beforeEach(()=>{auth.currentUser={uid:'checkout-owner'};});
 
 describe("upgrade source attribution", () => {
   beforeEach(() => {
@@ -26,6 +29,24 @@ describe("upgrade source attribution", () => {
     expect(apiFetch.mock.calls[0][1].body).toEqual({ plan: "premium", source: "ext_search_read" });
     await createPremiumCheckoutSession();
     expect(apiFetch.mock.calls[1][1].body).toEqual({ plan: "premium" });
+  });
+});
+
+describe('checkout ownership and navigation safety',()=>{
+  test('a response from a previous account cannot expose its checkout URL',async()=>{
+    let finish;apiFetch.mockReturnValue(new Promise(resolve=>{finish=resolve;}));
+    const pending=createPremiumCheckoutSession();auth.currentUser={uid:'another-owner'};
+    finish({url:'https://checkout.stripe.com/c/pay/old'});await expect(pending).rejects.toMatchObject({name:'AbortError'});
+  });
+  test('an aborted page request cannot redirect after a late response',async()=>{
+    let finish;apiFetch.mockReturnValue(new Promise(resolve=>{finish=resolve;}));const controller=new AbortController();
+    const pending=createPremiumCheckoutSession({signal:controller.signal});controller.abort();finish({url:'https://checkout.stripe.com/c/pay/old'});
+    await expect(pending).rejects.toMatchObject({name:'AbortError'});
+  });
+  test('unverified redirect hosts and schemes are refused',async()=>{
+    for(const url of ['javascript:alert(1)','https://example.invalid/pay','http://checkout.stripe.com/pay','https://user:pass@checkout.stripe.com/pay']){
+      apiFetch.mockResolvedValue({url});await expect(createPremiumCheckoutSession()).rejects.toThrow(/could not be verified/);
+    }
   });
 });
 

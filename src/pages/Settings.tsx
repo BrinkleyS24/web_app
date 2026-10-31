@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/AuthContext.jsx";
 import { apiFetch } from "../lib/api.js";
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -27,7 +27,7 @@ type SubscriptionStatus = {
   plan?: string;
   status?: string;
   current_period_end?: string | number | null;
-  cancel_at_period_end?: boolean;
+  cancel_at_period_end?: boolean | null;
   subscription_id?: string;
   billingPortalAvailable?: boolean;
   billingSource?: string;
@@ -69,94 +69,114 @@ function formatDate(value: unknown) {
 }
 
 export default function Settings() {
-  const { user, plan, planLoading, logout } = useAuth();
+  const { user } = useAuth();
+  return <SettingsAccount key={user?.uid || "signed-out"} />;
+}
+
+function SettingsAccount() {
+  const { user, plan, planLoading, planError, logout, refreshPlan } = useAuth();
   const navigate = useNavigate();
   const [subStatus, setSubStatus] = useState<SubscriptionResponse | null>(null);
   const [subLoading, setSubLoading] = useState(false);
   const [subError, setSubError] = useState("");
   const [busyPortal, setBusyPortal] = useState(false);
+  const [portalError, setPortalError] = useState("");
   const [coachPref, setCoachPref] = useState<CoachPreference | null>(null);
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachSaving, setCoachSaving] = useState(false);
   const [coachError, setCoachError] = useState("");
 
+  const requests = useRef<Partial<Record<"coach" | "billing" | "portal", AbortController>>>({});
+  const coachSavePending = useRef(false);
+  function startRequest(channel: "coach" | "billing" | "portal") {
+    requests.current[channel]?.abort();
+    const controller = new AbortController();
+    requests.current[channel] = controller;
+    return { signal: controller.signal,
+      current: () => !controller.signal.aborted && requests.current[channel] === controller };
+  }
+
   async function fetchCoachPreference() {
-    if (!user) {
-      setCoachPref(null);
-      return;
-    }
-    setCoachError("");
-    setCoachLoading(true);
+    if (!user || coachSavePending.current) return;
+    const request = startRequest("coach");
+    setCoachError(""); setCoachLoading(true);
     try {
-      const resp = await apiFetch("/api/user/coach-preference", { method: "GET" });
-      setCoachPref(resp || null);
+      const resp = await apiFetch("/api/user/coach-preference", { method: "GET", signal: request.signal });
+      if (!request.current()) return;
+      if (typeof resp?.enabled !== "boolean") throw new Error("Your coach setting could not be confirmed.");
+      setCoachPref(resp);
     } catch (error: any) {
+      if (!request.current()) return;
+      setCoachPref(null);
       setCoachError(friendlyErrorMessage(error, "Your coach setting did not load. Try again in a moment."));
-    } finally {
-      setCoachLoading(false);
-    }
+    } finally { if (request.current()) setCoachLoading(false); }
   }
 
   async function saveCoachPreference(nextEnabled: boolean) {
-    const previous = coachPref;
-    setCoachError("");
-    setCoachSaving(true);
-    // Optimistic: the switch should move under the finger, not after a round trip.
-    setCoachPref((current) => ({ ...(current || {}), enabled: nextEnabled }));
+    if (!user || !coachPref || coachSavePending.current) return;
+    coachSavePending.current = true;
+    const request = startRequest("coach");
+    setCoachError(""); setCoachSaving(true);
+    setCoachPref({ ...coachPref, enabled: nextEnabled });
     try {
       const resp = await apiFetch("/api/user/coach-preference", {
-        method: "POST",
-        body: JSON.stringify({ enabled: nextEnabled }),
+        method: "POST", body: JSON.stringify({ enabled: nextEnabled }), signal: request.signal,
       });
-      setCoachPref(resp || null);
+      if (!request.current()) return;
+      if (resp?.enabled !== nextEnabled) throw new Error("Your coach setting was not confirmed. Please retry.");
+      setCoachPref(resp);
     } catch (error: any) {
-      setCoachPref(previous);
-      setCoachError(friendlyErrorMessage(error, "Your coach setting did not save. Try again."));
+      if (!request.current()) return;
+      // A lost acknowledgement can follow a committed write. Re-read rather
+      // than presenting the previous value as the confirmed current choice.
+      setCoachPref(null);
+      setCoachError(friendlyErrorMessage(error, "We could not confirm the change. Refresh your coach setting before trying again."));
     } finally {
-      setCoachSaving(false);
+      if (request.current()) { coachSavePending.current = false; setCoachSaving(false); }
     }
   }
 
   async function fetchSubStatus() {
-    if (!user) {
-      setSubStatus(null);
-      return;
-    }
-
-    setSubError("");
-    setSubLoading(true);
+    if (!user) return;
+    const request = startRequest("billing");
+    setSubError(""); setSubStatus(null); setSubLoading(true);
     try {
-      const resp = await apiFetch("/api/subscriptions/status", { method: "GET" });
-      setSubStatus(resp || null);
+      const resp = await apiFetch("/api/subscriptions/status", { method: "GET", signal: request.signal });
+      if (!request.current()) return;
+      if (!["free", "premium"].includes(resp?.subscription?.plan) || !resp?.subscription?.status) {
+        throw new Error("Your billing details could not be verified. Please retry.");
+      }
+      setSubStatus(resp);
+      // Refresh the shared account reader after reconciliation, so route guards,
+      // the sidebar and other features see the same persisted entitlement.
+      if (resp.subscription.plan !== plan || planError) await refreshPlan?.();
     } catch (error: any) {
+      if (!request.current()) return;
       setSubError(friendlyErrorMessage(error, "Your billing details did not load. Try again in a moment."));
-    } finally {
-      setSubLoading(false);
-    }
+    } finally { if (request.current()) setSubLoading(false); }
   }
 
   async function openPortal() {
-    setSubError("");
-    setBusyPortal(true);
+    if (!user || busyPortal) return;
+    const request = startRequest("portal");
+    setPortalError(""); setBusyPortal(true);
     try {
       const resp = await apiFetch("/api/subscriptions/create-portal-session", {
-        method: "POST",
-        body: JSON.stringify({}),
+        method: "POST", body: JSON.stringify({}), signal: request.signal,
       });
-      const url = resp?.url;
-      if (!url) throw new Error("Backend did not return a portal URL.");
-      window.location.assign(url);
+      if (!request.current()) return;
+      const url = new URL(resp?.url || "");
+      if (url.protocol !== "https:" || url.hostname !== "billing.stripe.com") throw new Error("The billing portal URL could not be verified.");
+      window.location.assign(url.href);
     } catch (error: any) {
-      setSubError(friendlyErrorMessage(error, "The billing portal is not available for this account yet."));
-    } finally {
-      setBusyPortal(false);
-    }
+      if (!request.current()) return;
+      setPortalError(friendlyErrorMessage(error, "The billing portal could not be opened. Please retry."));
+    } finally { if (request.current()) setBusyPortal(false); }
   }
 
   useEffect(() => {
-    if (!user) return;
-    fetchSubStatus();
-    fetchCoachPreference();
+    if (user) { void fetchSubStatus(); void fetchCoachPreference(); }
+    return () => { Object.values(requests.current).forEach(controller => controller?.abort()); };
   }, [user?.uid]);
 
   async function handleSignOut() {
@@ -167,10 +187,8 @@ export default function Settings() {
   const subscription = subStatus?.subscription || null;
   const effectivePlan = subscription?.plan || plan;
   const isPremium = effectivePlan === "premium";
-  const isActive = subscription
-    ? subscription.status === "active" || subscription.status === "trialing"
-    : isPremium;
-  const statusLabel = subscription?.status || (subLoading ? "loading" : isPremium ? "active" : "inactive");
+  const isActive = Boolean(subscription && !subError && isPremium && ["active", "trialing"].includes(subscription.status || ""));
+  const statusLabel = subError && !subscription ? "unavailable" : subscription?.status || "loading";
   const renewalDate = formatDate(subscription?.current_period_end);
   const quota = subStatus?.quotaData;
   const trackedApplications = quota?.trackedApplications ?? quota?.monthlyProcessed ?? null;
@@ -197,6 +215,7 @@ export default function Settings() {
   const statusText = (() => {
     const status = String(statusLabel || "").toLowerCase();
     if (status === "loading") return "Checking…";
+    if (status === "unavailable") return "Unavailable";
     if (status === "active") return "Active";
     if (status === "trialing") return "Trial";
     if (status === "past_due") return "Payment due";
@@ -248,8 +267,8 @@ export default function Settings() {
                   {coachSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" /> : null}
                   <Switch
                     aria-label="Coach voice"
-                    checked={coachPref?.enabled !== false}
-                    disabled={coachLoading || coachSaving}
+                    checked={coachPref?.enabled === true}
+                    disabled={coachLoading || coachSaving || !coachPref}
                     onCheckedChange={saveCoachPreference}
                   />
                 </div>
@@ -262,7 +281,8 @@ export default function Settings() {
                 </p>
               ) : null}
 
-              {coachError ? <ErrorState title="Your coach setting did not save" detail={coachError} /> : null}
+              {!coachPref && !coachLoading ? <p className="text-[13px] text-muted-foreground">We could not confirm your coach setting. Refresh it before making a change.</p> : null}
+              {coachError ? <ErrorState stackRetryOnMobile title={coachPref ? "Your coach setting did not save" : "Your coach setting did not load"} detail={coachError} onRetry={fetchCoachPreference} /> : null}
             </div>
           </Panel>
         ) : null}
@@ -293,7 +313,7 @@ export default function Settings() {
                 label="Status"
                 value={statusText}
                 tone={isActive ? "positive" : "neutral"}
-                hint={isActive ? "Your subscription is active." : "No active Premium subscription on this account."}
+                hint={!subscription ? "Billing details have not been verified." : isActive ? "Your Premium access is active." : "No active Premium subscription on this account."}
                 loading={subLoading && !subStatus}
               />
               <StatTile
@@ -311,36 +331,37 @@ export default function Settings() {
             {subStatus && billedByStripe ? (
               <dl className="grid gap-3 text-[13px] sm:grid-cols-2">
                 <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
-                  <dt className={EYEBROW}>Renewal</dt>
+                  <dt className={EYEBROW}>{subscription?.cancel_at_period_end ? "Access through" : "Current period ends"}</dt>
                   <dd className="mt-1.5 font-medium text-foreground">{renewalDate || "No renewal date on file"}</dd>
                 </div>
                 <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
                   <dt className={EYEBROW}>Cancellation</dt>
                   <dd className="mt-1.5 font-medium text-foreground">
-                    {subscription?.cancel_at_period_end ? "Cancels at the end of this period" : "No cancellation scheduled"}
+                    {subscription?.cancel_at_period_end === true ? "Cancels at the end of this period" : subscription?.cancel_at_period_end === false ? "No cancellation scheduled" : "Cancellation schedule not confirmed"}
                   </dd>
                 </div>
               </dl>
             ) : null}
 
-            {subError ? <ErrorState title="Billing details did not load" detail={subError} onRetry={fetchSubStatus} /> : null}
+            {subError ? <ErrorState stackRetryOnMobile title="Billing details did not load" detail={subError} onRetry={fetchSubStatus} /> : null}
+            {portalError ? <ErrorState stackRetryOnMobile title="Billing portal did not open" detail={portalError} onRetry={openPortal} /> : null}
 
             <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
-              {isPremium && billingPortalAvailable ? (
+              {subscription && billingPortalAvailable ? (
                 <button type="button" className={BUTTON.secondary} disabled={busyPortal} onClick={openPortal}>
                   {busyPortal ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <ExternalLink className="h-3.5 w-3.5" aria-hidden />}
                   {busyPortal ? "Opening…" : "Manage billing"}
                 </button>
-              ) : isPremium ? (
+              ) : subscription && isPremium ? (
                 <p className="text-[13px] text-muted-foreground">
                   Premium is active. Billing for this account is not managed through Stripe, so there is no billing portal.
                 </p>
-              ) : (
+              ) : subscription && !billedByStripe ? (
                 <button type="button" className={BUTTON.primary} onClick={() => navigate("/upgrade?source=web_settings")}>
                   <Crown className="h-3.5 w-3.5" aria-hidden />
                   Upgrade to Premium
                 </button>
-              )}
+              ) : <p className="text-[13px] text-muted-foreground">Refresh billing to verify how this account is billed.</p>}
               {billedByStripe || !isPremium ? (
                 <p className="text-[12px] text-muted-foreground">
                   Payments are handled by Stripe. Applendium™ never stores card numbers.
@@ -363,7 +384,8 @@ export default function Settings() {
  * version first). This panel only points at the Resumes page and names what Apply Gate uses.
  */
 function ResumesSummaryPanel() {
-  const variantsQuery = useQuery({ queryKey: ["resume-variants"], queryFn: fetchResumeVariants });
+  const { user } = useAuth();
+  const variantsQuery = useQuery({ queryKey: ["resume-variants", user?.uid], queryFn: fetchResumeVariants });
   const variants = variantsQuery.data?.variants ?? [];
   const defaultVariant = variants.find((variant) => variant.isDefault) ?? null;
 

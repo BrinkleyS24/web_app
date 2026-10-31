@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth, firebaseConfigured } from "./firebase.js";
 import { signInFromExtensionBridge, signOutFromExtensionBridge } from "./extensionBridge.js";
@@ -72,6 +72,7 @@ const AuthContext = createContext({
   debugRoutesEnabled: false,
   debugAdminAccess: false,
   logout: async () => {},
+  refreshPlan: async () => false,
 });
 
 export function useAuth() {
@@ -127,7 +128,40 @@ export function AuthProvider({ children }) {
   const [debugRoutesEnabled, setDebugRoutesEnabled] = useState(isLocalDevBypass && DEV_AUTH_BYPASS_ADMIN);
   const [debugAdminAccess, setDebugAdminAccess] = useState(isLocalDevBypass && DEV_AUTH_BYPASS_ADMIN);
 
+  const planRequest = useRef(null);
+  const currentOwner = useRef(user?.uid || null);
+  currentOwner.current = user?.uid || null;
+  const refreshPlan = useCallback(async () => {
+    if (isLocalDevBypass) return true;
+    if (!user) return false;
+    planRequest.current?.abort();
+    const controller = new AbortController(), owner = user.uid;
+    planRequest.current = controller;
+    const current = () => !controller.signal.aborted && currentOwner.current === owner
+      && planRequest.current === controller;
+    try {
+      const data = await apiFetch("/api/user", { method: "POST", body: JSON.stringify({}), signal: controller.signal });
+      if (!current()) return false;
+      if (!["free", "premium"].includes(data?.plan)) throw new Error("Your account access could not be verified.");
+      setPlan(data.plan);
+      setAccountStatus({ authenticatedEmail: data?.authenticatedEmail || user.email || null,
+        permanentPremium: Boolean(data?.permanentPremium), planSource: data?.planSource || "unknown", requestId: data?.requestId || null });
+      setAdminEmail(Boolean(data?.adminEmail)); setDebugRoutesEnabled(Boolean(data?.debugRoutesEnabled));
+      setDebugAdminAccess(Boolean(data?.debugAdminAccess)); setPlanUid(owner); setPlanLoading(false); setPlanError("");
+      return true;
+    } catch (error) {
+      if (!current()) return false;
+      setPlanUid(owner); setPlanLoading(false);
+      setPlanError(error instanceof Error ? error.message : "Failed to load user plan.");
+      setAccountStatus({ authenticatedEmail: user.email || null, permanentPremium: false,
+        planSource: "verification_failed", status: error?.status || null, requestId: error?.payload?.requestId || null });
+      setAdminEmail(false); setDebugRoutesEnabled(false); setDebugAdminAccess(false);
+      return false;
+    }
+  }, [user, isLocalDevBypass]);
+
   async function logout() {
+    planRequest.current?.abort();
     clearOtherPrepDrafts(null);
     let signedOut = false;
     let lastError = null;
@@ -338,51 +372,11 @@ export function AuthProvider({ children }) {
       return undefined;
     }
 
-    let cancelled = false;
     setPlanLoading(true);
     setPlanError("");
-
-    apiFetch("/api/user", { method: "POST", body: JSON.stringify({}) })
-      .then((data) => {
-        if (cancelled) return;
-        if (data?.plan) {
-          setPlan(data.plan);
-        }
-        setAccountStatus({
-          authenticatedEmail: data?.authenticatedEmail || user.email || null,
-          permanentPremium: Boolean(data?.permanentPremium),
-          planSource: data?.planSource || "unknown",
-          requestId: data?.requestId || null,
-        });
-        setAdminEmail(Boolean(data?.adminEmail));
-        setDebugRoutesEnabled(Boolean(data?.debugRoutesEnabled));
-        setDebugAdminAccess(Boolean(data?.debugAdminAccess));
-        setPlanUid(user.uid);
-        setPlanLoading(false);
-        setPlanError("");
-      })
-      .catch((error) => {
-        console.error("[Applendium™] Failed to fetch user plan:", error);
-        if (cancelled) return;
-        setPlanUid(user.uid);
-        setPlanLoading(false);
-        setPlanError(error instanceof Error ? error.message : "Failed to load user plan.");
-        setAccountStatus({
-          authenticatedEmail: user.email || null,
-          permanentPremium: false,
-          planSource: "verification_failed",
-          status: error?.status || null,
-          requestId: error?.payload?.requestId || null,
-        });
-        setAdminEmail(false);
-        setDebugRoutesEnabled(false);
-        setDebugAdminAccess(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user, isLocalDevBypass]);
+    void refreshPlan();
+    return () => { planRequest.current?.abort(); };
+  }, [user, isLocalDevBypass, refreshPlan]);
 
   const loading = !authReady || (extensionDetected && !extensionAuthResolved);
   useEffect(() => { if (!loading) clearOtherPrepDrafts(user?.uid || null); }, [loading, user?.uid]);
@@ -405,6 +399,7 @@ export function AuthProvider({ children }) {
       debugRoutesEnabled,
       debugAdminAccess,
       logout,
+      refreshPlan,
     }}>
       {children}
     </AuthContext.Provider>
