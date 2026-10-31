@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { FirstMoveCard } from "./FirstMoveCard";
+const useAuth = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/AuthContext.jsx", () => ({useAuth}));
 
 const { fetchResume, fetchApplyGateHistory, fetchEmailMetrics, saveResume } = vi.hoisted(() => ({
   fetchResume: vi.fn(),
@@ -49,6 +51,7 @@ function metricsWith(applicationsSent: number) {
 }
 
 beforeEach(() => {
+  useAuth.mockReturnValue({user: {uid: "fictional-first-move"}, loading: false});
   localStorage.clear();
   fetchResume.mockResolvedValue({ success: true, resumeText: null });
   fetchApplyGateHistory.mockResolvedValue({ success: true, history: [] });
@@ -61,6 +64,18 @@ afterEach(() => {
 });
 
 describe("FirstMoveCard", () => {
+  test("unknown metric state cannot briefly present a new-user claim", async () => {
+    fetchEmailMetrics.mockReturnValue(new Promise(() => {}));
+    const {container} = renderCard();
+    await waitFor(() => expect(fetchResume).toHaveBeenCalled());
+    expect(container.querySelector("[data-testid='first-move-card']")).toBeNull();
+  });
+  test("signed-out cards make no account reads", () => {
+    useAuth.mockReturnValue({user: null, loading: false});
+    renderCard();
+    expect(fetchResume).not.toHaveBeenCalled();
+    expect(fetchEmailMetrics).not.toHaveBeenCalled();
+  });
   test("no resume -> Step 1 with the resume input", async () => {
     renderCard();
     expect(await screen.findByText(/Get a verdict on the next role/)).toBeInTheDocument();

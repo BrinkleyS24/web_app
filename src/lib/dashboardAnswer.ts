@@ -134,7 +134,8 @@ export function buildDashboardAnswer({
   /** Non-null when alerts could not be loaded at all (signed out, not premium, request failed). */
   alertsUnavailableMessage?: string | null;
 }): DashboardAnswer {
-  const alert = selectAnswerAlert(alerts);
+  // A failed refresh cannot keep an earlier actionable commitment in the hero.
+  const alert = alertsUnavailableMessage ? null : selectAnswerAlert(alerts);
 
   if (alert) {
     const debriefItems = (alert.debrief?.items || []).filter((item) => item?.emailId != null);

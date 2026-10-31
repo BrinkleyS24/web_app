@@ -99,6 +99,12 @@ describe("selectAnswerAlert", () => {
 });
 
 describe("buildDashboardAnswer", () => {
+  test("a failed refresh with cached alerts does not retain a stale commitment", () => {
+    const answer = buildDashboardAnswer({alerts: [alert("commitment-interview", {title: "Prepare now"})], alertsUnavailableMessage: "Could not verify current evidence."});
+    expect(answer.claim).toBe("Your search read is not available right now");
+    expect(answer.alertId).toBeNull();
+    expect(answer.anchor).toBeUndefined();
+  });
   test("passes the backend's own sentence through untouched", () => {
     const answer = buildDashboardAnswer({
       alerts: [

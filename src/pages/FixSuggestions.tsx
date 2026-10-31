@@ -243,6 +243,7 @@ function UpcomingFollowupWindowList({
             <div className="min-w-0">
               <p className="text-sm font-semibold text-foreground">{window.title}</p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">{window.description}</p>
+              {window.subject ? <p className="mt-1 break-words text-xs text-muted-foreground">Latest tracked email: “{window.subject}”</p> : null}
             </div>
             {/* Green text on a white chip (5.35:1). The 10% green tint over this translucent card
                 measured 4.47:1, just under AA (persona contrast scan, 2026-10-15). */}

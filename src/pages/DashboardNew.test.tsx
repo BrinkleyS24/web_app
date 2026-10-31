@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import type { ReactNode } from "react";
 
 import Dashboard from "./DashboardNew";
+import { useNavCounts } from "@/hooks/useNavCounts";
 
 const useAuth = vi.fn();
 
@@ -110,6 +111,11 @@ const QUEUE_ITEM_TEMPLATE = {
   company: "Acme Health",
 };
 
+function QueueCacheReader() {
+  const counts = useNavCounts(true, "user-1");
+  return <output data-testid="shared-nav-count">{counts["/next-actions"]}</output>;
+}
+
 function renderDashboard() {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -121,11 +127,26 @@ function renderDashboard() {
   return render(
     <MemoryRouter>
       <QueryClientProvider client={queryClient}>
+        <QueueCacheReader />
         <Dashboard />
       </QueryClientProvider>
     </MemoryRouter>,
   );
 }
+
+test("a malformed action cannot crash the dashboard or become caught up", async () => {
+  fetchRankedActionQueue.mockResolvedValue({success: true, queue: {doToday: [{id: "broken-action"}]}});
+  renderDashboard();
+  expect(await screen.findByText("Your actions did not load")).toBeInTheDocument();
+  expect(screen.getByText("How your search is going")).toBeInTheDocument();
+  expect(screen.queryByText("You're caught up")).not.toBeInTheDocument();
+});
+
+test("the rejection timing panel does not infer a person or form made the decision", async () => {
+  renderDashboard();
+  expect(await screen.findByText(/Timing alone does not establish why an employer declined/)).toBeInTheDocument();
+  expect(screen.queryByText(/says whether a person or a form/)).not.toBeInTheDocument();
+});
 
 beforeEach(() => {
   vi.spyOn(Date, "now").mockReturnValue(new Date("2026-04-13T12:00:00.000Z").getTime());

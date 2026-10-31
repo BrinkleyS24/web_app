@@ -62,15 +62,17 @@ describe("WeekInReview (the Weekly Summary, folded into Next Actions)", () => {
   test("leads with the week's read and what to do next", async () => {
     renderPage();
     expect(await screen.findByText("1 interview move this week, alongside 7 new applications.")).toBeInTheDocument();
-    expect(screen.getByText("Finish the CodeSignal assessment if the link still works, or close it out.")).toBeInTheDocument();
+    expect(screen.queryByText("Finish the CodeSignal assessment if the link still works, or close it out.")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", {name: "Open Next Actions for current tasks"})).toHaveAttribute("href", "/next-actions");
     expect(screen.getByText("12 last week")).toBeInTheDocument();
   });
 
-  test("a pending assessment is waiting on the user; an ordinary silence is just quiet", async () => {
+  test("legacy weekly tasks and assessment urgency are not presented as current work", async () => {
     renderPage();
-    expect(await screen.findByText("Waiting on you")).toBeInTheDocument();
-    expect(screen.getByText(/no submission has reached your inbox/)).toBeInTheDocument();
-    expect(screen.getByText(/No reply for 29 days since the application/)).toBeInTheDocument();
+    expect(await screen.findByRole("link", {name: "Open Next Actions for current tasks"})).toHaveAttribute("href", "/next-actions");
+    expect(screen.queryByText("Waiting on you")).not.toBeInTheDocument();
+    expect(screen.queryByText(/no submission has reached your inbox/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Do next week/)).not.toBeInTheDocument();
   });
 
   test("never says Unknown company: an email with no company is named by its subject", async () => {
@@ -83,12 +85,12 @@ describe("WeekInReview (the Weekly Summary, folded into Next Actions)", () => {
     const user = userEvent.setup();
     renderPage({ open: false });
     expect(await screen.findByText("1 interview move this week, alongside 7 new applications.")).toBeInTheDocument();
-    expect(screen.getByTestId("week-counts")).toHaveTextContent("Applications sent7");
+    expect(screen.getByTestId("week-counts")).toHaveTextContent("Applications first tracked7");
     expect(screen.queryByTestId("week-details")).toBeNull();
 
     await user.click(screen.getByTestId("week-toggle"));
     expect(screen.getByTestId("week-details")).toBeInTheDocument();
-    expect(screen.getByText("Waiting on you")).toBeInTheDocument();
+    expect(screen.getByRole("link", {name: "Open Next Actions for current tasks"})).toBeInTheDocument();
   });
 
   test("an old /weekly-summary link lands on the week card opened", async () => {

@@ -1143,8 +1143,8 @@ export function buildUpcomingFollowupWindows(params: {
           title: `First follow-up window for ${role}`,
           description:
             age >= 10
-              ? `${company} is inside the day 10-14 application follow-up window.`
-              : `${company} is ${daysLabel(age)} after application. A status follow-up is usually better around day 10-14.`,
+              ? `${company}'s latest tracked update is inside Applendium's day 10-14 check-in window.`
+              : `${company}'s latest tracked update is ${daysLabel(age)} old. Applendium suggests checking for news around day 10-14 after that update.`,
           sourceDescription: age >= 10 ? "Application follow-up due now" : "Application follow-up opens soon",
         });
       } else if (

@@ -292,6 +292,8 @@ function buildQueueResponse(overrides: Partial<Record<"doToday" | "thisWeek" | "
 }
 
 beforeEach(() => {
+  // Browser scrolling is exercised by the real-browser journeys; jsdom omits this API.
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
   resetCanonicalQueueImpressionSession();
   dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(new Date("2026-04-11T12:00:00.000Z").getTime());
 

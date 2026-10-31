@@ -83,7 +83,7 @@ const Dashboard = () => {
   const inbox = useInboxSync(user?.uid);
 
   const metricsQuery = useQuery({
-    queryKey: ["email-metrics", "last_30_days"],
+    queryKey: ["email-metrics", "last_30_days", user?.uid],
     queryFn: () => fetchEmailMetrics("last_30_days"),
     enabled: isAuthed,
     staleTime: 60_000,
@@ -97,11 +97,16 @@ const Dashboard = () => {
   const queueQuery = useQuery({
     queryKey: ["dashboard", "queue", user?.uid],
     queryFn: fetchRankedActionQueue,
+    select: (response) => {
+      if (!response.success || !response.queue) throw new Error("Your actions could not be verified.");
+      // Transform per observer: the sidebar shares the original response in this cache.
+      return buildDashboardMoveQueue(buildQueueItemsFromRankedQueue(response.queue));
+    },
     enabled: isAuthed,
     staleTime: 30_000,
   });
   const weeklyQuery = useQuery({
-    queryKey: ["weekly-summary", "highlights", "last_7_days"],
+    queryKey: ["weekly-summary", "highlights", "last_7_days", user?.uid],
     queryFn: () => fetchWeeklyHighlights("last_7_days"),
     enabled: isAuthed,
     staleTime: 60_000,
@@ -111,10 +116,10 @@ const Dashboard = () => {
   const { align: alignApplyGateTasks, history: historyQuery } = useApplyGateTaskAlignment(isAuthed);
 
   const cohortMetrics = metricsQuery.data?.cohortMetrics;
-  const alerts = useMemo(() => alertsQuery.data?.alerts || [], [alertsQuery.data]);
+  const alerts = useMemo(() => alertsQuery.isError ? [] : alertsQuery.data?.alerts || [], [alertsQuery.data, alertsQuery.isError]);
   const moveQueue = useMemo(
-    () => alignApplyGateTasks(buildDashboardMoveQueue(buildQueueItemsFromRankedQueue(queueQuery.data?.queue || null))),
-    [alignApplyGateTasks, queueQuery.data],
+    () => queueQuery.isError ? [] : alignApplyGateTasks(queueQuery.data || []),
+    [alignApplyGateTasks, queueQuery.data, queueQuery.isError],
   );
 
   // The lead card waits for its data. Rendering it early showed "Your search read is not available
@@ -448,9 +453,9 @@ function BarRow({ label, value, of, tone, hint }: { label: string; value: number
 
 const VELOCITY_ROWS: Array<{ key: string; label: string; tone: Tone }> = [
   { key: "auto_screen", label: "Within 3 days of applying", tone: "risk" },
-  { key: "recruiter_screen", label: "3 to 14 days", tone: "attention" },
+  { key: "recruiter_screen", label: "Over 3 through 14 days", tone: "attention" },
   { key: "late_stage", label: "After 14 days", tone: "neutral" },
-  { key: "post_interview", label: "After an interview", tone: "upcoming" },
+  { key: "post_interview", label: "After interview-stage evidence", tone: "upcoming" },
 ];
 
 /** A small section heading inside a panel: sentence case, not another mono all-caps eyebrow. */
@@ -463,7 +468,7 @@ const STAGE_SEGMENTS: Array<{ key: keyof Stages; label: string; bar: string; dot
   { key: "offer", label: "Offer", bar: TONES[STATUS_TONE.offer].rail, dot: TONES[STATUS_TONE.offer].rail },
   { key: "interviewing", label: "Still interviewing", bar: TONES[STATUS_TONE.interview].rail, dot: TONES[STATUS_TONE.interview].rail },
   { key: "interviewQuiet", label: "No word since the interview (30+ days)", bar: `${TONES[STATUS_TONE.interview].rail} opacity-40`, dot: `${TONES[STATUS_TONE.interview].rail} opacity-40` },
-  { key: "waiting", label: "Waiting on a reply", bar: "bg-foreground/35", dot: "bg-foreground/35" },
+  { key: "waiting", label: "Awaiting next step", bar: "bg-foreground/35", dot: "bg-foreground/35" },
   { key: "quiet", label: "Went quiet (30+ days)", bar: "bg-muted-foreground/25", dot: "bg-muted-foreground/25" },
   { key: "closed", label: "Closed by you", bar: "bg-muted-foreground/15", dot: "bg-muted-foreground/15" },
   { key: "rejected", label: "Rejected", bar: TONES[STATUS_TONE.rejected].rail, dot: TONES[STATUS_TONE.rejected].rail },
@@ -498,7 +503,7 @@ function StageBar({
   const summary = segments.map((segment) => `${label(segment)}: ${count(segment.key)}`).join(", ");
   return (
     <div className="space-y-3.5">
-      <p className={SUBHEAD}>Where your {applied} applications stand</p>
+      <p className={SUBHEAD}>Where your {applied} {applied === 1 ? "application stands" : "applications stand"}</p>
       {/* "Ever" and "now" side by side, each labelled (persona review, 2026-10-15): "6 reached an
           interview" next to "4 interviews need your answer" read as a contradiction when only one
           number said which question it answered. */}
@@ -555,6 +560,7 @@ function StageBar({
         {hasQuietBreakdown
           ? "“In interviews” counts those with no decision yet; “Still interviewing” are the ones with an email in the last 30 days. "
           : "“Interview outcome unknown” means no decision is recorded; this result does not separate recent updates from older silence. "}
+        &ldquo;Awaiting next step&rdquo; can include acknowledgements or assessment receipts; those do not establish a hiring decision.{" "}
         {fromAnswers
           ? `Counted from your inbox and applications you added, plus ${fromAnswers} ${fromAnswers === 1 ? "ending" : "endings"} you told us about.`
           : "Counted from your inbox and applications you added."}
@@ -620,7 +626,7 @@ function SearchStatusPanel({
           ) : (
           <div className="space-y-3.5">
             <p className={SUBHEAD}>Where your applications stand</p>
-            {funnel.pending != null ? <BarRow label="Waiting on a reply" value={funnel.pending} of={applied} tone="upcoming" /> : null}
+            {funnel.pending != null ? <BarRow label="Awaiting next step" value={funnel.pending} of={applied} tone="upcoming" /> : null}
             {funnel.silent != null ? <BarRow label="Went quiet (30+ days)" value={funnel.silent} of={applied} tone="neutral" /> : null}
             <BarRow label="Rejected" value={funnel.rejected} of={applied} tone="risk" />
             <BarRow label="Reached an interview" value={funnel.reachedInterview} of={applied} tone="brand" hint={ratePct ?? undefined} />
@@ -645,14 +651,13 @@ function SearchStatusPanel({
                 ))}
                 <p className="text-[12px] leading-snug text-muted-foreground">
                   {velocity.classified} rejections could be timed from application to decision
-                  {velocity.averageDays != null ? `, averaging ${velocity.averageDays} days` : ""}. Only an inbox can see this.
+                  {velocity.averageDays != null ? `, averaging ${velocity.averageDays} days` : ""}. Based on recorded dates and rejection messages. Timing alone does not establish why an employer declined or whether a person reviewed the resume.
                 </p>
               </>
             ) : (
               <p className="text-[13px] leading-relaxed text-muted-foreground">
                 This appears once 5 rejections can be timed from application to decision
-                {velocity ? ` — ${velocity.classified} so far` : ""}. How fast a decision comes back says whether a person or a
-                form turned you down.
+                {velocity ? ` — ${velocity.classified} so far` : ""}. Timing alone does not establish why an employer declined or whether a person reviewed the resume.
               </p>
             )}
           </div>

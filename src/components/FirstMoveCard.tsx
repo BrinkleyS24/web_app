@@ -5,6 +5,7 @@ import { ArrowRight, Check, FileText, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fetchApplyGateHistory, fetchEmailMetrics, fetchResume } from "@/lib/emails";
 import { useSaveResume } from "@/hooks/useSaveResume";
+import { useAuth } from "@/lib/AuthContext.jsx";
 
 const DISMISS_KEY = "firstMove.dismissed";
 const ESTABLISHED_THRESHOLD = 5;
@@ -31,30 +32,34 @@ function writeDismissed() {
  * Shows only when (no resume) OR (no Apply Gate runs yet); auto-hides afterward.
  */
 export function FirstMoveCard() {
+  const { user } = useAuth();
   const [dismissed, setDismissed] = useState(readDismissed);
   const [draft, setDraft] = useState("");
 
   const resumeQuery = useQuery({
-    queryKey: ["user-resume"],
+    queryKey: ["user-resume", user?.uid],
     queryFn: fetchResume,
+    enabled: Boolean(user),
     staleTime: 60_000,
   });
   const historyQuery = useQuery({
-    queryKey: ["dashboard", "apply-gate-history"],
+    queryKey: ["dashboard", "apply-gate-history", user?.uid],
     queryFn: fetchApplyGateHistory,
+    enabled: Boolean(user),
     staleTime: 60_000,
   });
   const metricsQuery = useQuery({
-    queryKey: ["email-metrics", "last_30_days"],
+    queryKey: ["email-metrics", "last_30_days", user?.uid],
     queryFn: () => fetchEmailMetrics("last_30_days"),
+    enabled: Boolean(user),
     staleTime: 60_000,
   });
 
   const saveMutation = useSaveResume();
 
   // Fail safe: while the gating signals load, render nothing; on error, hide.
-  if (resumeQuery.isLoading || historyQuery.isLoading) return null;
-  if (resumeQuery.isError || historyQuery.isError) return null;
+  if (!user || resumeQuery.isLoading || historyQuery.isLoading || metricsQuery.isLoading) return null;
+  if (resumeQuery.isError || historyQuery.isError || metricsQuery.isError) return null;
 
   const hasResume = Boolean(
     resumeQuery.data?.resumeText && resumeQuery.data.resumeText.trim().length > 20,
