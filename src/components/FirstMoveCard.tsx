@@ -10,17 +10,18 @@ import { useAuth } from "@/lib/AuthContext.jsx";
 const DISMISS_KEY = "firstMove.dismissed";
 const ESTABLISHED_THRESHOLD = 5;
 
-function readDismissed(): boolean {
+function readDismissed(ownerId: string): boolean {
   try {
-    return localStorage.getItem(DISMISS_KEY) === "true";
+    // The legacy global flag has no owner and cannot be safely attributed.
+    return localStorage.getItem(`${DISMISS_KEY}:${ownerId}`) === "true";
   } catch {
     return false;
   }
 }
 
-function writeDismissed() {
+function writeDismissed(ownerId: string) {
   try {
-    localStorage.setItem(DISMISS_KEY, "true");
+    localStorage.setItem(`${DISMISS_KEY}:${ownerId}`, "true");
   } catch {
     /* private mode — ignore */
   }
@@ -33,7 +34,8 @@ function writeDismissed() {
  */
 export function FirstMoveCard() {
   const { user } = useAuth();
-  const [dismissed, setDismissed] = useState(readDismissed);
+  // The account-scoped QueryClient provider remounts its subtree on owner change.
+  const [dismissed, setDismissed] = useState(() => user?.uid ? readDismissed(user.uid) : false);
   const [draft, setDraft] = useState("");
 
   const resumeQuery = useQuery({
@@ -71,7 +73,7 @@ export function FirstMoveCard() {
   if (!visible) return null;
 
   const handleDismiss = () => {
-    writeDismissed();
+    writeDismissed(user.uid);
     setDismissed(true);
   };
 

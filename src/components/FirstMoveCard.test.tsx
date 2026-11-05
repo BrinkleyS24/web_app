@@ -25,13 +25,14 @@ function renderCard() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(
+  const view = render(
     <MemoryRouter>
       <QueryClientProvider client={queryClient}>
         <FirstMoveCard />
       </QueryClientProvider>
     </MemoryRouter>,
   );
+  return { ...view, queryClient };
 }
 
 function metricsWith(applicationsSent: number) {
@@ -133,11 +134,52 @@ describe("FirstMoveCard", () => {
     );
   });
 
-  test("dismissed flag -> card hidden", async () => {
-    localStorage.setItem("firstMove.dismissed", "true");
-    const { container } = renderCard();
-    await waitFor(() => expect(fetchResume).toHaveBeenCalled());
+  test("owner's saved dismissal hides the card after signals load", async () => {
+    localStorage.setItem("firstMove.dismissed:fictional-first-move", "true");
+    const { container, queryClient } = renderCard();
+    await waitFor(() => expect(queryClient.getQueryState(["email-metrics", "last_30_days", "fictional-first-move"])?.status).toBe("success"));
     expect(container.querySelector("[data-testid='first-move-card']")).toBeNull();
+  });
+
+  test("another owner's dismissal cannot hide onboarding for this account", async () => {
+    localStorage.setItem("firstMove.dismissed:another-fictional-owner", "true");
+    renderCard();
+    expect(await screen.findByLabelText("Resume text")).toBeInTheDocument();
+  });
+
+  test("an unattributed legacy dismissal cannot be assigned to this owner", async () => {
+    localStorage.setItem("firstMove.dismissed", "true");
+    renderCard();
+    expect(await screen.findByLabelText("Resume text")).toBeInTheDocument();
+  });
+
+  test("a dismissal survives remount only for the owner who made it", async () => {
+    const user = userEvent.setup();
+    const first = renderCard();
+    await screen.findByLabelText("Resume text");
+    await user.click(screen.getByRole("button", {name: "Dismiss", exact: true}));
+    expect(localStorage.getItem("firstMove.dismissed:fictional-first-move")).toBe("true");
+    expect(localStorage.getItem("firstMove.dismissed")).toBeNull();
+    first.unmount();
+    const sameOwner = renderCard();
+    await waitFor(() => expect(sameOwner.queryClient.getQueryState(["email-metrics", "last_30_days", "fictional-first-move"])?.status).toBe("success"));
+    expect(screen.queryByLabelText("Resume text")).toBeNull();
+    sameOwner.unmount();
+    useAuth.mockReturnValue({user: {uid: "another-fictional-owner"}, loading: false});
+    renderCard();
+    expect(await screen.findByLabelText("Resume text")).toBeInTheDocument();
+  });
+
+  test("storage denial still permits a session dismissal without losing the card's state", async () => {
+    const user = userEvent.setup();
+    const read = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new DOMException("denied", "SecurityError"); });
+    const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new DOMException("denied", "SecurityError"); });
+    try {
+      renderCard();
+      await screen.findByLabelText("Resume text");
+      await user.click(screen.getByRole("button", {name: "Dismiss", exact: true}));
+      expect(screen.queryByLabelText("Resume text")).toBeNull();
+    } finally { read.mockRestore(); write.mockRestore(); }
   });
 
   test("saving a resume advances to Step 2", async () => {
