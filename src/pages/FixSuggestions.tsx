@@ -239,11 +239,9 @@ function UpcomingFollowupWindowList({
     <div className={compact ? "space-y-2" : "grid gap-3 md:grid-cols-2"}>
       {windows.map((window) => (
         <div key={window.id} className="rounded-xl border border-border/70 bg-background/70 p-3">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:gap-3">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-foreground">{window.title}</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">{window.description}</p>
-              {window.subject ? <p className="mt-1 break-words text-xs text-muted-foreground">Latest tracked email: “{window.subject}”</p> : null}
             </div>
             {/* Green text on a white chip (5.35:1). The 10% green tint over this translucent card
                 measured 4.47:1, just under AA (persona contrast scan, 2026-10-15). */}
@@ -251,6 +249,8 @@ function UpcomingFollowupWindowList({
               {window.opensInDays <= 0 ? "Open now" : `Opens in ${window.opensInDays} ${window.opensInDays === 1 ? "day" : "days"}`}
             </span>
           </div>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">{window.description}</p>
+          {window.subject ? <p className="mt-1 break-words text-xs text-muted-foreground">Latest tracked email: “{window.subject}”</p> : null}
           <div className="mt-2 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
             <span className="rounded-full bg-muted px-2 py-1">{window.company}</span>
             <span className="rounded-full bg-muted px-2 py-1">day {window.windowStartDay}-{window.windowEndDay}</span>
