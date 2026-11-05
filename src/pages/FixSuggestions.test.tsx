@@ -1033,4 +1033,17 @@ describe("Apply Gate tasks and countdown chips (persona review, 2026-10-15)", ()
       expect(chip.className).not.toContain("bg-accent/10");
     }
   });
+
+  test("one-day-old assessment receipt names nine days until its follow-up window, not email age", async () => {
+    fetchStoredEmails.mockResolvedValue({success:true,emails:[{
+      id:"assessment-completed",thread_id:"assessment-completed-thread",applicationId:"assessment-app",
+      company_name:"Birch Fictional Systems",position:"Support Engineer",category:"applied",
+      subject:"Thank you for completing your assessment",body:"We received your completed assessment and will review it.",
+      date:"2026-04-10T12:00:00.000Z",
+    }]});
+    renderPage();
+    expect(await screen.findByText(/Birch Fictional Systems's latest tracked update is 1 day old/)).toBeVisible();
+    const chip=await screen.findByTestId("followup-window-countdown");
+    expect(chip).toHaveTextContent(/^Opens in 9 days$/);
+  });
 });

@@ -248,7 +248,7 @@ function UpcomingFollowupWindowList({
             {/* Green text on a white chip (5.35:1). The 10% green tint over this translucent card
                 measured 4.47:1, just under AA (persona contrast scan, 2026-10-15). */}
             <span className="shrink-0 rounded-full bg-card px-2.5 py-1 text-xs font-semibold text-accent ring-1 ring-accent/30" data-testid="followup-window-countdown">
-              {window.opensInDays <= 0 ? "due now" : `${window.opensInDays}d`}
+              {window.opensInDays <= 0 ? "Open now" : `Opens in ${window.opensInDays} ${window.opensInDays === 1 ? "day" : "days"}`}
             </span>
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
