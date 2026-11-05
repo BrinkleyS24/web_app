@@ -38,9 +38,13 @@ export default function InterviewPrep() {
 function LiveInterviewList({owner}:{owner:string}) {
   const emails=useQuery({queryKey:["interview-prep","stored-emails",owner],queryFn:()=>loadPrepInterviewEmails(fetchStoredEmails),retry:false,staleTime:60_000});
   // Owner-bound like the workspace; shared task invalidation includes this prefix.
-  const queue=useQuery({queryKey:["interview-prep","queue",owner],queryFn:async()=>{const result=await fetchRankedActionQueue();if(!result?.success||!result.queue)throw new Error("Your prep tasks could not be loaded.");return result;},retry:false,staleTime:30_000});
-  let queueItems:ReturnType<typeof buildQueueItemsFromRankedQueue>=[];
-  try{queueItems=buildQueueItemsFromRankedQueue(queue.data?.queue||null);}catch{queueItems=[];}
+  const queue=useQuery({queryKey:["interview-prep","queue",owner],queryFn:async()=>{const result=await fetchRankedActionQueue();if(!result?.success||!result.queue)throw new Error("Your prep tasks could not be loaded.");return result;},select:result=>{
+    if(![result.queue.doToday,result.queue.thisWeek,result.queue.later,result.queue.blocked].every(Array.isArray))throw new Error("Your prep tasks could not be verified.");
+    return buildQueueItemsFromRankedQueue(result.queue);
+  },retry:false,staleTime:30_000});
+  // Mapping failures are unavailable, never a successful empty task list. Keep
+  // the cached API response unchanged for any other observers.
+  const queueItems=queue.isError?[]:queue.data||[];
   const interviews=emails.data?deriveLiveInterviews(emails.data,queueItems):[];
 
   if(emails.isPending)return <Panel className="mt-5" title="Your live interviews"><LoadingRows rows={2}/></Panel>;
@@ -48,11 +52,11 @@ function LiveInterviewList({owner}:{owner:string}) {
   return <Panel className="mt-5" title="Your live interviews" description={`Interviews with no decision yet and an email in the last ${LIVE_INTERVIEW_WINDOW_DAYS} days.`}>
     {queue.isError?<div className="mb-3"><ErrorState title="Your prep tasks could not be checked" detail="The interviews below are correct. Try again to see which have a prep task." onRetry={()=>void queue.refetch()}/></div>:null}
     {interviews.length===0?<EmptyState compact title="No live interviews right now" body="When an interview invitation reaches your inbox, it appears here with a way to prepare." action={<Link to="/next-actions" className={BUTTON.secondary}>Open Next Actions</Link>}/>
-      :<ul className="divide-y divide-border" data-testid="live-interviews">{interviews.map(item=><LiveInterviewRow key={item.key} item={item} queueLoading={queue.isPending}/>)}</ul>}
+      :<ul className="divide-y divide-border" data-testid="live-interviews">{interviews.map(item=><LiveInterviewRow key={item.key} item={item} queueLoading={queue.isPending} queueUnavailable={queue.isError}/>)}</ul>}
   </Panel>;
 }
 
-function LiveInterviewRow({item,queueLoading}:{item:LiveInterview;queueLoading:boolean}) {
+function LiveInterviewRow({item,queueLoading,queueUnavailable}:{item:LiveInterview;queueLoading:boolean;queueUnavailable:boolean}) {
   const title=[item.company,item.role].filter(Boolean).join(" · ")||"Interview";
   const days=daysSince(item.lastEmailAt.toISOString())??0;
   const when=days===0?"today":days===1?"yesterday":`${days} days ago`;
@@ -66,6 +70,7 @@ function LiveInterviewRow({item,queueLoading}:{item:LiveInterview;queueLoading:b
     </div>
     {task?(hasWorkspace?<Link to={href!} className={BUTTON.primary}>Prepare for this interview</Link>:<Link to="/next-actions" className={BUTTON.secondary}>Open the prep task</Link>)
       :queueLoading?<p className="text-[13px] text-muted-foreground">Checking for a prep task…</p>
+      :queueUnavailable?<p className="text-[13px] text-muted-foreground">Prep task unavailable until it can be checked.</p>
       :<div className="text-[13px] sm:max-w-[30ch] sm:text-right"><p className="text-muted-foreground">No current prep task was found for this interview.</p><Link to="/next-actions" className="font-medium underline">Review Next Actions</Link></div>}
   </li>;
 }

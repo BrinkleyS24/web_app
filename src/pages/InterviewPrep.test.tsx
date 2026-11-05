@@ -39,6 +39,43 @@ const interviewEmail=(over:Record<string,unknown>)=>({id:"e1",thread_id:"t-q",ca
 const prepAction={id:"prep-1",logicalKey,dedupeKey,primaryEntityId:"t-q",actionType:"prep_interview",actionCategory:"preparation",intent:"PREP_INTERVIEW",intentLabel:"Interview prep",sourceLabel:"Interview",stageLabel:"Interview",routeHref:"/interview-prep",routeLabel:"Prepare",draftEligible:false,title:"Prepare for Quillstone",urgencyLevel:"high",confidenceLevel:"strong",status:"open",effectiveStatus:"open",queueSource:"followup",createdAt:recent,evidence:[],playbook:[],company:"Quillstone Learning",threadId:"t-q",applicationId:"app-q"};
 test("lists live interviews with a way into the matching prep task",async()=>{mocks.stored.mockResolvedValue({success:true,emails:[interviewEmail({})]});mocks.queue.mockResolvedValue({success:true,queue:{doToday:[prepAction],thisWeek:[],later:[],blocked:[]}});setup(undefined,"/interview-prep");const link=await screen.findByRole("link",{name:"Prepare for this interview"});expect(link).toHaveAttribute("href",`/interview-prep?action=${logicalKey}&version=${dedupeKey}`);expect(screen.getByText("Quillstone Learning · Curriculum Developer")).toBeInTheDocument();});
 test("a live interview without a task says its prep task will appear in Next Actions",async()=>{mocks.stored.mockResolvedValue({success:true,emails:[interviewEmail({})]});setup(undefined,"/interview-prep");expect(await screen.findByText("No current prep task was found for this interview.")).toBeInTheDocument();});
+test("a malformed prep queue stays unavailable, retains interview evidence and can retry",async()=>{
+ mocks.stored.mockResolvedValue({success:true,emails:[interviewEmail({})]});
+ mocks.queue.mockResolvedValue({success:true,queue:{doToday:[{id:"broken-action"}],thisWeek:[],later:[],blocked:[]}});
+ setup(undefined,"/interview-prep");
+ expect(await screen.findByText("Your prep tasks could not be checked")).toBeVisible();
+ expect(screen.getByText("Quillstone Learning · Curriculum Developer")).toBeVisible();
+ expect(screen.queryByText("No current prep task was found for this interview.")).not.toBeInTheDocument();
+ expect(screen.queryByRole("link",{name:"Prepare for this interview"})).not.toBeInTheDocument();
+ mocks.queue.mockResolvedValue({success:true,queue:{doToday:[prepAction],thisWeek:[],later:[],blocked:[]}});
+ await userEvent.click(screen.getByRole("button",{name:"Try again"}));
+ expect(await screen.findByRole("link",{name:"Prepare for this interview"})).toHaveAttribute("href",`/interview-prep?action=${logicalKey}&version=${dedupeKey}`);
+ expect(screen.queryByText("Your prep tasks could not be checked")).not.toBeInTheDocument();
+});
+test("a failed prep-queue read cannot claim that a known interview has no task",async()=>{
+ mocks.stored.mockResolvedValue({success:true,emails:[interviewEmail({})]});
+ mocks.queue.mockRejectedValue(new Error("Fictional queue outage"));
+ setup(undefined,"/interview-prep");
+ expect(await screen.findByText("Your prep tasks could not be checked")).toBeVisible();
+ expect(screen.queryByText("No current prep task was found for this interview.")).not.toBeInTheDocument();
+ expect(screen.queryByText("No live interviews right now")).not.toBeInTheDocument();
+});
+test.each([{},[],{doToday:[],thisWeek:[],later:[]}])("missing prep-queue buckets are unavailable rather than a successful empty list: %j",async queue=>{
+ mocks.stored.mockResolvedValue({success:true,emails:[interviewEmail({})]});
+ mocks.queue.mockResolvedValue({success:true,queue});setup(undefined,"/interview-prep");
+ expect(await screen.findByText("Your prep tasks could not be checked")).toBeVisible();
+ expect(screen.queryByText("No current prep task was found for this interview.")).not.toBeInTheDocument();
+});
+test("a failed refresh with prior task data cannot keep an actionable stale prep link",async()=>{
+ mocks.stored.mockResolvedValue({success:true,emails:[interviewEmail({})]});
+ mocks.queue.mockResolvedValue({success:true,queue:{doToday:[prepAction],thisWeek:[],later:[],blocked:[]}});
+ const page=setup(undefined,"/interview-prep");await screen.findByRole("link",{name:"Prepare for this interview"});
+ mocks.queue.mockRejectedValue(new Error("Fictional refresh outage"));
+ await page.client.refetchQueries({queryKey:["interview-prep","queue","owner"]});
+ expect(await screen.findByText("Your prep tasks could not be checked")).toBeVisible();
+ expect(screen.queryByRole("link",{name:"Prepare for this interview"})).not.toBeInTheDocument();
+ expect(screen.queryByText("No current prep task was found for this interview.")).not.toBeInTheDocument();
+});
 test("a failed load shows an error with retry, not 'no interviews'",async()=>{mocks.stored.mockRejectedValue(Object.assign(new Error("Too many requests"),{status:429}));setup(undefined,"/interview-prep");expect(await screen.findByText("Your interviews did not load")).toBeInTheDocument();expect(screen.queryByText("No live interviews right now")).not.toBeInTheDocument();expect(screen.getByRole("button",{name:"Try again"})).toBeInTheDocument();});
 
 // Designer + mobile + teacher review, 2026-10-15.
