@@ -157,7 +157,7 @@ describe("FirstMoveCard", () => {
     const user = userEvent.setup();
     const first = renderCard();
     await screen.findByLabelText("Resume text");
-    await user.click(screen.getByRole("button", {name: "Dismiss", exact: true}));
+    await user.click(screen.getByRole("button", {name: /^Dismiss$/}));
     expect(localStorage.getItem("firstMove.dismissed:fictional-first-move")).toBe("true");
     expect(localStorage.getItem("firstMove.dismissed")).toBeNull();
     first.unmount();
@@ -177,7 +177,7 @@ describe("FirstMoveCard", () => {
     try {
       renderCard();
       await screen.findByLabelText("Resume text");
-      await user.click(screen.getByRole("button", {name: "Dismiss", exact: true}));
+      await user.click(screen.getByRole("button", {name: /^Dismiss$/}));
       expect(screen.queryByLabelText("Resume text")).toBeNull();
     } finally { read.mockRestore(); write.mockRestore(); }
   });
