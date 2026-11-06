@@ -48,9 +48,9 @@ function LiveInterviewList({owner}:{owner:string}) {
   const interviews=emails.data?deriveLiveInterviews(emails.data,queueItems):[];
 
   if(emails.isPending)return <Panel className="mt-5" title="Your live interviews"><LoadingRows rows={2}/></Panel>;
-  if(emails.isError)return <div className="mt-5"><ErrorState title="Your interviews did not load" detail="Your data is safe. Try again in a moment." onRetry={()=>void emails.refetch()}/></div>;
+  if(emails.isError)return <div className="mt-5"><ErrorState stackRetryOnMobile title="Your interviews did not load" detail="Your data is safe. Try again in a moment." onRetry={()=>void emails.refetch()}/></div>;
   return <Panel className="mt-5" title="Your live interviews" description={`Interviews with no decision yet and an email in the last ${LIVE_INTERVIEW_WINDOW_DAYS} days.`}>
-    {queue.isError?<div className="mb-3"><ErrorState title="Your prep tasks could not be checked" detail="The interviews below are correct. Try again to see which have a prep task." onRetry={()=>void queue.refetch()}/></div>:null}
+    {queue.isError?<div className="mb-3"><ErrorState stackRetryOnMobile title="Your prep tasks could not be checked" detail="The interviews below are correct. Try again to see which have a prep task." onRetry={()=>void queue.refetch()}/></div>:null}
     {interviews.length===0?<EmptyState compact title="No live interviews right now" body="When an interview invitation reaches your inbox, it appears here with a way to prepare." action={<Link to="/next-actions" className={BUTTON.secondary}>Open Next Actions</Link>}/>
       :<ul className="divide-y divide-border" data-testid="live-interviews">{interviews.map(item=><LiveInterviewRow key={item.key} item={item} queueLoading={queue.isPending} queueUnavailable={queue.isError}/>)}</ul>}
   </Panel>;
