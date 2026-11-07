@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Clock3 } from "lucide-react";
+import { Clock3 } from "lucide-react";
 import { useAuth } from "../lib/AuthContext.jsx";
 import { apiFetch } from "../lib/api.js";
 import { PublicFooter, PublicHeader } from "../components/landing/PublicShell.jsx";
@@ -15,20 +15,22 @@ export default function PaymentSuccess() {
     trackFunnel("checkout_success");
   }, []);
   const { user, loading, plan, planLoading } = useAuth();
-  const [attempt, setAttempt] = useState(0);
-  const [statusMessage, setStatusMessage] = useState("Finalizing premium access...");
+  const [statusMessage, setStatusMessage] = useState("Checking your Premium access...");
   const [statusError, setStatusError] = useState("");
+  const ownerId = user?.uid ?? null;
 
   usePageMetadata({
-    title: "Applendium™ | Payment Complete",
-    description: "Applendium™ Premium payment confirmation.",
+    title: "Applendium™ | Confirming Premium Access",
+    description: "Check your current Applendium™ Premium access.",
   });
 
   useEffect(() => {
+    setStatusMessage("Checking your Premium access...");
+    setStatusError("");
     if (loading || planLoading) return undefined;
 
-    if (!user) {
-      setStatusMessage("Sign in again to finish activating Premium.");
+    if (!ownerId) {
+      setStatusMessage("Sign in again to check your Premium access.");
       return undefined;
     }
 
@@ -39,37 +41,40 @@ export default function PaymentSuccess() {
 
     let cancelled = false;
     let timeoutId: number | undefined;
+    const controller = new AbortController();
 
     async function pollSubscription(nextAttempt: number) {
-      setAttempt(nextAttempt);
       setStatusError("");
 
       try {
         const response = await apiFetch("/api/subscriptions/status", {
           method: "GET",
           timeoutMs: 30000,
+          signal: controller.signal,
         });
         const subscription = response?.subscription;
         const activePremium =
-          subscription?.plan === "premium" &&
+          response?.success === true && subscription?.plan === "premium" &&
           (subscription?.status === "active" || subscription?.status === "trialing");
 
         if (cancelled) return;
 
         if (activePremium) {
           setStatusMessage("Premium is active. Opening your dashboard...");
-          window.setTimeout(() => window.location.replace("/dashboard"), 600);
+          timeoutId = window.setTimeout(() => {
+            if (!cancelled) window.location.replace("/dashboard");
+          }, 600);
           return;
         }
       } catch (error) {
         if (cancelled) return;
-        setStatusError(error instanceof Error ? error.message : "Unable to verify payment yet.");
+        setStatusError(error instanceof Error ? error.message : "Unable to verify Premium access yet.");
       }
 
       if (cancelled) return;
 
       if (nextAttempt >= MAX_STATUS_ATTEMPTS) {
-        setStatusMessage("Payment was received, but premium access is still syncing.");
+        setStatusMessage("We couldn't confirm Premium access yet. Open Settings to check your billing status, or contact support if you completed checkout.");
         return;
       }
 
@@ -82,11 +87,12 @@ export default function PaymentSuccess() {
 
     return () => {
       cancelled = true;
+      controller.abort();
       if (timeoutId != null) {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [loading, plan, planLoading, user]);
+  }, [loading, plan, planLoading, ownerId]);
 
   return (
     <div className="landingPage min-h-screen bg-[#FAFAF8] text-[#111111]">
@@ -97,11 +103,11 @@ export default function PaymentSuccess() {
           <div className="bg-grid pointer-events-none absolute inset-0 opacity-60" />
           <div className="relative mx-auto max-w-4xl px-6 py-24 md:px-10 md:py-32">
             <div className="landingMono inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.24em] text-[#0A7A55]">
-              {attempt >= MAX_STATUS_ATTEMPTS ? <Clock3 className="h-4 w-4" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
-              Payment complete
+              <Clock3 className="h-4 w-4" aria-hidden="true" />
+              Confirming access
             </div>
             <h1 className="landingDisplay mt-6 text-5xl font-black leading-[0.9] tracking-tighter text-[#111111] md:text-7xl">
-              Activating Premium.
+              Checking Premium.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-gray-600 md:text-xl">{statusMessage}</p>
             {statusError ? (
