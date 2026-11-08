@@ -246,6 +246,28 @@ test('a failed update keeps loaded jobs, but a rejected access check hides them'
   expect(screen.queryByRole('heading',{name:'QA Engineer'})).not.toBeInTheDocument();
 });
 
+test('a stale collection is unavailable rather than a zero-match verdict',async()=>{
+  mocks.fetchJobFeed.mockResolvedValue({...feed,catalog:{...feed.catalog,stale:true},counts:{recent:0,review:0,older:0,excluded:0},review:[]});
+  renderPage();
+  expect(await screen.findByText('The job collection needs an update')).toBeVisible();
+  expect(screen.queryByRole('button',{name:'Matches (0)'})).not.toBeInTheDocument();
+  expect(screen.queryByText('No resume-supported matches in this collection')).not.toBeInTheDocument();
+  expect(mocks.fetchJobApplicationStatuses).not.toHaveBeenCalled();
+});
+
+test('a known expired catalog hides cached jobs and recovers on a fresh update',async()=>{
+  renderPage();
+  await screen.findByRole('heading',{name:'QA Engineer'});
+  mocks.fetchJobFeed.mockRejectedValueOnce(Object.assign(new Error('Collection expired'),{status:503,payload:{code:'catalog_stale'}}));
+  await userEvent.click(screen.getByRole('button',{name:'Check for updates'}));
+  expect(await screen.findByText('The job collection needs an update')).toBeVisible();
+  expect(screen.queryByRole('heading',{name:'QA Engineer'})).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Job result sections')).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button',{name:'Check for updates'}));
+  expect(await screen.findByRole('heading',{name:'QA Engineer'})).toBeVisible();
+  expect(screen.queryByText('The job collection needs an update')).not.toBeInTheDocument();
+});
+
 test('city, state, and country fields save multiple locations without special syntax',async()=>{
   mocks.fetchJobPreferences.mockResolvedValue({preferences:{...preferences,workStyles:[],remoteCountry:'',remoteRegion:''},version:0,setupRequired:'location'});
   renderPage();

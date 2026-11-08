@@ -69,7 +69,7 @@ export async function fetchJobFeed(version: number, signal?: AbortSignal, finger
       try{page=await apiFetch(`/api/jobs/feed?version=${version}&discovery=1${fingerprint ? `&fingerprint=${encodeURIComponent(fingerprint)}` : ''}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, {signal,timeoutMs:60000});break;}
       catch(error){
         const status=(error as {status?:number}).status;
-        if(!cursor||signal?.aborted||(error as Error).name==='AbortError'||attempt>=2||(status!=null&&status<500))throw error;
+        if(!cursor||signal?.aborted||(error as Error).name==='AbortError'||(error as {payload?:{code?:string}}).payload?.code==='catalog_stale'||attempt>=2||(status!=null&&status<500))throw error;
         await retryDelay(status===503?5000:1000,signal);
       }
     }

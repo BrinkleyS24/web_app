@@ -68,6 +68,13 @@ test('a transient continuation outage retries the same page without duplicating 
  }finally{vi.useRealTimers();}
 });
 
+test('a known expired catalog stops continuation without transient outage retries',async()=>{
+ const error=Object.assign(new Error('Collection expired'),{status:503,payload:{code:'catalog_stale'}});
+ mocks.apiFetch.mockResolvedValueOnce(page(1,[])).mockRejectedValueOnce(error);
+ await expect(fetchJobFeed(2)).rejects.toBe(error);
+ expect(mocks.apiFetch).toHaveBeenCalledTimes(2);
+});
+
 test('cancelling retry backoff releases the timer and sends no further request',async()=>{
  vi.useFakeTimers();
  try{

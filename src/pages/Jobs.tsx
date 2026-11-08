@@ -106,8 +106,9 @@ export default function Jobs() {
     enabled: enabled && !prefs.isError && !resumes.isError && available && !setupRequired && !dirty, retry: false,
     staleTime: saved?.roleMode === 'resume' ? 300000 : 0,
     refetchOnWindowFocus: saved?.roleMode !== 'resume',
-    refetchInterval: query => query.state.data?.catalogPending ? 15000 : saved?.roleMode === 'resume' ? 1800000 : 300000 });
-  const applicationCandidates = useMemo(() => applicationCheckCandidates(feed.data), [feed.data]);
+    refetchInterval: query => (query.state.error as {payload?:{code?:string}} | null)?.payload?.code === 'catalog_stale' || query.state.data?.catalog?.stale ? 60000 : query.state.data?.catalogPending ? 15000 : saved?.roleMode === 'resume' ? 1800000 : 300000 });
+  const catalogStale = (feed.error as {payload?:{code?:string}} | null)?.payload?.code === 'catalog_stale' || Boolean(feed.data?.catalog?.stale);
+  const applicationCandidates = useMemo(() => catalogStale ? [] : applicationCheckCandidates(feed.data), [catalogStale, feed.data]);
   const applicationStatuses = useQuery({queryKey:['job-application-status',uid,applicationCandidates.map(applicationStatusReference)],
     queryFn:({signal})=>fetchJobApplicationStatuses(applicationCandidates,signal),
     enabled:enabled && !dirty && !prefs.isError && !resumes.isError && available && !setupRequired && applicationCandidates.length>0,
@@ -127,7 +128,7 @@ export default function Jobs() {
   function change<K extends keyof Draft>(key: K, value: Draft[K]) { setDraft(d => ({ ...d, [key]: value })); setDirty(true); setLocalError(''); save.reset(); }
   function refresh() { void client.invalidateQueries({ queryKey: ['job-preferences', uid] }); void client.invalidateQueries({ queryKey: ['job-resumes', uid] }); void client.invalidateQueries({ queryKey: ['job-feed', uid] }); void client.invalidateQueries({queryKey:['job-application-status',uid]}); }
   const feedError = feed.error as {status?:number} | null;
-  const keepPreviousFeed = !feed.isError || !feedError?.status || feedError.status >= 500;
+  const keepPreviousFeed = !catalogStale && (!feed.isError || !feedError?.status || feedError.status >= 500);
   const rawResults = !dirty && available && !setupRequired && !prefs.isError && !resumes.isError && keepPreviousFeed && !feed.data?.catalogPending && !feed.data?.setupRequired ? feed.data : null;
   const results = useMemo(() => rawResults ? projectApplicationAwareFeed(rawResults,applicationStatuses.data) : null,[rawResults,applicationStatuses.data]);
   // Bring available opportunities into view on arrival; preserve an explicit
@@ -175,14 +176,14 @@ export default function Jobs() {
         </form>}
       </Panel>}
       {!dirty && available && !setupRequired && feed.isFetching && !results && <div className="space-y-3"><p role="status" className="text-sm text-muted-foreground">Checking jobs against your resume and preferences…</p><LoadingRows /></div>}
-      {!dirty && available && !setupRequired && feed.isError && <ErrorState title={results ? 'Updates could not be loaded' : 'Jobs could not be loaded'} detail={results ? `${message(feed.error)} Showing previously loaded jobs.` : message(feed.error)} onRetry={refresh} />}
+      {!dirty && available && !setupRequired && catalogStale && <ErrorState title="The job collection needs an update" detail="Current matches cannot be checked because the collection is over 48 hours old. This does not tell us whether jobs fit your resume. Your preferences are saved; this page will check again automatically." onRetry={refresh} />}
+      {!dirty && available && !setupRequired && feed.isError && !catalogStale && <ErrorState title={results ? 'Updates could not be loaded' : 'Jobs could not be loaded'} detail={results ? `${message(feed.error)} Showing previously loaded jobs.` : message(feed.error)} onRetry={refresh} />}
       {!dirty && available && feed.data?.catalogPending && <EmptyState icon={BriefcaseBusiness} title="Preparing your job feed" body={feed.data.message || 'Your resume and preferences are ready. Jobs will appear here automatically when the collection is ready.'} />}
       {results && <>
         {applicationCandidates.length>0 && !applicationStatuses.data && <p role="status" className="text-sm text-muted-foreground">{applicationStatuses.isError ? 'Application history could not be checked. These results may include jobs you already applied to.' : 'Checking your tracked applications for these roles…'}</p>}
         {applicationStatuses.isError && applicationStatuses.data && <p role="status" className="text-sm text-muted-foreground">Application history could not be updated. Showing the last checked application status.</p>}
         {applicationCandidates.length>0 && <button type="button" className={BUTTON.ghost} disabled={applicationStatuses.isFetching} onClick={()=>void applicationStatuses.refetch()}>{applicationStatuses.isFetching ? 'Checking applications…' : 'Recheck applications'}</button>}
         {results.discovery && !results.discovery.complete && <p role="status" className="text-sm text-muted-foreground">{feed.isFetching ? 'Discovering roles from your resume' : 'Discovery paused'}: {results.discovery.scannedParts} of {results.discovery.totalParts} catalog batches checked. Results and counts are partial until the scan finishes.</p>}
-        {results.catalog.stale && <p role="alert" className="text-sm">The collection is over 48 hours old. Stale listings are hidden until the catalog is refreshed.</p>}
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2" aria-label="Job result sections">{([['recent','Matches'],['review','Needs review'],['older','Older'],['excluded','Excluded'],['applied','Already applied']] as const).map(([key,label]) => <button type="button" key={key} aria-pressed={tab === key} className={tab === key ? BUTTON.primary : BUTTON.secondary} onClick={() => setTab(key)}>{label} ({results.counts[key]})</button>)}</div>
             <p role="status" className="min-h-8 text-xs text-muted-foreground sm:min-h-4">{feed.isFetching ? 'Checking for updates…' : tab === 'older' ? 'Posted 31–60 days ago' : tab === 'applied' ? 'These postings match applications already recorded in your tracker' : tab === 'excluded' ? 'Requirement blockers and missing resume evidence are different' : tab === 'review' ? 'Core experience has support; check the remaining fit questions' : 'Posted in the past 30 days'}{!feed.isFetching && ` · Collection updated ${date(results.catalog.capturedAt)}`}</p>
