@@ -5,11 +5,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, afterEach, expect, test, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import Jobs from './Jobs';
-const mocks = vi.hoisted(() => ({useAuth:vi.fn(),fetchResumeVariants:vi.fn(),fetchJobPreferences:vi.fn(),saveJobPreferences:vi.fn(),fetchJobFeed:vi.fn(),fetchJobApplicationStatuses:vi.fn()}));
+const mocks = vi.hoisted(() => ({useAuth:vi.fn(),fetchResumeVariants:vi.fn(),fetchJobPreferences:vi.fn(),saveJobPreferences:vi.fn(),fetchJobFeed:vi.fn(),fetchJobApplicationStatuses:vi.fn(),retryJobFeed:vi.fn()}));
 vi.mock('@/lib/AuthContext.jsx', () => ({useAuth:mocks.useAuth}));
 vi.mock('@/components/DashboardLayout', () => ({DashboardLayout:({children}:{children:ReactNode}) => <div>{children}</div>}));
 vi.mock('@/lib/emails', () => ({fetchResumeVariants:mocks.fetchResumeVariants}));
-vi.mock('@/lib/jobFeed', () => ({fetchJobPreferences:mocks.fetchJobPreferences,saveJobPreferences:mocks.saveJobPreferences,fetchJobFeed:mocks.fetchJobFeed,fetchJobApplicationStatuses:mocks.fetchJobApplicationStatuses}));
+vi.mock('@/lib/jobFeed', () => ({fetchJobPreferences:mocks.fetchJobPreferences,saveJobPreferences:mocks.saveJobPreferences,fetchJobFeed:mocks.fetchJobFeed,fetchJobApplicationStatuses:mocks.fetchJobApplicationStatuses,retryJobFeed:mocks.retryJobFeed}));
 const id = '00000000-0000-4000-8000-000000000001';
 const preferences = {resumeMode:'default' as const,roleMode:'resume' as const,resumeId:id,roles:['QA Engineer'],workStyles:['remote'],locations:[],remoteCountry:'US',remoteRegion:'NY'};
 const row = {key:'j1',title:'QA Engineer',company:'Example',location:'US - Remote',url:'https://jobs.example.com/123',publishedAt:'2026-10-15',lastCheckedAt:'2026-10-21',dateBasis:'first_published',decision:'review',window:'recent',reasons:['Confirm scoped experience.'],requirements:[]};
@@ -19,6 +19,7 @@ function renderPage() {
   return render(<MemoryRouter><QueryClientProvider client={client}><Jobs /></QueryClientProvider></MemoryRouter>);
 }
 beforeEach(() => {
+  mocks.retryJobFeed.mockReset().mockResolvedValue({generationPending:true});
   mocks.useAuth.mockReturnValue({user:{uid:'owner'},plan:'premium'});
   mocks.fetchResumeVariants.mockResolvedValue({variants:[{id,name:'QA resume',isDefault:true}]});
   mocks.fetchJobPreferences.mockResolvedValue({preferences,version:2,setupRequired:null,resume:{id,name:'QA resume',fingerprint:'fp'}});
@@ -364,4 +365,41 @@ test('the selected resume mode and custom role focus are visible without opening
   await screen.findByRole('button',{name:/Needs review \(\d+\)/});
   expect(screen.getByText(/Chosen resume/)).toBeVisible();
   expect(screen.getByText('Your target titles: Software Engineer')).toBeVisible();
+});
+
+
+test('background preparation is a real pending state without fake zero matches or application checks',async()=>{
+ mocks.fetchJobPreferences.mockResolvedValue({preferences,version:2,backgroundGeneration:true,resume:{id,name:'QA resume',fingerprint:'fp'}});
+ mocks.fetchJobFeed.mockResolvedValue({generationPending:true,generation:{state:'queued'},matchingMode:'resume_discovery',version:2,resume:feed.resume,catalog:feed.catalog});
+ renderPage();
+ expect(await screen.findByText('Preparing your matches')).toBeVisible();
+ expect(screen.getByText(/You can leave this page/)).toBeVisible();
+ expect(screen.queryByRole('button',{name:'Matches (0)'})).not.toBeInTheDocument();
+ expect(screen.queryByRole('heading',{name:'QA Engineer'})).not.toBeInTheDocument();expect(mocks.fetchJobApplicationStatuses).not.toHaveBeenCalled();
+});
+
+test('background status polling brings completed results into view without a manual search',async()=>{
+ mocks.fetchJobFeed.mockResolvedValueOnce({generationPending:true,generation:{state:'running'},matchingMode:'resume_discovery',version:2,resume:feed.resume,catalog:feed.catalog}).mockResolvedValue(feed);
+ renderPage();await screen.findByText('Preparing your matches');
+ expect(await screen.findByRole('heading',{name:'QA Engineer'},{timeout:7000})).toBeVisible();
+ expect(screen.queryByText('Preparing your matches')).not.toBeInTheDocument();
+ expect(mocks.saveJobPreferences).not.toHaveBeenCalled();
+},10000);
+
+test('expired completed snapshots stay hidden and refresh rather than carrying stale cards into another read',async()=>{
+ mocks.fetchJobFeed.mockResolvedValueOnce({...feed,generation:{state:'ready',expiresAt:new Date(Date.now()-1000).toISOString()}})
+  .mockResolvedValue({generationPending:true,generation:{state:'queued'},matchingMode:'resume_discovery',version:2,resume:feed.resume,catalog:feed.catalog});
+ renderPage();await screen.findByText('Preparing your matches');
+ expect(mocks.fetchJobFeed).toHaveBeenCalledTimes(2);expect(mocks.fetchJobApplicationStatuses).not.toHaveBeenCalled();
+ expect(screen.queryByRole('heading',{name:'QA Engineer'})).not.toBeInTheDocument();
+});
+
+test('explicit retry uses the current preference version and document fingerprint',async()=>{
+ mocks.fetchJobPreferences.mockResolvedValue({preferences,version:2,backgroundGeneration:true,resume:{id,name:'QA resume',fingerprint:'fp'}});
+ mocks.fetchJobFeed.mockRejectedValueOnce(Object.assign(Error('Your matches could not be prepared.'),{status:503,payload:{code:'job_feed_refresh_failed'}}));
+ renderPage();await screen.findByText('Your matches could not be prepared.');
+ mocks.fetchJobFeed.mockResolvedValue({generationPending:true,generation:{state:'queued'},matchingMode:'resume_discovery',version:2,resume:feed.resume,catalog:feed.catalog});
+ await userEvent.click(screen.getByRole('button',{name:'Try again'}));
+ await waitFor(()=>expect(mocks.retryJobFeed).toHaveBeenCalledWith(2,'fp'));
+ expect(await screen.findByText('Preparing your matches')).toBeVisible();
 });

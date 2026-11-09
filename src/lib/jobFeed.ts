@@ -7,6 +7,7 @@ export type JobPreferences = {
   remoteCountry: string; remoteRegion: string;
 };
 export type SavedJobPreferences = { preferences: JobPreferences | null; version: number;
+  backgroundGeneration?: boolean;
   setupRequired?: 'resume' | 'roles' | 'location' | null; roleEvidence?: string[];
   resume?: { id: string; name: string; fingerprint: string } };
 export type FeedJob = {
@@ -26,6 +27,8 @@ export type JobFeed = {
   discovery?: {asOf:string;scannedParts:number;totalParts:number;complete:boolean;nextCursor:string|null};
   setupRequired?: boolean | 'resume' | 'roles' | 'location'; version: number;
   catalogPending?: boolean; message?: string;
+  generationPending?: boolean;
+  generation?: {state:'queued'|'running'|'ready';scannedParts?:number;totalParts?:number|null;requestedAt?:string;asOf?:string;completedAt?:string;expiresAt?:string};
   resume: { id: string; name: string; fingerprint: string };
   personalization?: {status:'available'|'no_history'|'unavailable';interviewedRoles:number;relevantInterviewedRoles?:number;roleFamilies?:{roleFamily:string;similarRoles:number}[]};
   catalog: { revision: string; capturedAt: string; stale: boolean; scope: string;
@@ -51,6 +54,8 @@ export async function fetchJobApplicationStatuses(jobs:FeedJob[],signal?:AbortSi
 }
 export const saveJobPreferences = (preferences: JobPreferences, expectedVersion: number): Promise<SavedJobPreferences> =>
   apiFetch('/api/jobs/preferences', { method: 'PUT', body: JSON.stringify({ preferences, expectedVersion }) });
+export const retryJobFeed = (version:number,fingerprint:string):Promise<JobFeed> =>
+  apiFetch('/api/jobs/feed/refresh',{method:'POST',body:JSON.stringify({version,fingerprint})});
 function retryDelay(ms:number,signal?:AbortSignal) {
   return new Promise<void>((resolve,reject)=>{
     const abort=()=>{clearTimeout(timer);signal?.removeEventListener('abort',abort);reject(new DOMException('Discovery cancelled.','AbortError'));};
@@ -66,7 +71,7 @@ export async function fetchJobFeed(version: number, signal?: AbortSignal, finger
     if(signal?.aborted)throw new DOMException('Discovery cancelled.','AbortError');
     let page:JobFeed;
     for(let attempt=0;;attempt++){
-      try{page=await apiFetch(`/api/jobs/feed?version=${version}&discovery=1${fingerprint ? `&fingerprint=${encodeURIComponent(fingerprint)}` : ''}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, {signal,timeoutMs:60000});break;}
+      try{page=await apiFetch(`/api/jobs/feed?version=${version}&discovery=1&background=1${fingerprint ? `&fingerprint=${encodeURIComponent(fingerprint)}` : ''}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, {signal,timeoutMs:60000});break;}
       catch(error){
         const status=(error as {status?:number}).status;
         if(!cursor||signal?.aborted||(error as Error).name==='AbortError'||(error as {payload?:{code?:string}}).payload?.code==='catalog_stale'||attempt>=2||(status!=null&&status<500))throw error;

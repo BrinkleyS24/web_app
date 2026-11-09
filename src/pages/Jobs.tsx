@@ -7,7 +7,7 @@ import { EmptyState, ErrorState, LoadingRows, PageHeader, Panel, ToneChip } from
 import { BUTTON } from '@/components/premium/tone';
 import { useAuth } from '@/lib/AuthContext.jsx';
 import { fetchResumeVariants } from '@/lib/emails';
-import { fetchJobFeed, fetchJobPreferences, saveJobPreferences, fetchJobApplicationStatuses, type FeedJob, type JobPreferences } from '@/lib/jobFeed';
+import { fetchJobFeed, fetchJobPreferences, saveJobPreferences, fetchJobApplicationStatuses, retryJobFeed, type FeedJob, type JobPreferences } from '@/lib/jobFeed';
 import { applicationCheckCandidates, projectApplicationAwareFeed, applicationStatusReference, retainApplicationStatuses } from '@/lib/jobFeedApplications';
 import { JOB_COUNTRIES, US_STATES, countryName, stateCode } from '@/lib/jobFeedLocations';
 
@@ -106,9 +106,14 @@ export default function Jobs() {
     enabled: enabled && !prefs.isError && !resumes.isError && available && !setupRequired && !dirty, retry: false,
     staleTime: saved?.roleMode === 'resume' ? 300000 : 0,
     refetchOnWindowFocus: saved?.roleMode !== 'resume',
-    refetchInterval: query => (query.state.error as {payload?:{code?:string}} | null)?.payload?.code === 'catalog_stale' || query.state.data?.catalog?.stale ? 60000 : query.state.data?.catalogPending ? 15000 : saved?.roleMode === 'resume' ? 1800000 : 300000 });
+    refetchInterval: query => (query.state.error as {payload?:{code?:string}} | null)?.payload?.code === 'catalog_stale' || query.state.data?.catalog?.stale ? 60000
+      : query.state.data?.generationPending ? query.state.error ? 60000 : 5000
+      : query.state.data?.generation?.expiresAt ? Math.max(5000,Math.min(1800000,Date.parse(query.state.data.generation.expiresAt)-Date.now()+10))
+      : query.state.data?.catalogPending ? 15000 : saved?.roleMode === 'resume' ? 1800000 : 300000 });
   const catalogStale = (feed.error as {payload?:{code?:string}} | null)?.payload?.code === 'catalog_stale' || Boolean(feed.data?.catalog?.stale);
-  const applicationCandidates = useMemo(() => catalogStale ? [] : applicationCheckCandidates(feed.data), [catalogStale, feed.data]);
+  const snapshotExpired=Boolean(feed.data?.generation?.expiresAt&&Date.parse(feed.data.generation.expiresAt)<=Date.now());
+  useEffect(()=>{if(snapshotExpired&&!feed.isFetching&&!feed.isError)void feed.refetch();},[snapshotExpired,feed.isFetching,feed.isError,feed.refetch]);
+  const applicationCandidates = useMemo(() => catalogStale||snapshotExpired ? [] : applicationCheckCandidates(feed.data), [catalogStale,snapshotExpired,feed.data]);
   const applicationStatuses = useQuery({queryKey:['job-application-status',uid,applicationCandidates.map(applicationStatusReference)],
     queryFn:({signal})=>fetchJobApplicationStatuses(applicationCandidates,signal),
     enabled:enabled && !dirty && !prefs.isError && !resumes.isError && available && !setupRequired && applicationCandidates.length>0,
@@ -126,10 +131,12 @@ export default function Jobs() {
     onSuccess: data => { client.setQueryData(['job-preferences', uid], data); client.removeQueries({ queryKey: ['job-feed', uid] }); setDirty(false); setShowPreferences(false); setLocalError(''); setTab(null); },
   });
   function change<K extends keyof Draft>(key: K, value: Draft[K]) { setDraft(d => ({ ...d, [key]: value })); setDirty(true); setLocalError(''); save.reset(); }
-  function refresh() { void client.invalidateQueries({ queryKey: ['job-preferences', uid] }); void client.invalidateQueries({ queryKey: ['job-resumes', uid] }); void client.invalidateQueries({ queryKey: ['job-feed', uid] }); void client.invalidateQueries({queryKey:['job-application-status',uid]}); }
+  function invalidateFeed() { void client.invalidateQueries({ queryKey: ['job-preferences', uid] }); void client.invalidateQueries({ queryKey: ['job-resumes', uid] }); void client.invalidateQueries({ queryKey: ['job-feed', uid] }); void client.invalidateQueries({queryKey:['job-application-status',uid]}); }
+  const refreshRequest=useMutation({mutationFn:()=>retryJobFeed(prefs.data!.version,prefs.data?.resume?.fingerprint||''),onSettled:invalidateFeed});
+  function refresh(){if(refreshRequest.isPending)return;if(prefs.data?.backgroundGeneration)refreshRequest.mutate();else invalidateFeed();}
   const feedError = feed.error as {status?:number} | null;
   const keepPreviousFeed = !catalogStale && (!feed.isError || !feedError?.status || feedError.status >= 500);
-  const rawResults = !dirty && available && !setupRequired && !prefs.isError && !resumes.isError && keepPreviousFeed && !feed.data?.catalogPending && !feed.data?.setupRequired ? feed.data : null;
+  const rawResults = !dirty && available && !setupRequired && !prefs.isError && !resumes.isError && keepPreviousFeed && !snapshotExpired && !feed.data?.generationPending && !feed.data?.catalogPending && !feed.data?.setupRequired ? feed.data : null;
   const results = useMemo(() => rawResults ? projectApplicationAwareFeed(rawResults,applicationStatuses.data) : null,[rawResults,applicationStatuses.data]);
   // Bring available opportunities into view on arrival; preserve an explicit
   // tab choice across background refreshes. Never default to excluded roles.
@@ -137,7 +144,7 @@ export default function Jobs() {
   useEffect(() => { if (results && (results.counts.recent || results.counts.review || results.counts.older)) setTab(current => current ?? (results.counts.recent ? 'recent' : results.counts.review ? 'review' : results.counts.older ? 'older' : 'recent')); }, [results]);
   const showForm = Boolean(setupRequired || !available || dirty || showPreferences);
   return <DashboardLayout><div className="space-y-6" data-testid="jobs-page">
-    <PageHeader eyebrow="Premium · Pilot" title="Jobs picked for you" description="Jobs based on your resume and where you want to work. Matches update automatically. No email connection needed." actions={enabled ? <button type="button" className={BUTTON.secondary} onClick={refresh} disabled={feed.isFetching || save.isPending || dirty}><RefreshCw className="h-3.5 w-3.5" aria-hidden />Check for updates</button> : undefined} />
+    <PageHeader eyebrow="Premium · Pilot" title="Jobs picked for you" description="Jobs based on your resume and where you want to work. Matches update automatically. No email connection needed." actions={enabled ? <button type="button" className={BUTTON.secondary} onClick={refresh} disabled={feed.isFetching || save.isPending || refreshRequest.isPending || dirty}><RefreshCw className="h-3.5 w-3.5" aria-hidden />Check for updates</button> : undefined} />
     {!enabled ? <EmptyState title="Jobs is included with Premium" body="Use a saved resume and your own location preferences to search the pilot inventory." action={<Link to="/upgrade?source=web_jobs" className={BUTTON.primary}>Explore Premium</Link>} /> : <>
       {(prefs.isLoading || resumes.isLoading) && <LoadingRows />}
       {(prefs.isError || resumes.isError) && <ErrorState title="Your feed preferences did not load" detail={message(prefs.error || resumes.error)} onRetry={refresh} />}
@@ -175,11 +182,13 @@ export default function Jobs() {
           </fieldset>
         </form>}
       </Panel>}
-      {!dirty && available && !setupRequired && feed.isFetching && !results && <div className="space-y-3"><p role="status" className="text-sm text-muted-foreground">Checking jobs against your resume and preferences…</p><LoadingRows /></div>}
+      {!dirty && available && !setupRequired && feed.isFetching && !results && !feed.data?.generationPending && <div className="space-y-3"><p role="status" className="text-sm text-muted-foreground">Checking jobs against your resume and preferences…</p><LoadingRows /></div>}
       {!dirty && available && !setupRequired && catalogStale && <ErrorState title="The job collection needs an update" detail="Current matches cannot be checked because the collection is over 48 hours old. This does not tell us whether jobs fit your resume. Your preferences are saved; this page will check again automatically." onRetry={refresh} />}
       {!dirty && available && !setupRequired && feed.isError && !catalogStale && <ErrorState title={results ? 'Updates could not be loaded' : 'Jobs could not be loaded'} detail={results ? `${message(feed.error)} Showing previously loaded jobs.` : message(feed.error)} onRetry={refresh} />}
+      {!dirty && available && !setupRequired && !feed.isError && feed.data?.generationPending && <div role="status" aria-live="polite"><EmptyState icon={BriefcaseBusiness} title="Preparing your matches" body="We are checking jobs against your resume. This can take a few minutes. You can leave this page; preparation will continue." /></div>}
       {!dirty && available && feed.data?.catalogPending && <EmptyState icon={BriefcaseBusiness} title="Preparing your job feed" body={feed.data.message || 'Your resume and preferences are ready. Jobs will appear here automatically when the collection is ready.'} />}
       {results && <>
+        {results.generation?.asOf && <p className="text-xs text-muted-foreground">Matches checked {new Date(results.generation.asOf).toLocaleString()}. Application history is checked separately.</p>}
         {applicationCandidates.length>0 && !applicationStatuses.data && <p role="status" className="text-sm text-muted-foreground">{applicationStatuses.isError ? 'Application history could not be checked. These results may include jobs you already applied to.' : 'Checking your tracked applications for these roles…'}</p>}
         {applicationStatuses.isError && applicationStatuses.data && <p role="status" className="text-sm text-muted-foreground">Application history could not be updated. Showing the last checked application status.</p>}
         {applicationCandidates.length>0 && <button type="button" className={BUTTON.ghost} disabled={applicationStatuses.isFetching} onClick={()=>void applicationStatuses.refetch()}>{applicationStatuses.isFetching ? 'Checking applications…' : 'Recheck applications'}</button>}

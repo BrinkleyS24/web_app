@@ -14,7 +14,7 @@ export function retainApplicationStatuses(previous:JobApplicationStatuses|undefi
 const order=(a:FeedJob,b:FeedJob)=>(b.interviewHistory?.similarRoles||0)-(a.interviewHistory?.similarRoles||0)
  ||Date.parse(b.publishedAt)-Date.parse(a.publishedAt)||a.key.localeCompare(b.key);
 export function applicationCheckCandidates(feed?:JobFeed|null):FeedJob[]{
- if(!feed||feed.catalogPending||feed.setupRequired||!feed.counts)return [];
+ if(!feed||feed.catalogPending||feed.generationPending||feed.setupRequired||!feed.counts)return [];
  return [...new Map([...(feed.eligibleCandidates||[...feed.recent,...feed.review,...feed.older]),...feed.excluded].map(row=>[row.key,row])).values()];
 }
 export function projectApplicationAwareFeed(feed:JobFeed,statuses?:JobApplicationStatuses):ApplicationAwareFeed{
