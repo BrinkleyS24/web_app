@@ -39,7 +39,8 @@ for(const width of [320,1280])test(`Current matcher evidence and prior-applicati
  await page.getByText('Job sources and coverage',{exact:true}).click();
  await expect(page.getByText(/Five rechecked recommendations only/)).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
- await page.evaluate(()=>window.scrollTo(0,0));
+ await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+ await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBe(0);
  await page.screenshot({path:testInfo.outputPath('current-supported.private.png'),fullPage:true,animations:'disabled'});
  await page.getByRole('button',{name:'Needs review (4)',exact:true}).click();
  const previous=fixture.feed.review.find(job=>job.key.startsWith('greenhouse:affirm:'))!;
@@ -49,6 +50,7 @@ for(const width of [320,1280])test(`Current matcher evidence and prior-applicati
  await expect(previousArticle.getByRole('link',{name:'Read employer posting'})).toHaveAttribute('href',previous.url);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
  expect(writes).toEqual([]);expect(errors).toEqual([]);
- await page.evaluate(()=>window.scrollTo(0,0));
+ await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+ await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBe(0);
  await page.screenshot({path:testInfo.outputPath('current-review.private.png'),fullPage:true,animations:'disabled'});
 });
