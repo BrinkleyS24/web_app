@@ -8,6 +8,12 @@ const assessment:ApplyGateQualificationAssessment={version:1,decision:'excluded'
  {label:'Python and Rust required.',quote:'Python and Rust required.',status:'unclear',evidence:'Built Python APIs.',evidenceSources:[{quote:'Built Python APIs.',start:0,end:18}]},
 ]};
 describe('qualification source evidence',()=>{
+ test('a present degree/date can still explicitly block the whole requirement',async()=>{
+  render(<QualificationEvidence assessment={{...assessment,exclusionKind:'requirement_blocker',requirements:[{label:'Graduation within twelve months',quote:'Graduation within twelve months required.',status:'unclear',blocking:true,evidenceState:'explicitly_present',evidence:'B.S. expected 2028.'}]}}/>);
+  await userEvent.click(screen.getByText('Review requirement evidence'));
+  expect(screen.getByText('Conflicts with the stated requirement')).toBeVisible();
+  expect(screen.queryByText('The full requirement is not established')).not.toBeInTheDocument();
+ });
  test('a partial conjunction identifies supported skills without treating the whole clause as missing',async()=>{
   render(<QualificationEvidence assessment={{...assessment,requirements:[{...assessment.requirements[0],components:[{id:'python',status:'supported',evidenceSourceIndexes:[0]},{id:'rust',status:'unknown',evidenceSourceIndexes:[]}]}]}}/>);
   await userEvent.click(screen.getByText('Review requirement evidence'));

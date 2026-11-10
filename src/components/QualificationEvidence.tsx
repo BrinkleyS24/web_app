@@ -18,7 +18,7 @@ export function QualificationEvidence({assessment}:{assessment:ApplyGateQualific
    <ul className="mt-3 space-y-3">
     {assessment.requirements.map((requirement,index)=>{
      const sources=requirement.evidenceSources?.length?requirement.evidenceSources.map(source=>source.quote):(requirement.evidence||'').split('\n').filter(Boolean);
-     const status=requirement.status==='satisfied'?'Supported by this resume':requirement.status==='interview_assessment'?'Assessed during interviews':requirement.evidenceState==='explicitly_absent'?'Conflicts with the stated requirement':'The full requirement is not established';
+     const status=requirement.blocking?'Conflicts with the stated requirement':requirement.status==='satisfied'?'Supported by this resume':requirement.status==='interview_assessment'?'Assessed during interviews':requirement.evidenceState==='explicitly_absent'?'Conflicts with the stated requirement':'The full requirement is not established';
      return <li key={index} className="min-w-0 space-y-1 border-l-2 border-border pl-3 [overflow-wrap:anywhere]">
       <p className="text-xs font-medium">{status}</p>
       <p className="font-medium">{requirement.label}</p>
