@@ -403,3 +403,11 @@ test('explicit retry uses the current preference version and document fingerprin
  await waitFor(()=>expect(mocks.retryJobFeed).toHaveBeenCalledWith(2,'fp'));
  expect(await screen.findByText('Preparing your matches')).toBeVisible();
 });
+
+
+test('a busy initial request recovers automatically without asking the user to repeat their search',async()=>{
+ mocks.fetchJobFeed.mockRejectedValueOnce(Object.assign(Error('Job matching is busy. Please try again shortly.'),{status:503,payload:{code:'job_feed_busy'}})).mockResolvedValue(feed);
+ renderPage();expect(await screen.findByText('Job matching is busy. Please try again shortly.')).toBeVisible();
+ expect(await screen.findByRole('heading',{name:'QA Engineer'},{timeout:7000})).toBeVisible();
+ expect(mocks.fetchJobFeed).toHaveBeenCalledTimes(2);expect(mocks.saveJobPreferences).not.toHaveBeenCalled();expect(mocks.retryJobFeed).not.toHaveBeenCalled();
+},10000);

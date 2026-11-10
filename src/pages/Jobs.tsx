@@ -106,7 +106,8 @@ export default function Jobs() {
     enabled: enabled && !prefs.isError && !resumes.isError && available && !setupRequired && !dirty, retry: false,
     staleTime: saved?.roleMode === 'resume' ? 300000 : 0,
     refetchOnWindowFocus: saved?.roleMode !== 'resume',
-    refetchInterval: query => (query.state.error as {payload?:{code?:string}} | null)?.payload?.code === 'catalog_stale' || query.state.data?.catalog?.stale ? 60000
+    refetchInterval: query => (query.state.error as {payload?:{code?:string}} | null)?.payload?.code === 'job_feed_busy' ? 5000
+      : (query.state.error as {payload?:{code?:string}} | null)?.payload?.code === 'catalog_stale' || query.state.data?.catalog?.stale ? 60000
       : query.state.data?.generationPending ? query.state.error ? 60000 : 5000
       : query.state.data?.generation?.expiresAt ? Math.max(5000,Math.min(1800000,Date.parse(query.state.data.generation.expiresAt)-Date.now()+10))
       : query.state.data?.catalogPending ? 15000 : saved?.roleMode === 'resume' ? 1800000 : 300000 });
