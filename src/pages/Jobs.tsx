@@ -72,7 +72,7 @@ function PostingCard({ job }: { job: FeedJob }) {
     <details className="rounded-lg bg-muted/40 px-3 py-2">
       <summary className="cursor-pointer text-sm font-medium">Posting requirements and resume evidence</summary>
       <div className="mt-3 space-y-4 text-sm">{job.requirements.length ? job.requirements.map((r,i) => <div key={i}>
-          <p className="font-medium">{r.label} · {r.status === 'interview_assessment' ? 'Assessed during interviews' : r.status === 'satisfied' ? 'Evidence found' : job.decision === 'review' ? 'Needs confirmation' : 'Not established'}</p>
+          <p className="font-medium">{r.label} · {r.blocking ? 'Conflicts with the stated requirement' : r.status === 'interview_assessment' ? 'Assessed during interviews' : r.status === 'satisfied' ? 'Evidence found' : job.decision === 'review' ? 'Needs confirmation' : 'Not established'}</p>
         {r.quote && <blockquote className="mt-1 border-l-2 border-border pl-3 text-muted-foreground">{r.quote}</blockquote>}
         <p className="mt-1 text-muted-foreground">{r.status === 'interview_assessment' ? 'Discuss this during interviews; it is not a missing resume qualification.' : `Resume: ${r.evidence || 'No supporting passage was established.'}`}</p>
       </div>) : <p>The requirements could not be fully extracted. Read the employer’s posting.</p>}</div>

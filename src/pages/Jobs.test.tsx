@@ -29,6 +29,14 @@ beforeEach(() => {
 });
 afterEach(() => { vi.clearAllMocks(); });
 
+test('a present graduation date can be an explicit blocker rather than missing evidence',async()=>{
+ mocks.fetchJobFeed.mockResolvedValue({...feed,counts:{recent:0,review:0,older:0,excluded:1},review:[],excluded:[{...row,decision:'excluded',exclusionKind:'requirement_blocker',requirements:[{label:'Graduation within twelve months',quote:'Graduation within twelve months required.',status:'unclear',blocking:true,evidence:'B.S. expected 2028.'}]}]});
+ renderPage();await userEvent.click(await screen.findByRole('button',{name:'Excluded (1)'}));
+ await userEvent.click(screen.getByText('Posting requirements and resume evidence'));
+ expect(screen.getByText(/Graduation within twelve months · Conflicts with the stated requirement/)).toBeVisible();
+ expect(screen.getByText('Resume: B.S. expected 2028.')).toBeVisible();
+});
+
 test('confirmed applications have their own section and possible duplicates remain reviewable',async()=>{
  mocks.fetchJobFeed.mockResolvedValue({...feed,counts:{recent:1,review:1,older:0,excluded:0},recent:[{...row,key:'already',decision:'supported',title:'Already submitted QA role'}],eligibleCandidates:[{...row,key:'already',decision:'supported',title:'Already submitted QA role'},row]});
  mocks.fetchJobApplicationStatuses.mockResolvedValue({status:'available',checkedAt:'2026-10-24',matches:[{key:'already',state:'confirmed',applicationId:'7',appliedAt:'2026-10-20',status:'applied'},{key:row.key,state:'possible'}]});

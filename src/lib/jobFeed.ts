@@ -19,7 +19,7 @@ export type FeedJob = {
   window: 'recent' | 'older'; decision: 'supported' | 'review' | 'excluded'; availability: string;
   exclusionKind?: 'requirement_blocker' | 'insufficient_evidence' | 'specialty' | 'seniority' | null;
   interviewHistory?: {similarRoles:number;roleFamily:string};
-  reasons: string[]; requirements: { label: string; quote: string | null; status: string; evidence: string | null }[];
+  reasons: string[]; requirements: { label: string; quote: string | null; status: string; evidence: string | null; blocking?:boolean }[];
 };
 export type JobFeed = {
   eligibleCandidates?: FeedJob[];
