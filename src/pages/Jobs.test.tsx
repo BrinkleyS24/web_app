@@ -323,6 +323,7 @@ test('interview history explains eligible ordering without inventing a rate or s
   await screen.findByRole('button',{name:/Needs review \(\d+\)/});
   await userEvent.click(screen.getByRole('button',{name:'Needs review (1)'}));
   expect(screen.getByText('Your history marks 9 similar QA and testing roles as Interviewed or Offer.')).toBeVisible();
+  await userEvent.click(screen.getByText('Job sources and coverage',{exact:true}));
   expect(screen.getByText('Similar roles with tracked interview outcomes appear first.')).toBeVisible();
 });
 
