@@ -144,7 +144,7 @@ export default function Jobs() {
   const tab = selectedTab ?? (results?.counts.recent ? 'recent' : results?.counts.review ? 'review' : results?.counts.older ? 'older' : 'recent');
   useEffect(() => { if (results && (results.counts.recent || results.counts.review || results.counts.older)) setTab(current => current ?? (results.counts.recent ? 'recent' : results.counts.review ? 'review' : results.counts.older ? 'older' : 'recent')); }, [results]);
   const showForm = Boolean(setupRequired || !available || dirty || showPreferences);
-  return <DashboardLayout><div className="space-y-6" data-testid="jobs-page">
+  return <DashboardLayout><div className="space-y-4 sm:space-y-6" data-testid="jobs-page">
     <PageHeader eyebrow="Premium · Pilot" title="Jobs picked for you" description="Jobs matched to your resume and work preferences. No email connection needed." actions={enabled ? <button type="button" className={BUTTON.secondary} onClick={refresh} disabled={feed.isFetching || save.isPending || refreshRequest.isPending || dirty}><RefreshCw className="h-3.5 w-3.5" aria-hidden />Check for updates</button> : undefined} />
     {!enabled ? <EmptyState title="Jobs is included with Premium" body="Use a saved resume and your own location preferences to search the pilot inventory." action={<Link to="/upgrade?source=web_jobs" className={BUTTON.primary}>Explore Premium</Link>} /> : <>
       {(prefs.isLoading || resumes.isLoading) && <LoadingRows />}
