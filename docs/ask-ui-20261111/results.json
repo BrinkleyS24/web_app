@@ -3,7 +3,7 @@
   "assessment": {
     "grade": "A",
     "scope": "Engineer UI review of standalone Ask page on the documented local workflows; no deployed-release or human-study certification",
-    "deployed": false
+    "deployed": true
   },
   "sourceHashes": {
     "frontend/web/src/components/AskApplendium.tsx": "c2f16ca5ac3307bbfa225eb330f88979262858cd1f52b49b563c4a981741588d",
@@ -234,8 +234,8 @@
     "No independent human study or complete accessibility certification",
     "No authenticated Gmail-thread opening",
     "No universal AI-answer accuracy claim",
-    "Older Dashboard embedded presentation deferred",
-    "Production deployment and post-deployment smoke validation pending"
+    "Older Dashboard embedded presentation deferred"
   ],
-  "backendCommit": "e97b125a639eb902518ca33d0962481513a53d42"
+  "backendCommit": "e97b125a639eb902518ca33d0962481513a53d42",
+  "releaseReceipt": "release.json"
 }

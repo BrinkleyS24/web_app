@@ -1,0 +1,113 @@
+{
+  "backend": {
+    "revision": "applendium-backend-ask-e97b125",
+    "previousServing": [
+      [
+        "applendium-backend-jobs-3eff247",
+        100
+      ]
+    ],
+    "requested": true,
+    "confirmed": true
+  },
+  "frontend": {
+    "deploy": "6af4edec058fdbad0c17836d",
+    "previousDeploy": "6af4a33df5f828b5fdcff203",
+    "confirmed": true,
+    "locked": true,
+    "source": "1caa4cbefa6ab0c68bbdb5a237d069bddde0a364"
+  },
+  "image": "gcr.io/project-644ce3ec-f5b0-43c3-8f3/applendium-backend-ask@sha256:737be543d84d6da086974e9fd5e2e6134fdf0dee4309c23e8632f7e1efe9272c",
+  "servingChecks": {
+    "passed": true,
+    "mode": "production",
+    "frontend": "1caa4cbefa6ab0c68bbdb5a237d069bddde0a364",
+    "backend": "e97b125a639eb902518ca33d0962481513a53d42",
+    "api": "https://applendium-backend-277330820484.us-central1.run.app",
+    "webAssets": "Actual published web assets",
+    "browserNetwork": true,
+    "normalFirebaseAuth": true,
+    "devAuthBypass": false,
+    "simulatedExtensionBridge": true,
+    "sourceWrites": false,
+    "health": 200,
+    "anonymousAsk": 401,
+    "fullList": 218,
+    "knownEmailSources": 214,
+    "providerStatus": 200,
+    "checks": [
+      {
+        "width": 1440,
+        "overflow": false,
+        "initialRows": 5
+      },
+      {
+        "width": 390,
+        "overflow": false,
+        "initialRows": 5
+      },
+      {
+        "width": 320,
+        "overflow": false,
+        "initialRows": 5
+      }
+    ],
+    "errors": [],
+    "requests": [
+      {
+        "path": "/api/send",
+        "status": 200,
+        "method": "POST"
+      },
+      {
+        "path": "/api/activity",
+        "status": 200,
+        "method": "POST"
+      },
+      {
+        "path": "/api/user",
+        "status": 200,
+        "method": "POST"
+      },
+      {
+        "path": "/api/emails/sync-status",
+        "status": 200,
+        "method": "GET"
+      },
+      {
+        "path": "/api/ask",
+        "status": 200,
+        "method": "POST"
+      },
+      {
+        "path": "/api/suggestions/strategy-alerts",
+        "status": 200,
+        "method": "GET"
+      },
+      {
+        "path": "/api/suggestions/queue",
+        "status": 200,
+        "method": "GET"
+      },
+      {
+        "path": "/api/ask",
+        "status": 200,
+        "method": "POST"
+      }
+    ],
+    "blocked": [
+      {
+        "path": "/api/send",
+        "method": "POST"
+      },
+      {
+        "path": "/api/activity",
+        "method": "POST"
+      }
+    ]
+  },
+  "publicAssetsByteVerified": true,
+  "jobsWorkerAndDispatcherChanged": false,
+  "schemaChanges": false,
+  "unrelatedLocalChangesShipped": false
+}
