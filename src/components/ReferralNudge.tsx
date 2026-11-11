@@ -16,10 +16,10 @@ export function ReferralNudge({ company }: ReferralNudgeProps) {
         <Users className="h-4 w-4 shrink-0 mt-0.5 text-accent" aria-hidden="true" />
         <div>
           <p className="text-xs font-semibold text-foreground leading-snug">
-            Referred candidates clear screening far more often than cold applies.
+            Want to learn more about this team?
           </p>
           <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-            Before you apply, it&apos;s worth finding a warm intro at {name}.
+            Consider asking someone at {name} about the role and its expectations.
           </p>
           <a
             href={href}

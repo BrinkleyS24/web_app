@@ -7,7 +7,7 @@ describe("ReferralNudge", () => {
     const { container } = render(<ReferralNudge company="Acme" />);
 
     expect(container.textContent).toContain(
-      "Referred candidates clear screening far more often than cold applies.",
+      "Want to learn more about this team?",
     );
 
     const link = container.querySelector("a");
@@ -16,6 +16,7 @@ describe("ReferralNudge", () => {
 
     // Must never contain a percentage — no fabricated odds.
     expect(container.textContent).not.toMatch(/%/);
+    expect(container.textContent).not.toMatch(/clear screening|far more often|better odds/i);
   });
 
   test("renders nothing when company is null", () => {
