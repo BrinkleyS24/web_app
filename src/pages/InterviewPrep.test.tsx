@@ -25,8 +25,8 @@ async function build(){await userEvent.click(screen.getByRole("button",{name:"Bu
 test("the default resume is preselected and named; a thin invitation with no posting builds nothing",async()=>{setup();await screen.findByText("Example Health · Receptionist");await waitFor(()=>expect(screen.getByLabelText("Resume for this interview")).toHaveValue(variantId));expect(screen.getByTestId("prep-resume-why")).toHaveTextContent("Picked: your default resume");expect(screen.getByTestId("prep-basis")).toHaveTextContent("The invitation is too short to practice from");expect(screen.getByRole("button",{name:"Build my practice"})).toBeDisabled();expect(screen.getByText(/Date and time are unconfirmed/)).toBeInTheDocument();expect(mocks.build).not.toHaveBeenCalled();});
 test("build carries the exact task, invitation version, posting and selected resume",async()=>{setup();await fill();await build();expect(mocks.build).toHaveBeenCalledWith({logicalKey,dedupeKey,sourceVersion:source.sourceVersion,variantId,jobDescription:posting,focusAreas:[quote]},{signal:expect.any(AbortSignal)});expect(screen.getByText(pack.disclosure)).toBeInTheDocument();await userEvent.click(screen.getByText("Possible examples from your selected resume"));expect(screen.getByText(pack.practice[0].possibleExamples[0])).toBeInTheDocument();});
 test("inputs, pack and rehearsal notes survive navigation without silently rebuilding",async()=>{const page=setup();await fill();await build();await userEvent.type(screen.getByLabelText("What I did"),"I confirmed each appointment and updated the records.");page.unmount();setup(page.client);expect(await screen.findByLabelText("What I did")).toHaveValue("I confirmed each appointment and updated the records.");expect(screen.getByLabelText("Posting for this role")).toHaveValue(posting);expect(mocks.build).toHaveBeenCalledTimes(1);});
-test("rebuilding cannot discard written notes without explicit reset acknowledgement",async()=>{setup();await fill();await build();await userEvent.type(screen.getByLabelText("Situation"),"A busy clinic morning.");const rebuild=screen.getByRole("button",{name:"Rebuild practice"});expect(rebuild).toBeDisabled();await userEvent.click(screen.getByLabelText(/I understand rebuilding replaces/));expect(rebuild).toBeEnabled();await userEvent.click(rebuild);await waitFor(()=>expect(screen.getByLabelText("Situation")).toHaveValue(""));});
-test("new invitation fingerprint makes old practice unavailable for copying while retaining notes",async()=>{setup();await fill();await build();await userEvent.type(screen.getByLabelText("What I did"),"My actual contribution.");mocks.source.mockResolvedValue({...source,sourceVersion:"d".repeat(64)});await userEvent.click(screen.getByRole("button",{name:"Check for invitation changes"}));expect(await screen.findByRole("alert")).toHaveTextContent(/earlier invitation/);expect(screen.getByRole("button",{name:"Copy practice notes"})).toBeDisabled();expect(screen.getByLabelText("What I did")).toHaveValue("My actual contribution.");});
+test("rebuilding cannot discard written notes without explicit reset acknowledgement",async()=>{setup();await fill();await build();await userEvent.type(screen.getByLabelText("Situation"),"A busy clinic morning.");await userEvent.click(screen.getByText("Review source, change setup or enable tab recovery"));const rebuild=screen.getByRole("button",{name:"Rebuild practice"});expect(rebuild).toBeDisabled();await userEvent.click(screen.getByLabelText(/I understand rebuilding replaces/));expect(rebuild).toBeEnabled();await userEvent.click(rebuild);await waitFor(()=>expect(screen.getByLabelText("Situation")).toHaveValue(""));});
+test("new invitation fingerprint makes old practice unavailable for copying while retaining notes",async()=>{setup();await fill();await build();await userEvent.type(screen.getByLabelText("What I did"),"My actual contribution.");mocks.source.mockResolvedValue({...source,sourceVersion:"d".repeat(64)});await userEvent.click(screen.getByText("Review source, change setup or enable tab recovery"));await userEvent.click(screen.getByRole("button",{name:"Check for invitation changes"}));expect(await screen.findByRole("alert")).toHaveTextContent(/earlier invitation/);expect(screen.getByRole("button",{name:"Copy practice notes"})).toBeDisabled();expect(screen.getByLabelText("What I did")).toHaveValue("My actual contribution.");});
 test("source outage preserves inputs and blocks practice until verified",async()=>{mocks.source.mockRejectedValue(new Error("Interview source unavailable."));setup();expect(await screen.findByRole("alert")).toHaveTextContent("Interview source unavailable.");await userEvent.type(screen.getByLabelText("Posting for this role"),posting);await userEvent.click(screen.getByRole("button",{name:"Reload interview source"}));expect(screen.getByLabelText("Posting for this role")).toHaveValue(posting);expect(screen.getByRole("button",{name:"Build my practice"})).toBeDisabled();});
 test("failed generation retains inputs and never claims practice exists",async()=>{mocks.build.mockRejectedValue(new Error("The invitation changed."));setup();await fill();await userEvent.click(screen.getByRole("button",{name:"Build my practice"}));expect(await screen.findByRole("alert")).toHaveTextContent("The invitation changed.");expect(screen.getByLabelText("Posting for this role")).toHaveValue(posting);expect(screen.queryByText("Walk through a real example.")).not.toBeInTheDocument();});
 test("late generation after leaving cannot cache a pack",async()=>{let finish:(value:unknown)=>void;mocks.build.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));const page=setup();await fill();await userEvent.click(screen.getByRole("button",{name:"Build my practice"}));await waitFor(()=>expect(mocks.build).toHaveBeenCalled());page.unmount();finish!(pack);await new Promise(resolve=>setTimeout(resolve,0));const cache=page.client.getQueryData<Record<string,{pack?:unknown}>>(["outreach-draft-session","owner","interview-prep"]);expect(cache?.[`${logicalKey}:${dedupeKey}`]?.pack).toBeUndefined();});
@@ -35,10 +35,10 @@ test("copy uses the user's actual notes; clipboard failure keeps them editable",
 test("missing action keys do not request any interview source or resume data",async()=>{setup(undefined,"/interview-prep");expect(await screen.findByText("No live interviews right now")).toBeInTheDocument();expect(mocks.source).not.toHaveBeenCalled();expect(mocks.variants).not.toHaveBeenCalled();});
 // /interview-prep dead-ended at "Open an interview task from Next Actions" (persona review, 2026-10-14).
 const recent=new Date(Date.now()-3*86_400_000).toISOString();
-const interviewEmail=(over:Record<string,unknown>)=>({id:"e1",thread_id:"t-q",category:"Interviewed",company_name:"Quillstone Learning",position:"Curriculum Developer",date:recent,applicationId:"app-q",...over});
+const interviewEmail=(over:Record<string,unknown>)=>({id:"101",thread_id:"t-q",category:"Interviewed",company_name:"Quillstone Learning",position:"Curriculum Developer",date:recent,applicationId:"app-q",...over});
 const prepAction={id:"prep-1",logicalKey,dedupeKey,primaryEntityId:"t-q",actionType:"prep_interview",actionCategory:"preparation",intent:"PREP_INTERVIEW",intentLabel:"Interview prep",sourceLabel:"Interview",stageLabel:"Interview",routeHref:"/interview-prep",routeLabel:"Prepare",draftEligible:false,title:"Prepare for Quillstone",urgencyLevel:"high",confidenceLevel:"strong",status:"open",effectiveStatus:"open",queueSource:"followup",createdAt:recent,evidence:[],playbook:[],company:"Quillstone Learning",threadId:"t-q",applicationId:"app-q"};
 test("lists live interviews with a way into the matching prep task",async()=>{mocks.stored.mockResolvedValue({success:true,emails:[interviewEmail({})]});mocks.queue.mockResolvedValue({success:true,queue:{doToday:[prepAction],thisWeek:[],later:[],blocked:[]}});setup(undefined,"/interview-prep");const link=await screen.findByRole("link",{name:"Prepare for this interview"});expect(link).toHaveAttribute("href",`/interview-prep?action=${logicalKey}&version=${dedupeKey}`);expect(screen.getByText("Quillstone Learning · Curriculum Developer")).toBeInTheDocument();});
-test("a live interview without a task says its prep task will appear in Next Actions",async()=>{mocks.stored.mockResolvedValue({success:true,emails:[interviewEmail({})]});setup(undefined,"/interview-prep");expect(await screen.findByText("No current prep task was found for this interview.")).toBeInTheDocument();});
+test("a live interview without a task opens its exact invitation",async()=>{mocks.stored.mockResolvedValue({success:true,emails:[interviewEmail({})]});setup(undefined,"/interview-prep");expect(await screen.findByRole("link",{name:"Prepare for this interview"})).toHaveAttribute("href","/interview-prep?email=101");});
 test("a malformed prep queue stays unavailable, retains interview evidence and can retry",async()=>{
  mocks.stored.mockResolvedValue({success:true,emails:[interviewEmail({})]});
  mocks.queue.mockResolvedValue({success:true,queue:{doToday:[{id:"broken-action"}],thisWeek:[],later:[],blocked:[]}});
@@ -46,7 +46,7 @@ test("a malformed prep queue stays unavailable, retains interview evidence and c
  expect(await screen.findByText("Your prep tasks could not be checked")).toBeVisible();
  expect(screen.getByText("Quillstone Learning · Curriculum Developer")).toBeVisible();
  expect(screen.queryByText("No current prep task was found for this interview.")).not.toBeInTheDocument();
- expect(screen.queryByRole("link",{name:"Prepare for this interview"})).not.toBeInTheDocument();
+ expect(screen.getByRole("link",{name:"Prepare for this interview"})).toHaveAttribute("href","/interview-prep?email=101");
  mocks.queue.mockResolvedValue({success:true,queue:{doToday:[prepAction],thisWeek:[],later:[],blocked:[]}});
  await userEvent.click(screen.getByRole("button",{name:"Try again"}));
  expect(await screen.findByRole("link",{name:"Prepare for this interview"})).toHaveAttribute("href",`/interview-prep?action=${logicalKey}&version=${dedupeKey}`);
@@ -66,14 +66,14 @@ test.each([{},[],{doToday:[],thisWeek:[],later:[]}])("missing prep-queue buckets
  expect(await screen.findByText("Your prep tasks could not be checked")).toBeVisible();
  expect(screen.queryByText("No current prep task was found for this interview.")).not.toBeInTheDocument();
 });
-test("a failed refresh with prior task data cannot keep an actionable stale prep link",async()=>{
+test("a failed task refresh replaces the stale task link with an exact invitation link",async()=>{
  mocks.stored.mockResolvedValue({success:true,emails:[interviewEmail({})]});
  mocks.queue.mockResolvedValue({success:true,queue:{doToday:[prepAction],thisWeek:[],later:[],blocked:[]}});
  const page=setup(undefined,"/interview-prep");await screen.findByRole("link",{name:"Prepare for this interview"});
  mocks.queue.mockRejectedValue(new Error("Fictional refresh outage"));
  await page.client.refetchQueries({queryKey:["interview-prep","queue","owner"]});
  expect(await screen.findByText("Your prep tasks could not be checked")).toBeVisible();
- expect(screen.queryByRole("link",{name:"Prepare for this interview"})).not.toBeInTheDocument();
+ expect(screen.getByRole("link",{name:"Prepare for this interview"})).toHaveAttribute("href","/interview-prep?email=101");
  expect(screen.queryByText("No current prep task was found for this interview.")).not.toBeInTheDocument();
 });
 test("a failed load shows an error with retry, not 'no interviews'",async()=>{mocks.stored.mockRejectedValue(Object.assign(new Error("Too many requests"),{status:429}));setup(undefined,"/interview-prep");expect(await screen.findByText("Your interviews did not load")).toBeInTheDocument();expect(screen.queryByText("No live interviews right now")).not.toBeInTheDocument();expect(screen.getByRole("button",{name:"Try again"})).toBeInTheDocument();});
@@ -103,7 +103,7 @@ test("an exact confirmed submission wins over the default without inferring a ch
 
 test("opting into tab recovery restores notes with a fresh query cache after a reload",async()=>{
   const page=setup();await fill();await build();
-  await userEvent.click(screen.getByLabelText(/Keep a recovery copy/));
+  await userEvent.click(screen.getByText("Review source, change setup or enable tab recovery"));await userEvent.click(screen.getByLabelText(/Keep a recovery copy/));
   await userEvent.type(screen.getByLabelText("What I did"),"Recover this fictional rehearsal note.");
   page.unmount();setup();
   expect(await screen.findByLabelText("What I did")).toHaveValue("Recover this fictional rehearsal note.");
@@ -137,7 +137,7 @@ test("an edited saved resume makes older practice non-copyable while keeping not
 test("storage quota failure preserves notes and never claims they are recoverable",async()=>{
   setup();await fill();await build();await userEvent.type(screen.getByLabelText("What I did"),"Do not lose this note.");
   const storage=vi.spyOn(Storage.prototype,"setItem").mockImplementation(()=>{throw new DOMException("Full","QuotaExceededError");});
-  try{await userEvent.click(screen.getByLabelText(/Keep a recovery copy/));expect(await screen.findByRole("alert")).toHaveTextContent("tab copy could not be saved");expect(screen.getByLabelText("What I did")).toHaveValue("Do not lose this note.");expect(screen.getByLabelText(/Keep a recovery copy/)).not.toBeChecked();}
+  try{await userEvent.click(screen.getByText("Review source, change setup or enable tab recovery"));await userEvent.click(screen.getByLabelText(/Keep a recovery copy/));expect(await screen.findByRole("alert")).toHaveTextContent("tab copy could not be saved");expect(screen.getByLabelText("What I did")).toHaveValue("Do not lose this note.");expect(screen.getByLabelText(/Keep a recovery copy/)).not.toBeChecked();}
   finally{storage.mockRestore();}
 });
 
@@ -155,4 +155,47 @@ test("the interview list counts calendar days like Next Actions, including a lat
   const clock=vi.spyOn(Date,"now").mockReturnValue(morning.getTime());
   try{mocks.stored.mockResolvedValue({success:true,emails:[interviewEmail({date:yesterday.toISOString()})]});setup(undefined,"/interview-prep");expect(await screen.findByText("Last email yesterday")).toBeInTheDocument();}
   finally{clock.mockRestore();}
+});
+
+const generalSource={kind:"general",sourceVersion:"a".repeat(64),company:"",role:"",threadId:null,schedule:null,excerpts:[],resumeSubmission:{status:"unknown"}};
+test("general practice with no resumes gives a usable setup action and never builds",async()=>{
+  mocks.source.mockResolvedValue(generalSource);mocks.variants.mockResolvedValue({success:true,variants:[]});setup(undefined,"/interview-prep?practice=general");
+  expect(await screen.findByText("Add a readable resume before building your practice.")).toBeVisible();
+  expect(screen.getByRole("link",{name:"Manage resumes"})).toHaveAttribute("href","/resumes");expect(screen.getByRole("button",{name:"Build my practice"})).toBeDisabled();expect(mocks.build).not.toHaveBeenCalled();
+});
+test("general practice builds from a posting with no fabricated invitation or task",async()=>{
+  mocks.source.mockResolvedValue(generalSource);setup(undefined,"/interview-prep?practice=general");
+  await waitFor(()=>expect(screen.getByLabelText("Resume for this practice")).toHaveValue(variantId));
+  expect(screen.getByText(/No invitation is connected/)).toBeVisible();expect(screen.queryByRole("link",{name:/messages in Gmail/})).toBeNull();
+  fireEvent.change(screen.getByLabelText("Posting for this role"),{target:{value:posting}});
+  fireEvent.change(screen.getByLabelText("Responsibilities or requirements to practice"),{target:{value:quote}});
+  await build();expect(mocks.build.mock.calls[0][0]).toEqual({mode:"general",sourceVersion:generalSource.sourceVersion,variantId,jobDescription:posting,focusAreas:[quote]});
+  expect(mocks.stored).not.toHaveBeenCalled();expect(mocks.queue).not.toHaveBeenCalled();
+});
+test("a fully unbound canonical task uses the general workspace without losing its task identity",async()=>{
+  mocks.source.mockResolvedValue({...generalSource,logicalKey,dedupeKey});setup();
+  await screen.findByText(/No invitation is connected/);expect(screen.getByLabelText("Resume for this practice")).toBeInTheDocument();
+  expect(mocks.source.mock.calls[0][0]).toEqual({logicalKey,dedupeKey});
+});
+test("general practice remains reachable during an inbox outage",async()=>{
+  mocks.stored.mockRejectedValue(new Error("Inbox unavailable"));setup(undefined,"/interview-prep");
+  await screen.findByText("Your interviews did not load");expect(screen.getByRole("link",{name:"Practice for a role"})).toHaveAttribute("href","/interview-prep?practice=general");
+});
+test("direct invitation selection loads without requesting the queue",async()=>{
+  mocks.source.mockResolvedValue({...source,kind:"invitation",emailId:"101",logicalKey:undefined,dedupeKey:undefined});setup(undefined,"/interview-prep?email=101");
+  await screen.findByText("Example Health · Receptionist");expect(mocks.source.mock.calls[0][0]).toEqual({emailId:"101"});expect(mocks.queue).not.toHaveBeenCalled();
+});
+test("topic navigation retains every answer and exports hidden topics and eligibility notes",async()=>{
+  const eligibility={...pack.practice[0],id:"eligibility",quote:"Active nursing licence required before starting.",kind:"eligibility",question:"Explain your current credential status."};
+  mocks.build.mockResolvedValue({...pack,practice:[...pack.practice,eligibility]});setup();await fill();await build();
+  await userEvent.type(screen.getByLabelText("What I did"),"My first truthful example.");
+  await userEvent.click(screen.getByRole("button",{name:"Practice topic 2"}));expect(screen.queryByLabelText("What I did")).toBeNull();
+  await userEvent.type(screen.getByLabelText("My current status"),"Credential pending; not held.");
+  await userEvent.click(screen.getByRole("button",{name:"Practice topic 1"}));expect(screen.getByLabelText("What I did")).toHaveValue("My first truthful example.");
+  const writeText=vi.fn().mockResolvedValue(undefined);Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText}});
+  await userEvent.click(screen.getByRole("button",{name:"Copy practice notes"}));expect(writeText).toHaveBeenCalledWith(expect.stringContaining("Credential pending; not held."));expect(writeText).toHaveBeenCalledWith(expect.stringContaining("My first truthful example."));
+});
+test("the build binds the current saved resume version",async()=>{
+  mocks.variants.mockResolvedValue({success:true,variants:[{id:variantId,name:"Front desk",isDefault:true,contentVersion:"b".repeat(64)}]});setup();await fill();await build();
+  expect(mocks.build.mock.calls[0][0].expectedResumeVersion).toBe("b".repeat(64));
 });

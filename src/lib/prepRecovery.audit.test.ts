@@ -4,6 +4,11 @@ import {loadPrepInterviewEmails} from "./interviewPrep";
 const key="0123456789abcdef:fedcba9876543210";
 const sessions={[key]:{...emptyPrepSession,posting:"Private fictional posting",notes:{"example:Situation":"Fictional work example"}}};
 beforeEach(()=>{sessionStorage.clear();vi.restoreAllMocks();});
+
+test("general and direct invitation drafts recover independently without inventing a task",()=>{
+  const drafts={general:{...emptyPrepSession,posting:"General practice posting"},"email:101":{...emptyPrepSession,posting:"Invitation practice posting"},...sessions};
+  savePrepDrafts("owner",drafts);expect(loadPrepDrafts("owner").sessions).toEqual(drafts);
+});
 test("explicit tab copies restore only the same owner, expire, and clear on account change",()=>{
   const now=Date.now();expect(loadPrepDrafts("owner",now).remember).toBe(false);
   savePrepDrafts("owner",sessions,now);expect(loadPrepDrafts("owner",now+100).sessions).toEqual(sessions);

@@ -67,12 +67,13 @@ function ResolvedActionContext({ logicalKey, dedupeKey, ownerId, interview }: { 
       : <>
         <h2 className="text-base font-semibold">{action.title}</h2>
         {[action.company, action.roleTitle].filter(Boolean).length > 0 && <p className="text-sm">{[action.company, action.roleTitle].filter(Boolean).join(" · ")}</p>}
-        <p className="text-sm text-muted-foreground">{action.whyNow || action.targetOutcome}</p>
-        {action.evidence?.length ? <details><summary className="cursor-pointer text-sm font-medium">Evidence for this task</summary>
-          <ul className="mt-2 space-y-1 text-sm text-muted-foreground">{action.evidence.slice(0, 4).map((line, index) => <li key={index}>{line}</li>)}</ul>
+        {!interview?<p className="text-sm text-muted-foreground">{action.whyNow || action.targetOutcome}</p>:null}
+        {interview||action.evidence?.length ? <details><summary className="cursor-pointer text-sm font-medium">{interview?"Why this practice task":"Evidence for this task"}</summary>
+          {interview?<p className="mt-2 text-sm text-muted-foreground">{action.whyNow || action.targetOutcome}</p>:null}
+          {action.evidence?.length?<ul className="mt-2 space-y-1 text-sm text-muted-foreground">{action.evidence.slice(0, 4).map((line, index) => <li key={index}>{line}</li>)}</ul>:null}
         </details> : null}
         {status !== "open" ? <p className="text-sm">This task is {status || "unavailable"}. Review it in Next Actions.</p>
-          : <p className="text-sm text-muted-foreground">When you finish this task, mark it done here. This records your progress, not an application submission.</p>}
+          : <p className="text-sm text-muted-foreground">{interview?"Mark done records practice progress, not an application submission.":"When you finish this task, mark it done here. This records your progress, not an application submission."}</p>}
       </>}
     {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
     <div className="flex flex-wrap gap-2">

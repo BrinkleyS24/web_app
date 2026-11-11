@@ -9,6 +9,10 @@ const email = (over: Record<string, unknown>) => ({
 });
 
 describe("deriveLiveInterviews (Dashboard's 'Still interviewing' rule)", () => {
+  test("a same-name general task never replaces the exact invitation anchor",()=>{
+    const task={actionType:"prep_interview",company:"Quillstone",roleTitle:"Curriculum Developer"} as never;
+    expect(deriveLiveInterviews([email({id:"101",category:"Interviewed"})],[task],now)[0]).toMatchObject({sourceEmailId:"101",prepTask:null});
+  });
   test("numeric API application IDs and string task IDs identify the same application",()=>{
     const task={id:"numeric",actionType:"prep_interview",applicationId:"9918",threadId:"t1",company:"Quillstone",roleTitle:"Curriculum Developer"} as never;
     expect(deriveLiveInterviews([email({category:"Interviewed",applicationId:9918})],[task],now)[0]).toMatchObject({applicationId:"9918",prepTask:task});

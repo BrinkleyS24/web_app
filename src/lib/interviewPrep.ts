@@ -2,8 +2,12 @@ import { apiFetch } from "@/lib/api";
 import type { ActionContext } from "./actionWorkspace";
 import type { StoredEmail, StoredEmailsResponse } from "./emails";
 
-export type InterviewSource = ActionContext & {
-  sourceVersion: string; company: string; role: string; threadId: string;
+export type PrepSelection = ActionContext | { emailId: string } | { mode: "general" };
+export const prepSelectionKey = (selection: PrepSelection) => "logicalKey" in selection ? `${selection.logicalKey}:${selection.dedupeKey}` : "emailId" in selection ? `email:${selection.emailId}` : "general";
+export const validPrepEmailId = (value: string | null): value is string => Boolean(value && /^[1-9]\d{0,15}$/.test(value) && Number.isSafeInteger(Number(value)));
+export type InterviewSource = Partial<ActionContext> & {
+  kind?: "invitation" | "general"; emailId?: string;
+  sourceVersion: string; company: string; role: string; threadId: string | null;
   applicationId?: string | null;
   phase?: "invited" | "completed" | "unknown";
   resumeSubmission?: {status:"confirmed"|"unknown"|"unavailable"|"unusable";variantId?:string;name?:string};
@@ -14,13 +18,18 @@ export type PracticePack = {
   sourceVersion: string; resume: { id: string; name: string; version: string }; postingVersion: string; disclosure: string;
   practice: { id: string; quote: string; kind: "eligibility" | "experience"; question: string; guidance: string; askInterviewer: string; possibleExamples: string[] }[];
 };
-export type PracticeInput = ActionContext & { sourceVersion: string; variantId: string; jobDescription: string; focusAreas: string[] };
+export type PracticeInput = PrepSelection & { sourceVersion: string; variantId: string; expectedResumeVersion?: string; jobDescription: string; focusAreas: string[] };
 
-export async function fetchInterviewSource(keys: ActionContext, options: {signal?:AbortSignal} = {}): Promise<InterviewSource> {
+export async function fetchInterviewSource(keys: PrepSelection, options: {signal?:AbortSignal} = {}): Promise<InterviewSource> {
   const response = await apiFetch(`/api/suggestions/interview-prep/context?${new URLSearchParams(keys)}`, { method:"GET",signal:options.signal }) as {success:boolean;source:InterviewSource};
   if (!response?.success || !/^[a-f0-9]{64}$/.test(response.source?.sourceVersion || "") || !Array.isArray(response.source?.excerpts)
-    || response.source.logicalKey !== keys.logicalKey || response.source.dedupeKey !== keys.dedupeKey
-    || typeof response.source.threadId!=="string" || !response.source.threadId || typeof response.source.company!=="string" || typeof response.source.role!=="string"
+    || ("logicalKey" in keys && (response.source.logicalKey !== keys.logicalKey || response.source.dedupeKey !== keys.dedupeKey))
+    || ("emailId" in keys && (response.source.kind === "general" || response.source.emailId !== keys.emailId))
+    || ("mode" in keys && response.source.kind !== "general")
+    || (response.source.kind != null && !["invitation", "general"].includes(response.source.kind))
+    || (response.source.kind === "general" ? response.source.threadId !== null || response.source.schedule !== null || response.source.excerpts.length !== 0
+      : typeof response.source.threadId!=="string" || !response.source.threadId)
+    || typeof response.source.company!=="string" || typeof response.source.role!=="string"
     || response.source.excerpts.length>4 || !response.source.excerpts.every(e=>e&&[e.id,e.subject,e.sender,e.text].every(v=>typeof v==="string"))
     || response.source.schedule!=null&&(!response.source.schedule||typeof response.source.schedule.startAt!=="string"||typeof response.source.schedule.hasTime!=="boolean")
     || response.source.phase!=null&&!['invited','completed','unknown'].includes(response.source.phase)) throw new Error("Your interview source was not confirmed. Reload it.");
@@ -37,7 +46,7 @@ export function isPracticePack(pack:unknown):pack is PracticePack {
 export async function buildInterviewPractice(input: PracticeInput, options: {signal?:AbortSignal} = {}): Promise<PracticePack> {
   const response = await apiFetch("/api/suggestions/interview-prep/practice", { method:"POST",body:JSON.stringify(input),timeoutMs:20_000,signal:options.signal }) as {success:boolean;pack:PracticePack};
   if (!response?.success || !isPracticePack(response.pack) || response.pack.sourceVersion !== input.sourceVersion
-    || response.pack.resume.id !== input.variantId || response.pack.practice.length!==input.focusAreas.length
+    || response.pack.resume.id !== input.variantId || input.expectedResumeVersion!=null&&response.pack.resume.version!==input.expectedResumeVersion || response.pack.practice.length!==input.focusAreas.length
     || response.pack.practice.some((item,i)=>squash(item.quote)!==squash(input.focusAreas[i]))) throw new Error("Your practice was not confirmed. Try again.");
   return response.pack;
 }

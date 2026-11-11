@@ -4,7 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, test, vi } from 'vitest';
 import { ActionWorkspaceBanner } from './ActionWorkspaceBanner';
 
-const mocks=vi.hoisted(()=>({ complete:vi.fn() }));
+const mocks=vi.hoisted(()=>({ complete:vi.fn(), source:vi.fn() }));
+vi.mock('@/lib/interviewPrep',()=>({fetchInterviewSource:(...args:unknown[])=>mocks.source(...args)}));
 vi.mock('@/lib/AuthContext.jsx',()=>({ useAuth:()=>({user:{uid:'original-owner'}}) }));
 vi.mock('@/lib/emails',()=>({ completeQueueAction:mocks.complete }));
 vi.mock('@/hooks/useWorkspaceAction',()=>({useWorkspaceAction:()=>({
@@ -13,6 +14,13 @@ vi.mock('@/hooks/useWorkspaceAction',()=>({useWorkspaceAction:()=>({
 })}));
 
 describe('task completion while leaving a linked workspace',()=>{
+  test('an interview task without evidence still renders its compact context safely',async()=>{
+    mocks.source.mockResolvedValue({kind:'general',sourceVersion:'a'.repeat(64)});
+    const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+    render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/interview-prep?action=aaaaaaaaaaaaaaaa&version=bbbbbbbbbbbbbbbb']}><ActionWorkspaceBanner /></MemoryRouter></QueryClientProvider>);
+    expect(screen.getByText('Why this practice task')).toBeVisible();expect(screen.getByText(/Mark done records practice progress/)).toBeVisible();
+    await waitFor(()=>expect(screen.getByRole('button',{name:"I've finished this task"})).toBeEnabled());client.clear();
+  });
   test('a confirmed late save refreshes its owner after unmount without touching another account',async()=>{
     let resolveSave:(value:unknown)=>void;
     mocks.complete.mockImplementation(()=>new Promise(resolve=>{resolveSave=resolve;}));

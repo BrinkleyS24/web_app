@@ -1,0 +1,66 @@
+{
+  "passed": true,
+  "environment": "local production build, current owned account reads, actual local Prep router with Firebase/Premium authentication",
+  "anonymousContext": 401,
+  "oldCanonicalTaskStatus": 409,
+  "newCanonicalTaskStatus": 200,
+  "newCanonicalTaskKind": "general",
+  "practiceStatus": 200,
+  "topics": 3,
+  "source": "Posting text supplied by the user; not a current listing verification",
+  "coreDataWrites": false,
+  "taskCompletionNotPerformed": true,
+  "notes": "Temporary browser memory, clipboard stub; no external AI provider",
+  "normalFirebaseAuth": true,
+  "simulatedExtensionBridge": true,
+  "devAuthBypass": false,
+  "liveInvitationUnavailable": true,
+  "geometry": [
+    {
+      "width": 1440,
+      "overflow": false,
+      "visibleNoteFields": 4,
+      "practiceHeadingTop": 493.25,
+      "documentHeight": 1458
+    },
+    {
+      "width": 390,
+      "overflow": false,
+      "visibleNoteFields": 4,
+      "practiceHeadingTop": 596.125,
+      "documentHeight": 2368
+    },
+    {
+      "width": 320,
+      "overflow": false,
+      "visibleNoteFields": 4,
+      "practiceHeadingTop": 596.125,
+      "documentHeight": 2524
+    }
+  ],
+  "errors": [],
+  "uiGrade": "A for reviewed local workflows",
+  "productionDeployed": false,
+  "fullWebSuite": {
+    "passed": 744,
+    "suites": 147
+  },
+  "finalFocusedChecks": {
+    "contractAndBannerPassed": 6,
+    "emptyResumePassed": 1,
+    "countsOverlap": true
+  },
+  "backend": {
+    "passed": 154,
+    "files": 6,
+    "prepSubset": 67
+  },
+  "browserFixtures": {
+    "mainScenariosPassed": 9,
+    "newCustomerPassed": 1
+  },
+  "typecheck": true,
+  "productionBuild": true,
+  "productionGuard": true,
+  "tokenCheck": true
+}

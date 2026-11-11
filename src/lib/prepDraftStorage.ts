@@ -20,7 +20,7 @@ export function loadPrepDrafts(owner:string,now=Date.now()):{sessions:Record<str
     if(!raw)return {sessions:{},remember:false,error:""};
     const saved=raw.length<=MAX_CHARS?JSON.parse(raw):null;
     if(!record(saved)||saved.owner!==owner||saved.version!==1||typeof saved.expiresAt!=="number"||saved.expiresAt<=now||saved.expiresAt>now+PREP_DRAFT_TTL
-      ||!record(saved.sessions)||Object.keys(saved.sessions).length>10||!Object.entries(saved.sessions).every(([k,v])=>/^[a-f0-9]{16}:[a-f0-9]{16}$/.test(k)&&validSession(v))){
+      ||!record(saved.sessions)||Object.keys(saved.sessions).length>10||!Object.entries(saved.sessions).every(([k,v])=>/^(?:[a-f0-9]{16}:[a-f0-9]{16}|general|email:[1-9]\d{0,15})$/.test(k)&&validSession(v))){
       sessionStorage.removeItem(PREFIX+owner);return {sessions:{},remember:false,error:"The saved tab copy expired or could not be restored. Start fresh or use notes you downloaded."};
     }
     return {sessions:saved.sessions as Record<string,PrepSession>,remember:true,error:""};

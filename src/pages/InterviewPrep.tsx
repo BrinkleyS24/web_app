@@ -7,10 +7,10 @@ import { BUTTON } from "@/components/premium/tone";
 import { useAuth } from "@/lib/AuthContext.jsx";
 import { fetchRankedActionQueue, fetchResumeVariants, fetchStoredEmails, type ResumeVariant } from "@/lib/emails";
 import { ActionWorkspaceBanner } from "@/components/premium/ActionWorkspaceBanner";
-import { actionToolHref, readActionContext, type ActionContext } from "@/lib/actionWorkspace";
+import { actionToolHref, readActionContext } from "@/lib/actionWorkspace";
 import { deriveLiveInterviews, LIVE_INTERVIEW_WINDOW_DAYS, type LiveInterview } from "@/lib/liveInterviews";
 import { buildQueueItemsFromRankedQueue, daysSince } from "@/lib/premiumTaskQueue";
-import { buildInterviewPractice, fetchInterviewSource, interviewHasPassed, invitationPracticeInput, invitationScheduleLabel, loadPrepInterviewEmails, pickFocusAreas, splitFocusAreas, type InterviewSource } from "@/lib/interviewPrep";
+import { buildInterviewPractice, fetchInterviewSource, interviewHasPassed, invitationPracticeInput, invitationScheduleLabel, loadPrepInterviewEmails, pickFocusAreas, splitFocusAreas, prepSelectionKey, validPrepEmailId, type PrepSelection, type InterviewSource } from "@/lib/interviewPrep";
 import { usePrepDraftSessions } from "@/hooks/usePrepDraftSessions";
 import { emptyPrepSession, type PrepSession } from "@/lib/prepDraftStorage";
 import { friendlyErrorMessage } from "@/lib/apiErrors";
@@ -21,10 +21,12 @@ const noteFields = ["Situation", "My responsibility", "What I did", "Result and 
 
 export default function InterviewPrep() {
   const {user}=useAuth(); const location=useLocation(); const context=readActionContext(location.search);
+  const params=new URLSearchParams(location.search), emailId=params.get("email");
+  const selection:PrepSelection|null=context || (validPrepEmailId(emailId)?{emailId}:params.get("practice")==="general"?{mode:"general"}:null);
   // The task card follows the page heading (designer review, 2026-10-15: it rendered above the H1).
-  return <DashboardLayout actionBannerInPage><PageHeader eyebrow="Practice with your evidence" title="Interview preparation" description="Prepare truthful examples for this role, with the invitation and the resume you choose in view." />
+  return <DashboardLayout actionBannerInPage><PageHeader eyebrow="Practice with your evidence" title="Interview preparation" description="Prepare for an interview or practice for a role, using your resume and the employer’s own words." />
     <ActionWorkspaceBanner />
-    {context && user ? <PrepWorkspace key={`${user.uid}:${context.logicalKey}:${context.dedupeKey}`} context={context} owner={user.uid} />
+    {selection && user ? <PrepWorkspace key={`${user.uid}:${prepSelectionKey(selection)}`} context={selection} owner={user.uid} />
       : user ? <LiveInterviewList key={user.uid} owner={user.uid} /> : null}
   </DashboardLayout>;
 }
@@ -47,13 +49,12 @@ function LiveInterviewList({owner}:{owner:string}) {
   const queueItems=queue.isError?[]:queue.data||[];
   const interviews=emails.data?deriveLiveInterviews(emails.data,queueItems):[];
 
-  if(emails.isPending)return <Panel className="mt-5" title="Your live interviews"><LoadingRows rows={2}/></Panel>;
-  if(emails.isError)return <div className="mt-5"><ErrorState stackRetryOnMobile title="Your interviews did not load" detail="Your data is safe. Try again in a moment." onRetry={()=>void emails.refetch()}/></div>;
-  return <Panel className="mt-5" title="Your live interviews" description={`Interviews with no decision yet and an email in the last ${LIVE_INTERVIEW_WINDOW_DAYS} days.`}>
+  return <div className="mt-5 space-y-5"><Panel title="What would you like to prepare?" description="Choose an interview below, or practice for a role before you have an invitation."><Link to="/interview-prep?practice=general" className={`${BUTTON.primary} min-h-11`}>Practice for a role</Link><p className="mt-2 text-sm text-muted-foreground">Use a saved resume and the posting. No interview or Gmail connection is needed.</p></Panel>
+    {emails.isPending?<Panel title="Your live interviews"><LoadingRows rows={2}/></Panel>:emails.isError?<ErrorState stackRetryOnMobile title="Your interviews did not load" detail="Try again to see your invitations. You can still practice for a role above." onRetry={()=>void emails.refetch()}/>:<Panel title="Your live interviews" description={`Interviews with no decision yet and an email in the last ${LIVE_INTERVIEW_WINDOW_DAYS} days.`}>
     {queue.isError?<div className="mb-3"><ErrorState stackRetryOnMobile title="Your prep tasks could not be checked" detail="The interviews below are correct. Try again to see which have a prep task." onRetry={()=>void queue.refetch()}/></div>:null}
     {interviews.length===0?<EmptyState compact title="No live interviews right now" body="When an interview invitation reaches your inbox, it appears here with a way to prepare." action={<Link to="/next-actions" className={BUTTON.secondary}>Open Next Actions</Link>}/>
       :<ul className="divide-y divide-border" data-testid="live-interviews">{interviews.map(item=><LiveInterviewRow key={item.key} item={item} queueLoading={queue.isPending} queueUnavailable={queue.isError}/>)}</ul>}
-  </Panel>;
+  </Panel>}</div>;
 }
 
 function LiveInterviewRow({item,queueLoading,queueUnavailable}:{item:LiveInterview;queueLoading:boolean;queueUnavailable:boolean}) {
@@ -61,14 +62,16 @@ function LiveInterviewRow({item,queueLoading,queueUnavailable}:{item:LiveIntervi
   const days=daysSince(item.lastEmailAt.toISOString())??0;
   const when=days===0?"today":days===1?"yesterday":`${days} days ago`;
   const task=item.prepTask;
-  const href=task?actionToolHref("/interview-prep",task):null;
+  const directHref=validPrepEmailId(item.sourceEmailId||null)?`/interview-prep?email=${encodeURIComponent(item.sourceEmailId!)}`:null;
+  const taskHref=task?actionToolHref("/interview-prep",task):null;
+  const href=taskHref&&taskHref!=="/interview-prep"?taskHref:directHref;
   const hasWorkspace=Boolean(href&&href!=="/interview-prep");
   return <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
     <div className="min-w-0">
       <p className="text-[15px] font-semibold text-foreground">{title}</p>
       <p className="text-[13px] text-muted-foreground">Last email {when}</p>
     </div>
-    {task?(hasWorkspace?<Link to={href!} className={BUTTON.primary}>Prepare for this interview</Link>:<Link to="/next-actions" className={BUTTON.secondary}>Open the prep task</Link>)
+    {hasWorkspace?<Link to={href!} className={BUTTON.primary}>Prepare for this interview</Link>:task?<Link to="/next-actions" className={BUTTON.secondary}>Open the prep task</Link>
       :queueLoading?<p className="text-[13px] text-muted-foreground">Checking for a prep task…</p>
       :queueUnavailable?<p className="text-[13px] text-muted-foreground">Prep task unavailable until it can be checked.</p>
       :<div className="text-[13px] sm:max-w-[30ch] sm:text-right"><p className="text-muted-foreground">No current prep task was found for this interview.</p><Link to="/next-actions" className="font-medium underline">Review Next Actions</Link></div>}
@@ -96,20 +99,22 @@ function effectiveInputs(session: Pick<PrepSession,"posting"|"focus">, invitatio
   return { from: "posting" as const, posting: session.posting, focusAreas: typedFocus.length ? typedFocus : pickFocusAreas(session.posting) };
 }
 
-function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
-  const sessionKey=`${context.logicalKey}:${context.dedupeKey}`;
+function PrepWorkspace({context,owner}:{context:PrepSelection;owner:string}) {
+  const sessionKey=prepSelectionKey(context);
   const [sessions,updateSessions,recovery]=usePrepDraftSessions(owner);
   const session=sessions[sessionKey]||empty;
   const sessionRef=useRef(session); sessionRef.current=session;
   const update=(patch:Partial<PrepSession>)=>{copyRevision.current++;setCopied("");updateSessions(current=>({...current,[sessionKey]:{...(current[sessionKey]||empty),...patch}}));};
   const [pending,setPending]=useState(false),[error,setError]=useState(""),[resetAllowed,setResetAllowed]=useState(false),[copied,setCopied]=useState("");
   const [focusNewPack,setFocusNewPack]=useState(false);
+  const [topicIndex,setTopicIndex]=useState(0);
   const practiceRegion=useRef<HTMLDivElement>(null);
   const guard=useRef(false),mounted=useRef(true),controller=useRef<AbortController|undefined>(undefined);
   const copyRevision=useRef(0);
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;controller.current?.abort();copyRevision.current++;};},[]);
   useEffect(()=>{if(focusNewPack&&session.pack){practiceRegion.current?.focus({preventScroll:true});practiceRegion.current?.scrollIntoView?.({block:"start",behavior:"smooth"});setFocusNewPack(false);}},[focusNewPack,session.pack]);
-  const source=useQuery({queryKey:["interview-prep","source",owner,context.logicalKey,context.dedupeKey],queryFn:({signal})=>fetchInterviewSource(context,{signal}),retry:false,staleTime:0,gcTime:0});
+  const source=useQuery({queryKey:"logicalKey" in context?["interview-prep","source",owner,context.logicalKey,context.dedupeKey]:["interview-prep","source",owner,sessionKey],queryFn:({signal})=>fetchInterviewSource(context,{signal}),retry:false,staleTime:0,gcTime:0});
+  const general=source.data?.kind==="general" || "mode" in context;
   const latestSource=useRef(source.data?.sourceVersion);latestSource.current=source.isError?undefined:source.data?.sourceVersion;
   const resumes=useQuery({queryKey:["interview-prep","resumes",owner],queryFn:async()=>{
     const response=await fetchResumeVariants();if(!response.success||!Array.isArray(response.variants))throw new Error("Your resumes could not be loaded.");return response.variants;
@@ -152,9 +157,9 @@ function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
     const sourceVersion=source.data!.sourceVersion;
     controller.current=new AbortController();
     try {
-      const pack=await buildInterviewPractice({...context,sourceVersion:source.data!.sourceVersion,variantId:snapshot.variantId,jobDescription:inputs.posting,focusAreas:inputs.focusAreas},{signal:controller.current.signal});
+      const pack=await buildInterviewPractice({...context,sourceVersion:source.data!.sourceVersion,variantId:snapshot.variantId,...(currentResume?.contentVersion?{expectedResumeVersion:currentResume.contentVersion}:{}),jobDescription:inputs.posting,focusAreas:inputs.focusAreas},{signal:controller.current.signal});
       if(!mounted.current||latestSource.current!==sourceVersion||JSON.stringify([sessionRef.current.variantId,sessionRef.current.posting,sessionRef.current.focus])!==signature)return;
-      update({pack,builtInput:signature,builtFrom:inputs.from,notes:{}});setResetAllowed(false);setFocusNewPack(true);
+      update({pack,builtInput:signature,builtFrom:inputs.from,notes:{}});setTopicIndex(0);setResetAllowed(false);setFocusNewPack(true);
     }catch(err){if(mounted.current)setError(friendlyErrorMessage(err,"Practice could not be built. Your inputs remain here."));}
     finally{guard.current=false;if(mounted.current)setPending(false);}
   }
@@ -171,53 +176,57 @@ function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
     try{await navigator.clipboard.writeText(text);if(mounted.current&&copyRevision.current===revision)setCopied("Practice notes copied. This did not mark the task done.");}
     catch{if(mounted.current&&copyRevision.current===revision)setCopied("Copy failed. Your notes are still here; select and copy them manually.");}
   }
-  return <div className="mt-5 min-w-0 space-y-5 [overflow-wrap:anywhere]">
-    <Panel title={passed?"1. Your interview":"1. Confirm the invitation"}>
-      {source.isPending?<p role="status">Loading your interview source…</p>:source.isError?<><p role="alert">{friendlyErrorMessage(source.error,"Your interview source could not be loaded.")}</p><button className={BUTTON.secondary} onClick={()=>void source.refetch()}>Reload interview source</button></>:source.data?<>
+  const sourcePanel=<Panel title={general?"1. Practice for a role":passed?"1. Your interview":"1. Confirm the invitation"}>
+      {source.isPending?<p role="status">Loading your practice source…</p>:source.isError?<><p role="alert">{friendlyErrorMessage(source.error,"Your interview source could not be loaded.")}</p><div className="mt-3 flex flex-wrap gap-2"><button className={BUTTON.secondary} onClick={()=>void source.refetch()}>Reload interview source</button><Link to="/interview-prep?practice=general" className={BUTTON.secondary}>Practice for a role instead</Link></div></>:source.data?.kind==="general"?<p className="text-sm text-muted-foreground">No invitation is connected to this practice. Add a posting and rehearse examples from your resume. This does not confirm an interview, a submitted resume or job eligibility.</p>:source.data?<>
         <p className="font-semibold">{[source.data.company,source.data.role].filter(Boolean).join(" · ")||"Interview conversation"}</p>
         <p className="mt-2 text-sm">{invitationScheduleLabel(source.data.schedule)}</p>
         {/* A past interview is not "confirmed" (2026-10-15); prep then serves the next conversation. */}
         {source.data.phase==="completed"?<p className="mt-2 text-sm text-muted-foreground">The latest interview message describes a completed conversation. Use this practice for reflection or a confirmed next round; check Gmail for newer instructions.</p>:passed
           ?<p className="mt-2 text-sm text-muted-foreground">The scheduled time has passed. This does not confirm that the interview took place. Check the latest invitation before preparing for another round.</p>
           :<p className="mt-2 text-sm text-muted-foreground">Confirm the time, timezone, interview format and contact in the original invitation. These may change.</p>}
-        <a href={`https://mail.google.com/mail/u/0/#all/${encodeURIComponent(source.data.threadId)}`} target="_blank" rel="noreferrer" className={`${BUTTON.secondary} mt-3`}>Read interview messages in Gmail</a>
+        <a href={`https://mail.google.com/mail/u/0/#all/${encodeURIComponent(source.data.threadId!)}`} target="_blank" rel="noreferrer" className={`${BUTTON.secondary} mt-3`}>Read interview messages in Gmail</a>
         <details className="mt-3"><summary className="cursor-pointer text-sm font-medium">Invitation evidence</summary>{source.data.excerpts.map(email=><div key={email.id} className="mt-3 border-t border-border pt-3 text-sm"><p className="font-medium">{email.subject}</p><p className="text-muted-foreground">Message sender: {email.sender}</p><p className="mt-2 whitespace-pre-wrap">{email.text||"No readable message text; check Gmail."}</p>{email.threadId?<a href={`https://mail.google.com/mail/u/0/#all/${encodeURIComponent(email.threadId)}`} target="_blank" rel="noreferrer" className="mt-2 inline-block font-medium underline">Open this message in Gmail</a>:null}</div>)}</details>
         <button className={`${BUTTON.secondary} mt-3`} disabled={source.isFetching||pending} onClick={()=>void checkForChanges()}>Check for invitation changes</button>
         {checkNote?<p role="status" className="mt-2 text-sm">{checkNote}</p>:null}
       </>:null}
-    </Panel>
-    {/* One tap on a phone (mobile + teacher review, 2026-10-15): the resume is preselected and, with
-        no posting pasted, practice comes from the invitation's own words. The posting is optional. */}
-    <Panel title="2. Build your practice" description="Starts from the invitation and your resume. Add the posting if you want practice on its duties.">
-      <div className="space-y-4">
+    </Panel>;
+  const setupPanel=<Panel title="2. Build your practice" description={general?"Start with your resume and the role you want to prepare for.":"Starts from the invitation and your resume. Add the posting if you want practice on its duties."}>
+      <details open={!session.pack||inputsChanged||packStale}>
+      <summary className="cursor-pointer text-sm font-medium">{session.pack?`Practice setup · ${session.pack.resume.name}`:"Choose your resume and source"}</summary>
+      <div className="mt-4 space-y-4">
         {resumes.isError?<><p role="alert">Your resumes could not be loaded. Your other inputs remain here.</p><button className={BUTTON.secondary} onClick={()=>void resumes.refetch()}>Reload resumes</button></>:null}
-        <div><label htmlFor="prep-resume" className="block text-sm font-medium">Resume for this interview</label><select id="prep-resume" className={`${field} mt-1`} disabled={pending||resumes.isPending} value={session.variantId} onChange={e=>{update({variantId:e.target.value});setResetAllowed(false);}}><option value="">Choose a resume</option>{resumes.data?.map(resume=><option key={resume.id} value={resume.id}>{resume.name}</option>)}</select>
+        <div><label htmlFor="prep-resume" className="block text-sm font-medium">{general?"Resume for this practice":"Resume for this interview"}</label><select id="prep-resume" className={`${field} mt-1`} disabled={pending||resumes.isPending} value={session.variantId} onChange={e=>{update({variantId:e.target.value});setResetAllowed(false);}}><option value="">Choose a resume</option>{resumes.data?.map(resume=><option key={resume.id} value={resume.id}>{resume.name}</option>)}</select>
           {suggested&&session.variantId===suggested.id?<p className="mt-1 text-xs text-muted-foreground" data-testid="prep-resume-why">Picked: {suggested.why}. Change it if you will discuss another version.</p>:null}
           {source.data?.resumeSubmission?.status==="unavailable"?<p className="mt-2 text-sm" role="status">Your submitted resume could not be checked. The practice choice below does not establish what you sent.</p>:source.data?.resumeSubmission?.status==="unusable"?<p className="mt-2 text-sm">The confirmed submitted document is no longer available as an unchanged active version. Choose a practice resume, or review its history in Resumes.</p>:null}
           {resumes.data?.length===0?<p className="mt-2 text-sm">Add a readable resume before building your practice.</p>:null}<Link to="/resumes" className="mt-2 inline-block text-sm font-medium underline">Manage resumes</Link></div>
-        <p className="text-sm" data-testid="prep-basis">{source.isPending||source.isFetching||resumes.isFetching?"Checking the latest invitation and resume before building or reusing practice.":source.isError||resumes.isError?"Some practice evidence is unavailable. Your existing inputs and notes remain here.":effective.from==="invitation"
+        <p className="text-sm" data-testid="prep-basis">{source.isPending||source.isFetching||resumes.isFetching?"Checking the latest source and resume before building or reusing practice.":source.isError||resumes.isError?"Some practice evidence is unavailable. Your existing inputs and notes remain here.":general&&!session.posting?"Add the employer’s posting to choose what to rehearse.":effective.from==="invitation"
           ?(invitation?`Practice comes from the invitation's own words, starting with “${invitation.focusAreas[0]}”`:"The invitation is too short to practice from. Add the posting below.")
           :"Practice comes from the posting you added."}</p>
-        {session.pack&&hasNotes?<label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={resetAllowed} disabled={pending} onChange={e=>setResetAllowed(e.target.checked)}/>I understand rebuilding replaces this practice and clears its rehearsal notes.</label>:null}
         {sourceAvailable&&!resumes.isPending&&inputIssue?<p id="prep-input-help" role="status" className="text-sm text-warning">{inputIssue}</p>:null}
-        <button className={BUTTON.primary} aria-describedby={inputIssue?"prep-input-help":undefined} disabled={pending||!inputValid||!sourceAvailable||Boolean(session.pack&&hasNotes&&!resetAllowed)} onClick={()=>void generate()}>{pending?"Building practice…":session.pack?"Rebuild practice":"Build my practice"}</button>
         {error?<p role="alert" className="text-sm text-destructive">{error}</p>:null}
         <details className="rounded-xl border border-border p-3" open={Boolean(session.posting||session.focus)||(!invitation&&Boolean(source.data))}>
           <summary className="cursor-pointer text-sm font-medium">{invitation?"Add the posting (optional)":"Add the posting to build practice"}</summary>
           <div className="mt-3 space-y-4">
-            <div><label htmlFor="prep-posting" className="block text-sm font-medium">Posting for this role</label><textarea id="prep-posting" className={`${field} mt-1 min-h-[160px]`} maxLength={25000} disabled={pending} value={session.posting} onChange={e=>{update({posting:e.target.value});setResetAllowed(false);}}/><p className="mt-1 text-xs text-muted-foreground">Paste the posting text, at least 100 characters. Confirm it is the role above.</p></div>
+            <div><label htmlFor="prep-posting" className="block text-sm font-medium">Posting for this role</label><textarea id="prep-posting" className={`${field} mt-1 min-h-[160px]`} maxLength={25000} disabled={pending} value={session.posting} onChange={e=>{update({posting:e.target.value});setResetAllowed(false);}}/><p className="mt-1 text-xs text-muted-foreground">{general?"Paste the employer’s posting, at least 100 characters.":"Paste the posting text, at least 100 characters. Confirm it is the role above."}</p></div>
             <div><label htmlFor="prep-focus" className="block text-sm font-medium">Responsibilities or requirements to practice</label><textarea id="prep-focus" className={`${field} mt-1 min-h-[100px]`} maxLength={3004} disabled={pending} value={session.focus} onChange={e=>{update({focus:e.target.value});setResetAllowed(false);}}/><p className="mt-1 text-xs text-muted-foreground">Optional. Copy 1–5 exact lines from the posting, one per line. Leave it empty and we pick up to 3 duties from it.</p></div>
           </div>
         </details>
+      </div></details>
+      {session.pack&&hasNotes?<label className="mt-4 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={resetAllowed} disabled={pending} onChange={e=>setResetAllowed(e.target.checked)}/>I understand rebuilding replaces this practice and clears its rehearsal notes.</label>:null}
+      <button className={`${BUTTON.primary} mt-4 min-h-11`} aria-describedby={inputIssue?"prep-input-help":undefined} disabled={pending||!inputValid||!sourceAvailable||Boolean(session.pack&&hasNotes&&!resetAllowed)} onClick={()=>void generate()}>{pending?"Building practice…":session.pack?"Rebuild practice":"Build my practice"}</button>
+      <div className="mt-4 border-t border-border pt-4">
         <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={recovery.remember} onChange={event=>recovery.toggle(event.target.checked)}/>Keep a recovery copy of my posting, practice and notes in this tab on this device.</label>
-        <p className="text-xs text-muted-foreground">Optional, for a private device. The browser copy can survive reloads and expires after 30 minutes without edits. Signing out or switching accounts clears it in this tab. It does not sync to other devices. Download notes to keep a lasting copy.</p>
+        <p className="mt-1 text-xs text-muted-foreground">Private device only. Expires after 30 minutes without edits; clears on sign-out. Download notes to keep them.</p>
         {recovery.storageError?<p role="alert" className="text-sm text-warning">{recovery.storageError}</p>:recovery.remember?<p role="status" className="text-xs">Recovery copy saved in this tab.</p>:<p className="text-xs text-muted-foreground">Recovery is off. Reloading or signing out clears notes that you have not copied or downloaded.</p>}
       </div>
-    </Panel>
-    {session.pack?<div ref={practiceRegion} role="region" aria-label="Interview practice" tabIndex={-1} className="scroll-mt-20 outline-none"><Panel title="3. Rehearse your answers" description={`Using ${session.pack.resume.name}`}>
+    </Panel>;
+  const practicePanel=session.pack?<div ref={practiceRegion} role="region" aria-label="Interview practice" tabIndex={-1} className="scroll-mt-20 outline-none"><Panel title="Rehearse your answers" description={`Using ${session.pack.resume.name}`}>
       {packStale||inputsChanged?<p role="alert" className="mb-3 text-sm text-warning">This practice uses an earlier invitation or earlier inputs. Review the source and rebuild before using it.</p>:null}
+      {!sourceAvailable?<p role="status" className="mb-3 text-sm text-warning">{source.isError||resumes.isError?"Your current source or resume could not be verified. Notes remain editable and downloadable; review the source below before reusing practice.":"Checking your current source and resume. Notes remain editable."}</p>:null}
       <p className="mb-4 text-sm text-muted-foreground">{session.pack.disclosure}</p>
-      <div className="space-y-5">{session.pack.practice.map(item=><section key={item.id} className="min-w-0 rounded-xl border border-border p-4">
+      <nav aria-label="Practice topics" className="mb-4 flex flex-wrap gap-2">{session.pack.practice.map((item,index)=><button key={item.id} type="button" aria-pressed={index===topicIndex} aria-label={`Practice topic ${index+1}`} onClick={()=>{setTopicIndex(index);setCopied("");}} className={`${index===topicIndex?BUTTON.primary:BUTTON.secondary} min-h-11`}>Topic {index+1}{Object.entries(session.notes).some(([key,value])=>key.startsWith(`${item.id}:`)&&value.trim())?" · Notes":""}</button>)}</nav>
+      <p className="mb-3 text-sm text-muted-foreground" role="status">Topic {topicIndex+1} of {session.pack.practice.length}. Your notes stay here when you switch topics.</p>
+      <div className="space-y-5">{session.pack.practice.slice(topicIndex,topicIndex+1).map(item=><section key={item.id} className="min-w-0 rounded-xl border border-border p-4">
         <p className="text-xs font-medium uppercase text-muted-foreground">{session.builtFrom==="invitation"?"From the invitation":"From your posting"}</p><blockquote className="mt-1 text-sm font-semibold">{item.quote}</blockquote>
         <p className="mt-3 font-medium">{item.question}</p><p className="mt-2 text-sm text-muted-foreground">{item.guidance}</p>
         <details className="mt-3"><summary className="cursor-pointer text-sm font-medium">Possible examples from your selected resume</summary>{item.possibleExamples.length?item.possibleExamples.map((text,index)=><blockquote key={index} className="mt-2 whitespace-pre-wrap text-sm">{text}</blockquote>):<p className="mt-2 text-sm">No closely worded example was found. That does not establish a skill gap. Choose a truthful example from your own experience.</p>}</details>
@@ -225,9 +234,16 @@ function PrepWorkspace({context,owner}:{context:ActionContext;owner:string}) {
         <p className="mt-3 text-sm"><span className="font-medium">A question to ask: </span>{item.askInterviewer}</p>
       </section>)}</div>
       <p className="mt-4 text-sm">Say each answer aloud once. Check that it explains your own contribution and uses only facts you can support.</p>
-      <button className={`${BUTTON.secondary} mt-3`} disabled={packStale||inputsChanged||!sourceAvailable} onClick={()=>void copyNotes()}>Copy practice notes</button>{copied?<p role="status" className="mt-2 text-sm">{copied}</p>:null}
-      <button className={`${BUTTON.secondary} mt-3 ml-2`} onClick={downloadNotes}>Download practice notes</button>
-      <p className="mt-3 text-xs text-muted-foreground">Building or editing practice does not mark the task done. Use the explicit task-completion button when you have finished.</p>
-    </Panel></div>:null}
+      <div className="mt-3 flex flex-wrap gap-2"><button className={BUTTON.secondary} disabled={packStale||inputsChanged||!sourceAvailable} onClick={()=>void copyNotes()}>Copy practice notes</button>
+      <button className={BUTTON.secondary} onClick={downloadNotes}>Download practice notes</button></div>{copied?<p role="status" className="mt-2 text-sm">{copied}</p>:null}
+      <p className="mt-3 text-xs text-muted-foreground">{recovery.remember&&!recovery.storageError?"A recovery copy is saved in this tab for 30 minutes without edits.":"Download your notes before leaving. Reloading clears notes unless you enable tab recovery below."}</p>
+      <p className="mt-3 text-xs text-muted-foreground">{"logicalKey" in context?"Building or editing practice does not mark the task done. Use the explicit task-completion button when you have finished.":"Practice notes are for your rehearsal. They do not update application outcomes or confirm qualifications."}</p>
+    </Panel></div>:null;
+  return <div className="mt-5 min-w-0 space-y-5 [overflow-wrap:anywhere]">
+    <Link to="/interview-prep" className="inline-block text-sm font-medium underline">All interview preparation</Link>
+    {session.pack?<>{practicePanel}<details open={packStale||inputsChanged||source.isError||resumes.isError} className="rounded-2xl border border-border bg-card p-4">
+      <summary className="cursor-pointer text-sm font-medium">Review source, change setup or enable tab recovery</summary>
+      <div className="mt-4 space-y-5">{sourcePanel}{setupPanel}</div>
+    </details></>:<>{sourcePanel}{setupPanel}</>}
   </div>;
 }

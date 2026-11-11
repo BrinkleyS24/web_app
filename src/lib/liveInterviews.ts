@@ -24,6 +24,8 @@ export type LiveInterview = {
   lastEmailAt: Date;
   /** The prep task in Next Actions for this interview, when there is one. */
   prepTask: QueueItem | null;
+  /** An exact owned invitation anchor; no queued action is required to prepare it. */
+  sourceEmailId?: string;
 };
 
 const PREP_TYPES = new Set(["prep_interview", "prepare_interview"]);
@@ -51,14 +53,9 @@ function findPrepTask(interview: Omit<LiveInterview, "prepTask">, tasks: QueueIt
   if (byApplication) return byApplication;
   const byThread = tasks.find((task) => task.threadId && interview.threadIds.includes(task.threadId));
   if (byThread && !(interview.applicationId && byThread.applicationId && String(byThread.applicationId)!==interview.applicationId)) return byThread;
-  const company = norm(interview.company);
-  if (!company) return null;
-  const role = norm(interview.role);
-  if (!role) return null;
-  // Explicit identifiers outrank text. A unique employer name cannot erase a conflict.
-  const sameRole = tasks.filter((task) => norm(task.company) === company && norm(task.roleTitle) === role
-    && !(interview.applicationId && task.applicationId && String(task.applicationId)!==interview.applicationId));
-  return sameRole.length === 1 ? sameRole[0] : null;
+  // An employer/title resemblance never establishes task identity. When no
+  // exact task exists, preparation uses this invitation's owned email anchor.
+  return null;
 }
 
 export function deriveLiveInterviews(
@@ -98,6 +95,7 @@ export function deriveLiveInterviews(
       applicationId: applicationId == null ? null : String(applicationId),
       threadIds: Array.from(new Set(sorted.map((email) => email.thread_id).filter(Boolean) as string[])),
       lastEmailAt,
+      sourceEmailId: String(sorted[lastInterviewIndex].id),
     };
     live.push({ ...base, prepTask: findPrepTask(base, tasks) });
   }
