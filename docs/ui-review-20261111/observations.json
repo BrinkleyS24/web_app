@@ -1,0 +1,295 @@
+{
+  "capturedOn": "2026-11-11",
+  "frontendCommit": "ba197d499ce78c88d6e9bd37fb63ed5e91555a7f",
+  "frontendAssets": {
+    "scripts": [
+      "/assets/index-FpyeRjnC.js"
+    ],
+    "css": [
+      "/css2",
+      "/assets/index-BG9DXCfk.css"
+    ]
+  },
+  "method": "Live published web assets, existing authorized owner account, actual browser API responses, simulated extension authentication bridge; no core response fixtures. Telemetry and task impressions intercepted. Source-changing actions guarded. Heuristic UX review, not human usability-study scores.",
+  "baseline": [
+    {
+      "page": "dashboard",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "documentHeight": 2364,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 12,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "jobs",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "documentHeight": 919,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 9,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "next-actions",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "documentHeight": 2586,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 22,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "strategy-alerts",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "documentHeight": 1016,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 6,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "interview-prep",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "documentHeight": 900,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 8,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "apply-gate",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "documentHeight": 2700,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 8,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "resumes",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "documentHeight": 1197,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 10,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "ask",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "documentHeight": 900,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 5,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "settings",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "documentHeight": 1531,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 8,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "upgrade",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "documentHeight": 1286,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 5,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "dashboard",
+      "viewport": {
+        "width": 390,
+        "height": 900
+      },
+      "documentHeight": 4039,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 12,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "jobs",
+      "viewport": {
+        "width": 390,
+        "height": 900
+      },
+      "documentHeight": 1241,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 9,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "next-actions",
+      "viewport": {
+        "width": 390,
+        "height": 900
+      },
+      "documentHeight": 4765,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 22,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "strategy-alerts",
+      "viewport": {
+        "width": 390,
+        "height": 900
+      },
+      "documentHeight": 1431,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 6,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "interview-prep",
+      "viewport": {
+        "width": 390,
+        "height": 900
+      },
+      "documentHeight": 900,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 8,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "apply-gate",
+      "viewport": {
+        "width": 390,
+        "height": 900
+      },
+      "documentHeight": 3556,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 8,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "resumes",
+      "viewport": {
+        "width": 390,
+        "height": 900
+      },
+      "documentHeight": 1665,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 10,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "ask",
+      "viewport": {
+        "width": 390,
+        "height": 900
+      },
+      "documentHeight": 900,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 5,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "settings",
+      "viewport": {
+        "width": 390,
+        "height": 900
+      },
+      "documentHeight": 2399,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 8,
+      "responsesAtLeast400": 0
+    },
+    {
+      "page": "upgrade",
+      "viewport": {
+        "width": 390,
+        "height": 900
+      },
+      "documentHeight": 2163,
+      "horizontalOverflow": false,
+      "clientErrors": 0,
+      "apiResponses": 5,
+      "responsesAtLeast400": 0
+    }
+  ],
+  "interactionRuns": {
+    "interactions.json": {
+      "observations": 17,
+      "automationFailures": 0,
+      "actualFailedResponses": [
+        {
+          "path": "/api/suggestions/interview-prep/context",
+          "method": "GET",
+          "status": 409
+        },
+        {
+          "path": "/api/suggestions/interview-prep/context",
+          "method": "GET",
+          "status": 409
+        }
+      ]
+    },
+    "supplemental.json": {
+      "observations": 21,
+      "automationFailures": 0,
+      "actualFailedResponses": []
+    }
+  },
+  "measuredExamples": {
+    "askSuggestedQuestion": "Who has not replied in 2 weeks?",
+    "askReportedApplications": 218,
+    "askSourceCards": 50,
+    "askDesktopPageHeight": 11139,
+    "askMobilePageHeight": 19055
+  },
+  "limits": [
+    "One populated owner account, no new-customer seeded cohort",
+    "No full keyboard, screen-reader or contrast-conformance certification",
+    "No checkout, real payment, sends, application decisions, resume saving or destructive controls exercised",
+    "Live interview practice generation not exercised: no live interviews, promoted generic preparation task failed source validation",
+    "AI answer quality across intents not graded by this UI audit",
+    "Extension popup, admin tools and Google-popup onboarding not re-audited"
+  ],
+  "preparationHandoff": "See prep-handoff.json; source guard rejects an open promoted task with no thread/email/application. Fresh-link version matches. The offered reload repeats the rejection."
+}

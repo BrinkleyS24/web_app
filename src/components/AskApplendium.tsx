@@ -6,7 +6,9 @@ import { ArrowUp, ExternalLink, Loader2, Sparkles } from "lucide-react";
 import { ErrorState, ToneChip } from "@/components/premium/PremiumUI";
 import { WhyLine } from "@/components/premium/WhyLine";
 import { BUTTON, CARD, EYEBROW, TONES, type Tone } from "@/components/premium/tone";
-import { ASK_HANDOFF_ROUTES, ASK_MAX_QUESTION_CHARS, askAnswerLines, askApplendium, askListMarker, type AskNextStep, type AskResponse, type AskStage, type AskTotals } from "@/lib/ask";
+import { ASK_HANDOFF_ROUTES, ASK_MAX_QUESTION_CHARS, ASK_SUGGESTIONS, askApplendium, type AskNextStep, type AskResponse, type AskStage } from "@/lib/ask";
+import { AskAnswerText as AskAnswer, AskTotalsList } from "@/components/AskAnswerText";
+import { AskWorkspace } from "@/components/AskWorkspace";
 import { AskDraft } from "@/components/AskDraft";
 import { buildGmailThreadUrl } from "@/lib/premiumTaskQueue";
 import { STATUS_TONE } from "@/lib/statusTone";
@@ -21,12 +23,7 @@ import { useAuth } from "@/lib/AuthContext.jsx";
  */
 
 // Starting points, not a menu: each maps to a lookup the backend can answer exactly.
-export const ASK_SUGGESTIONS = [
-  "Who hasn't replied in 2 weeks?",
-  "What should I follow up on?",
-  "Any assessments waiting on me?",
-  "Why was I rejected?",
-];
+export { ASK_SUGGESTIONS } from "@/lib/ask";
 
 // Labels match the Dashboard's stage bar word for word.
 const STAGE_LOOK: Record<AskStage, { label: string; tone: Tone }> = {
@@ -59,63 +56,12 @@ function shortDate(isoDay: string | null | undefined) {
   return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-/**
- * The answer as plain lines, lists as lists (persona review, 2026-10-15: raw **markdown**, an
- * internal "interview_quiet" and a numbered list crammed into one paragraph). Never raw markdown.
- */
-function AskAnswer({ result }: { result: AskResponse }) {
-  const lines = askAnswerLines(result);
-  const blocks: Array<{ kind: "p"; text: string } | { kind: "ul" | "ol"; items: string[] }> = [];
-  for (const line of lines) {
-    const marker = askListMarker(line);
-    const last = blocks[blocks.length - 1];
-    if (!marker) blocks.push({ kind: "p", text: line });
-    else if (last && last.kind === (marker.ordered ? "ol" : "ul")) (last as { items: string[] }).items.push(marker.text);
-    else blocks.push({ kind: marker.ordered ? "ol" : "ul", items: [marker.text] });
-  }
-  return (
-    <div className="max-w-[72ch] space-y-2 text-[15px] leading-relaxed text-foreground" data-testid="ask-answer">
-      {blocks.map((block, index) =>
-        block.kind === "p" ? (
-          <p key={index}>{block.text}</p>
-        ) : block.kind === "ol" ? (
-          <ol key={index} className="list-decimal space-y-1 pl-5">{block.items.map((item, i) => <li key={i}>{item}</li>)}</ol>
-        ) : (
-          <ul key={index} className="list-disc space-y-1 pl-5">{block.items.map((item, i) => <li key={i}>{item}</li>)}</ul>
-        ),
-      )}
-    </div>
-  );
-}
-
-/** Code-computed totals, labelled like the Dashboard so "reached" (ever) and "in interviews" (now) differ. */
-function AskTotalsList({ totals }: { totals: AskTotals }) {
-  const rows: Array<[string, number]> = [
-    ["Tracked applications", totals.applications],
-    ["Open now", totals.open],
-    ["Reached an interview (ever)", totals.reachedInterview],
-    ["In interviews (now)", totals.inInterviewStage],
-    ["Offers", totals.offers],
-    ["Rejected", totals.rejected],
-  ];
-  return (
-    <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3" data-testid="ask-totals">
-      {rows.map(([label, value]) => (
-        <div key={label} className="rounded-lg bg-muted/50 px-3 py-2">
-          <dt className="text-[12px] text-muted-foreground">{label}</dt>
-          <dd className="text-[20px] font-semibold tabular-nums text-foreground">{value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-export function AskApplendium() {
+export function AskApplendium({ presentation = "embedded" }: { presentation?: "embedded" | "workspace" } = {}) {
   const { user } = useAuth();
-  return <AskForOwner key={user?.uid || "signed-out"} ownerId={user?.uid || null} />;
+  return <AskForOwner key={user?.uid || "signed-out"} ownerId={user?.uid || null} presentation={presentation} />;
 }
 
-function AskForOwner({ ownerId }: { ownerId: string | null }) {
+function AskForOwner({ ownerId, presentation }: { ownerId: string | null; presentation: "embedded" | "workspace" }) {
   const [question, setQuestion] = useState("");
   const [asked, setAsked] = useState<string | null>(null);
   const pending = useRef(false);
@@ -149,6 +95,12 @@ function AskForOwner({ ownerId }: { ownerId: string | null }) {
   const result = mutation.data;
   const since = shortDate(result?.basis?.earliestTrackedOn);
   const count = result?.basis?.applications;
+
+  if (presentation === "workspace") return <AskWorkspace
+    ownerId={ownerId} question={question} onQuestionChange={setQuestion}
+    onAsk={ask} asked={asked} pending={mutation.isPending} error={mutation.isError ? mutation.error : null}
+    result={!mutation.isPending && !mutation.isError ? result : undefined}
+  />;
 
   return (
     <section className={cn(CARD, "px-5 py-5 sm:px-6")} aria-labelledby="ask-applendium-title">

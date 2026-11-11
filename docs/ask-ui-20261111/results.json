@@ -1,0 +1,241 @@
+{
+  "recordedAt": "2026-11-11T21:42:38.467187+00:00",
+  "assessment": {
+    "grade": "A",
+    "scope": "Engineer UI review of standalone Ask page on the documented local workflows; no deployed-release or human-study certification",
+    "deployed": false
+  },
+  "sourceHashes": {
+    "frontend/web/src/components/AskApplendium.tsx": "c2f16ca5ac3307bbfa225eb330f88979262858cd1f52b49b563c4a981741588d",
+    "frontend/web/src/components/AskAnswerText.tsx": "5c791902dfcfcdbd813cb2d0f1a6378b0826a9a4de03c22909010a63a3c6b3b1",
+    "frontend/web/src/components/AskWorkspace.tsx": "43ec76493742838a2901e8dd168244672caf71a4121213a686a978a9550dcac0",
+    "frontend/web/src/lib/ask.ts": "6572eee3ef4d838a040843ddfba41d8a860e6eaac7a6a11d8bb1af350bcf66ce",
+    "frontend/web/src/lib/askResults.ts": "c56e74ec468bcc7d4fd18a28a3e7d932119e85685b71e586ff0638c6d444e1e0",
+    "frontend/web/src/lib/emails.ts": "715a6857ca41e4e77bd3930a27acb0d8024be5ed57c8610201bd1ee102d38508",
+    "frontend/web/src/pages/Ask.tsx": "af33d202054fdafc4ce2661b2a561a124d49a765f42b198e3a290c3a4143ec1d",
+    "backend/gmail-job-tracker-be/routes/askRoutes.js": "a784c6a24e4e36b4c55030ee311ed9009f4b9013c78b809145aae96cdaa57bc8",
+    "backend/gmail-job-tracker-be/services/askService.js": "769fb3c3c934385ef48fb4bb3c3f41f4baf7c67e9571cbeea89c3c6fff1b05b4"
+  },
+  "releaseAssets": [
+    {
+      "path": "/assets/index-5Bnnud8R.js",
+      "sha256": "add2d8da73632751d167c3709e85957298954b60ff5dc103d3b8f10e8ef4ca7d"
+    },
+    {
+      "path": "/assets/index-YyX3mOhy.css",
+      "sha256": "254131614106b729798647349cb3674dc4314439841768512a8fa744a58a6090"
+    }
+  ],
+  "releaseBuildFlags": {
+    "VITE_JOB_FEED_ENABLED": true,
+    "api": "existing production API"
+  },
+  "tests": {
+    "web": {
+      "passed": 729,
+      "failed": 0,
+      "files": 70
+    },
+    "askBackend": {
+      "passed": 260,
+      "failed": 0,
+      "files": 13
+    },
+    "browserFixtureScenariosPassed": 4,
+    "typecheck": true,
+    "productionEnvGuard": true,
+    "tokenParity": true,
+    "productionBuild": true,
+    "finalFocusedWorkspaceTests": 16,
+    "coverageNote": "The final focused suite includes additional cases added after the 729-test full run. These counts overlap."
+  },
+  "liveAndCompiledUi": [
+    {
+      "state": "empty-390",
+      "width": 390,
+      "height": 900,
+      "rows": 0,
+      "horizontalOverflow": false,
+      "summaryTop": null
+    },
+    {
+      "state": "older-api-390",
+      "width": 390,
+      "height": 1879,
+      "rows": 5,
+      "horizontalOverflow": false,
+      "summaryTop": 384
+    },
+    {
+      "type": "native_response",
+      "status": 200,
+      "answerKind": "list",
+      "listTotal": 218,
+      "sourceRows": 214,
+      "citations": 50,
+      "hasDraft": false,
+      "hasTotals": false
+    },
+    {
+      "state": "complete-list-1440",
+      "width": 1440,
+      "height": 1806,
+      "rows": 5,
+      "horizontalOverflow": false,
+      "summaryTop": 380
+    },
+    {
+      "state": "complete-list-390",
+      "width": 390,
+      "height": 2229,
+      "rows": 5,
+      "horizontalOverflow": false,
+      "summaryTop": 384
+    },
+    {
+      "state": "complete-list-320",
+      "width": 320,
+      "height": 2323,
+      "rows": 5,
+      "horizontalOverflow": false,
+      "summaryTop": 432
+    },
+    {
+      "state": "page-two-320",
+      "width": 320,
+      "height": 2346,
+      "rows": 5,
+      "horizontalOverflow": false,
+      "summaryTop": 432
+    },
+    {
+      "state": "no-filter-matches-320",
+      "width": 320,
+      "height": 1300,
+      "rows": 0,
+      "horizontalOverflow": false,
+      "summaryTop": 432
+    },
+    {
+      "state": "longest-first-1440",
+      "width": 1440,
+      "height": 1806,
+      "rows": 5,
+      "horizontalOverflow": false,
+      "summaryTop": 380
+    },
+    {
+      "type": "native_response",
+      "status": 200,
+      "citations": 8,
+      "hasDraft": false,
+      "hasTotals": false
+    },
+    {
+      "state": "followups-1440",
+      "width": 1440,
+      "height": 2134,
+      "rows": 5,
+      "horizontalOverflow": false,
+      "summaryTop": 380
+    },
+    {
+      "state": "followups-390",
+      "width": 390,
+      "height": 2385,
+      "rows": 5,
+      "horizontalOverflow": false,
+      "summaryTop": 384
+    },
+    {
+      "type": "native_response",
+      "status": 200,
+      "citations": 0,
+      "hasDraft": false,
+      "hasTotals": false
+    },
+    {
+      "state": "totals-390",
+      "width": 390,
+      "height": 900,
+      "rows": 0,
+      "horizontalOverflow": false,
+      "summaryTop": 384
+    },
+    {
+      "state": "dashboard-embedded-preserved",
+      "dedicatedWorkspace": 0,
+      "embeddedQuestion": 1
+    },
+    {
+      "state": "dashboard-preserved-390",
+      "width": 390,
+      "height": 4039,
+      "rows": 0,
+      "horizontalOverflow": false,
+      "summaryTop": null
+    }
+  ],
+  "finalRender": {
+    "mode": "Current compiled assets, frozen replay of real authorized owner API answers from this session; other account reads live. Not a new provider evaluation.",
+    "observations": [
+      {
+        "state": "final-complete-list-390",
+        "width": 390,
+        "height": 2229,
+        "rows": 5,
+        "horizontalOverflow": false,
+        "summaryTop": 384
+      },
+      {
+        "state": "final-complete-list-1440",
+        "width": 1440,
+        "height": 1806,
+        "rows": 5,
+        "horizontalOverflow": false,
+        "summaryTop": 380
+      },
+      {
+        "state": "final-followups-390",
+        "width": 390,
+        "height": 2385,
+        "rows": 5,
+        "horizontalOverflow": false,
+        "summaryTop": 384
+      }
+    ]
+  },
+  "localPreview": {
+    "passed": true,
+    "origin": "http://localhost:5173",
+    "compiledReviewBundle": true,
+    "actualProductionAccountReads": true,
+    "askBrowserTransportProxy": false,
+    "otherApiReads": "loopback reverse proxy to unchanged production service",
+    "devAuthBypass": false,
+    "simulatedExtensionBridge": true,
+    "accountWrites": false,
+    "apiStatus": 200,
+    "completeList": 218,
+    "sourceRows": 214,
+    "errors": [],
+    "failures": [],
+    "failedRequests": [],
+    "heading": [
+      "Ask Applendium"
+    ]
+  },
+  "baseline": {
+    "source": "../ui-review-20261111/observations.json",
+    "noReplyDesktopHeight": 11139,
+    "noReplyMobileHeight": 19055
+  },
+  "limitations": [
+    "No independent human study or complete accessibility certification",
+    "No authenticated Gmail-thread opening",
+    "No universal AI-answer accuracy claim",
+    "Older Dashboard embedded presentation deferred",
+    "Production deployment and post-deployment smoke validation pending"
+  ],
+  "backendCommit": "e97b125a639eb902518ca33d0962481513a53d42"
+}

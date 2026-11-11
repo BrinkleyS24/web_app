@@ -1520,7 +1520,7 @@ export type VariantStrategy = {
 export type ApplyGateQualificationAssessment = {
   version:number;decision:'supported'|'review'|'excluded'|'unavailable';exclusionKind?:string|null;reasons:string[];
   requirementCount?:number;requirementsTruncated?:boolean;
-  requirements:{label:string;quote:string|null;status:string;evidence:string|null;evidenceState?:string;source?:{quote:string;start:number;end:number}|null;evidenceSources?:{quote:string;start:number;end:number}[];components?:{id:string;status:string;evidenceSourceIndexes:number[]}[]}[];
+  requirements:{label:string;quote:string|null;status:string;evidence:string|null;evidenceState?:string;blocking?:boolean;source?:{quote:string;start:number;end:number}|null;evidenceSources?:{quote:string;start:number;end:number}[];components?:{id:string;status:string;evidenceSourceIndexes:number[]}[]}[];
 };
 export type ApplyGateResult = {
   qualificationAssessment?: ApplyGateQualificationAssessment;

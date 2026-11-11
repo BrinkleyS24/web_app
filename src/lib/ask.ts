@@ -1,5 +1,10 @@
 import { apiFetch } from "@/lib/api";
 
+export const ASK_SUGGESTIONS = [
+  "Who hasn't replied in 2 weeks?", "What should I follow up on?",
+  "Any assessments waiting on me?", "Why was I rejected?",
+];
+
 /** Where an application stands now — the same buckets as the Dashboard's stage bar. */
 export type AskStage = "waiting" | "quiet" | "interviewing" | "interview_quiet" | "offer" | "rejected" | "closed";
 
@@ -69,6 +74,9 @@ export type AskResponse = {
   answer: string;
   /** The answer as plain lines, no markdown or codes, and without the draft (2026-10-15). */
   answerLines?: string[];
+  /** A list can replace its enumerated prose only when the server says it is the whole answer. */
+  answerKind?: "list" | "compound";
+  unansweredQuestions?: string[];
   totals?: AskTotals | null;
   applications: AskApplication[];
   quotes?: AskQuote[];
@@ -77,12 +85,30 @@ export type AskResponse = {
   /** A drafted email as fields, so it can be edited and copied; `answer` keeps the text too. */
   draft?: { subject?: string | null; body: string } | null;
   /** A list the backend computed in code (never the AI), e.g. applications with no reply. */
-  list?: {
-    kind: "no_reply";
-    minDays: number;
-    total: number;
-    items: { ref: string; company: string; role: string | null; appliedOn: string | null; lastUpdateOn: string | null; daysSinceLastUpdate: number | null }[];
-  } | null;
+  list?: AskResultList | null;
+};
+
+export type AskListItem = {
+  ref: string;
+  company: string;
+  role: string | null;
+  appliedOn?: string | null;
+  lastUpdateOn?: string | null;
+  daysSinceLastUpdate?: number | null;
+  interviewedOn?: string | null;
+  interviewDateKnown?: boolean | null;
+  interviewStatus?: string | null;
+  stage?: AskStage;
+  /** Additive metadata: older APIs provide links only for their capped citations. */
+  threadId?: string | null;
+};
+
+export type AskResultList = {
+  kind: "no_reply" | "reached_interview";
+  minDays?: number;
+  total: number;
+  items: AskListItem[];
+  excludedAsReplied?: { ref: string; company: string; repliedOn?: string | null }[];
 };
 
 /** Where each handoff kind takes the member. */
@@ -100,6 +126,8 @@ function readableResponse(value: unknown): value is AskResponse {
   const optionalText = (item: unknown) => item == null || typeof item === "string";
   const count = (item: unknown) => typeof item === "number" && Number.isSafeInteger(item) && item >= 0;
   if (!object(value) || value.success !== true || typeof value.answer !== "string" || !value.answer.trim() || !Array.isArray(value.applications)) return false;
+  if (value.answerKind != null && !["list", "compound"].includes(String(value.answerKind))) return false;
+  if (value.unansweredQuestions != null && (!Array.isArray(value.unansweredQuestions) || value.unansweredQuestions.some(item => typeof item !== "string"))) return false;
   const stages = new Set(["waiting", "quiet", "interviewing", "interview_quiet", "offer", "rejected", "closed"]);
   if (value.applications.some(item => !object(item) || typeof item.ref !== "string" || typeof item.company !== "string"
     || typeof item.stage !== "string" || !stages.has(item.stage) || !optionalText(item.role) || !optionalText(item.why) || !optionalText(item.note))) return false;
@@ -117,8 +145,18 @@ function readableResponse(value: unknown): value is AskResponse {
       : !count(item))) return false;
   }
   if (value.basis != null && (!object(value.basis) || (value.basis.applications != null && !count(value.basis.applications)) || !optionalText(value.basis.earliestTrackedOn))) return false;
-  if (value.list != null && (!object(value.list) || !Array.isArray(value.list.items)
-    || value.list.items.some(item => !object(item) || typeof item.ref !== "string" || typeof item.company !== "string" || !optionalText(item.role)))) return false;
+  if (value.list != null && (!object(value.list) || !["no_reply", "reached_interview"].includes(String(value.list.kind))
+    || !count(value.list.total) || !Array.isArray(value.list.items) || value.list.items.length !== value.list.total
+    || (value.list.minDays != null && !count(value.list.minDays))
+    || value.list.items.some(item => !object(item) || typeof item.ref !== "string" || typeof item.company !== "string"
+      || !optionalText(item.role) || !optionalText(item.threadId) || !optionalText(item.appliedOn) || !optionalText(item.lastUpdateOn)
+      || !optionalText(item.interviewedOn) || !optionalText(item.interviewStatus)
+      || (item.interviewDateKnown != null && typeof item.interviewDateKnown !== "boolean")
+      || (item.stage != null && !stages.has(String(item.stage)))
+      || (item.daysSinceLastUpdate != null && !count(item.daysSinceLastUpdate)))
+    || new Set(value.list.items.map(item => (item as Record<string, unknown>).ref)).size !== value.list.items.length
+    || (value.list.excludedAsReplied != null && (!Array.isArray(value.list.excludedAsReplied)
+      || value.list.excludedAsReplied.some(item => !object(item) || typeof item.ref !== "string" || typeof item.company !== "string" || !optionalText(item.repliedOn)))))) return false;
   return true;
 }
 

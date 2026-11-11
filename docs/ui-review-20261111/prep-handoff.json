@@ -1,0 +1,36 @@
+{
+  "capturedAt": "2026-11-11T18:06:12.392Z",
+  "browser": "Chromium, actual published assets and actual authenticated API, no endpoint fixtures",
+  "checks": [
+    {
+      "attempt": "fresh_dashboard_link",
+      "status": 409,
+      "code": "INTERVIEW_SOURCE_CHANGED",
+      "error": "This interview or its evidence changed. Review Next Actions and reload the source."
+    },
+    {
+      "attempt": "offered_reload",
+      "status": 409,
+      "code": "INTERVIEW_SOURCE_CHANGED",
+      "error": "This interview or its evidence changed. Review Next Actions and reload the source."
+    }
+  ],
+  "action": {
+    "actionType": "prep_interview",
+    "legacyActionType": null,
+    "hasThread": false,
+    "hasEmail": false,
+    "hasApplication": false,
+    "status": "open",
+    "linkVersionMatches": true
+  },
+  "assets": {
+    "scripts": [
+      "/assets/index-FpyeRjnC.js"
+    ],
+    "css": [
+      "/css2",
+      "/assets/index-BG9DXCfk.css"
+    ]
+  }
+}

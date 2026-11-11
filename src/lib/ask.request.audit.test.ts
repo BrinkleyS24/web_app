@@ -20,3 +20,17 @@ test.each([{applications:{private:'invalid'}},{applications:1,open:-1},{applicat
  apiFetch.mockResolvedValue({success:true,answer:'Your totals',applications:[],totals});
  await expect(askApplendium('How many applications?')).rejects.toThrow(/response/i);
 });
+
+test.each([
+ {kind:'no_reply',total:2,items:[{ref:'R1',company:'Example',role:null}]},
+ {kind:'no_reply',total:2,items:[{ref:'R1',company:'Example',role:null},{ref:'R1',company:'Other',role:null}]},
+ {kind:'no_reply',total:1,items:[{ref:'R1',company:'Example',role:null,threadId:{unsafe:'object'}}]},
+])('incomplete or malformed structured lists cannot silently misstate complete results: %j',async list=>{
+ apiFetch.mockResolvedValue({success:true,answer:'Your applications',applications:[],list});
+ await expect(askApplendium('Who has not replied?')).rejects.toThrow(/response/i);
+});
+
+test('the older complete list contract is accepted without new optional source metadata',async()=>{
+ const result={success:true,answer:'One application',applications:[],list:{kind:'reached_interview',total:1,items:[{ref:'R1',company:'Example',role:null,stage:'rejected',interviewedOn:'2026-10-01'}]}};
+ apiFetch.mockResolvedValue(result);await expect(askApplendium('Which applications reached interviews?')).resolves.toEqual(result);
+});
