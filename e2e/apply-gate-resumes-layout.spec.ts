@@ -75,6 +75,7 @@ for (const width of [390, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await mockApi(page);
     await page.goto("/apply-gate");
+    await page.getByTestId('apply-gate-options').locator('summary').click();
     await page.getByLabel("Job title", { exact: true }).fill("Instructional Designer (K-12 Curriculum)");
     await page.getByLabel("Company (optional)").fill("Brightwell Learning");
     await page.getByLabel("Job description", { exact: true }).fill("Build K-12 courses in Articulate 360. Career changers from the classroom welcome.");

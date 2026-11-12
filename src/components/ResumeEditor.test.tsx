@@ -1,4 +1,4 @@
-import { render, screen, waitFor, act, cleanup } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, act, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -104,4 +104,15 @@ test('compare highlights the lines only in each version', async () => {
   expect([...removed.querySelectorAll('[data-changed]')].map(n => n.textContent)).toEqual(['Removed line: -Ran the robotics club']);
   expect([...added.querySelectorAll('[data-changed]')].map(n => n.textContent)).toEqual(['Added line: +Built two Rise modules', 'Added line: +Administered Canvas course shells']);
   expect(screen.getByText(/1 lines only in the first version; 2 only in the second/)).toBeInTheDocument();
+});
+
+
+test('rapid replacement of both draft fields saves exactly the visible new inputs', async () => {
+  view();
+  const name = await screen.findByLabelText('New version name');
+  const body = screen.getByLabelText('Resume text to save');
+  fireEvent.change(name, {target:{value:'Front desk revised'}});
+  fireEvent.change(body, {target:{value:edited}});
+  fireEvent.click(screen.getByRole('button', {name:'Save as new version'}));
+  await waitFor(() => expect(createResumeVariant).toHaveBeenCalledWith(expect.objectContaining({name:'Front desk revised',text:edited})));
 });

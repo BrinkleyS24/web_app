@@ -86,7 +86,10 @@ test("an older linked check is visible even outside the five newest postings", a
   renderAt("/apply-gate?verdict=verdict-42");
   expect(await screen.findByTestId("apply-gate-history-verdict-42")).toHaveTextContent("Linked source check");
   expect(screen.getAllByTestId(/^apply-gate-history-(?!count)/)[0]).toHaveAttribute("data-testid","apply-gate-history-verdict-42");
-  expect(screen.getByRole("link",{name:"Show latest checks"})).toHaveAttribute("href","/apply-gate");
+  await userEvent.click(screen.getByRole("button",{name:"Show latest checks"}));
+  expect(screen.queryByTestId("apply-gate-linked-check")).not.toBeInTheDocument();
+  expect(screen.getByRole("button",{name:"Saved checks"})).toHaveAttribute("aria-current","page");
+  expect(screen.getAllByTestId(/^apply-gate-history-(?!count)/)[0]).toHaveAttribute("data-testid","apply-gate-history-newer-0");
   expect(recheckApplyGateVerdict).not.toHaveBeenCalled();
 });
 

@@ -181,6 +181,7 @@ test("Apply Gate pasted JD flow hides preferred-only gaps from requirement check
   await expect(page.getByLabel("Job posting link (optional)")).toBeVisible();
   await expect(page.getByRole("button", { name: "Check this role" })).toBeDisabled();
 
+  await page.getByTestId('apply-gate-options').locator('summary').click();
   await page.getByLabel("Job title").fill("Software Development Engineer in Test");
   await page.getByLabel("Company (optional)").fill("Onebrief");
   await page.getByLabel("Job description").fill(onebriefJobDescription);
@@ -204,7 +205,7 @@ test("Apply Gate pasted JD flow hides preferred-only gaps from requirement check
   expect(pageErrors).toEqual([]);
   expect(failedRequests).toEqual([]);
 
-  await page.screenshot({ path: "test-results/apply-gate-onebrief.png", fullPage: true });
+  await page.screenshot({ path: test.info().outputPath("apply-gate-onebrief.png"), fullPage: true });
 });
 
 test("Apply Gate keeps the decision visible when saving the action fails", async ({ page }) => {
@@ -336,6 +337,7 @@ test("Apply Gate keeps the decision visible when saving the action fails", async
   });
 
   await page.goto("/apply-gate", { waitUntil: "domcontentloaded" });
+  await page.getByTestId('apply-gate-options').locator('summary').click();
   await page.getByLabel("Job title").fill("Automation Engineer");
   await page.getByLabel("Company (optional)").fill("Acme Robotics");
   await page.getByLabel("Job description").fill("Requires Python automation and robotics validation.");
@@ -346,7 +348,7 @@ test("Apply Gate keeps the decision visible when saving the action fails", async
 
   await expect(page.getByRole("alert")).toContainText("Choice not saved. Try again.");
   await expect(page.getByRole("heading", { name: "Fix first before applying" })).toBeVisible();
-  await expect(page.getByText("Automation Engineer")).toBeVisible();
+  await expect(page.getByTestId("apply-gate-current-result").getByText("Automation Engineer", {exact:true})).toBeVisible();
 
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);

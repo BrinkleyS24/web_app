@@ -1,0 +1,51 @@
+{
+  "scope": "Compiled local production-mode candidate using the existing authorized account and serving API; no provider or source-changing calls.",
+  "metrics": [
+    {
+      "width": 1440,
+      "viewportHeight": 900,
+      "beforeSubmitTop": 1096.75,
+      "afterSubmitTop": 783.875,
+      "pixelsEarlier": 312.88,
+      "overflow": false
+    },
+    {
+      "width": 768,
+      "viewportHeight": 900,
+      "beforeSubmitTop": 1105.125,
+      "afterSubmitTop": 808.25,
+      "pixelsEarlier": 296.88,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "viewportHeight": 900,
+      "beforeSubmitTop": 1145.125,
+      "afterSubmitTop": 818.75,
+      "pixelsEarlier": 326.38,
+      "overflow": false
+    },
+    {
+      "width": 320,
+      "viewportHeight": 900,
+      "beforeSubmitTop": 1201.5,
+      "afterSubmitTop": 834.75,
+      "pixelsEarlier": 366.75,
+      "overflow": false
+    }
+  ],
+  "checks": {
+    "normalFirebaseAuth": true,
+    "simulatedExtensionBridge": true,
+    "sourceWrites": false,
+    "liveAnalysis": false,
+    "deferredHistory": true,
+    "keptDraft": true,
+    "exactResumeHandoff": true,
+    "sourceQuotationsChecked": 4,
+    "historyFailureVisible": true,
+    "historyRetryRecovered": true,
+    "historyRead": 200,
+    "errors": []
+  }
+}

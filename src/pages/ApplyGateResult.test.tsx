@@ -57,10 +57,10 @@ vi.mock("@/lib/emails", async () => {
   };
 });
 
-function renderPage() {
+function renderPage(entry = '/apply-gate') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
-    <MemoryRouter initialEntries={["/apply-gate"]}>
+    <MemoryRouter initialEntries={[entry]}>
       <QueryClientProvider client={queryClient}>
         <ApplyGate />
       </QueryClientProvider>
@@ -69,6 +69,7 @@ function renderPage() {
 }
 
 async function runAnalyze(jobTitle = "Instructional Designer") {
+  await userEvent.click(screen.getByTestId('apply-gate-options').querySelector('summary')!);
   await userEvent.type(screen.getByLabelText("Job title"), jobTitle);
   await userEvent.type(screen.getByLabelText("Company (optional)"), "Brightwell Learning");
   await userEvent.type(screen.getByLabelText("Job description"), "Build K-12 courses in Articulate 360. Career changers from the classroom welcome.");
@@ -259,7 +260,9 @@ describe("three blocks", () => {
     renderPage();
     await runAnalyze();
     const progress = await screen.findByTestId("apply-gate-progress");
-    expect(progress).toHaveTextContent("usually takes 10-20 seconds");
+    expect(progress).toHaveTextContent("seconds elapsed");
+    expect(progress).toHaveTextContent("Keep this page open for the result.");
+    expect(progress).not.toHaveTextContent(/\d+%|Writing your decision|Scoring fit/);
     expect(progress).not.toHaveTextContent(/half a minute/);
     expect(scrollIntoView).toHaveBeenCalled();
     expect(scrollIntoView.mock.instances[0]).toBe(progress);
@@ -293,7 +296,7 @@ describe("history keeps every run", () => {
 
   test("a posting checked three times shows the latest and says Checked 3 times", async () => {
     fetchApplyGateHistory.mockResolvedValue({ success: true, history: [run("c", 14, "not_recommended"), run("b", 13), run("a", 12)] });
-    renderPage();
+    renderPage('/apply-gate?view=saved');
     const card = await screen.findByTestId("apply-gate-history-c");
     expect(within(card).getByText("Checked 3 times")).toBeInTheDocument();
     expect(screen.queryByTestId("apply-gate-history-b")).not.toBeInTheDocument();

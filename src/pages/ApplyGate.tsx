@@ -40,87 +40,22 @@ import { VariantStrategyCard, type VariantDraftDecisions } from "@/components/Va
 import { ReferralNudge } from "@/components/ReferralNudge";
 import { QualificationEvidence } from "@/components/QualificationEvidence";
 
-const APPLY_GATE_STAGES = [
-  "Reading the job description",
-  "Matching against your resume",
-  "Scoring fit & rejection risk",
-  "Writing your decision brief",
-];
-
-// The premium verdict is a single backend call (no streaming), so this shows
-// staged, time-estimated progress instead of a blank spinner — the difference
-// between "is this broken?" and "it's working through my resume".
-// 2026-10-14: checks measured 5-15 s, so the copy says 10-20 s, not "half a
-// minute"; and the panel scrolls itself into view, because the user is usually
-// at the bottom of the form (or above it on a phone) when they press Check.
+// A single request provides no server-observed stage or percentage updates.
 function ApplyGateProgress() {
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const reduceMotion =
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const [pct, setPct] = useState(reduceMotion ? 50 : 8);
-
+  const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
-    if (reduceMotion) return undefined;
-    const id = window.setInterval(() => {
-      // Ease asymptotically toward 92% so the bar never claims "done" early.
-      setPct((p) => (p >= 92 ? 92 : p + Math.max(0.7, (92 - p) * 0.05)));
-    }, 600);
+    const started = Date.now();
+    const id = window.setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    panelRef.current?.scrollIntoView?.({ behavior: reduced ? 'auto' : 'smooth', block: 'nearest' });
     return () => window.clearInterval(id);
-  }, [reduceMotion]);
-
-  useEffect(() => {
-    panelRef.current?.scrollIntoView?.({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
-    // Mount only: re-scrolling on every progress tick would fight the user's own scrolling.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const stageIndex = Math.min(
-    APPLY_GATE_STAGES.length - 1,
-    Math.floor((pct / 92) * APPLY_GATE_STAGES.length),
-  );
-
   return (
-    <div
-      ref={panelRef}
-      data-testid="apply-gate-progress"
-      className="glass-card scroll-mt-20 rounded-2xl p-6 sm:p-8"
-      role="status"
-      aria-live="polite"
-      aria-busy="true"
-    >
-      <p className="text-sm font-semibold">Checking this role…</p>
-      <p className="mt-1 text-xs leading-5 text-muted-foreground">
-        This usually takes 10-20 seconds. We compare your resume with the posting and with how
-        similar roles went for you.
-      </p>
-      <div className="mt-5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-        <div
-          className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <ul className="mt-5 space-y-2.5">
-        {APPLY_GATE_STAGES.map((label, i) => {
-          const state = i < stageIndex ? "done" : i === stageIndex ? "active" : "pending";
-          return (
-            <li key={label} className="flex items-center gap-2.5 text-sm">
-              {state === "done" ? (
-                <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-              ) : state === "active" ? (
-                <Loader2
-                  className={`h-4 w-4 shrink-0 text-primary ${reduceMotion ? "" : "animate-spin"}`}
-                  aria-hidden="true"
-                />
-              ) : (
-                <span className="h-4 w-4 shrink-0 rounded-full border border-muted-foreground/30" aria-hidden="true" />
-              )}
-              <span className={state === "pending" ? "text-muted-foreground" : "font-medium"}>{label}</span>
-            </li>
-          );
-        })}
-      </ul>
+    <div ref={panelRef} data-testid="apply-gate-progress" className={cn(CARD, 'scroll-mt-20 space-y-3 p-6')} role="status" aria-busy="true">
+      <p className="flex items-center gap-2 text-sm font-semibold"><Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />Checking this role...</p>
+      <p className="text-sm text-muted-foreground">Comparing the posting with your resume and relevant application history. Keep this page open for the result.</p>
+      <p className="text-xs text-muted-foreground" aria-live="off">{elapsed} seconds elapsed</p>
     </div>
   );
 }
@@ -1192,7 +1127,7 @@ function buildHistoryDisplayItemFromResult(
 function actionConfirmationCopy(action: ApplyGateAction): { title: string; body: string } {
   if (action === "applied") {
     return {
-      title: "Marked as applied — good luck.",
+      title: "Applying intent saved.",
       body: "Your applying intent is recorded. Confirm the resume you actually submitted on the tracked application before its outcome can count toward a resume version.",
     };
   }
@@ -1204,7 +1139,7 @@ function actionConfirmationCopy(action: ApplyGateAction): { title: string; body:
   }
   return {
     title: "Skipped — on to the next one.",
-    body: "Logged so similar low-fit roles get flagged faster next time.",
+    body: "Your choice is saved with this check. Find it in Saved checks.",
   };
 }
 
@@ -1219,6 +1154,15 @@ const ApplyGateWorkspace = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const actionContext = readActionContext(location.search);
+  const params = new URLSearchParams(location.search);
+  const changeView = (view: 'check' | 'saved') => {
+    const next = new URLSearchParams(location.search);
+    next.set('view', view);
+    if (view === 'check' && !result) next.delete('verdict');
+    navigate({ search: `?${next}` });
+  };
+  const [historyLimit, setHistoryLimit] = useState(5);
+  const operation = useRef(false);
   const choice=readResumeChoice(location.search);
   const formKey=actionContext?`${actionContext.logicalKey}:${actionContext.dedupeKey}`:'standalone';
   const [forms,updateForms]=useDraftSession<CheckForm>('apply-gate-form');
@@ -1235,6 +1179,13 @@ const ApplyGateWorkspace = () => {
   useEffect(()=>{if(choice.present)setVariantId(choice.id||'');},[choice.present,choiceSignature]);
   useEffect(()=>{updateForms(current=>({...current,[formKey]:{jobTitle,companyName,jobDescription,jobUrl,variantId,riskTolerance}}));},[jobTitle,companyName,jobDescription,jobUrl,variantId,riskTolerance,formKey]);
   const [result, setResult] = useState<ApplyGateResult | null>(null);
+  const showSavedChecks = params.get('view') === 'saved'
+    || (params.has('verdict') && (params.get('view') !== 'check' || !result));
+  const inputKey = JSON.stringify({jobTitle, companyName, jobDescription, jobUrl, variantId, riskTolerance});
+  const [resultInputKey, setResultInputKey] = useState<string | null>(null);
+  const [resultFromSaved, setResultFromSaved] = useState(false);
+  const resultInputsChanged = resultInputKey !== null && resultInputKey !== inputKey;
+  const formRef = useRef<HTMLFieldSetElement | null>(null);
   useEffect(() => {
     const action = workspace.action;
     if (!actionContext || !action || workspace.queue.isFetching || workspace.queue.isError
@@ -1280,7 +1231,11 @@ const ApplyGateWorkspace = () => {
   const MIN_RESUME_CHARS = 200;
   const resumePasteLength = resumePaste.trim().length;
   const saveResumeMutation = useMutation({
-    mutationFn: (text: string) => saveResume(text),
+    mutationFn: async (text: string) => {
+      const saved = await saveResume(text);
+      if (saved?.success !== true) throw new Error('Your resume was not saved. Keep the text and try again.');
+      return saved;
+    },
     onSuccess: () => {
       setResumePaste("");
       queryClient.invalidateQueries({ queryKey: ["user-resume"] });
@@ -1289,7 +1244,7 @@ const ApplyGateWorkspace = () => {
   });
 
   // Resume variants: pick which one to run the gate against; the choice rides
-  // analyze → verdict → apply so the outcome attributes back to that variant.
+  // analyze and verdict only; submitted versions are confirmed on applications.
   const variantsQuery = useQuery({
     queryKey: ["resume-variants"],
     queryFn: fetchResumeVariants,
@@ -1334,8 +1289,12 @@ const ApplyGateWorkspace = () => {
 
   const historyQuery = useQuery<ApplyGateHistoryQueryData>({
     queryKey: ["apply-gate-history"],
-    queryFn: fetchApplyGateHistory,
-    enabled: Boolean(user),
+    queryFn: async () => {
+      const response = await fetchApplyGateHistory();
+      if (response?.success !== true || !Array.isArray(response.history)) throw new Error('Saved checks could not be loaded.');
+      return response;
+    },
+    enabled: Boolean(user) && (showSavedChecks || Boolean(result)),
     staleTime: 30_000,
   });
 
@@ -1344,35 +1303,6 @@ const ApplyGateWorkspace = () => {
   const [recheckingId, setRecheckingId] = useState<string | null>(null);
   const [recheckError, setRecheckError] = useState<{ id: string; message: string } | null>(null);
   const resultTopRef = useRef<HTMLDivElement | null>(null);
-  const handleRecheck = useCallback(
-    async (verdictId: string) => {
-      setRecheckingId(verdictId);
-      setRecheckError(null);
-      try {
-        const data = await recheckApplyGateVerdict(verdictId);
-        setResult(data);
-        // A re-check is a new check of the same posting; history keeps the newest one. Point the
-        // page at it, or the banner says the old check "is no longer in your history" (2026-10-16).
-        const nextId = (data as { id?: string } | null)?.id;
-        if (nextId) {
-          const params = new URLSearchParams(location.search);
-          if (params.get("verdict") === verdictId) {
-            params.set("verdict", String(nextId));
-            navigate({ search: `?${params}` }, { replace: true });
-          }
-        }
-        setIsCurrentWarningExpanded(false);
-        setActionConfirmation(null);
-        await invalidateApplyGateViews(queryClient);
-        resultTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      } catch (error) {
-        setRecheckError({ id: verdictId, message: error instanceof Error ? error.message : "Could not re-check this role." });
-      } finally {
-        setRecheckingId(null);
-      }
-    },
-    [queryClient, location.search, navigate],
-  );
 
   const rawHistory: ApplyGateHistoryItem[] = historyQuery.data?.history ?? [];
   // A Next Actions link names the check it came from (?verdict=<id>). History carries no posting
@@ -1385,35 +1315,34 @@ const ApplyGateWorkspace = () => {
     [companyName, jobTitle, result],
   );
   const history = useMemo<Array<GroupedHistoryItem<ApplyGateHistoryDisplayItem>>>(() => {
-    const grouped = groupHistoryItems<ApplyGateHistoryDisplayItem>(rawHistory);
-    if (!currentHistoryProjection) return grouped;
-    return grouped.filter((item) => !sameHistoryPosting(item, currentHistoryProjection));
-  }, [currentHistoryProjection, rawHistory]);
-  const visibleHistory = useMemo<Array<GroupedHistoryItem<ApplyGateHistoryDisplayItem>>>(() => {
-    if (!linkedCheck) return history.slice(0, 5);
-    // A source link identifies a specific run, including one superseded on the
-    // same posting. Never silently replace it with the newest grouped decision.
+    return groupHistoryItems<ApplyGateHistoryDisplayItem>(rawHistory);
+  }, [rawHistory]);
+  const orderedHistory = useMemo<Array<GroupedHistoryItem<ApplyGateHistoryDisplayItem>>>(() => {
+    if (!linkedCheck) return history;
+    // Exact source links retain their named run rather than the latest grouped run.
     const source = { ...linkedCheck, _checkCount: 1, _earlierChecks: [] };
-    return [source, ...history.filter(item => !sameHistoryPosting(item, linkedCheck))].slice(0, 5);
+    return [source, ...history.filter(item => !sameHistoryPosting(item, linkedCheck))];
   }, [history, linkedCheck]);
-  // Earlier runs of the posting on screen now. They are hidden from "Roles you checked" (the
-  // current result stands for them), so they are listed in its details instead of vanishing.
+  const visibleHistory = orderedHistory.slice(0, historyLimit);
+  // Preserve earlier runs in the current result's details as well as grouped saved history.
   const currentEarlierChecks = useMemo<ApplyGateHistoryDisplayItem[]>(() => {
     if (!currentHistoryProjection) return [];
     return rawHistory.filter((item) => item.id !== currentHistoryProjection.id && sameHistoryPosting(item, currentHistoryProjection));
   }, [currentHistoryProjection, rawHistory]);
 
   const analyzeMutation = useMutation({
-    mutationFn: () =>
-      analyzeJobAlignment({
-        jobTitle,
-        jobDescription,
-        companyName,
-        riskTolerance,
-        ...(jobUrl.trim() ? { jobUrl: jobUrl.trim() } : {}),
-        ...(variantId ? { variantId } : {}),
-      }),
-    onSuccess: (data) => {
+    mutationFn: async (input: CheckForm) => {
+      const data = await analyzeJobAlignment({
+        ...input,
+        jobUrl: input.jobUrl.trim() || undefined,
+        variantId: input.variantId || undefined,
+      });
+      if (data?.success !== true) throw new Error('The check did not complete. Keep the posting and try again.');
+      return data;
+    },
+    onSuccess: (data, input) => {
+      setResultInputKey(JSON.stringify(input));
+      setResultFromSaved(false);
       setResult(data);
       setIsCurrentWarningExpanded(false);
       setActionConfirmation(null);
@@ -1424,7 +1353,7 @@ const ApplyGateWorkspace = () => {
       if (data.insufficientProfile) {
         return;
       }
-      const currentAsHistory = buildHistoryDisplayItemFromResult(data, jobTitle, companyName, null);
+      const currentAsHistory = buildHistoryDisplayItemFromResult(data, input.jobTitle, input.companyName, null);
       if (currentAsHistory && !currentAsHistory._unsaved) {
         const persistedHistoryItem = currentAsHistory as ApplyGateHistoryItem;
         queryClient.setQueryData<ApplyGateHistoryQueryData>(["apply-gate-history"], (previous) => {
@@ -1442,18 +1371,53 @@ const ApplyGateWorkspace = () => {
       }
       void invalidateApplyGateViews(queryClient);
     },
-    onError: () => {
-      setResult(null);
-      setIsCurrentWarningExpanded(false);
-    },
+    onSettled: () => { operation.current = false; },
   });
+
+  const handleRecheck = useCallback(
+    async (verdictId: string) => {
+      if (operation.current) return;
+      operation.current = true;
+      analyzeMutation.reset();
+      setRecheckingId(verdictId);
+      setRecheckError(null);
+      try {
+        const data = await recheckApplyGateVerdict(verdictId);
+        if (data?.success !== true) throw new Error('Could not re-check this role. Keep the posting and try again.');
+        setResult(data);
+        setResultInputKey(null);
+        setResultFromSaved(true);
+        setActionSaveError(null);
+        // A re-check is a new check of the same posting; history keeps the newest one. Point the
+        // page at it, or the banner says the old check "is no longer in your history" (2026-10-16).
+        const nextId = (data as { id?: string } | null)?.id;
+        const nextParams = new URLSearchParams(location.search);
+        nextParams.set('view', 'check');
+        if (nextId) nextParams.set('verdict', String(nextId));
+        navigate({ search: `?${nextParams}` }, { replace: true });
+        setIsCurrentWarningExpanded(false);
+        setActionConfirmation(null);
+        await invalidateApplyGateViews(queryClient);
+        resultTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (error) {
+        setRecheckError({ id: verdictId, message: error instanceof Error ? error.message : "Could not re-check this role." });
+      } finally {
+        setRecheckingId(null);
+        operation.current = false;
+      }
+    },
+    [queryClient, location.search, navigate, analyzeMutation.reset],
+  );
+
 
   // URL-only analysis is allowed again: the backend fetches the posting with
   // hardened extraction (SSRF-guarded, redirect-validated, size-capped) and
   // returns an honest 400 when it can't extract a usable description.
   const jobUrlLooksFetchable = /^https?:\/\/\S+\.\S+/i.test(jobUrl.trim());
   const canAnalyze = (jobDescription.trim().length > 0 || jobUrlLooksFetchable) && !needsResume
-    && !variantsQuery.isLoading && !variantsQuery.isError && (variants.length === 0 && !choice.present || variants.some((v) => v.id === variantId));
+    && !variantsQuery.isLoading && !variantsQuery.isError
+    && (variants.length > 0 || (resumeQuery.isSuccess && hasResume))
+    && (variants.length === 0 && !choice.present || variants.some((v) => v.id === variantId));
 
   // ── Coach-voice translation ─────────────────────────────────────────
   // The backend's structured levels (bands, confidence) are model-card
@@ -1488,9 +1452,26 @@ const ApplyGateWorkspace = () => {
   };
 
   const handleAnalyze = useCallback(() => {
-    if (!canAnalyze) return;
-    analyzeMutation.mutate();
-  }, [analyzeMutation, canAnalyze]);
+    if (!canAnalyze || operation.current) return;
+    operation.current = true;
+    analyzeMutation.mutate({jobTitle, companyName, jobDescription, jobUrl, variantId, riskTolerance});
+  }, [analyzeMutation, canAnalyze, jobTitle, companyName, jobDescription, jobUrl, variantId, riskTolerance]);
+
+  const busy = analyzeMutation.isPending || Boolean(recheckingId) || Boolean(savingAction);
+  const startAnotherRole = () => {
+    if (operation.current) return;
+    const blank = { jobTitle: '', companyName: '', jobDescription: '', jobUrl: '', variantId, riskTolerance };
+    updateForms(current => ({...current, [formKey]: blank, standalone: blank}));
+    setJobTitle(''); setCompanyName(''); setJobDescription(''); setJobUrl('');
+    setResult(null); setResultInputKey(null); setResultFromSaved(false);
+    setActionConfirmation(null); setActionSaveError(null); setRecheckError(null);
+    analyzeMutation.reset();
+    const next = new URLSearchParams(location.search);
+    for (const key of ['verdict', 'action', 'version']) next.delete(key);
+    next.set('view', 'check');
+    navigate({ search: `?${next}` });
+    requestAnimationFrame(() => document.getElementById('job-description')?.focus());
+  };
 
   const markVerdictActionInCache = useCallback(
     (verdictId: string, action: ApplyGateAction) => {
@@ -1511,6 +1492,12 @@ const ApplyGateWorkspace = () => {
 
   const handleAction = useCallback(
     async (action: ApplyGateAction) => {
+      if (operation.current || resultInputsChanged) return;
+      if (!result?.id || result.historySaved === false) {
+        setActionSaveError({verdictId: result?.id || 'unsaved', message: 'Choice not saved: this check has no saved history record. Keep the posting and run the check again.'});
+        return;
+      }
+      operation.current = true;
       const targetUrl = (result?.jobUrl || "").trim();
       if (result?.id) {
         const displayDecision = displayDecisionFromResult(result);
@@ -1574,7 +1561,8 @@ const ApplyGateWorkspace = () => {
         setActionSaveError((current) => (current?.verdictId === result.id ? null : current));
 
         try {
-          await updateApplyGateAction(result.id, action, { feedback });
+          const acknowledgment = await updateApplyGateAction(result.id, action, { feedback });
+          if (acknowledgment?.success !== true) throw new Error('Choice not saved.');
           markVerdictActionInCache(result.id, action);
           await invalidateApplyGateViews(queryClient);
           if (action === "applied" && targetUrl) {
@@ -1593,19 +1581,19 @@ const ApplyGateWorkspace = () => {
           });
         } finally {
           setSavingAction((current) => (current?.verdictId === result.id ? null : current));
+          operation.current = false;
         }
         return;
       }
-      if (action === "applied" && targetUrl) {
-        window.open(targetUrl, "_blank", "noopener,noreferrer");
-      }
-      setActionConfirmation({ action });
+
     },
-    [companyName, jobTitle, markVerdictActionInCache, queryClient, result, variantDraftDecisions],
+    [companyName, jobTitle, markVerdictActionInCache, queryClient, result, variantDraftDecisions, resultInputsChanged],
   );
 
   const handleHistoryAction = useCallback(
     async (item: ApplyGateHistoryDisplayItem, action: ApplyGateAction) => {
+      if (operation.current) return;
+      operation.current = true;
       const displayDecision = displayDecisionFromHistory(item);
       const useDisplayDecision = usesResolvedDecision(item.explanation_payload) && Boolean(displayDecision);
       const status = useDisplayDecision ? statusFromDisplayDecision(displayDecision) : verdictToStatus(item.verdict);
@@ -1636,7 +1624,8 @@ const ApplyGateWorkspace = () => {
       setActionSaveError((current) => (current?.verdictId === item.id ? null : current));
 
       try {
-        await updateApplyGateAction(item.id, action, { feedback });
+        const acknowledgment = await updateApplyGateAction(item.id, action, { feedback });
+        if (acknowledgment?.success !== true) throw new Error('Choice not saved.');
         markVerdictActionInCache(item.id, action);
         await invalidateApplyGateViews(queryClient);
       } catch {
@@ -1646,6 +1635,7 @@ const ApplyGateWorkspace = () => {
         });
       } finally {
         setSavingAction((current) => (current?.verdictId === item.id ? null : current));
+        operation.current = false;
       }
     },
     [markVerdictActionInCache, queryClient],
@@ -1821,7 +1811,7 @@ const ApplyGateWorkspace = () => {
         ? decisionActionsForStatus(currentStatus, currentRecommendation, Boolean(result?.scoringBreakdown?.hardBlocker))
         : []));
   const currentSavePending = Boolean(result?.id && savingAction?.verdictId === result.id);
-  const currentSaveError = result?.id && actionSaveError?.verdictId === result.id
+  const currentSaveError = result && actionSaveError?.verdictId === (result.id || 'unsaved')
     ? actionSaveError.message
     : null;
   const currentFitLabel = currentDisplayDecisionMissing
@@ -1923,26 +1913,34 @@ const ApplyGateWorkspace = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-5">
+      <div className="min-w-0 space-y-5 [overflow-wrap:anywhere]">
         <PageHeader
           eyebrow="Before you apply"
           title="Apply Gate"
-          description="Paste a job and get a clear call — apply, fix first, or skip — with the reasons behind it and what to fix before you spend the time."
+          description="Check a posting against your resume, then decide your next step."
         />
 
+        <nav aria-label="Apply Gate views" className="flex flex-wrap gap-2">
+          <button type="button" aria-current={!showSavedChecks ? 'page' : undefined} className={!showSavedChecks ? BUTTON.primary : BUTTON.secondary} onClick={() => changeView('check')}>Check a role</button>
+          <button type="button" aria-current={showSavedChecks ? 'page' : undefined} className={showSavedChecks ? BUTTON.primary : BUTTON.secondary} onClick={() => changeView('saved')}>Saved checks</button>
+        </nav>
+        <section hidden={!showSavedChecks} aria-label="Saved checks" className="space-y-4">
+        {historyQuery.isLoading ? <p role="status">Loading saved checks...</p> : null}
+        {historyQuery.isError ? <div className={cn(CARD, 'p-4')} role="alert">Saved checks could not be loaded. Your new-check draft is still available. <button className="underline" onClick={() => historyQuery.refetch()}>Try loading checks again</button></div> : null}
+        {historyQuery.isSuccess && rawHistory.length === 0 ? <EmptyState icon={ScanSearch} title="No saved checks yet" body="Check a role to keep its verdict here." /> : null}
         {linkedCheck ? (
           <div className={cn(CARD, "flex flex-wrap items-center justify-between gap-3 p-4")} data-testid="apply-gate-linked-check">
             <div className="min-w-0">
               <p className="text-[13px] font-semibold text-foreground">
                 Saved check: {linkedCheck.job_title}{linkedCheck.company_name ? ` at ${linkedCheck.company_name}` : ""}
               </p>
-              <p className="text-[13px] text-muted-foreground">Re-check it against your current resume. It uses the posting you already checked.</p>
+              <p className="text-[13px] text-muted-foreground">Re-check the saved posting with its original resume selection. The result identifies the resume evaluated.</p>
               {recheckError?.id === linkedCheck.id ? <p role="alert" className="mt-1 text-[13px] text-destructive">{recheckError.message}</p> : null}
             </div>
             <button
               type="button"
               className={BUTTON.primary}
-              disabled={recheckingId === linkedCheck.id}
+              disabled={busy}
               onClick={() => handleRecheck(linkedCheck.id)}
             >
               {recheckingId === linkedCheck.id ? "Checking…" : "Re-check this posting"}
@@ -1954,11 +1952,16 @@ const ApplyGateWorkspace = () => {
           </p>
         ) : null}
 
-        <div ref={resultTopRef} className="grid scroll-mt-20 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]">
-          <div className={cn(CARD, "space-y-3 p-5")}>
+        </section>
+        <section hidden={showSavedChecks} aria-label="Check a role" className="space-y-4">
+        <div ref={resultTopRef} className={cn("grid scroll-mt-20 items-start gap-5", (result || analyzeMutation.isPending) ? "xl:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]" : "mx-auto w-full max-w-3xl")}>
+          <fieldset ref={formRef} disabled={busy} className={cn(CARD, "min-w-0 space-y-3 p-5")}>
+          <legend className="sr-only">Posting and resume</legend>
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-foreground">Check a role</h2>
           </div>
+          {variantsQuery.isSuccess && variants.length === 0 && resumeQuery.isError ? <p role="alert" className="text-sm">Your resume could not be loaded. <button type="button" className="underline" onClick={() => resumeQuery.refetch()}>Try loading your resume again</button></p> : null}
+          {variantsQuery.isSuccess && variants.length === 0 && resumeQuery.isLoading ? <p role="status" className="text-sm text-muted-foreground">Loading your resume...</p> : null}
           {choice.present&&!choice.id&&!variants.some(v=>v.id===variantId)?<p role="alert" className="text-sm">This resume link is incomplete. Choose an available version; no default was substituted.</p>:null}
           {choice.id&&variantsQuery.isSuccess&&!variants.some(v=>v.id===variantId)?<p role="alert" className="text-sm">The linked resume is no longer available. Choose another version; no default was substituted.</p>:null}
           {needsResume ? (
@@ -2014,6 +2017,57 @@ const ApplyGateWorkspace = () => {
           </div>
           ) : (
           <>
+          {variants.length > 0 ? (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground" htmlFor="resume-variant">Resume</label>
+              <select
+                id="resume-variant"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                value={variantId}
+                onChange={(e) => setVariantId(e.target.value)}
+              >
+                <option value="" disabled>Choose a resume</option>
+                {variants.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}{v.isDefault ? " (default)" : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">{!variantId
+                ? 'No default resume is set. Choose which one to check against this role.'
+                : 'Checking a version does not confirm it was submitted.'}</p>
+              {RESUME_ID.test(variantId)&&variants.some(v=>v.id===variantId)?<Link className="inline-block text-sm font-medium underline" to={resumeToolHref('/resumes',variantId,location.search)}>View or edit this version</Link>:null}
+
+            </div>
+          ) : null}
+          {variantsQuery.isError ? <p role="alert" className="text-sm">Your resumes could not be loaded. <button type="button" className="underline" onClick={() => variantsQuery.refetch()}>Try again</button></p> : null}
+          {variantId && variantsQuery.isSuccess && !variants.some((v) => v.id === variantId) ? <p role="alert" className="text-sm">The selected resume is no longer available. Choose another resume.</p> : null}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground" htmlFor="job-url">Job posting link (optional)</label>
+            <input
+              id="job-url"
+              type="url"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              value={jobUrl}
+              onChange={(e) => setJobUrl(e.target.value)}
+              placeholder="https://…"
+            />
+            <p className="text-xs text-muted-foreground">Use a public posting link, or paste the full description below.</p>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground" htmlFor="job-description">Job description</label>
+            <textarea
+              id="job-description"
+              className="w-full min-h-[120px] rounded-md border border-border bg-background px-3 py-2 text-sm"
+              value={jobDescription}
+              onChange={(e) => setJobDescription(e.target.value)}
+              placeholder="Paste the job description"
+            />
+            <p className="text-xs text-muted-foreground">Include the full posting and requirements.</p>
+          </div>
+          <details data-testid="apply-gate-options" className="rounded-lg border border-border p-3">
+            <summary className="cursor-pointer text-sm font-medium">Optional details{jobTitle || companyName ? ` · ${[jobTitle, companyName].filter(Boolean).join(' at ')}` : ''}{riskTolerance !== 'balanced' ? ` · ${RISK_TOLERANCE_COPY[riskTolerance].label}` : ''}</summary>
+            <div className="mt-3 space-y-3">
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground" htmlFor="job-title">Job title</label>
             <input
@@ -2036,43 +2090,6 @@ const ApplyGateWorkspace = () => {
             <p className="text-xs text-muted-foreground">Useful when the pasted job description does not clearly name the employer.</p>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground" htmlFor="job-url">Job posting link (optional)</label>
-            <input
-              id="job-url"
-              type="url"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              value={jobUrl}
-              onChange={(e) => setJobUrl(e.target.value)}
-              placeholder="https://…"
-            />
-            <p className="text-xs text-muted-foreground">If you leave the description empty, we read the posting from this URL (public job pages only). It also lets "Apply" open the posting in a new tab.</p>
-          </div>
-          {variants.length > 0 ? (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground" htmlFor="resume-variant">Resume</label>
-              <select
-                id="resume-variant"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                value={variantId}
-                onChange={(e) => setVariantId(e.target.value)}
-              >
-                <option value="" disabled>Choose a resume</option>
-                {variants.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name}{v.isDefault ? " (default)" : ""}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-muted-foreground">{!variantId
-                ? 'No default resume is set. Choose which one to check against this role.'
-                : 'Which saved resume to evaluate — and record as sent if you apply.'}</p>
-              {RESUME_ID.test(variantId)&&variants.some(v=>v.id===variantId)?<Link className="inline-block text-sm font-medium underline" to={resumeToolHref('/resumes',variantId,location.search)}>View or edit this version</Link>:null}
-              <p className="text-xs text-muted-foreground">The posting stays in this tab while you manage versions. Reloading or signing out clears unsaved inputs. Saving edits does not recheck the role automatically.</p>
-            </div>
-          ) : null}
-          {variantsQuery.isError ? <p role="alert" className="text-sm">Your resumes could not be loaded. <button type="button" className="underline" onClick={() => variantsQuery.refetch()}>Try again</button></p> : null}
-          {variantId && variantsQuery.isSuccess && !variants.some((v) => v.id === variantId) ? <p role="alert" className="text-sm">The selected resume is no longer available. Choose another resume.</p> : null}
-          <div className="space-y-2">
             <label className="text-sm font-medium text-foreground" htmlFor="risk-tolerance">Apply style</label>
             <select
               id="risk-tolerance"
@@ -2088,22 +2105,14 @@ const ApplyGateWorkspace = () => {
             </select>
             <p className="text-xs text-muted-foreground">{RISK_TOLERANCE_COPY[riskTolerance].helper}</p>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground" htmlFor="job-description">Job description</label>
-            <textarea
-              id="job-description"
-              className="w-full min-h-[120px] rounded-md border border-border bg-background px-3 py-2 text-sm"
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-              placeholder="Paste the job description"
-            />
-            <p className="text-xs text-muted-foreground">Paste the full job description, or leave it empty and we will read the posting from the URL above.</p>
-          </div>
+              <p className="text-xs text-muted-foreground">The posting stays in this tab while you manage versions. Reloading or signing out clears unsaved inputs. Saving edits does not recheck the role automatically.</p>
+            </div>
+          </details>
           <button type="button" onClick={handleAnalyze} disabled={analyzeMutation.isPending || !canAnalyze} className={BUTTON.primary}>
             {analyzeMutation.isPending ? "Checking…" : "Check this role"}
           </button>
           {analyzeMutation.isError && (
-            <p className="text-xs text-destructive">
+            <p role="alert" className="text-xs text-destructive">
               {analyzeMutation.error instanceof Error
                 ? analyzeMutation.error.message
                 : "Apply Gate could not analyze this role. Paste the full job description and try again."}
@@ -2111,9 +2120,9 @@ const ApplyGateWorkspace = () => {
           )}
           </>
           )}
-          </div>
+          </fieldset>
 
-          <div className="min-w-0">
+          <div className="min-w-0" hidden={!result && !analyzeMutation.isPending}>
             {analyzeMutation.isPending ? (
               <ApplyGateProgress />
             ) : result?.insufficientProfile ? (
@@ -2195,6 +2204,8 @@ const ApplyGateWorkspace = () => {
                   </div>
                 </section>
 
+                {resultFromSaved ? <p className="text-sm text-muted-foreground">This result re-checks a saved posting. The form is your separate draft for a new check.</p> : null}
+                {resultInputsChanged ? <p role="alert" className="rounded-lg border border-warning/30 p-3 text-sm">The inputs have changed since this check. This verdict still describes the original inputs. Check this role again before recording a choice.</p> : null}
                 <QualificationEvidence assessment={result.qualificationAssessment} />
                 {result.historySaved===false&&<p role="alert" className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-sm">{result.historyWarning||'This check was not saved to history. Keep the posting and try again before leaving this page.'}</p>}
 
@@ -2247,7 +2258,7 @@ const ApplyGateWorkspace = () => {
                       </ul>
                     ) : null}
                     {(currentStatus === "strong" || currentStatus === "potential") && (
-                      <ReferralNudge company={result.companyName} />
+                      <details className="rounded-lg border border-border p-3"><summary className="cursor-pointer text-sm font-medium">Explore a connection (optional)</summary><div className="mt-3"><ReferralNudge company={result.companyName} /></div></details>
                     )}
                   </section>
                 ) : null}
@@ -2287,10 +2298,7 @@ const ApplyGateWorkspace = () => {
                         size="sm"
                         variant="ghost"
                         className="text-xs h-8 text-muted-foreground"
-                        onClick={() => {
-                          setActionConfirmation(null);
-                          setResult(null);
-                        }}
+                        onClick={startAnotherRole}
                       >
                         Review another role
                       </Button>
@@ -2309,7 +2317,7 @@ const ApplyGateWorkspace = () => {
                           variant={item.variant || "default"}
                           className={`${item.className || ""} text-xs h-8`.trim()}
                           onClick={() => void handleAction(item.action)}
-                          disabled={currentSavePending}
+                          disabled={busy || resultInputsChanged}
                           aria-busy={currentSavePending && savingAction?.action === item.action ? "true" : undefined}
                         >
                           {currentSavePending && savingAction?.action === item.action ? "Saving..." : item.label}
@@ -2626,11 +2634,14 @@ const ApplyGateWorkspace = () => {
           </div>
         </div>
 
+        </section>
+        <section hidden={!showSavedChecks} aria-label="Loaded check history" className="space-y-4">
+        {historyQuery.isSuccess ? <p className="text-sm text-muted-foreground">{orderedHistory.length} loaded posting{orderedHistory.length === 1 ? '' : 's'}. Repeat checks are grouped; this is the history returned by the service.</p> : null}
         {visibleHistory.length > 0 && (
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className={EYEBROW}>{linkedCheck ? "Source check and other postings" : "Roles you checked"}</p>
-              {linkedCheck ? <Link to="/apply-gate" className="inline-flex min-h-11 items-center text-[13px] underline underline-offset-2">Show latest checks</Link> : null}
+              {linkedCheck ? <button type="button" onClick={() => { const next = new URLSearchParams(location.search); next.delete('verdict'); next.set('view', 'saved'); navigate({search: `?${next}`}); }} className="inline-flex min-h-11 items-center text-[13px] underline underline-offset-2">Show latest checks</button> : null}
             </div>
             {visibleHistory.map((item) => (
               <div key={item.id} data-testid={`apply-gate-history-${item.id}`} className={cn(CARD, "space-y-3 p-5")}>
@@ -2708,7 +2719,7 @@ const ApplyGateWorkspace = () => {
                     : null;
                   return (
                     <>
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between">
                   <div className="min-w-0">
                     <p className="text-[14px] font-semibold leading-tight text-foreground">{roleCompany.role}</p>
                     <p className="mt-0.5 text-[12.5px] leading-tight text-muted-foreground">
@@ -2724,6 +2735,7 @@ const ApplyGateWorkspace = () => {
                     <ToneChip tone={item.outdated ? "neutral" : historyDecision.tone}>{item.outdated ? 'Re-check needed' : historyDecision.label}</ToneChip>
                   </div>
                 </div>
+                <p className="text-xs text-muted-foreground">Checked {formatCheckDate(item.created_at) || 'at an unknown date'}</p>
                 <p className="text-xs text-muted-foreground">{item.explanation_payload?.resume_document || item.resume_variant_id
                   ? `Checked against: ${item.explanation_payload?.resume_document?.name
                     || variants.find((v) => v.id === (item.resume_variant_id || item.explanation_payload?.resume_document?.variantId))?.name || 'a previously saved resume'}${['legacy', 'seeded_from_legacy'].includes(item.explanation_payload?.resume_document?.source || '') ? ' (from your old profile)' : ''}`
@@ -2751,7 +2763,7 @@ const ApplyGateWorkspace = () => {
                     <button
                       type="button"
                       onClick={() => void handleRecheck(item.id)}
-                      disabled={recheckingId === item.id}
+                      disabled={busy}
                       className={cn(BUTTON.secondary, "px-3 py-1.5 text-[12.5px]")}
                     >
                       {recheckingId === item.id ? "Re-checking…" : "Re-check"}
@@ -2814,7 +2826,7 @@ const ApplyGateWorkspace = () => {
                         variant={actionItem.variant || "default"}
                         className={`${actionItem.className || ""} text-xs h-8`.trim()}
                         onClick={() => void handleHistoryAction(item, actionItem.action)}
-                        disabled={historySavePending}
+                        disabled={busy}
                         aria-busy={historySavePending && savingAction?.action === actionItem.action ? "true" : undefined}
                       >
                         {historySavePending && savingAction?.action === actionItem.action ? "Saving..." : actionItem.label}
@@ -2840,7 +2852,10 @@ const ApplyGateWorkspace = () => {
                       </summary>
                       <div className="mt-3 space-y-3">{oldRead}</div>
                     </details>
-                  ) : oldRead;
+                  ) : <details className="rounded-lg border border-border p-3" open={linkedCheck?.id === item.id || undefined}>
+                    <summary className="cursor-pointer text-sm font-medium">{historyDecided ? 'Review saved evidence' : 'Review evidence and record a choice'}</summary>
+                    <div className="mt-3 space-y-3">{oldRead}</div>
+                  </details>;
                 })()}
                     </>
                   );
@@ -2849,6 +2864,8 @@ const ApplyGateWorkspace = () => {
             ))}
           </div>
         )}
+        {orderedHistory.length > historyLimit ? <button type="button" className={BUTTON.secondary} onClick={() => setHistoryLimit(limit => limit + 5)}>Show more saved checks</button> : null}
+        </section>
       </div>
     </DashboardLayout>
   );

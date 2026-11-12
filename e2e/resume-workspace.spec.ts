@@ -28,6 +28,7 @@ for (const width of [320, 1280]) test(`resume compare edit save and use preserve
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
   await page.goto(`/apply-gate?resume=${id}&action=${logicalKey}&version=${dedupeKey}`);
+  await page.getByTestId('apply-gate-options').locator('summary').click();
   await expect(page.getByLabel('Resume', { exact: true })).toHaveValue(id); await expect(page.getByLabel('Job title', { exact: true })).toHaveValue('Receptionist');
   await page.getByLabel('Job description', { exact: true }).fill(posting);
   await page.getByRole('link', { name: 'View or edit this version' }).click();
@@ -37,12 +38,15 @@ for (const width of [320, 1280]) test(`resume compare edit save and use preserve
   await expect(page.getByRole('heading', { name: 'Compare saved wording', exact: true })).toBeVisible();
   expect(creates).toHaveLength(0); expect(analyses).toHaveLength(0); expect(completions).toHaveLength(0);
   await page.getByLabel('New version name').fill('Front desk revised'); await page.getByLabel('Resume text to save').fill(edited);
+  await expect(page.getByLabel('New version name')).toHaveValue('Front desk revised');
+  await expect(page.getByLabel('Resume text to save')).toHaveValue(edited);
   await expect(page.getByLabel('Use this new version as my default for extension job checks')).not.toBeChecked();
   await page.getByRole('button', { name: 'Save as new version' }).click(); await expect(page.getByText('Ready to use: Front desk revised')).toBeVisible();
   expect(creates).toHaveLength(1); expect(creates[0]).toMatchObject({ name: 'Front desk revised', text: edited, defaultMode: 'none' }); expect(creates[0].requestId).toEqual(expect.any(String));
   await page.getByRole('button', { name: 'Copy saved text' }).click(); expect(await page.evaluate(() => (window as unknown as { copied: string }).copied)).toBe(edited);
   const downloaded = page.waitForEvent('download'); await page.getByRole('button', { name: 'Download saved text' }).click(); const download = await downloaded; expect(download.suggestedFilename()).toBe('Front desk revised.txt'); expect(await fs.readFile((await download.path())!, 'utf8')).toBe(edited);
   await page.getByRole('link', { name: 'Use this version in Apply Gate' }).click(); await expect(page.getByLabel('Resume', { exact: true })).toHaveValue(saved);
+  await page.getByTestId('apply-gate-options').locator('summary').click();
   await expect(page.getByLabel('Job description', { exact: true })).toHaveValue(posting); await expect(page.getByLabel('Job title', { exact: true })).toHaveValue('Receptionist'); await expect(page.getByLabel('Company (optional)')).toHaveValue('Example Health');
   expect(analyses).toHaveLength(0); expect(completions).toHaveLength(0);
   await page.getByRole('button', { name: 'Check this role' }).click(); await expect.poll(() => analyses.length).toBe(1); expect(analyses[0]).toMatchObject({ variantId: saved, jobDescription: posting, jobTitle: 'Receptionist' });

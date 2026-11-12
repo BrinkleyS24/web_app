@@ -1,0 +1,45 @@
+{
+  "status": "local_verified_not_deployed",
+  "grade": {
+    "ui": "A",
+    "assessment": "Engineering judgment for the exercised UI workflows; not an independently adjudicated customer/model/production grade."
+  },
+  "baseCommit": "dded16e",
+  "tests": {
+    "webPassed": 831,
+    "webFailed": 0,
+    "browser": {
+      "startTime": "2026-11-12T22:05:56.482Z",
+      "duration": 53270.706,
+      "expected": 28,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "typeScript": true,
+    "productionBuild": true,
+    "productionEnvironmentGuard": true,
+    "tokenGuard": true,
+    "productionAuthBypass": false
+  },
+  "sourceSha256": {
+    "src/pages/ApplyGate.tsx": "24fac836479fc947b5e5afa8e607ca9224b4d7a1b18c459dc1667a2a3b10df70",
+    "src/pages/ApplyGate.test.tsx": "c4afe9dc1152b813b26987564be5b11525856745895dcb34de53e67ac2a87a6e",
+    "src/pages/ApplyGateResult.test.tsx": "4da76efaeaff09662f1355973b2e88924e97eb52a3314bbc01f61a9f56b2fe05",
+    "src/pages/ApplyGateLinkedCheck.test.tsx": "cbd734752f3736013f8c956f005eafaaac18b0edb6131a4dca198d426f03aebb",
+    "src/components/ResumeEditor.test.tsx": "505069a4e06443364309ec6e718b4ae199005b56ad9edd1da301ae3a63d7f4e6",
+    "src/pages/__snapshots__/ApplyGate.test.tsx.snap": "2b9506f8aa478f7dae3afb7b5b62a857aa1d3034b08a235af4184cad657b822d",
+    "e2e/apply-gate-workflow.spec.ts": "ee90ed10e9452bc892e21735b18b33d4916d953eac0da4c8652f7dee1053015c",
+    "e2e/apply-gate.spec.ts": "c3a2157244d645005f64f669c6866f2882b5c1b1650f3c87af615e1f6e851d3b",
+    "e2e/apply-gate-persona-matrix.spec.ts": "9d5421a9b2b263bfbeda322cdc12d631a435c81218e7bbfbc0afd3cd9d18f143",
+    "e2e/apply-gate-resumes-layout.spec.ts": "1317ac41f99a0a7b778665cb3c2b392dbd98bb6c2dca72f8a99b7442361aa270",
+    "e2e/resume-workspace.spec.ts": "d987ed00ab2dbd9de4d4cbafcdd97d2fa422f808c813d053811e04f780055d36"
+  },
+  "rollbackDeploy": "6af62d7887d0ec064508d383",
+  "backendChanged": false,
+  "migrationRequired": false,
+  "liveProviderCalls": false,
+  "customerSourceWrites": false,
+  "ownerEvidence": "owner-read-only.json",
+  "sourceHashNormalization": "UTF-8 bytes with LF newlines"
+}

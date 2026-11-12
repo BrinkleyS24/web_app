@@ -143,6 +143,8 @@ const baseResult = {
 };
 
 async function runAnalyze(options?: { companyName?: string; jobTitle?: string; jobDescription?: string }) {
+  const details = screen.getByTestId('apply-gate-options');
+  if (!details.hasAttribute('open')) await userEvent.click(within(details).getByText('Optional details', {exact: false}));
   await userEvent.type(screen.getByLabelText("Job title"), options?.jobTitle || "Automation Engineer");
   if (options?.companyName) {
     await userEvent.type(screen.getByLabelText("Company (optional)"), options.companyName);
@@ -162,6 +164,147 @@ beforeEach(() => {
   updateApplyGateAction.mockResolvedValue({ success: true });
   fetchResumeVariants.mockResolvedValue({ success: true, variants: [] });
   fetchVariantScoreboard.mockResolvedValue({ success: true, scoreboard: { minSample: 5, perVariant: [] }, recommendation: null });
+});
+
+test('a new check defers history and preserves its draft across the saved-check view', async () => {
+  renderPage();
+  await userEvent.type(screen.getByLabelText('Job description'), 'An unsubmitted posting draft.');
+  expect(fetchApplyGateHistory).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole('button', {name: 'Saved checks'}));
+  expect(await screen.findByText('No saved checks yet')).toBeVisible();
+  await userEvent.click(screen.getByRole('button', {name: 'Check a role'}));
+  expect(screen.getByLabelText('Job description')).toHaveValue('An unsubmitted posting draft.');
+  expect(analyzeJobAlignment).not.toHaveBeenCalled();
+});
+
+test.each([{success:false}, {success:true, history:null}])('malformed history is a recoverable error, not empty history: %j', async response => {
+  fetchApplyGateHistory.mockResolvedValueOnce(response);
+  renderPage('/apply-gate?view=saved');
+  expect(await screen.findByText(/Saved checks could not be loaded/)).toBeVisible();
+  expect(screen.queryByText('No saved checks yet')).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', {name:'Try loading checks again'}));
+  expect(await screen.findByText('No saved checks yet')).toBeVisible();
+});
+
+test('an explicit negative save acknowledgment never records a choice; retry can complete', async () => {
+  analyzeJobAlignment.mockResolvedValue(baseResult);
+  updateApplyGateAction.mockResolvedValueOnce({success:false});
+  renderPage(); await runAnalyze();
+  await userEvent.click(await screen.findByRole('button', {name:'Fixing resume first'}));
+  expect(await screen.findByText('Choice not saved. Try again.')).toBeVisible();
+  expect(screen.queryByRole('button', {name:'Review another role'})).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', {name:'Fixing resume first'}));
+  expect(await screen.findByRole('button', {name:'Review another role'})).toBeVisible();
+});
+
+test.each([{id:undefined}, {id:'unsaved-id', historySaved:false}])('an unsaved check cannot claim to record applying intent: %j', async unsaved => {
+  analyzeJobAlignment.mockResolvedValue({...baseResult,...unsaved});
+  renderPage(); await runAnalyze();
+  await userEvent.click(await screen.findByRole('button', {name:'Fixing resume first'}));
+  expect(await screen.findByText(/Choice not saved: this check has no saved history record/)).toBeVisible();
+  expect(updateApplyGateAction).not.toHaveBeenCalled();
+  expect(screen.queryByRole('button', {name:'Review another role'})).not.toBeInTheDocument();
+});
+
+test('changed inputs retain the original verdict but require a new check before a choice', async () => {
+  analyzeJobAlignment.mockResolvedValue(baseResult);
+  renderPage(); await runAnalyze();
+  const action = await screen.findByRole('button', {name:'Fixing resume first'});
+  await userEvent.type(screen.getByLabelText('Job description'), ' New requirements.');
+  expect(screen.getByText(/The inputs have changed since this check/)).toBeVisible();
+  expect(action).toBeDisabled();
+  expect(updateApplyGateAction).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole('button', {name:'Check this role'}));
+  await waitFor(() => expect(screen.queryByText(/The inputs have changed since this check/)).not.toBeInTheDocument());
+  expect(screen.getByRole('button', {name:'Fixing resume first'})).toBeEnabled();
+});
+
+test('starting another role clears the posting and metadata but retains the selected resume and style', async () => {
+  fetchResumeVariants.mockResolvedValue({success:true,variants:[{id:'resume-a',name:'My saved version',isDefault:true}]});
+  analyzeJobAlignment.mockResolvedValue(baseResult);
+  renderPage(); await runAnalyze({companyName:'Fictional Cedar'});
+  await userEvent.type(screen.getByLabelText('Job posting link (optional)'), 'https://example.test/old');
+  await userEvent.selectOptions(screen.getByLabelText('Apply style'), 'conservative');
+  await userEvent.click(screen.getByRole('button', {name:'Check this role'}));
+  await waitFor(() => expect(screen.getByRole('button', {name:'Fixing resume first'})).toBeEnabled());
+  await userEvent.click(screen.getByRole('button', {name:'Fixing resume first'}));
+  await userEvent.click(await screen.findByRole('button', {name:'Review another role'}));
+  expect(screen.getByLabelText('Job description')).toHaveValue('');
+  expect(screen.getByLabelText('Job posting link (optional)')).toHaveValue('');
+  expect(screen.getByLabelText('Job title')).toHaveValue('');
+  expect(screen.getByLabelText('Company (optional)')).toHaveValue('');
+  expect(screen.getByLabelText('Resume')).toHaveValue('resume-a');
+  expect(screen.getByLabelText('Apply style')).toHaveValue('conservative');
+  expect(screen.getByRole('button', {name:'Check this role'})).toBeDisabled();
+});
+
+test('a pending check captures one request, disables editing and survives view switching', async () => {
+  let finish!: (value: typeof baseResult) => void;
+  analyzeJobAlignment.mockReturnValue(new Promise(resolve => {finish=resolve;}));
+  renderPage(); await runAnalyze();
+  expect(screen.getByTestId('apply-gate-progress')).toHaveTextContent('seconds elapsed');
+  expect(screen.getByLabelText('Job description')).toBeDisabled();
+  expect(screen.queryByText(/Scoring fit|Writing your decision|Reading the job/)).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button',{name:'Saved checks'}));
+  await userEvent.click(screen.getByRole('button',{name:'Check a role'}));
+  expect(screen.getByTestId('apply-gate-progress')).toBeVisible();
+  finish(baseResult);
+  expect(await screen.findByRole('button',{name:'Fixing resume first'})).toBeEnabled();
+  expect(analyzeJobAlignment).toHaveBeenCalledTimes(1);
+  expect(analyzeJobAlignment).toHaveBeenCalledWith(expect.objectContaining({jobDescription:'Requires PLC and controls experience.'}));
+});
+
+test('a failed legacy resume read cannot enable a check without a known resume', async () => {
+  fetchResume.mockRejectedValueOnce(new Error('Unavailable'));
+  renderPage();
+  expect(await screen.findByText(/Your resume could not be loaded/)).toBeVisible();
+  await userEvent.type(screen.getByLabelText('Job description'), 'A complete posting draft.');
+  expect(screen.getByRole('button', {name:'Check this role'})).toBeDisabled();
+  await userEvent.click(screen.getByRole('button', {name:'Try loading your resume again'}));
+  await waitFor(() => expect(screen.getByRole('button', {name:'Check this role'})).toBeEnabled());
+  expect(screen.getByLabelText('Job description')).toHaveValue('A complete posting draft.');
+});
+
+test('saved-history choices also require a positive save acknowledgment', async () => {
+  fetchApplyGateHistory.mockResolvedValue({success:true,history:[{
+    id:'saved-choice',job_title:'Automation Engineer',company_name:'Fictional Cedar',verdict:'risky',
+    reasons:'[]',created_at:'2026-11-12T12:00:00Z',user_action:null,
+  }]});
+  updateApplyGateAction.mockResolvedValueOnce({success:false});
+  renderPage('/apply-gate?view=saved');
+  const card=within(await screen.findByTestId('apply-gate-history-saved-choice'));
+  await userEvent.click(card.getByText('Review evidence and record a choice'));
+  await userEvent.click(card.getByRole('button', {name:'Not applying'}));
+  expect(await card.findByText('Choice not saved. Try again.')).toBeVisible();
+  expect(card.queryByText('You skipped it')).not.toBeInTheDocument();
+});
+
+test('a failed analysis envelope preserves the draft and last result rather than inventing a verdict', async () => {
+  analyzeJobAlignment.mockResolvedValueOnce(baseResult).mockResolvedValueOnce({success:false});
+  renderPage(); await runAnalyze();
+  expect(await screen.findByTestId('apply-gate-current-result')).toBeVisible();
+  await userEvent.type(screen.getByLabelText('Job description'), ' Additional requirements.');
+  await userEvent.click(screen.getByRole('button', {name:'Check this role'}));
+  expect(await screen.findByText('The check did not complete. Keep the posting and try again.')).toBeVisible();
+  expect(screen.getByTestId('apply-gate-current-result')).toBeVisible();
+  expect(screen.getByText(/The inputs have changed since this check/)).toBeVisible();
+  expect(screen.getByLabelText('Job description')).toHaveValue('Requires PLC and controls experience. Additional requirements.');
+});
+
+test('starting another role from a task handoff also clears an older standalone posting', async () => {
+  analyzeJobAlignment.mockResolvedValue(baseResult);
+  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+  render(<MemoryRouter initialEntries={['/apply-gate']}><QueryClientProvider client={client}>
+    <Link to="/apply-gate?action=0123456789abcdef&version=fedcba9876543210">Open task</Link><ApplyGate />
+  </QueryClientProvider></MemoryRouter>);
+  await userEvent.type(screen.getByLabelText('Job description'), 'An older standalone posting.');
+  await userEvent.click(screen.getByRole('link', {name:'Open task'}));
+  await runAnalyze();
+  await userEvent.click(await screen.findByRole('button', {name:'Fixing resume first'}));
+  await userEvent.click(await screen.findByRole('button', {name:'Review another role'}));
+  expect(screen.getByLabelText('Job description')).toHaveValue('');
+  expect(screen.getByLabelText('Job title')).toHaveValue('');
+  expect(screen.getByRole('button', {name:'Check this role'})).toBeDisabled();
 });
 
 test('an explicit workspace handoff selects its exact version over another default', async()=>{
@@ -262,7 +405,7 @@ describe("one saved Apply Gate presentation on every surface", () => {
       for (const action of popup.actions) expect(card.getByRole("button", { name: action.label })).toBeInTheDocument();
     };
     assertCard(current);
-    // The page intentionally hides the active verdict from history. Reopen it to exercise
+    // Reopen Saved checks to exercise
     // the persisted history path, just as opening "Full read" from the popup does.
     view.unmount();
     fetchApplyGateHistory.mockResolvedValue({ success: true, history: [{
@@ -270,8 +413,10 @@ describe("one saved Apply Gate presentation on every surface", () => {
       verdict: result.verdict, reasons: JSON.stringify(result.reasons),
       explanation_payload: result.explanation, created_at: new Date().toISOString(),
     }] });
-    renderPage();
-    assertCard(within(await screen.findByTestId(`apply-gate-history-${result.id}`)));
+    renderPage('/apply-gate?view=saved');
+    const savedCard = await screen.findByTestId(`apply-gate-history-${result.id}`);
+    await userEvent.click(within(savedCard).getByText('Review evidence and record a choice'));
+    assertCard(within(savedCard));
   });
 
   test("a canonical clean pass never falls back to a stale warning", async () => {
@@ -311,7 +456,7 @@ describe("ApplyGate current UI", () => {
 
   test("snapshot: risky verdict renders the current card layout", async () => {
     analyzeJobAlignment.mockResolvedValue(baseResult);
-    const { container } = renderPage();
+    renderPage();
 
     await runAnalyze();
 
@@ -321,7 +466,14 @@ describe("ApplyGate current UI", () => {
       expect(screen.getByText("Fixing resume first")).toBeInTheDocument();
     });
 
-    expect(container).toMatchSnapshot();
+    const card = within(screen.getByTestId('apply-gate-current-result'));
+    const text = (element: HTMLElement) => element.textContent?.replace(/\s+/g, ' ').trim();
+    expect({
+      call: text(card.getByTestId('apply-gate-call')),
+      nextSteps: text(card.getByTestId('apply-gate-todo')),
+      choices: card.getAllByRole('button').map(text),
+      details: text(card.getByTestId('apply-gate-details').querySelector('summary')!),
+    }).toMatchSnapshot();
   });
 
   test("uncalibrated risk renders an honest fit-based band, not a false-precise %", async () => {
@@ -1212,7 +1364,7 @@ describe("ApplyGate current UI", () => {
       verdict: "good_fit",
       explanation: { ...(baseResult as { explanation?: object }).explanation, decision: "apply_now" },
     });
-    renderPage();
+    renderPage('/apply-gate?view=saved');
 
     expect(await screen.findByText(/Checked with an earlier version of Apply Gate/)).toBeInTheDocument();
     // No "Choose what you did" chore on any card.
@@ -1232,7 +1384,7 @@ describe("ApplyGate current UI", () => {
       company_name: 'Fictional Cedar', created_at: '2026-10-28T12:00:00Z', outdated: true,
       verdict: action === 'APPLY' ? 'good_fit' : 'not_recommended', reasons: JSON.stringify(projected.reasons),
       explanation_payload: projected.explanation, user_action: null }] });
-    renderPage();
+    renderPage('/apply-gate?view=saved');
     expect(await screen.findByText('Re-check for current advice')).toBeVisible();
     expect(screen.getByText('Re-check needed')).toBeVisible();
     const oldHeading = action === 'APPLY' ? 'Apply now' : 'Skip this role';
@@ -1277,7 +1429,7 @@ describe("ApplyGate current UI", () => {
         },
       ],
     });
-    renderPage();
+    renderPage('/apply-gate?view=saved');
 
     await waitFor(() => {
       expect(screen.getByText("QA Engineer")).toBeInTheDocument();

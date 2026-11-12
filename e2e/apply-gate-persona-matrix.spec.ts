@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import {mockApplyGateWorkspace} from './helpers/applyGateApi';
+import { buildApplyGatePresentation } from '../../../backend/gmail-job-tracker-be/services/applyGatePresentation.js';
 
 type RequirementStatus = "missing" | "satisfied" | "unclear";
 type RequirementPriority = "hard" | "preferred";
@@ -334,6 +335,9 @@ function buildAnalyzeResponse(scenario: PersonaScenario) {
       education: "bachelors",
     },
     explanation: {
+      // Exercise the supported resolved-decision/legacy-ledger wire format. The
+      // workflow suite separately exercises the full current presentation.
+      display_decision: buildApplyGatePresentation({decision:{action:({apply_now:'APPLY',apply_with_caveats:'APPLY_WITH_STRATEGY',fix_first:'FIX_THEN_APPLY',skip:'SKIP'})[scenario.decision]},facts:{}}).decision,
       hard_blockers: requirementItems.filter((item) => item.blocksApplication).map((item) => item.label),
       missing_required: requirementItems.filter((item) => item.priority === "hard" && item.candidateStatus === "missing").map((item) => item.label),
       missing_preferred: requirementItems.filter((item) => item.priority === "preferred" && item.candidateStatus === "missing").map((item) => item.label),
@@ -459,6 +463,7 @@ test.describe("Apply Gate persona matrix", () => {
       await expect(page.getByRole("heading", { name: "Apply Gate" })).toBeVisible();
       await expect(page.getByRole("button", { name: "Check this role" })).toBeDisabled();
 
+      await page.getByTestId('apply-gate-options').locator('summary').click();
       await page.getByLabel("Job title").fill(scenario.jobTitle);
       await page.getByLabel("Company (optional)").fill(scenario.companyName);
       await page.getByLabel("Job description").fill(scenario.jobDescription);
@@ -489,7 +494,7 @@ test.describe("Apply Gate persona matrix", () => {
         }),
       );
 
-      await page.screenshot({ path: `test-results/apply-gate-${scenario.key}.png`, fullPage: true });
+      await page.screenshot({ path: test.info().outputPath(`apply-gate-${scenario.key}.png`), fullPage: true });
     });
   }
 });
