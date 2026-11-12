@@ -1,0 +1,73 @@
+{
+  "date": "2026-11-12",
+  "uiGrade": "A for reviewed local main workflows",
+  "productionDeployed": false,
+  "humanUsabilityStudy": false,
+  "sameOwnedSourceFacts": true,
+  "compiledPreview": true,
+  "normalFirebaseAuthentication": true,
+  "simulatedExtensionBridge": true,
+  "devAuthBypass": false,
+  "apiTransport": "loopback proxy to the normally serving production backend",
+  "coreSourceWrites": false,
+  "newModelCalls": false,
+  "backendOrSchemaChanges": false,
+  "dashboardLayoutChanged": false,
+  "before": [
+    {
+      "width": 1440,
+      "height": 1016,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "height": 1431,
+      "overflow": false
+    },
+    {
+      "width": 320,
+      "height": 1658,
+      "overflow": false
+    }
+  ],
+  "after": [
+    {
+      "width": 1440,
+      "height": 984,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "height": 1295,
+      "overflow": false
+    },
+    {
+      "width": 320,
+      "height": 1427,
+      "overflow": false
+    }
+  ],
+  "actualAccountChecks": {
+    "interviewPrepHandoff": true,
+    "exactDefaultResumeLink": true,
+    "fullOriginalAlertExplanation": true,
+    "exclusionsRevealed": true
+  },
+  "tests": {
+    "fullWebPassed": 778,
+    "fullWebFailed": 0,
+    "finalTargetedPassed": 47,
+    "sidebarPassed": 6,
+    "finalBrowserFixturesPassed": 9,
+    "countsOverlap": true
+  },
+  "typecheck": true,
+  "productionGuard": true,
+  "tokenCheck": true,
+  "productionBuild": true,
+  "remainingLimits": [
+    "Current owned account is a thin resume-pattern sample; other states use fixtures.",
+    "No human usability, full accessibility, multi-browser or production deployment certification.",
+    "Source eligibility/outcome/causal adjudication is unchanged and not independently re-evaluated here."
+  ]
+}

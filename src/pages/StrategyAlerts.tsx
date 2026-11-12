@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import type { LucideIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
@@ -8,7 +8,6 @@ import {
   CalendarClock,
   CheckCircle2,
   Compass,
-  FileText,
   FlaskConical,
   MessageCircleQuestion,
   Radar,
@@ -19,13 +18,15 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { EmptyState, ErrorState, LoadingRows, PageHeader, Panel, SectionLabel, ToneChip } from "@/components/premium/PremiumUI";
 import { BUTTON, CARD, EYEBROW, TONES, type Tone } from "@/components/premium/tone";
 import { useAuth } from "@/lib/AuthContext.jsx";
-import { fetchResumeGaps, fetchStrategyAlerts, type ResumeGapInsightsResponse, type StrategyAlert } from "@/lib/emails";
+import { fetchResumeGaps, fetchStrategyAlerts, type StrategyAlert } from "@/lib/emails";
 import { findDebriefAlert, isPlaceholderAlert as isPlaceholder, visibleStrategyAlerts } from "@/lib/strategyAlertVisibility";
 import { cn } from "@/lib/utils";
+import { ResumePatternsPanel } from "@/components/premium/ResumePatternsPanel";
+import { requireResumePatterns, requireStrategyAlerts } from "@/lib/strategyPresentation";
 
 function alertLook(alert: StrategyAlert): { tone: Tone; label: string; icon: LucideIcon } {
   if (alert.kind === "experiment") {
-    return { tone: "brand", label: alert.experiment?.status === "measured" ? "Experiment result" : "Experiment running", icon: FlaskConical };
+    return { tone: "brand", label: alert.experiment?.status === "measured" ? "Experiment result" : ["running", "started"].includes(alert.experiment?.status || "") ? "Experiment running" : alert.experiment?.status === "not_started" ? "Experiment not started" : "Experiment", icon: FlaskConical };
   }
   if (alert.kind === "commitment") return { tone: "upcoming", label: "Coming up", icon: CalendarClock };
   if (alert.severity === "positive") return { tone: "positive", label: "Keep doing this", icon: CheckCircle2 };
@@ -35,12 +36,16 @@ function alertLook(alert: StrategyAlert): { tone: Tone; label: string; icon: Luc
 }
 
 function alertCta(alert: StrategyAlert): { to: string; label: string } {
+  if (alert.kind !== "experiment" && alert.experiment?.status === "not_started") return { to: "/next-actions", label: "Start in Next Actions" };
+  if (alert.id === "performance-focus-interview") return { to: "/interview-prep", label: "Open interview preparation" };
+  if (alert.id === "performance-rejection-velocity-post_interview") return { to: "/interview-prep", label: "Open interview preparation" };
+  if (alert.id === "performance-focus-reach" || alert.id === "focus-industry-conversion") return { to: "/apply-gate", label: "Check your next role" };
   // You run an experiment by applying, so the next step is the next role.
   if (alert.kind === "experiment") return { to: "/apply-gate", label: "Check your next role" };
   if (alert.kind === "fit") return { to: "/apply-gate", label: "Check your next role" };
-  if (alert.kind === "commitment") return { to: "/next-actions", label: alert.anchor?.kind === "assessment" ? "Open assessment tasks" : "Open interview tasks" };
+  if (alert.kind === "commitment") return { to: "/next-actions", label: alert.anchor?.kind === "assessment" ? "Open assessment tasks" : alert.anchor?.kind === "interview" ? "Open interview tasks" : "Review related tasks" };
   if (alert.kind === "focus") return { to: "/next-actions", label: "See focused actions" };
-  return { to: "/next-actions", label: "See what to do today" };
+  return { to: "/next-actions", label: "Review next actions" };
 }
 
 /**
@@ -51,13 +56,11 @@ function alertCta(alert: StrategyAlert): { to: string; label: string } {
 function AlertCard({ alert }: { alert: StrategyAlert }) {
   const look = alertLook(alert);
   const cta = alertCta(alert);
-  const [expanded, setExpanded] = useState(false);
-  const longDescription = (alert.description || "").length > 180;
 
   return (
     <article id={alert.id} className={cn(CARD, "relative scroll-mt-24 overflow-hidden")}>
       <span className={cn("absolute inset-y-0 left-0 w-1", TONES[look.tone].rail)} aria-hidden />
-      <div className="px-6 py-5">
+      <div className="min-w-0 px-5 py-5 [overflow-wrap:anywhere]">
         <div className="flex flex-wrap items-center gap-2">
           <ToneChip tone={look.tone}>{look.label}</ToneChip>
           {alert.timeframe_label ? <span className="text-[12px] text-muted-foreground">{alert.timeframe_label}</span> : null}
@@ -65,23 +68,6 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
         <h2 className="mt-2.5 text-[20px] font-bold leading-snug tracking-[-0.015em] text-foreground">{alert.title}</h2>
         {alert.supporting_stat ? (
           <p className="mt-1.5 text-[15px] font-semibold text-foreground/85">{alert.supporting_stat}</p>
-        ) : null}
-        {alert.description ? (
-          <div className="mt-1.5 max-w-[74ch]">
-            <p className={cn("text-[13px] leading-relaxed text-muted-foreground", !expanded && longDescription && "line-clamp-2")}>
-              {alert.description}
-            </p>
-            {longDescription ? (
-              <button
-                type="button"
-                onClick={() => setExpanded((open) => !open)}
-                aria-expanded={expanded}
-                className="mt-1 min-h-11 text-[13px] font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-              >
-                {expanded ? "Show less" : "Read more"}
-              </button>
-            ) : null}
-          </div>
         ) : null}
 
         <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
@@ -96,9 +82,15 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
             </Link>
         </div>
 
+        {alert.description ? <details className="mt-3 max-w-[74ch] text-sm">
+          <summary className="min-h-11 cursor-pointer py-3 font-medium">Why this appeared</summary>
+          <p className="whitespace-pre-wrap leading-relaxed text-muted-foreground">{alert.description}</p>
+        </details> : null}
+
         {/* The finding's experiment: one change to try, measured on the next applications. */}
         {alert.kind !== "experiment" && alert.experiment?.status === "not_started" ? (
-          <div className={cn("mt-4 rounded-xl border px-4 py-3", TONES.brand.surface)} data-testid="experiment-offer">
+          <details className={cn("mt-3 rounded-xl border px-4 py-3", TONES.brand.surface)} data-testid="experiment-offer">
+            <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">Try one change</summary>
             <p className={cn("flex items-center gap-1.5", EYEBROW, TONES.brand.text)}>
               <FlaskConical className="h-3.5 w-3.5" aria-hidden />
               Try it and see
@@ -107,10 +99,7 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
             {alert.experiment.howItWorks ? (
               <p className="mt-1 text-[13px] leading-snug text-muted-foreground">{alert.experiment.howItWorks}</p>
             ) : null}
-            <Link to="/next-actions" className={cn(BUTTON.secondary, "mt-2.5 inline-flex px-3 py-1.5 text-[13px]")}>
-              Start in Next Actions
-            </Link>
-          </div>
+          </details>
         ) : alert.kind !== "experiment" && alert.experiment?.status === "started" ? (
           <p className="mt-3 text-[13px] text-muted-foreground">
             You are trying this now. Its progress is under Your experiments at the top of this page.
@@ -118,85 +107,6 @@ function AlertCard({ alert }: { alert: StrategyAlert }) {
         ) : null}
       </div>
     </article>
-  );
-}
-
-function SkillGapsPanel({ data }: { data: ResumeGapInsightsResponse }) {
-  const gaps = data.gaps || [];
-  const excluded = (data.outdatedVerdictsExcluded || 0) + (data.changedResumeVerdictsExcluded || 0);
-  return (
-    <Panel
-      icon={FileText}
-      tone="brand"
-      title="Requirements that keep coming up"
-      description={`Unresolved requirements from the latest current Apply Gate checks for ${data.resume?.name || "your default resume"}. Review the quoted requirement and add only details you can support.`}
-    >
-      <p className="mb-3 text-[13px] leading-relaxed text-muted-foreground">
-        {data.resume ? <>Using <strong>{data.resume.name}</strong>, your default resume. <Link className="underline underline-offset-2" to={`/resumes#resume-${data.resume.variantId}`}>View or change your resume</Link>.</>
-          : <>Choose a default resume to see its recurring gaps. <Link className="underline underline-offset-2" to="/resumes">Open Resumes</Link>.</>}
-        {data.truncated ? ` This summary uses the latest ${data.sampledChecks} checks; older checks are outside this sample.` : ""}
-      </p>
-      {excluded > 0 ? <p className="mb-3 text-[13px] leading-relaxed text-muted-foreground">
-        {excluded} {excluded === 1 ? "check needs" : "checks need"} a fresh Apply Gate check to verify the current analysis and saved wording. <Link className="underline underline-offset-2" to="/apply-gate">Re-check in Apply Gate</Link>.
-      </p> : null}
-      {(data.otherResumeVerdictsExcluded || 0) > 0 ? <p className="mb-3 text-[13px] text-muted-foreground">{data.otherResumeVerdictsExcluded} checks for other resume versions are kept separate.</p> : null}
-      {gaps.length === 0 ? (
-        <EmptyState
-          compact
-          title={data.distinctRolesEvaluated ? "No repeated gaps" : "No current checks for this version"}
-          body={
-            "A gap appears after it is seen in two distinct roles checked against this exact saved wording. Other resume versions are kept separate."
-          }
-          action={
-            excluded > 0 ? (
-              <Link to="/apply-gate" className={BUTTON.secondary}>
-                Open Apply Gate
-              </Link>
-            ) : undefined
-          }
-        />
-      ) : (
-        <ul className="divide-y divide-border">
-          {gaps.slice(0, 6).map((gap) => (
-            <li key={`${gap.category}-${gap.skill}`} className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
-              <div className="min-w-0">
-                <p className="text-[15px] font-semibold text-foreground">{gap.skill}</p>
-                {gap.label ? <p className="mt-1 text-[13px] text-muted-foreground">{gap.label}</p> : null}
-                <p className="mt-0.5 text-[13px] text-muted-foreground">
-                  {gap.examples
-                    .map((example) => [example.company, example.position].filter(Boolean).join(" · "))
-                    .filter(Boolean)
-                    .slice(0, 3)
-                    .join("; ")}
-                </p>
-                {gap.examples.length > 0 && gap.occurrences > Math.min(gap.examples.length, 3) ? (
-                  <p className="mt-1 text-[12px] text-muted-foreground">Showing {Math.min(gap.examples.length, 3)} of {gap.occurrences} checked roles.</p>
-                ) : null}
-                {gap.examples.some(example => example.requirementQuote) ? <details className="mt-2 text-[13px] text-muted-foreground">
-                  <summary className="min-h-11 cursor-pointer py-3">See posting evidence</summary>
-                  <ul className="mt-2 space-y-2">
-                    {gap.examples.filter(example => example.requirementQuote).map((example, index) => <li key={example.verdictId || index}>
-                      {example.verdictId ? <Link
-                        to={`/apply-gate?verdict=${encodeURIComponent(example.verdictId)}`}
-                        className="inline-flex min-h-11 items-center font-medium underline underline-offset-2 hover:text-foreground"
-                      >{[example.company, example.position].filter(Boolean).join(" · ") || "View saved check"}</Link>
-                        : <span className="font-medium">{[example.company, example.position].filter(Boolean).join(" · ")}</span>}
-                      <blockquote className="mt-1 border-l-2 border-border pl-3">{example.requirementQuote}</blockquote>
-                    </li>)}
-                  </ul>
-                </details> : null}
-              </div>
-              <div className="flex items-center gap-2">
-                <ToneChip tone={gap.category === "preferred" ? "neutral" : "attention"}>
-                  {gap.category === "required" ? "Requirement blocker" : gap.category === "evidence" ? "Review requirement" : "Nice to have"}
-                </ToneChip>
-                <span className="text-[12px] font-medium text-muted-foreground">{gap.occurrences} roles</span>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Panel>
   );
 }
 
@@ -208,6 +118,7 @@ const StrategyAlerts = () => {
   const alertsQuery = useQuery({
     queryKey: ["strategy-alerts", "alerts", user?.uid],
     queryFn: fetchStrategyAlerts,
+    select: requireStrategyAlerts,
     enabled: isAuthed,
     staleTime: 120_000,
     refetchOnWindowFocus: "always",
@@ -215,6 +126,7 @@ const StrategyAlerts = () => {
   const gapsQuery = useQuery({
     queryKey: ["strategy-alerts", "skill-gaps", user?.uid],
     queryFn: fetchResumeGaps,
+    select: requireResumePatterns,
     enabled: isAuthed,
     staleTime: 300_000,
     refetchOnWindowFocus: "always",
@@ -252,7 +164,7 @@ const StrategyAlerts = () => {
         <PageHeader
           eyebrow="Patterns in your search"
           title="Strategy Alerts"
-          description="Patterns across your tracked applications and saved job checks, with the evidence and a next step. An alert only appears when there is enough evidence behind it."
+          description="What your tracked results suggest, and one step to consider next. Open the evidence when you want the detail."
         />
 
         {alertsQuery.isLoading ? (
@@ -271,7 +183,7 @@ const StrategyAlerts = () => {
           <Link
             to="/dashboard"
             data-testid="debrief-link"
-            className={cn(CARD, "flex items-center justify-between gap-3 px-5 py-4 transition-colors hover:border-foreground/25")}
+            className={cn(CARD, "flex flex-col items-start justify-between gap-3 px-5 py-4 transition-colors hover:border-foreground/25 sm:flex-row sm:items-center")}
           >
             <span className="flex min-w-0 items-center gap-3">
               <MessageCircleQuestion className={cn("h-4 w-4 shrink-0", TONES.attention.text)} aria-hidden />
@@ -286,7 +198,7 @@ const StrategyAlerts = () => {
           </Link>
         ) : null}
 
-        {alertsQuery.isLoading || alertsQuery.isError ? null : alerts.length === 0 ? (
+        {!isAuthed || alertsQuery.isLoading || alertsQuery.isError ? null : alerts.length === 0 ? (
           <div className={cn(CARD, "p-5")}>
             <EmptyState
               icon={Radar}
@@ -331,10 +243,10 @@ const StrategyAlerts = () => {
           title="Your resume patterns did not load"
           detail="Retry to load patterns for your current default resume. You can review your resume library separately."
           onRetry={() => void gapsQuery.refetch()}
-        /> : showGaps ? <SkillGapsPanel data={gapsQuery.data!} /> : gapsQuery.isLoading && isAuthed ? <Panel title="Resume patterns"><LoadingRows rows={2} /></Panel> : null}
+        /> : showGaps ? <ResumePatternsPanel data={gapsQuery.data!} /> : gapsQuery.isLoading && isAuthed ? <Panel title="Resume patterns"><LoadingRows rows={2} /></Panel> : null}
 
         <p className="px-1 text-[12px] leading-relaxed text-muted-foreground">
-          Alerts describe patterns in your own results. They show what tends to go with what — not proof that one thing caused another.
+          These are observations from your tracked records, not proof of why an employer decided or whether you qualify for a new role.
         </p>
       </div>
     </DashboardLayout>

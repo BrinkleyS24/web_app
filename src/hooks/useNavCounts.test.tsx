@@ -68,6 +68,11 @@ beforeEach(() => {
 });
 
 describe("useNavCounts", () => {
+  test.each([{success:false},{success:true,alerts:{}},{success:true,alerts:[{id:"broken"}]}])("invalid alerts mean no badge instead of a broken screen: %j",async response=>{
+    fetchStrategyAlerts.mockResolvedValue(response);
+    const {result}=renderHook(()=>useNavCounts(true,"test-user"),{wrapper});
+    await waitFor(()=>expect(result.current["/next-actions"]).toBe(4));expect(result.current["/strategy-alerts"]).toBe(0);
+  });
   // The badge said 2 beside a page of 3 cards (persona review, 2026-10-14). It now counts exactly
   // the cards the page shows: good news included, floors and the dashboard-only debrief excluded.
   test("counts Today and exactly the alert cards Strategy Alerts shows", async () => {

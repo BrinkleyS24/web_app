@@ -92,10 +92,46 @@ afterEach(() => {
 });
 
 describe("StrategyAlerts", () => {
+  test("one current role and many older exclusions never claim no repeated gaps",async()=>{
+    fetchStrategyAlerts.mockResolvedValue({success:true,alerts:[{...lowMatch,id:"performance-focus-interview",kind:"performance",severity:"medium",title:"Review the interview decisions you have recorded"}]});
+    fetchResumeGaps.mockResolvedValue({success:true,basis:"current_default_resume_checks",resume:{variantId:"r",name:"Current default"},analyzedVerdicts:1,distinctRolesEvaluated:1,gaps:[],outdatedVerdictsExcluded:71});renderPage();
+    expect(await screen.findByText("Only one current role checked")).toBeVisible();expect(screen.queryByText("No repeated gaps")).toBeNull();expect(screen.getByRole("link",{name:"Check another role"})).toHaveAttribute("href","/apply-gate");
+    expect(screen.getByText(/71 older checks were excluded/)).not.toBeVisible();fireEvent.click(screen.getByText("What this summary uses"));expect(screen.getByText(/71 older checks were excluded/)).toBeVisible();
+    expect(screen.getByRole("link",{name:"Open interview preparation"})).toHaveAttribute("href","/interview-prep");
+  });
+  test("a sufficient negative is explicitly scoped and does not establish eligibility",async()=>{
+    fetchResumeGaps.mockResolvedValue({success:true,basis:"current_default_resume_checks",resume:{variantId:"r",name:"Current default"},analyzedVerdicts:3,distinctRolesEvaluated:3,gaps:[]});renderPage();
+    expect(await screen.findByText("No repeated requirements in these checks")).toBeVisible();expect(screen.getByText(/does not establish qualification for another job/)).toBeVisible();
+  });
+  test("a capped history keeps its sample limit visible before the evidence disclosure opens",async()=>{
+    fetchResumeGaps.mockResolvedValue({success:true,basis:"current_default_resume_checks",resume:{variantId:"r",name:"Current default"},analyzedVerdicts:3,distinctRolesEvaluated:3,gaps:[],sampledChecks:150,sampleLimit:150,truncated:true});renderPage();
+    expect(await screen.findByText("Based on the latest 150 saved checks; older checks are outside this sample.",{exact:true})).toBeVisible();
+  });
+  test("a customer without a default resume is guided to Resumes",async()=>{
+    fetchResumeGaps.mockResolvedValue({success:true,basis:"current_default_resume_checks",resume:null,unavailableReason:"no_default_resume",analyzedVerdicts:0,distinctRolesEvaluated:0,gaps:[]});renderPage();
+    expect(await screen.findByText("Choose a default resume")).toBeVisible();expect(screen.getByRole("link",{name:"Open Resumes"})).toHaveAttribute("href","/resumes");
+  });
+  test.each([{success:false,alerts:[]},{success:true,alerts:{}},{success:true,alerts:[{...lowMatch,severity:"unknown"}]}])("malformed findings are unavailable while independent resume patterns survive: %j",async payload=>{
+    fetchStrategyAlerts.mockResolvedValue(payload);renderPage();expect(await screen.findByText("Your alerts did not load")).toBeVisible();expect(screen.queryByText("No strong patterns yet")).toBeNull();expect(await screen.findByText("Playwright")).toBeVisible();
+  });
+  test("a failed refresh with cached findings does not leave their recommendation actionable",async()=>{
+    const client=new QueryClient({defaultOptions:{queries:{retry:false}}});renderPage({client});await screen.findByRole("heading",{name:lowMatch.title});
+    fetchStrategyAlerts.mockRejectedValue(new Error("Fictional refresh outage"));await client.refetchQueries({queryKey:["strategy-alerts","alerts","test-user"]});
+    expect(await screen.findByText("Your alerts did not load")).toBeVisible();expect(screen.queryByRole("heading",{name:lowMatch.title})).toBeNull();expect(screen.getByText("Playwright")).toBeVisible();client.clear();
+  });
+  test("all returned requirements stay reachable and optional details never become blockers",async()=>{
+    const gaps=Array.from({length:7},(_,index)=>({skill:`Requirement ${index+1}`,category:index===6?"preferred":"evidence",label:"Original evidence label",occurrences:2,examples:[]}));
+    fetchResumeGaps.mockResolvedValue({success:true,basis:"current_default_resume_checks",resume:{variantId:"r",name:"Current default"},analyzedVerdicts:3,distinctRolesEvaluated:3,gaps});renderPage();
+    await screen.findByText("Requirement 1");expect(screen.getByText("Requirement 7")).not.toBeVisible();fireEvent.click(screen.getByText("More repeated requirements (4)"));expect(screen.getByText("Requirement 7")).toBeVisible();expect(screen.getByText("Nice to have")).toBeVisible();expect(screen.queryByText("Requirement blocker")).toBeNull();
+  });
+  test("the full explanation is available on demand while the proposed next step stays visible",async()=>{
+    renderPage();await screen.findByRole("heading",{name:lowMatch.title});expect(screen.getByText(lowMatch.description)).not.toBeVisible();expect(screen.getByText(lowMatch.recommendation)).toBeVisible();
+    fireEvent.click(screen.getAllByText("Why this appeared")[0]);expect(screen.getByText(lowMatch.description)).toBeVisible();
+  });
   test("posting evidence opens its exact saved check without inventing a missing source identity", async () => {
     fetchResumeGaps.mockResolvedValue({success:true,basis:"current_default_resume_checks",resume:{variantId:"resume-a",name:"QA current"},analyzedVerdicts:2,distinctRolesEvaluated:2,gaps:[{skill:"Degree",category:"required",label:"Explicit requirement blocker in the checked resume",occurrences:2,examples:[{company:"One",position:"QA",requirementQuote:"A completed degree is mandatory.",verdictId:"source/one"},{company:"Unknown attribution",position:"QA",requirementQuote:"A completed degree is mandatory."}]}]});
     renderPage();
-    await screen.findByText("Requirements that keep coming up");
+    await screen.findByText("Requirements across role checks");
     fireEvent.click(screen.getByText("See posting evidence"));
     expect(screen.getByRole("link",{name:"One · QA"})).toHaveAttribute("href","/apply-gate?verdict=source%2Fone");
     expect(screen.queryByRole("link",{name:"Unknown attribution · QA"})).not.toBeInTheDocument();
@@ -113,7 +149,7 @@ describe("StrategyAlerts", () => {
     expect(await screen.findByText("Strategy alerts are temporarily paused")).toBeInTheDocument();
     expect(screen.queryByRole("heading",{name:lowMatch.title})).not.toBeInTheDocument();
     expect(screen.getByText(/Next Actions, Apply Gate, and your saved resumes remain available/)).toBeInTheDocument();
-    expect(await screen.findByText("Requirements that keep coming up")).toBeInTheDocument();
+    expect(await screen.findByText("Requirements across role checks")).toBeInTheDocument();
   });
   test("a failed gap read remains retryable while the alert finding stays available", async () => {
     fetchResumeGaps.mockRejectedValueOnce(new Error("Temporary database outage"));
@@ -121,7 +157,7 @@ describe("StrategyAlerts", () => {
     expect(await screen.findByText("Your resume patterns did not load")).toBeInTheDocument();
     expect(screen.getByRole("heading", {name: lowMatch.title})).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: /Try again/i}));
-    expect(await screen.findByText("Requirements that keep coming up")).toBeInTheDocument();
+    expect(await screen.findByText("Requirements across role checks")).toBeInTheDocument();
     expect(screen.queryByText("Your resume patterns did not load")).not.toBeInTheDocument();
   });
 
@@ -155,8 +191,9 @@ describe("StrategyAlerts", () => {
     fetchResumeGaps.mockResolvedValue({success:true,basis:"current_default_resume_checks",resume:{variantId:"resume-a",name:"Career switch"},analyzedVerdicts:0,distinctRolesEvaluated:0,gaps:[],changedResumeVerdictsExcluded:2});
     renderPage();
     expect(await screen.findByRole("link",{name:"View or change your resume"})).toHaveAttribute("href","/resumes#resume-resume-a");
-    expect(screen.getByText(/2 checks need a fresh Apply Gate check/)).toBeInTheDocument();
+    expect(screen.getByText(/2 checks used earlier resume wording/)).toBeInTheDocument();
     expect(screen.getByText(/Other resume versions are kept separate/)).toBeInTheDocument();
+    expect(screen.getByText("No current role checks for this version")).toBeVisible();
   });
   test("each alert says what was noticed, the evidence, and what to do", async () => {
     renderPage();
@@ -165,7 +202,8 @@ describe("StrategyAlerts", () => {
     expect(screen.getByText("3 of your last 4 acted-on Apply Gate decisions were risky or not recommended.")).toBeInTheDocument();
     expect(screen.getByText("75.0% of recent screened applications were low-match")).toBeInTheDocument();
     expect(screen.getByText("Shift the next batch toward good-fit or strong-fit roles before sending more applications.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Check your next role/ })).toHaveAttribute("href", "/apply-gate");
+    expect(screen.getAllByRole("link", { name: /Check your next role/ })).toHaveLength(2);
+    screen.getAllByRole("link", { name: /Check your next role/ }).forEach(link=>expect(link).toHaveAttribute("href", "/apply-gate"));
 
     expect(screen.getByText("Needs attention")).toBeInTheDocument();
     expect(screen.getByText("Working for you")).toBeInTheDocument();
@@ -194,7 +232,7 @@ describe("StrategyAlerts", () => {
 
   test("skill gaps from Apply Gate checks live here now", async () => {
     renderPage();
-    expect(await screen.findByText("Requirements that keep coming up")).toBeInTheDocument();
+    expect(await screen.findByText("Requirements across role checks")).toBeInTheDocument();
     expect(screen.getByText("Playwright")).toBeInTheDocument();
     expect(screen.getByText("NewCo · QA; OtherCo · SDET")).toBeInTheDocument();
   });
@@ -204,7 +242,7 @@ describe("StrategyAlerts", () => {
       success: true, basis: "current_default_resume_checks", resume: {variantId: "resume-a", name: "QA default"}, analyzedVerdicts: 4, distinctRolesEvaluated: 0, verdictsWithGapData: 0, gaps: [], outdatedVerdictsExcluded: 4,
     });
     renderPage();
-    expect(await screen.findByText(/4 checks need a fresh Apply Gate check/)).toBeInTheDocument();
+    expect(await screen.findByText(/4 older checks were excluded/)).toBeInTheDocument();
   });
 
   test("does not call the premium endpoint when signed out", async () => {
