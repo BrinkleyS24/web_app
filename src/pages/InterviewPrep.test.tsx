@@ -18,7 +18,10 @@ const source={logicalKey,dedupeKey,sourceVersion:"a".repeat(64),company:"Example
 const pack={sourceVersion:source.sourceVersion,resume:{id:variantId,name:"Front desk",version:"b".repeat(64)},postingVersion:"c".repeat(64),disclosure:"Practice prompts, not predictions of interview questions.",practice:[{id:"focus-one",quote,kind:"experience",question:"Walk through a real example.",guidance:"Only facts you can support.",askInterviewer:"How is success measured?",possibleExamples:["Managed appointment scheduling and patient records for a clinic."]}]};
 beforeEach(()=>{sessionStorage.clear();vi.clearAllMocks();mocks.auth.mockReturnValue({user:{uid:"owner"}});mocks.source.mockResolvedValue(source);mocks.variants.mockResolvedValue({success:true,variants:[{id:variantId,name:"Front desk",isDefault:true},{id:"ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee",name:"Other version"}]});mocks.build.mockResolvedValue(pack);mocks.history.mockResolvedValue({success:true,history:[]});mocks.stored.mockResolvedValue({success:true,emails:[]});mocks.queue.mockResolvedValue({success:true,queue:{doToday:[],thisWeek:[],later:[],blocked:[]}});});
 function setup(client=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}}),path=`/interview-prep?action=${logicalKey}&version=${dedupeKey}`){const ui=<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><InterviewPrep/></MemoryRouter></QueryClientProvider>;return {...render(ui),client,ui};}
-async function fill(){await screen.findByText("Example Health · Receptionist");await userEvent.selectOptions(screen.getByLabelText("Resume for this interview"),variantId);await userEvent.type(screen.getByLabelText("Posting for this role"),posting);await userEvent.type(screen.getByLabelText("Responsibilities or requirements to practice"),quote);}
+// The source setup represents pasting a posting and its exact focus quote.
+// Keep actual typing in the note-editing cases rather than replaying hundreds of
+// setup keystrokes in every unrelated regression.
+async function fill(){await screen.findByText("Example Health · Receptionist");await userEvent.selectOptions(screen.getByLabelText("Resume for this interview"),variantId);fireEvent.change(screen.getByLabelText("Posting for this role"),{target:{value:posting}});fireEvent.change(screen.getByLabelText("Responsibilities or requirements to practice"),{target:{value:quote}});}
 async function build(){await userEvent.click(screen.getByRole("button",{name:"Build my practice"}));await screen.findByText("Walk through a real example.");}
 // 2026-10-15: prep starts in one tap, so the default resume is preselected (it used to require an
 // explicit choice). A thin invitation with no posting still builds nothing, and no time is guessed.
@@ -187,7 +190,8 @@ test("direct invitation selection loads without requesting the queue",async()=>{
 });
 test("topic navigation retains every answer and exports hidden topics and eligibility notes",async()=>{
   const eligibility={...pack.practice[0],id:"eligibility",quote:"Active nursing licence required before starting.",kind:"eligibility",question:"Explain your current credential status."};
-  mocks.build.mockResolvedValue({...pack,practice:[...pack.practice,eligibility]});setup();await fill();await build();
+  mocks.build.mockResolvedValue({...pack,practice:[...pack.practice,eligibility]});setup();await fill();
+  fireEvent.change(screen.getByLabelText("Posting for this role"),{target:{value:posting+" "+eligibility.quote}});fireEvent.change(screen.getByLabelText("Responsibilities or requirements to practice"),{target:{value:quote+"\n"+eligibility.quote}});await build();
   await userEvent.type(screen.getByLabelText("What I did"),"My first truthful example.");
   await userEvent.click(screen.getByRole("button",{name:"Practice topic 2"}));expect(screen.queryByLabelText("What I did")).toBeNull();
   await userEvent.type(screen.getByLabelText("My current status"),"Credential pending; not held.");
