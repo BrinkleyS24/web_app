@@ -1,7 +1,7 @@
 {
   "date": "2026-11-12",
   "uiGrade": "A for reviewed local main workflows",
-  "productionDeployed": false,
+  "productionDeployed": true,
   "humanUsabilityStudy": false,
   "sameOwnedSourceFacts": true,
   "compiledPreview": true,
@@ -69,5 +69,6 @@
     "Current owned account is a thin resume-pattern sample; other states use fixtures.",
     "No human usability, full accessibility, multi-browser or production deployment certification.",
     "Source eligibility/outcome/causal adjudication is unchanged and not independently re-evaluated here."
-  ]
+  ],
+  "releaseReceipt": "release.json"
 }

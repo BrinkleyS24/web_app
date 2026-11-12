@@ -1,0 +1,24 @@
+{
+  "deployed": true,
+  "at": "2026-11-12T15:12:45.103363+00:00",
+  "webCommit": "5cdc67b9bf1c4a9a3a2c69fbce9dd08a35b61ed9",
+  "webDeploy": "6af5d66f09633c0372e2af9a",
+  "rollbackWebDeploy": "6af5c6307d4438c9b188387b",
+  "apiTraffic": [
+    [
+      "applendium-backend-prep-450a73a",
+      100
+    ]
+  ],
+  "backendConfigurationUnchanged": true,
+  "publishLockPreserved": true,
+  "publicAssetHashesVerified": true,
+  "productionBrowserPassed": true,
+  "migrations": false,
+  "coreCustomerWrites": false,
+  "limits": [
+    "Normal Firebase/Premium authentication with simulated extension bridge.",
+    "Injected dependency failure is separate from live source checks.",
+    "No human usability, multi-browser, fleet-load or underlying-outcome certification."
+  ]
+}
