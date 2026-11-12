@@ -1,0 +1,86 @@
+{
+  "date": "2026-11-12",
+  "change": "Clear completed resume confirmations from actionable work; retain correctable history",
+  "status": "local_correction_not_deployed",
+  "previousAGrade": "withdrawn",
+  "newGrade": "not_assigned",
+  "fullRegression": {
+    "numPassedTests": 809,
+    "numFailedTests": 0,
+    "numPassedTestSuites": 149,
+    "numFailedTestSuites": 0
+  },
+  "targeted": {
+    "numPassedTests": 104,
+    "numFailedTests": 0
+  },
+  "browser": {
+    "startTime": "2026-11-12T16:10:51.904Z",
+    "duration": 152005.956,
+    "expected": 16,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "actualAccountReadOnly": {
+    "normalFirebaseAuth": true,
+    "simulatedExtensionBridge": true,
+    "sourceWrites": false,
+    "sourcePageSize": 10,
+    "needsConfirmation": 3,
+    "recorded": 7,
+    "hasOlderPages": true,
+    "confirmedEntriesAbsentFromActionableList": true,
+    "correctionOpenedReadOnly": true,
+    "unchangedCorrectionDisabled": true,
+    "metrics": [
+      {
+        "width": 1440,
+        "overflow": false
+      },
+      {
+        "width": 768,
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "overflow": false
+      },
+      {
+        "width": 320,
+        "overflow": false
+      }
+    ],
+    "errors": []
+  },
+  "checks": {
+    "typeScript": true,
+    "productionGuard": true,
+    "tokenCheck": true,
+    "productionBuild": true,
+    "loopbackBuild": true,
+    "databaseMigrationNeeded": false,
+    "backendChanged": false
+  },
+  "acceptance": [
+    "already confirmed records absent from editable task list",
+    "successful confirmation moves after server refresh",
+    "explicit unknown completes without credit",
+    "named unavailable document remains actionable",
+    "reload retains recording",
+    "history correction uses current revision",
+    "identical correction cannot resave",
+    "lost response retries same request",
+    "failed acknowledgement leaves task",
+    "failed refreshed read does not invent completion",
+    "pagination cannot discard pending save",
+    "page-local empty state retains older-page continuation",
+    "keyboard focus and view/draft preservation"
+  ],
+  "limitations": [
+    "Counts and recorded history are page-local; older pages remain accessible through pagination.",
+    "Real-account writes were not performed; mutations use stateful fictional service fixtures.",
+    "No automatic A re-award, human usability study or complete accessibility/cross-browser certification."
+  ],
+  "sourceSha256": "c3258fd6803d03e0a4231461c3f6851b8f6a2697e97b5e1c57ecb2c475c0b44e"
+}

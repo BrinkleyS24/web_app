@@ -1,8 +1,22 @@
 # Resumes UI review — November 12, 2026
 
-**Grade: A for the reviewed local UI/main workflows. Not deployed.** This is a heuristic engineering assessment, not a human usability-study result or production-readiness certification of every Premium feature.
+**Prior A grade withdrawn.** The customer found that confirmed applications stayed editable in the work list. The earlier assessment missed persistent task completion; passing the listed technical checks did not justify that grade. A follow-up correction separates actionable work from recorded history and adds stateful completion/reload/correction acceptance tests. This remains a local candidate, not a deployed revision.
 
 The baseline [UI review](../ui-review-20261111/README.md) graded Resumes **C**. Saved wording, outcome analysis, health findings and submission confirmations competed on one page. “Compare” described two different tasks. In the observed account, 509 applications with unknown submitted versions appeared before the library, while the confirmation action was far below it.
+
+## Completion correction after customer review
+
+The customer correctly identified that a confirmed application remained an editable task. The previous browser fixture returned `submission: null` even after a successful PUT; it asserted a save message, not completion that survives a reload. The technical pass counts below did not establish that product behavior. **The A is withdrawn, with no automatic replacement grade.**
+
+The [correction plan](COMPLETION-PLAN.md) defines the revised acceptance and risks. The panel now puts only unanswered applications or named unavailable documents in **Needs confirmation on this page**. Saved answers move into compact **Recorded on this page** history after a server refresh. A recorded entry has an explicit **Change submitted resume** action; unchanged choices cannot be saved again. Explicit unknown answers complete the task while preserving zero resume credit. No application, resume, confirmation or historical outcome is deleted.
+
+Write failures keep the task and its retry identity. A failed or inconsistent read after an acknowledged write reports that the updated list could not be verified, rather than claiming completion. The completion message lives outside the removed row. Pagination waits for pending saves; page-local empty copy retains the older-applications action. Dependent advice is invalidated immediately without making task completion wait for unrelated analysis reads.
+
+Correction validation passed **809 web tests, 104 targeted checks, 16 browser scenarios, TypeScript and guarded production/preview builds**. The new stateful browser scenario starts with ten applications (two already recorded), finishes the eight tasks, retries a lost acknowledgment using the same request, reloads, corrects a recorded choice using its revision, then records an older application as unknown. It runs at 320/390/768/1440px. Existing editor/wording/Apply Gate and view-preservation checks also pass.
+
+A fresh read-only check on the actual account observed **3 needing confirmation and 7 recorded on the current ten-application page**, with older pages available. Those seven are absent from the editable task list; correction can be opened without writing. No actual-account records were changed during validation. The older source-parity/count measurements below describe the earlier snapshot before the customer's confirmations, not this later account state.
+
+See [correction results and limits](completion-results.json), [mobile completion](completion-390.png) and [desktop completion](completion-1440.png). The published screenshots use fictional data. This correction is committed for local review and is **not deployed**. It changes presentation, not attribution policy or database transactions; no migration/backend rollout is required. Counts/history remain page-local rather than a new server-filtered global queue. Human usability and complete accessibility/multi-browser validation remain unverified.
 
 This is a **local frontend candidate**, not the serving production revision. Strategy Alerts was separately [deployed and verified](../strategy-ui-20261112/release.json). No new backend, migration, worker, AI call or source-changing action on the real account is part of this Resumes change. Dashboard remains last.
 

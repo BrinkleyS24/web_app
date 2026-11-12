@@ -4,7 +4,7 @@
   "status": "local_candidate_not_deployed",
   "grade": {
     "baseline": "C",
-    "candidate": "A",
+    "candidate": "withdrawn",
     "kind": "heuristic engineering UI assessment",
     "scope": "reviewed Library, outcome/submission, evidence/failure and cross-feature workflows",
     "notCertified": [
@@ -13,7 +13,9 @@
       "all browsers",
       "new backend attribution correctness",
       "live source mutations or concurrency"
-    ]
+    ],
+    "previousCandidate": "A",
+    "reason": "Missed persistent task completion: confirmed applications remained editable in the actionable list."
   },
   "sourceWritesOnRealAccount": false,
   "normalFirebaseAuth": true,
@@ -184,5 +186,6 @@
     "numFailedTests": 0,
     "numPassedTestSuites": 149,
     "numFailedTestSuites": 0
-  }
+  },
+  "historicalValidationNote": "The original passing checks did not test task completion with a stateful service. See the follow-up completion review."
 }

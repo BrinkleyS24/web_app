@@ -20,6 +20,7 @@ for (const width of [320, 390, 768, 1440]) {
     const errors: string[] = [], requests: string[] = [], confirmations: unknown[] = [];
     const roleFilters: Array<string | null> = [];
     let healthFailed = false, libraryFailed = false, outcomesFailed = false;
+    let submitted: Record<string, unknown> | null = null;
     page.on('pageerror', error => errors.push(error.message));
     await page.route('**/api/**', async route => {
       const request = route.request(), url = new URL(request.url()), path = url.pathname;
@@ -40,10 +41,11 @@ for (const width of [320, 390, 768, 1440]) {
           { variantId: 'archived-version', name: 'Archived wording — original submission preserved', sent: 1, matchedToOutcome: 1, interviewed: 1, offered: 0, rejected: 0, noResponse: 0, interviewRate: 100, sufficientSample: false },
         ] }, recommendation: null, breakdown: { [first]: [{ applicationId: '100', role: 'QA Engineer', company: 'Fictional Cedar', outcome: 'interviewed' }] } };
       } else if (path === '/api/resumes/submissions') {
-        body = { success: true, applications: [{ id: '100', role: 'QA Engineer', company: 'Fictional Cedar', submission: null, outcomeLabel: 'interviewed' }], nextCursor: null, unlinkedSubmissions: 0 };
+        body = { success: true, applications: [{ id: '100', role: 'QA Engineer', company: 'Fictional Cedar', submission: submitted, outcomeLabel: 'interviewed' }], nextCursor: null, unlinkedSubmissions: 0 };
       } else if (path.startsWith('/api/resumes/submissions/') && request.method() === 'PUT') {
         confirmations.push(request.postDataJSON());
         if (confirmations.length === 1) { status = 503; body = { error: 'Acknowledgment unavailable. Retry the same confirmation.' }; }
+        else { const payload = request.postDataJSON(); submitted = { variantId: payload.variantId, name: variants.find(v => v.id === payload.variantId)?.name ?? null, revision: payload.expectedRevision + 1, confirmedAt: '2026-11-12T16:00:00Z', source: 'user_confirmed', documentAvailable: payload.variantId !== null, archived: false }; }
       } else if (path === `/api/resumes/${first}` || path === `/api/resumes/${second}`) {
         const index = path.endsWith(first) ? 0 : 1;
         body = { success: true, document: { id: variants[index].id, name: names[index], text, fingerprint: 'a'.repeat(64) } };
@@ -82,7 +84,8 @@ for (const width of [320, 390, 768, 1440]) {
     await page.getByRole('tab', { name: 'Outcomes & submissions' }).click();
     await expect(page.getByLabel('Submitted resume for application 100')).toHaveValue(second);
     await page.getByRole('button', { name: 'Retry confirmation' }).click();
-    await expect(page.getByText('Submitted version confirmed.', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Submitted version confirmed\. Find it under Recorded on this page/)).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Submitted resume for application 100' })).toHaveCount(0);
     expect(confirmations).toHaveLength(2);
     expect(confirmations[1]).toEqual(confirmations[0]);
     await page.getByLabel('Compare outcomes for a role (optional)').fill('QA Engineer');
