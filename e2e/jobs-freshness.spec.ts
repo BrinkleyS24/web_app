@@ -20,6 +20,7 @@ for(const width of [320,1280])test(`Collection expiry is not a qualification ver
  });
  await page.goto('/jobs');
  await expect(page.getByRole('heading',{name:'Software Engineer Intern',exact:true})).toBeVisible();
+  { const summary=page.getByText('Job sources and coverage',{exact:true}); await expect(summary).toBeVisible(); if(!await summary.evaluate(e=>(e as HTMLElement).closest('details')!.open))await summary.click(); }
  mode='stale';await page.getByRole('button',{name:'Check for updates'}).click();
  await expect(page.getByText('The job collection needs an update',{exact:true})).toBeVisible();
  await expect(page.getByLabel('Job result sections')).toHaveCount(0);
@@ -27,7 +28,7 @@ for(const width of [320,1280])test(`Collection expiry is not a qualification ver
  await expect(page.getByText('No resume-supported matches in this collection',{exact:true})).toHaveCount(0);
  await expect(page.getByText(/This does not tell us whether jobs fit your resume/)).toBeVisible();
  await page.screenshot({path:testInfo.outputPath('collection-expired.png'),fullPage:true});
- mode='recovered';await page.getByRole('button',{name:'Check for updates'}).click();
+ mode='recovered';await page.getByRole('button',{name:'Try again'}).click();
  await expect(page.getByRole('heading',{name:'Software Engineer Intern',exact:true})).toBeVisible();
  await expect(page.getByText('The job collection needs an update',{exact:true})).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);

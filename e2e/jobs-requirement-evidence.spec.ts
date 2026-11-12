@@ -21,6 +21,7 @@ for(const width of [320,1280])test(`supported clauses and partial evidence stay 
   await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
  });
  await page.goto('/jobs');
+  { const summary=page.getByText(/^Other results/); await expect(summary).toBeVisible(); if(!await summary.evaluate(e=>(e as HTMLElement).closest('details')!.open))await summary.click(); }
  await page.getByRole('button',{name:`Excluded (${feed.counts.excluded})`}).click();
  const impiricus=feed.excluded.find((r:any)=>r.key.includes('impiricus'));
  const arbiter=feed.excluded.find((r:any)=>r.key.includes('arbiter-ai'));

@@ -33,14 +33,18 @@ for(const width of [320,1280])test(`tracked submissions are separate and history
  await expect(page.getByRole('heading',{name:'QA Engineer',exact:true})).toHaveCount(0);
  await expect(page.getByRole('heading',{name:'Automation Engineer',exact:true})).toBeVisible();
  await expect(page.getByText(/A similar application is in your tracker/)).toBeVisible();
+  { const summary=page.getByText(/^Other results/); await expect(summary).toBeVisible(); if(!await summary.evaluate(e=>(e as HTMLElement).closest('details')!.open))await summary.click(); }
  await expect(page.getByRole('button',{name:'Already applied (1)',exact:true})).toBeVisible();
  await page.screenshot({path:test.info().outputPath('fresh-and-possible.png'),fullPage:true});
  const previousStatusReads=statusReads;
  justApplied=true;
+  { const summary=page.getByText('Job sources and coverage',{exact:true}); await expect(summary).toBeVisible(); if(!await summary.evaluate(e=>(e as HTMLElement).closest('details')!.open))await summary.click(); }
  await page.getByRole('button',{name:'Recheck applications',exact:true}).click();
+  { const summary=page.getByText(/^Other results/); await expect(summary).toBeVisible(); if(!await summary.evaluate(e=>(e as HTMLElement).closest('details')!.open))await summary.click(); }
  await expect(page.getByRole('button',{name:'Already applied (2)',exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'Matches (1)',exact:true})).toBeVisible();
  expect(statusReads).toBeGreaterThan(previousStatusReads);expect(feedReads).toBe(1);
+  { const summary=page.getByText(/^Other results/); await expect(summary).toBeVisible(); if(!await summary.evaluate(e=>(e as HTMLElement).closest('details')!.open))await summary.click(); }
  await page.getByRole('button',{name:'Already applied (2)',exact:true}).click();
  await expect(page.getByRole('heading',{name:'QA Engineer',exact:true})).toBeVisible();
  await expect(page.getByRole('heading',{name:'Software Engineer',exact:true})).toBeVisible();
@@ -68,7 +72,8 @@ test('history outage keeps matches visible and can recover without another quali
  await expect(page.getByText('Application history could not be checked. These results may include jobs you already applied to.')).toBeVisible();
  await expect(page.getByRole('button',{name:'Matches (1)',exact:true})).toBeVisible();
  await page.screenshot({path:test.info().outputPath('history-unavailable.png'),fullPage:true});
- unavailable=false;await page.getByRole('button',{name:'Recheck applications',exact:true}).click();
+ unavailable=false;await page.getByRole('button',{name:'Retry application check',exact:true}).click();
+  { const summary=page.getByText(/^Other results/); await expect(summary).toBeVisible(); if(!await summary.evaluate(e=>(e as HTMLElement).closest('details')!.open))await summary.click(); }
  await expect(page.getByRole('button',{name:'Already applied (1)',exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'Matches (0)',exact:true})).toBeVisible();
  expect(feedReads).toBe(1);

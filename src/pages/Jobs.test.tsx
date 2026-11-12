@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -18,6 +18,14 @@ function renderPage() {
   const client = new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});
   return render(<MemoryRouter><QueryClientProvider client={client}><Jobs /></QueryClientProvider></MemoryRouter>);
 }
+async function openOtherResults() {
+  const summary = await screen.findByText(/^Other results/);
+  if (!summary.closest('details')?.open) await userEvent.click(summary);
+}
+async function openCoverage() {
+  const summary = await screen.findByText('Job sources and coverage', { exact: true });
+  if (!summary.closest('details')?.open) await userEvent.click(summary);
+}
 beforeEach(() => {
   mocks.retryJobFeed.mockReset().mockResolvedValue({generationPending:true});
   mocks.useAuth.mockReturnValue({user:{uid:'owner'},plan:'premium'});
@@ -29,9 +37,45 @@ beforeEach(() => {
 });
 afterEach(() => { vi.clearAllMocks(); });
 
+test('the initial view keeps diagnostic counts and routine refreshes secondary', async () => {
+ renderPage();
+ await screen.findByRole('heading',{name:'QA Engineer'});
+ expect(screen.getByText(/^Other results/).closest('details')).not.toHaveAttribute('open');
+ expect(screen.getByText('Job sources and coverage',{exact:true}).closest('details')).not.toHaveAttribute('open');
+
+ expect(screen.getByRole('link',{name:'View matching resume'})).toHaveAttribute('href',`/resumes?view=library&resume=${id}#resume-${id}`);
+ await openOtherResults();
+ expect(screen.getByRole('button',{name:'Excluded (0)'})).toBeVisible();
+ await openCoverage();
+ expect(screen.getByRole('button',{name:'Check for updates'})).toBeVisible();
+});
+
+test('a specific fit question leads the card while interview-assessed traits remain inspectable',async()=>{
+ const generic='Communication and product judgment are assessed during interviews; they are not verified resume qualifications.';
+ const question='Production work has evidence; the depth of on-call experience needs confirmation.';
+ mocks.fetchJobFeed.mockResolvedValue({...feed,review:[{...row,reasons:[generic,question]}]});
+ renderPage();
+ expect(await screen.findByTestId('review-question')).toHaveTextContent(question);
+ expect(screen.getByTestId('review-question')).not.toHaveTextContent(generic);
+ await userEvent.click(screen.getByText('All fit notes (2)'));
+ expect(screen.getByText(generic)).toBeVisible();
+});
+
+test('recovering an application lookup visibly clears a tracked role from fresh recommendations',async()=>{
+ mocks.fetchJobApplicationStatuses.mockRejectedValueOnce(Error('History unavailable')).mockResolvedValue({status:'available',checkedAt:'2026-10-24',matches:[{key:row.key,state:'confirmed',applicationId:'7'}]});
+ renderPage();
+ expect(await screen.findByText(/Application history could not be checked/)).toBeVisible();
+ await userEvent.click(screen.getByRole('button',{name:'Retry application check'}));
+ expect(await screen.findByText('No recent jobs waiting for review')).toBeVisible();
+ expect(screen.queryByRole('heading',{name:'QA Engineer'})).not.toBeInTheDocument();
+ await userEvent.click(screen.getByRole('button',{name:'View tracked postings'}));
+ expect(screen.getByRole('button',{name:'Already applied (1)'})).toHaveAttribute('aria-pressed','true');
+ expect(screen.getByRole('heading',{name:'QA Engineer'})).toBeVisible();
+});
+
 test('a present graduation date can be an explicit blocker rather than missing evidence',async()=>{
  mocks.fetchJobFeed.mockResolvedValue({...feed,counts:{recent:0,review:0,older:0,excluded:1},review:[],excluded:[{...row,decision:'excluded',exclusionKind:'requirement_blocker',requirements:[{label:'Graduation within twelve months',quote:'Graduation within twelve months required.',status:'unclear',blocking:true,evidence:'B.S. expected 2028.'}]}]});
- renderPage();await userEvent.click(await screen.findByRole('button',{name:'Excluded (1)'}));
+ renderPage(); await openOtherResults();await userEvent.click(await screen.findByRole('button',{name:'Excluded (1)'}));
  await userEvent.click(screen.getByText('Posting requirements and resume evidence'));
  expect(screen.getByText(/Graduation within twelve months · Conflicts with the stated requirement/)).toBeVisible();
  expect(screen.getByText('Resume: B.S. expected 2028.')).toBeVisible();
@@ -40,7 +84,7 @@ test('a present graduation date can be an explicit blocker rather than missing e
 test('confirmed applications have their own section and possible duplicates remain reviewable',async()=>{
  mocks.fetchJobFeed.mockResolvedValue({...feed,counts:{recent:1,review:1,older:0,excluded:0},recent:[{...row,key:'already',decision:'supported',title:'Already submitted QA role'}],eligibleCandidates:[{...row,key:'already',decision:'supported',title:'Already submitted QA role'},row]});
  mocks.fetchJobApplicationStatuses.mockResolvedValue({status:'available',checkedAt:'2026-10-24',matches:[{key:'already',state:'confirmed',applicationId:'7',appliedAt:'2026-10-20',status:'applied'},{key:row.key,state:'possible'}]});
- renderPage();
+ renderPage(); await openOtherResults();
  await screen.findByRole('button',{name:'Already applied (1)'});
  await userEvent.click(screen.getByRole('button',{name:'Needs review (1)'}));
  expect(screen.getByText(/A similar application is in your tracker/)).toBeVisible();
@@ -62,7 +106,7 @@ test('changing accounts never carries previous application history into the next
  mocks.fetchJobApplicationStatuses.mockResolvedValueOnce({status:'available',checkedAt:'2026-10-24',matches:[{key:row.key,state:'confirmed',applicationId:'private-owner-application'}]}).mockImplementation(()=>new Promise(()=>{}));
  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
  const view=()=> <MemoryRouter><QueryClientProvider client={client}><Jobs /></QueryClientProvider></MemoryRouter>;
- const rendered=render(view());
+ const rendered=render(view()); await openOtherResults();
  await screen.findByRole('button',{name:'Already applied (1)'});
  mocks.useAuth.mockReturnValue({user:{uid:'different-owner'},plan:'premium'});
  rendered.rerender(view());
@@ -75,7 +119,7 @@ test('changing accounts never carries previous application history into the next
 test('a reused posting key with a changed URL remains visible while updated history is pending',async()=>{
  mocks.fetchJobApplicationStatuses.mockResolvedValueOnce({status:'available',checkedAt:'2026-10-24',matches:[{key:row.key,state:'confirmed',applicationId:'old-opening'}]}).mockImplementation(()=>new Promise(()=>{}));
  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
- render(<MemoryRouter><QueryClientProvider client={client}><Jobs /></QueryClientProvider></MemoryRouter>);
+ render(<MemoryRouter><QueryClientProvider client={client}><Jobs /></QueryClientProvider></MemoryRouter>); await openOtherResults();
  await screen.findByRole('button',{name:'Already applied (1)'});
  act(()=>client.setQueryData(['job-feed','owner',2,id,'fp'],{...feed,review:[{...row,url:'https://jobs.example.test/new-opening'}]}));
  await screen.findByRole('button',{name:'Needs review (1)'});
@@ -222,6 +266,7 @@ test('a background refresh preserves the card and expanded evidence',async()=>{
   expect(summary.closest('details')).toHaveAttribute('open');
   let finish: (value:unknown)=>void;
   mocks.fetchJobFeed.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+  await openCoverage();
   await userEvent.click(screen.getByRole('button',{name:'Check for updates'}));
   expect(await screen.findByText('Checking for updates…')).toBeInTheDocument();
   expect(screen.getByRole('heading',{name:'QA Engineer'})).toBeInTheDocument();
@@ -246,10 +291,12 @@ test('a failed update keeps loaded jobs, but a rejected access check hides them'
   renderPage();
   await screen.findByRole('heading',{name:'QA Engineer'});
   mocks.fetchJobFeed.mockRejectedValueOnce(Object.assign(new Error('Temporarily unavailable'),{status:503}));
+  await openCoverage();
   await userEvent.click(screen.getByRole('button',{name:'Check for updates'}));
   expect(await screen.findByText('Updates could not be loaded')).toBeInTheDocument();
   expect(screen.getByRole('heading',{name:'QA Engineer'})).toBeInTheDocument();
   mocks.fetchJobFeed.mockRejectedValueOnce(Object.assign(new Error('Access denied'),{status:403}));
+  await openCoverage();
   await userEvent.click(screen.getByRole('button',{name:'Check for updates'}));
   expect(await screen.findByText('Jobs could not be loaded')).toBeInTheDocument();
   expect(screen.queryByRole('heading',{name:'QA Engineer'})).not.toBeInTheDocument();
@@ -268,11 +315,12 @@ test('a known expired catalog hides cached jobs and recovers on a fresh update',
   renderPage();
   await screen.findByRole('heading',{name:'QA Engineer'});
   mocks.fetchJobFeed.mockRejectedValueOnce(Object.assign(new Error('Collection expired'),{status:503,payload:{code:'catalog_stale'}}));
+  await openCoverage();
   await userEvent.click(screen.getByRole('button',{name:'Check for updates'}));
   expect(await screen.findByText('The job collection needs an update')).toBeVisible();
   expect(screen.queryByRole('heading',{name:'QA Engineer'})).not.toBeInTheDocument();
   expect(screen.queryByLabelText('Job result sections')).not.toBeInTheDocument();
-  await userEvent.click(screen.getByRole('button',{name:'Check for updates'}));
+  await userEvent.click(screen.getByRole('button',{name:'Try again'}));
   expect(await screen.findByRole('heading',{name:'QA Engineer'})).toBeVisible();
   expect(screen.queryByText('The job collection needs an update')).not.toBeInTheDocument();
 });
@@ -313,7 +361,7 @@ test('long notes stay available in full and coverage starts collapsed',async()=>
   await userEvent.click(screen.getByRole('button',{name:'Needs review (1)'}));
   expect(screen.getByText('Third uncertainty.')).not.toBeVisible();
   await userEvent.click(screen.getByText('All fit notes (3)'));
-  expect(screen.getByText(reasons[0].trim())).toBeVisible();
+  expect(within(screen.getByText('All fit notes (3)').closest('details')!).getByText(reasons[0].trim())).toBeVisible();
   expect(screen.getByText('Third uncertainty.')).toBeVisible();
 });
 
@@ -332,7 +380,7 @@ test('unsupported fit is distinguished from a known requirement blocker',async()
     {...row,key:'level',title:'Staff Software Engineer',decision:'excluded',exclusionKind:'seniority',interviewHistory:{similarRoles:20,roleFamily:'software engineering'},reasons:['The selected resume does not establish staff-level work.']},
     {...row,key:'degree',title:'QA Engineer',decision:'excluded',exclusionKind:'requirement_blocker',reasons:['A completed degree is required.']},
   ]});
-  renderPage();
+  renderPage(); await openOtherResults();
   await screen.findByRole('button',{name:/Needs review \(\d+\)/});
   await userEvent.click(screen.getByRole('button',{name:'Excluded (2)'}));
   expect(screen.getByText('Qualification not established')).toBeVisible();
@@ -351,7 +399,8 @@ test('an explicit empty Matches tab remains selected during a background update'
  renderPage();await screen.findByRole('heading',{name:'QA Engineer'});
  await userEvent.click(screen.getByRole('button',{name:'Matches (0)'}));
  expect(screen.getByText('No resume-supported matches in this collection')).toBeVisible();
- await userEvent.click(screen.getByRole('button',{name:'Check for updates'}));
+ await openCoverage();
+  await userEvent.click(screen.getByRole('button',{name:'Check for updates'}));
  await waitFor(()=>expect(mocks.fetchJobFeed).toHaveBeenCalledTimes(2));
  expect(screen.getByRole('button',{name:'Matches (0)'})).toHaveAttribute('aria-pressed','true');
  expect(screen.queryByRole('heading',{name:'QA Engineer'})).not.toBeInTheDocument();

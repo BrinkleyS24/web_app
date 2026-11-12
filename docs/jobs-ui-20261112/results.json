@@ -1,0 +1,204 @@
+{
+  "date": "2026-11-12",
+  "feature": "Jobs UI",
+  "status": "local_candidate_not_deployed",
+  "grade": {
+    "value": "A",
+    "scope": "engineering assessment of reviewed UI/main customer workflows",
+    "notCertified": [
+      "matching correctness",
+      "job supply adequacy",
+      "human usability research",
+      "complete accessibility/multi-browser conformance",
+      "live preference mutations/database concurrency",
+      "deployment or fleet capacity"
+    ]
+  },
+  "fullWebRegression": {
+    "numPassedTests": 817,
+    "numFailedTests": 0,
+    "numPassedTestSuites": 150,
+    "numFailedTestSuites": 0
+  },
+  "browser": {
+    "main": {
+      "startTime": "2026-11-12T20:15:23.122Z",
+      "duration": 53902.227,
+      "expected": 25,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "additionalFrozenEvidence": {
+      "startTime": "2026-11-12T20:19:38.674Z",
+      "duration": 11832.245,
+      "expected": 4,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "totalPassed": 29,
+    "totalSkipped": 0,
+    "totalFailures": 0,
+    "fixtureClock": "Background generation replay uses its captured asOf time; freshness/expiry tests use a live clock."
+  },
+  "checks": {
+    "typeScript": true,
+    "productionGuard": true,
+    "tokenCheck": true,
+    "productionBuild": true,
+    "loopbackBuild": true,
+    "authBypassInProductionBuild": false
+  },
+  "frozenComparison": {
+    "viewportHeight": 900,
+    "sourceParity": {
+      "passed": true,
+      "controlledFrozenSource": true,
+      "checks": {
+        "/api/jobs/preferences": true,
+        "/api/resumes": true,
+        "/api/jobs/feed": true,
+        "/api/jobs/application-status": true
+      }
+    },
+    "counts": {
+      "recent": 0,
+      "review": 4,
+      "older": 0,
+      "excluded": 22850
+    },
+    "before": [
+      {
+        "width": 1440,
+        "height": 2205,
+        "overflow": false,
+        "firstRoleTop": 618.375
+      },
+      {
+        "width": 768,
+        "height": 2822,
+        "overflow": false,
+        "firstRoleTop": 862.3125
+      },
+      {
+        "width": 390,
+        "height": 3184,
+        "overflow": false,
+        "firstRoleTop": 837.25
+      },
+      {
+        "width": 320,
+        "height": 3637,
+        "overflow": false,
+        "firstRoleTop": 945.625
+      }
+    ],
+    "after": [
+      {
+        "width": 1440,
+        "height": 2225,
+        "overflow": false,
+        "firstRoleTop": 526.9375
+      },
+      {
+        "width": 768,
+        "height": 2516,
+        "overflow": false,
+        "firstRoleTop": 551.3125
+      },
+      {
+        "width": 390,
+        "height": 2827,
+        "overflow": false,
+        "firstRoleTop": 549.25
+      },
+      {
+        "width": 320,
+        "height": 3166,
+        "overflow": false,
+        "firstRoleTop": 636.75
+      }
+    ],
+    "normalFirebaseAuth": true,
+    "simulatedExtensionBridge": true,
+    "capturedReadResponsesSubstituted": true
+  },
+  "freshActualAccountCheck": {
+    "normalFirebaseAuth": true,
+    "simulatedExtensionBridge": true,
+    "sourceWrites": false,
+    "preferencesSaved": false,
+    "counts": {
+      "recent": 0,
+      "review": 3,
+      "older": 0,
+      "excluded": 24183
+    },
+    "generationPending": null,
+    "catalogStale": false,
+    "metrics": [
+      {
+        "width": 1440,
+        "height": 1809,
+        "overflow": false,
+        "firstRoleTop": 570.9375
+      },
+      {
+        "width": 768,
+        "height": 1984,
+        "overflow": false,
+        "firstRoleTop": 595.3125
+      },
+      {
+        "width": 390,
+        "height": 2178,
+        "overflow": false,
+        "firstRoleTop": 585.25
+      },
+      {
+        "width": 320,
+        "height": 2479,
+        "overflow": false,
+        "firstRoleTop": 692.75
+      }
+    ],
+    "errors": [],
+    "exactResumeHandoff": true
+  },
+  "knownSampleDrift": "The catalog refreshed during review: initial live 4 review/22850 excluded, final live 3 review/24183 excluded. This is not attributed to UI changes. Layout comparison uses identical frozen source responses.",
+  "longFields": {
+    "width": 320,
+    "reproducedOverflowBefore": true,
+    "passedAfter": true,
+    "headingReadableWidthOver100px": true
+  },
+  "completedJourneys": [
+    "preference failure retains draft",
+    "preference retry restores results",
+    "cleared title override survives reload",
+    "history outage preserves uncertainty",
+    "history recovery moves confirmed exact role out of recommendations",
+    "tracked posting remains accessible",
+    "blocked vs insufficient evidence remain distinct",
+    "pending generation survives reload and automatically completes",
+    "partial discovery does not claim a complete negative",
+    "stale catalog hides cached cards and recovers",
+    "explicit tab/evidence survives refresh",
+    "matching resume opens exact saved document"
+  ],
+  "scopeSafety": {
+    "matchingChanged": false,
+    "sourceCoverageChanged": false,
+    "backendChanged": false,
+    "migrationRequired": false,
+    "realAccountWrites": false,
+    "resumesRelease": "../resumes-ui-20261112/release.json",
+    "dashboardRedesigned": false
+  },
+  "sourceSha256": {
+    "src/pages/Jobs.tsx": "b71121ef30753e0444e01b5196605277131eaded0856082406730176e3c78d8f",
+    "src/lib/jobFeedPresentation.ts": "58a947fae05c754fe20bd4f642aa8c05c3f8ffa7dc1cfbafa77741b3a499c50c"
+  },
+  "trackerValidation": "Existing /dashboard link verified; full Dashboard workflow is outside this review."
+}

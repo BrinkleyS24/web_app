@@ -79,6 +79,7 @@ for (const width of [320,1280]) test(`Jobs uses ordinary location fields and pre
   expect(preferences.locations).toEqual([{city:'New York',region:'NY',country:'US'}]);
   await page.locator('article summary').click();
   await expect(page.locator('article details')).toHaveAttribute('open','');
+  { const summary=page.getByText('Job sources and coverage',{exact:true}); await expect(summary).toBeVisible(); if(!await summary.evaluate(e=>(e as HTMLElement).closest('details')!.open))await summary.click(); }
   await page.getByRole('button',{name:'Check for updates'}).click();
   await expect(page.getByText('Checking for updates…')).toBeVisible();
   await expect(page.locator('article')).toHaveCount(1);
@@ -106,10 +107,12 @@ for(const width of [320,1280]) test(`Jobs explains interview history and separat
   });
   await page.goto('/jobs');
   await expect(page.getByText('Your history marks 2 similar QA and testing roles as Interviewed or Offer.')).toBeVisible();
+  await page.getByText('Job sources and coverage',{exact:true}).click();
   await expect(page.getByText('Your history marks 2 roles in this focus as Interviewed or Offer. These tracked stages guide ordering; they do not verify qualifications or which resume you submitted.')).toBeVisible();
   await page.getByRole('button',{name:'Needs review (0)'}).click();
   await expect(page.getByText('No recent jobs waiting for review')).toBeVisible();
   await expect(page.locator('article')).toHaveCount(0);
+  { const summary=page.getByText(/^Other results/); await expect(summary).toBeVisible(); if(!await summary.evaluate(e=>(e as HTMLElement).closest('details')!.open))await summary.click(); }
   await page.getByRole('button',{name:'Excluded (1)'}).click();
   await expect(page.getByText('Qualification not established',{exact:true})).toBeVisible();
   await expect(page.getByText('Your history marks 2 similar QA and testing roles as Interviewed or Offer.')).toHaveCount(0);

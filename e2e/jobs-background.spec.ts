@@ -5,6 +5,8 @@ test.skip(!path,'Requires actual matcher/AES/PostgreSQL generated fictional fixt
 for(const width of [320,1280])test(`Background preparation survives reload and automatically presents completed evidence at ${width}px`,async({page},testInfo)=>{
  const fixture=JSON.parse(readFileSync(path!,'utf8'));
  expect(fixture.feed.generation.state).toBe('ready');expect(fixture.feed.counts.recent).toBe(1);
+ // Replay at the captured matcher time; expiry behavior has separate live-clock cases.
+ await page.clock.setFixedTime(new Date(fixture.feed.generation.asOf));
  let ready=false,feedReads=0,statusReads=0;const errors:string[]=[],writes:string[]=[];
  page.on('pageerror',e=>errors.push(e.message));await page.setViewportSize({width,height:1000});
  await page.route('**/*',route=>['localhost','127.0.0.1'].includes(new URL(route.request().url()).hostname)?route.continue():route.abort());
@@ -26,7 +28,9 @@ for(const width of [320,1280])test(`Background preparation survives reload and a
  await page.screenshot({path:testInfo.outputPath('preparing.png'),fullPage:true,animations:'disabled'});
  await page.reload();await expect(page.getByText('Preparing your matches',{exact:true})).toBeVisible();ready=true;
  await expect(page.getByRole('button',{name:'Matches (1)',exact:true})).toBeVisible({timeout:10000});
+ await page.getByText('Job sources and coverage',{exact:true}).click();
  await expect(page.getByText(/Matches checked/)).toBeVisible();await expect(page.getByText(/A similar application is in your tracker/)).toBeVisible();
+  { const summary=page.getByText(/^Other results/); await expect(summary).toBeVisible(); if(!await summary.evaluate(e=>(e as HTMLElement).closest('details')!.open))await summary.click(); }
  await expect(page.getByRole('button',{name:'Already applied (0)',exact:true})).toBeVisible();
  await page.getByText('Posting requirements and resume evidence',{exact:true}).click();
  await expect(page.locator('blockquote').first()).toBeVisible();await expect(page.getByText('Preparing your matches',{exact:true})).toHaveCount(0);

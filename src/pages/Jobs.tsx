@@ -4,11 +4,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BriefcaseBusiness, ExternalLink, MapPin, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { EmptyState, ErrorState, LoadingRows, PageHeader, Panel, ToneChip } from '@/components/premium/PremiumUI';
-import { BUTTON } from '@/components/premium/tone';
+import { BUTTON, TONES } from '@/components/premium/tone';
 import { useAuth } from '@/lib/AuthContext.jsx';
 import { fetchResumeVariants } from '@/lib/emails';
 import { fetchJobFeed, fetchJobPreferences, saveJobPreferences, fetchJobApplicationStatuses, retryJobFeed, type FeedJob, type JobPreferences } from '@/lib/jobFeed';
 import { applicationCheckCandidates, projectApplicationAwareFeed, applicationStatusReference, retainApplicationStatuses } from '@/lib/jobFeedApplications';
+import { jobReviewQuestion } from '@/lib/jobFeedPresentation';
+import { resumeLibraryHref } from '@/lib/resumeLibraryPresentation';
 import { JOB_COUNTRIES, US_STATES, countryName, stateCode } from '@/lib/jobFeedLocations';
 
 const INPUT = 'mt-1 w-full min-h-10 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
@@ -47,25 +49,30 @@ function locationSummary(p: JobPreferences) {
 function PostingCard({ job }: { job: FeedJob }) {
   const safeUrl = (() => { try { const u = new URL(job.url); return u.protocol === 'https:' && !u.username && !u.password ? u.href : null; } catch { return null; } })();
   const notes = [...new Set(job.reasons)];
+  const question = jobReviewQuestion(job);
   const preview = notes.slice(0,2).map(note => {
     const text = note.replace(/^Confirm the full requirement: /, 'Confirm: ');
     return text.length > 160 ? `${text.slice(0,157).trimEnd()}…` : text;
   });
-  const showFullNotes = notes.length > 2 || notes.some(note => note.replace(/^Confirm the full requirement: /, 'Confirm: ').length > 160);
+  const showFullNotes = job.decision === 'review' ? notes.some(note => note !== question) : notes.length > 2 || notes.some(note => note.replace(/^Confirm the full requirement: /, 'Confirm: ').length > 160);
   const blocker = job.decision === 'excluded' && (!job.exclusionKind || job.exclusionKind === 'requirement_blocker');
-  return <article className="rounded-xl border border-border bg-card p-5 space-y-3">
+  return <article className="min-w-0 break-words rounded-xl border border-border bg-card p-5 space-y-3">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><p className="text-xs font-medium text-muted-foreground">{job.company}</p><h2 className="mt-1 text-base font-semibold">{job.title}</h2>
-        <p className="mt-1 flex items-start gap-1.5 text-sm text-muted-foreground"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />{job.location || 'Location needs confirmation'}</p></div>
+      <div className="min-w-0 max-w-full"><p className="text-xs font-medium text-muted-foreground">{job.company}</p><h2 className="mt-1 text-base font-semibold">{job.title}</h2>
+        <p className="mt-1 flex items-start gap-1.5 text-sm text-muted-foreground"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden /><span className="min-w-0">{job.location || 'Location needs confirmation'}</span></p></div>
       <ToneChip tone={job.decision === 'supported' ? 'positive' : blocker ? 'risk' : job.decision === 'excluded' ? 'neutral' : 'attention'}>{job.decision === 'supported' ? 'Resume-supported' : blocker ? 'Requirement blocker' : job.decision === 'excluded' ? 'Qualification not established' : 'Needs review'}</ToneChip>
     </div>
-    <p className="text-xs text-muted-foreground">{job.dateBasis === 'last_published' ? 'Last published' : job.dateBasis === 'first_published' ? 'First published' : 'Employer posting date'}: {date(job.publishedAt)}{job.dateBasis === 'last_published' ? ' · May be a repost' : ''} · Checked {date(job.lastCheckedAt)}</p>
     {job.window === 'older' && <p className="text-sm font-medium">31–60 days old · Employer was accepting applications when checked.</p>}
-    {job.qualificationAssessment?.decision === 'supported' && job.decision === 'review' && <p className="text-sm">Core resume requirements have support. The remaining review is about where or how you can work.</p>}
-    {job.decision !== 'excluded' && job.interviewHistory && <p className="text-sm font-medium">Your history marks {job.interviewHistory.similarRoles} similar {job.interviewHistory.roleFamily} {job.interviewHistory.similarRoles === 1 ? 'role' : 'roles'} as Interviewed or Offer.</p>}
+
     {job.application?.state === 'confirmed' && <p className="text-sm font-medium">Already applied{job.application.appliedAt ? ` · Recorded ${date(job.application.appliedAt)}` : ''}{job.application.status ? ` · ${job.application.status}` : ''}. <Link to="/dashboard" className="underline">Open tracker</Link></p>}
     {job.application?.state === 'possible' && <p className="text-sm font-medium">A similar application is in your tracker. Confirm the posting before applying again. <Link to="/dashboard" className="underline">Open tracker</Link></p>}
-    <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">{preview.map((reason, i) => <li key={i}>{reason}</li>)}</ul>
+    {job.decision === 'review' ? <div data-testid="review-question" className={`rounded-lg border p-3 text-sm ${TONES.attention.surface}`}>
+      <p className="text-xs font-semibold text-foreground">Check before applying</p>
+      <p className="mt-1 leading-relaxed text-foreground">{question || 'The remaining fit question was not supplied. Review the employer posting and requirement evidence before applying.'}</p>
+    </div> : <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">{preview.map((reason, i) => <li key={i}>{reason}</li>)}</ul>}
+    {safeUrl && <a href={safeUrl} target="_blank" rel="noopener noreferrer" className={BUTTON.secondary}>Read employer posting <ExternalLink className="h-3.5 w-3.5" aria-hidden /></a>}
+    <p className="text-xs text-muted-foreground">{job.dateBasis === 'last_published' ? 'Last published' : job.dateBasis === 'first_published' ? 'First published' : 'Employer posting date'}: {date(job.publishedAt)}{job.dateBasis === 'last_published' ? ' · May be a repost' : ''} · Checked {date(job.lastCheckedAt)}</p>
+    {job.decision !== 'excluded' && job.interviewHistory && <p className="text-sm font-medium">Your history marks {job.interviewHistory.similarRoles} similar {job.interviewHistory.roleFamily} {job.interviewHistory.similarRoles === 1 ? 'role' : 'roles'} as Interviewed or Offer.</p>}
     {showFullNotes && <details className="text-sm"><summary className="cursor-pointer font-medium">All fit notes ({notes.length})</summary>
       <ul className="mt-2 list-disc space-y-2 pl-5 text-muted-foreground">{notes.map((note,i) => <li key={i}>{note}</li>)}</ul>
     </details>}
@@ -77,7 +84,6 @@ function PostingCard({ job }: { job: FeedJob }) {
         <p className="mt-1 text-muted-foreground">{r.status === 'interview_assessment' ? 'Discuss this during interviews; it is not a missing resume qualification.' : `Resume: ${r.evidence || 'No supporting passage was established.'}`}</p>
       </div>) : <p>The requirements could not be fully extracted. Read the employer’s posting.</p>}</div>
     </details>
-    {safeUrl && <a href={safeUrl} target="_blank" rel="noopener noreferrer" className={BUTTON.secondary}>Read employer posting <ExternalLink className="h-3.5 w-3.5" aria-hidden /></a>}
   </article>;
 }
 export default function Jobs() {
@@ -91,6 +97,7 @@ export default function Jobs() {
   const [showPreferences, setShowPreferences] = useState(false);
   const [selectedTab, setTab] = useState<'recent' | 'review' | 'older' | 'excluded' | 'applied' | null>(null);
   const [localError, setLocalError] = useState('');
+  const [otherSectionsOpen, setOtherSectionsOpen] = useState(false);
   const prefs = useQuery({ queryKey: ['job-preferences', uid], queryFn: fetchJobPreferences, enabled, retry: false, refetchInterval:60000 });
   const resumes = useQuery({ queryKey: ['job-resumes', uid], queryFn: fetchResumeVariants, enabled, retry: false });
   const variants = resumes.data?.variants || [];
@@ -144,13 +151,16 @@ export default function Jobs() {
   const tab = selectedTab ?? (results?.counts.recent ? 'recent' : results?.counts.review ? 'review' : results?.counts.older ? 'older' : 'recent');
   useEffect(() => { if (results && (results.counts.recent || results.counts.review || results.counts.older)) setTab(current => current ?? (results.counts.recent ? 'recent' : results.counts.review ? 'review' : results.counts.older ? 'older' : 'recent')); }, [results]);
   const showForm = Boolean(setupRequired || !available || dirty || showPreferences);
-  return <DashboardLayout><div className="space-y-4 sm:space-y-6" data-testid="jobs-page">
-    <PageHeader eyebrow="Premium · Pilot" title="Jobs picked for you" description="Jobs matched to your resume and work preferences. No email connection needed." actions={enabled ? <button type="button" className={BUTTON.secondary} onClick={refresh} disabled={feed.isFetching || save.isPending || refreshRequest.isPending || dirty}><RefreshCw className="h-3.5 w-3.5" aria-hidden />Check for updates</button> : undefined} />
+  return <DashboardLayout><div className="min-w-0 break-words space-y-4 sm:space-y-6" data-testid="jobs-page">
+    <PageHeader eyebrow="Premium · Pilot" title="Jobs picked for you" description="Jobs matched to your resume and work preferences. New results appear automatically." />
     {!enabled ? <EmptyState title="Jobs is included with Premium" body="Use a saved resume and your own location preferences to search the pilot inventory." action={<Link to="/upgrade?source=web_jobs" className={BUTTON.primary}>Explore Premium</Link>} /> : <>
       {(prefs.isLoading || resumes.isLoading) && <LoadingRows />}
-      {(prefs.isError || resumes.isError) && <ErrorState title="Your feed preferences did not load" detail={message(prefs.error || resumes.error)} onRetry={refresh} />}
+      {(prefs.isError || resumes.isError) && <ErrorState stackRetryOnMobile title="Your feed preferences did not load" detail={message(prefs.error || resumes.error)} onRetry={refresh} />}
       {!prefs.isPending && !resumes.isPending && !prefs.isError && !resumes.isError && <Panel bodyClassName={showForm ? undefined : 'p-4 sm:p-5'} title={showForm ? setupRequired === 'location' ? 'Where would you like to work?' : 'Your feed preferences' : undefined} icon={showForm ? SlidersHorizontal : undefined} description={showForm ? setupRequired === 'location' ? 'Confirm this once. Your resume will bring you relevant jobs automatically.' : 'Roles come from your resume. Adjust these preferences whenever your plans change.' : undefined} action={showForm && saved && available && !setupRequired ? <button type="button" className={BUTTON.secondary} disabled={dirty || save.isPending} onClick={() => setShowPreferences(false)}>Hide preferences</button> : undefined}>
-        {!variants.length ? <EmptyState title="Save a resume to start" body="Choose the version that represents the work you want to do next." action={<Link to="/resumes" className={BUTTON.primary}>Open Resumes</Link>} /> : !showForm && saved ? <div className="flex flex-wrap items-center justify-between gap-3 text-sm"><div className="min-w-0 space-y-1"><p><strong>{variants.find(v => v.id === saved.resumeId)?.name}</strong><span className="text-muted-foreground"> · {saved.resumeMode === 'chosen' ? 'Chosen resume' : 'Default resume'}</span></p><p className="text-muted-foreground">{locationSummary(saved)}</p><p className="text-xs text-muted-foreground">{saved.roleMode === 'custom' ? `Your target titles: ${saved.roles.join(', ')}` : 'Resume-driven discovery · No title filter'}</p></div><button type="button" className={BUTTON.secondary} onClick={() => setShowPreferences(true)}>Adjust feed</button></div> : <form onSubmit={event => { event.preventDefault(); try { const p = fromDraft(draft, saved?.roleMode === 'custom' ? [] : saved?.roles || []); setLocalError(''); save.mutate(p); } catch (error) { setLocalError(message(error)); } }}>
+        {!variants.length ? <EmptyState title="Save a resume to start" body="Choose the version that represents the work you want to do next." action={<Link to="/resumes" className={BUTTON.primary}>Open Resumes</Link>} /> : !showForm && saved ? <div className="space-y-2 text-sm">
+          <div className="flex items-start justify-between gap-3"><p className="min-w-0"><Link to={resumeLibraryHref('',saved.resumeId)} className="font-semibold underline-offset-2 hover:underline" aria-label="View matching resume">{variants.find(v => v.id === saved.resumeId)?.name}</Link><span className="text-xs text-muted-foreground"> · {saved.resumeMode === 'chosen' ? 'Chosen resume' : 'Default resume'}</span></p><button type="button" className={BUTTON.secondary} onClick={() => setShowPreferences(true)}>Adjust feed</button></div>
+          <p className="text-xs text-muted-foreground">{locationSummary(saved)}</p><p className="text-xs text-muted-foreground">{saved.roleMode === 'custom' ? `Your target titles: ${saved.roles.join(', ')}` : 'Resume-driven discovery · No title filter'}</p>
+        </div> : <form onSubmit={event => { event.preventDefault(); try { const p = fromDraft(draft, saved?.roleMode === 'custom' ? [] : saved?.roles || []); setLocalError(''); save.mutate(p); } catch (error) { setLocalError(message(error)); } }}>
           <fieldset disabled={save.isPending} className="space-y-4">
             {saved && !available && <p role="alert" className="text-sm text-destructive">Your saved resume is unavailable. Choose another version and save your search.</p>}
             <div className="grid gap-4 md:grid-cols-2">
@@ -177,34 +187,43 @@ export default function Jobs() {
               <p className="text-xs text-muted-foreground">Add the cities you want to work in, including nearby cities you would commute to.</p>
             </fieldset>}
             <p className="text-xs text-muted-foreground">A degree in progress does not count as completed. Equivalent experience, work authorization, scoped years, and unfamiliar requirements need review. Your resume is never sent to job boards.</p>
-            {(localError || save.isError) && <ErrorState title="Your preferences were not saved" detail={localError || message(save.error)} />}
+            {(localError || save.isError) && <ErrorState stackRetryOnMobile title="Your preferences were not saved" detail={localError || message(save.error)} />}
             {save.isError && <button type="button" className={BUTTON.secondary} onClick={async () => { const loaded = await prefs.refetch(); if (loaded.isSuccess) { setDirty(false); setLocalError(''); save.reset(); } }}>Reload saved preferences</button>}
             <div className="flex flex-wrap items-center gap-3"><button type="submit" className={BUTTON.primary} disabled={!dirty || (!draft.resumeId && !defaultResume) || !draft.workStyles.length || save.isPending}>{save.isPending ? 'Saving…' : setupRequired ? 'Start my feed' : 'Save preferences'}</button>{dirty && <><span className="text-xs text-muted-foreground">Unsaved changes · results hidden</span><button type="button" className={BUTTON.ghost} onClick={() => { setDirty(false); setLocalError(''); save.reset(); }}>Discard changes</button></>}</div>
           </fieldset>
         </form>}
       </Panel>}
       {!dirty && available && !setupRequired && feed.isFetching && !results && !feed.data?.generationPending && <div className="space-y-3"><p role="status" className="text-sm text-muted-foreground">Checking jobs against your resume and preferences…</p><LoadingRows /></div>}
-      {!dirty && available && !setupRequired && catalogStale && <ErrorState title="The job collection needs an update" detail="Current matches cannot be checked because the collection is over 48 hours old. This does not tell us whether jobs fit your resume. Your preferences are saved; this page will check again automatically." onRetry={refresh} />}
-      {!dirty && available && !setupRequired && feed.isError && !catalogStale && <ErrorState title={results ? 'Updates could not be loaded' : 'Jobs could not be loaded'} detail={results ? `${message(feed.error)} Showing previously loaded jobs.` : message(feed.error)} onRetry={refresh} />}
+      {!dirty && available && !setupRequired && catalogStale && <ErrorState stackRetryOnMobile title="The job collection needs an update" detail="Current matches cannot be checked because the collection is over 48 hours old. This does not tell us whether jobs fit your resume. Your preferences are saved; this page will check again automatically." onRetry={refresh} />}
+      {!dirty && available && !setupRequired && feed.isError && !catalogStale && <ErrorState stackRetryOnMobile title={results ? 'Updates could not be loaded' : 'Jobs could not be loaded'} detail={results ? `${message(feed.error)} Showing previously loaded jobs.` : message(feed.error)} onRetry={refresh} />}
       {!dirty && available && !setupRequired && !feed.isError && feed.data?.generationPending && <div role="status" aria-live="polite"><EmptyState icon={BriefcaseBusiness} title="Preparing your matches" body="We are checking jobs against your resume. This can take a few minutes. You can leave this page; preparation will continue." /></div>}
       {!dirty && available && feed.data?.catalogPending && <EmptyState icon={BriefcaseBusiness} title="Preparing your job feed" body={feed.data.message || 'Your resume and preferences are ready. Jobs will appear here automatically when the collection is ready.'} />}
       {results && <>
-        {results.generation?.asOf && <p className="text-xs text-muted-foreground">Matches checked {new Date(results.generation.asOf).toLocaleString()}. Application history is checked separately.</p>}
+
         {applicationCandidates.length>0 && !applicationStatuses.data && <p role="status" className="text-sm text-muted-foreground">{applicationStatuses.isError ? 'Application history could not be checked. These results may include jobs you already applied to.' : 'Checking your tracked applications for these roles…'}</p>}
         {applicationStatuses.isError && applicationStatuses.data && <p role="status" className="text-sm text-muted-foreground">Application history could not be updated. Showing the last checked application status.</p>}
-        {applicationCandidates.length>0 && <button type="button" className={BUTTON.ghost} disabled={applicationStatuses.isFetching} onClick={()=>void applicationStatuses.refetch()}>{applicationStatuses.isFetching ? 'Checking applications…' : 'Recheck applications'}</button>}
+        {applicationStatuses.isError && <button type="button" className={BUTTON.ghost} disabled={applicationStatuses.isFetching} onClick={()=>void applicationStatuses.refetch()}>Retry application check</button>}
         {results.discovery && !results.discovery.complete && <p role="status" className="text-sm text-muted-foreground">{feed.isFetching ? 'Discovering roles from your resume' : 'Discovery paused'}: {results.discovery.scannedParts} of {results.discovery.totalParts} catalog batches checked. Results and counts are partial until the scan finishes.</p>}
         <div className="space-y-2">
-          <div className="flex flex-wrap gap-2" aria-label="Job result sections">{([['recent','Matches'],['review','Needs review'],['older','Older'],['excluded','Excluded'],['applied','Already applied']] as const).map(([key,label]) => <button type="button" key={key} aria-pressed={tab === key} className={tab === key ? BUTTON.primary : BUTTON.secondary} onClick={() => setTab(key)}>{label} ({results.counts[key]})</button>)}</div>
-            <p role="status" className="min-h-8 text-xs text-muted-foreground sm:min-h-4">{feed.isFetching ? 'Checking for updates…' : tab === 'older' ? 'Posted 31–60 days ago' : tab === 'applied' ? 'These postings match applications already recorded in your tracker' : tab === 'excluded' ? 'Requirement blockers and missing resume evidence are different' : tab === 'review' ? 'Core experience has support; check the remaining fit questions' : 'Posted in the past 30 days'}{!feed.isFetching && ` · Collection updated ${date(results.catalog.capturedAt)}`}</p>
+          <div className="flex flex-wrap gap-2" aria-label="Job result sections">{([['recent','Matches'],['review','Needs review'],['older','Older']] as const).map(([key,label]) => <button type="button" key={key} aria-pressed={tab === key} className={tab === key ? BUTTON.primary : BUTTON.secondary} onClick={() => {setTab(key);setOtherSectionsOpen(false);}}>{label} ({results.counts[key]})</button>)}</div>
+          <details open={otherSectionsOpen} onToggle={event => setOtherSectionsOpen(event.currentTarget.open)} className="text-sm">
+            <summary className="min-h-10 cursor-pointer py-2 text-muted-foreground">Other results{tab === 'excluded' ? ' · Excluded selected' : tab === 'applied' ? ' · Already applied selected' : ''}</summary>
+            <div className="mt-1 flex flex-wrap gap-2">{([['applied','Already applied'],['excluded','Excluded']] as const).map(([key,label]) => <button type="button" key={key} aria-pressed={tab === key} className={tab === key ? BUTTON.primary : BUTTON.secondary} onClick={() => setTab(key)}>{label} ({results.counts[key]})</button>)}</div>
+          </details>
+            <p role="status" className="min-h-8 text-xs text-muted-foreground sm:min-h-4">{feed.isFetching ? 'Checking for updates…' : tab === 'older' ? 'Posted 31–60 days ago' : tab === 'applied' ? 'These postings match applications already recorded in your tracker' : tab === 'excluded' ? 'Requirement blockers and missing resume evidence are different' : tab === 'review' ? 'Core experience has support; check the remaining fit questions' : 'Posted in the past 30 days'}</p>
           {tab === 'excluded' && <p className="text-sm text-muted-foreground">{results.exclusionSummary && `${results.exclusionSummary.requirementBlockers} requirement blockers; ${results.exclusionSummary.insufficientEvidence} with qualification not established. `}Missing evidence does not mean you lack the qualification. Some requirements or supporting resume passages could not be established. These roles stay out of recommendations until their core requirements have support.</p>}
           {tab !== 'excluded' && results.personalization?.status === 'unavailable' && <p className="text-xs text-muted-foreground">Interview history is temporarily unavailable. Jobs are ordered by posting date.</p>}
         </div>
-          {tab === 'review' && <p className="text-sm text-muted-foreground">These roles have supporting core experience. Fit notes explain what still needs confirmation with the employer, including equivalent experience and expectations such as scale.</p>}
+
         {tab === 'applied' && <p className="text-sm text-muted-foreground">These roles stay out of fresh recommendations. Similar titles alone do not establish that you applied to the same posting. Applications missing from your tracker cannot be checked.</p>}
         {tab === 'older' && <p className="text-sm text-muted-foreground">Only postings the employer was still accepting applications for are included here. Each card retains its requirement status.</p>}
-        {results[tab].length ? <div className="space-y-4">{results[tab].map(job => <PostingCard key={job.key} job={job} />)}{results.counts[tab] > results[tab].length && <p className="text-sm text-muted-foreground">Showing {results[tab].length} of {results.counts[tab]}.</p>}</div> : results.discovery && !results.discovery.complete ? <EmptyState icon={BriefcaseBusiness} title="Discovery is still incomplete" body="No roles in this section have been established in the batches checked so far. This is not a complete result." /> : <EmptyState icon={BriefcaseBusiness} title={tab === 'applied' ? 'No confirmed prior applications in these results' : tab === 'recent' && results.counts.applied>0 ? 'Some matching roles are already in your tracker' : tab === 'recent' ? 'No resume-supported matches in this collection' : tab === 'review' ? 'No recent jobs waiting for review' : tab === 'older' ? 'No eligible older listings in this collection' : 'No requirement exclusions to show'} body={tab === 'applied' ? 'Only confirmed applications to the same posting appear here. Missing records and similar titles are not treated as proof.' : tab === 'recent' ? 'We keep checking for new jobs using your resume and saved preferences. Needs review and Older stay available separately. Coverage is still limited during this pilot.' : 'Your preferences are saved. We keep checking for new jobs automatically.'} />}
+        {results[tab].length ? <div className="space-y-4">{results[tab].map(job => <PostingCard key={job.key} job={job} />)}{results.counts[tab] > results[tab].length && <p className="text-sm text-muted-foreground">Showing {results[tab].length} of {results.counts[tab]}.</p>}</div> : results.discovery && !results.discovery.complete ? <EmptyState icon={BriefcaseBusiness} title="Discovery is still incomplete" body="No roles in this section have been established in the batches checked so far. This is not a complete result." /> : <EmptyState icon={BriefcaseBusiness} title={tab === 'applied' ? 'No confirmed prior applications in these results' : tab === 'recent' && results.counts.applied>0 ? 'Some matching roles are already in your tracker' : tab === 'recent' ? 'No resume-supported matches in this collection' : tab === 'review' ? 'No recent jobs waiting for review' : tab === 'older' ? 'No eligible older listings in this collection' : 'No requirement exclusions to show'} body={tab === 'applied' ? 'Only confirmed applications to the same posting appear here. Missing records and similar titles are not treated as proof.' : tab === 'recent' ? 'We keep checking for new jobs using your resume and saved preferences. Needs review and Older stay available separately. Coverage is still limited during this pilot.' : 'Your preferences are saved. We keep checking for new jobs automatically.'} action={tab !== 'applied' && tab !== 'excluded' && results.counts.applied > 0 ? <button type="button" className={BUTTON.secondary} onClick={() => {setOtherSectionsOpen(true);setTab('applied');}}>View tracked postings</button> : undefined} />}
         <details className="rounded-xl border border-border bg-card p-4 text-xs text-muted-foreground"><summary className="cursor-pointer font-medium text-foreground">Job sources and coverage</summary>
+          <div className="mt-3 space-y-2">
+            <p>Collection updated {date(results.catalog.capturedAt)}.{results.generation?.asOf ? ` Matches checked ${new Date(results.generation.asOf).toLocaleString()}.` : ''} Application history is checked separately.</p>
+            <div className="flex flex-wrap gap-2"><button type="button" className={BUTTON.secondary} onClick={refresh} disabled={feed.isFetching || save.isPending || refreshRequest.isPending || dirty}><RefreshCw className="h-3.5 w-3.5" aria-hidden />Check for updates</button>
+              {applicationCandidates.length>0 && <button type="button" className={BUTTON.ghost} disabled={applicationStatuses.isFetching} onClick={()=>void applicationStatuses.refetch()}>{applicationStatuses.isFetching ? 'Checking applications…' : 'Recheck applications'}</button>}</div>
+          </div>
           <p className="mt-3">{results.catalog.scope} Collected {date(results.catalog.capturedAt)}. {results.catalog.sourcesSuccessful} of {results.catalog.sourcesAttempted} sources responded; {results.catalog.sourcesFailed} unavailable, {results.catalog.sourcesLimited} partial. Thin results can reflect source coverage.</p>
           <p className="mt-2">The feed checks for updates automatically while this page is open. Your default resume follows future default changes; a chosen version stays selected. Opening a posting does not record an application.</p>
           <p className="mt-2">Your resume controls qualification. Tracked interview outcomes prioritize similar eligible roles, even without an Apply Gate check. Interview history never overrides a requirement or identifies which resume you submitted.</p>
