@@ -40,7 +40,7 @@
   ],
   "errors": [],
   "uiGrade": "A for reviewed local workflows",
-  "productionDeployed": false,
+  "productionDeployed": true,
   "fullWebSuite": {
     "passed": 744,
     "suites": 147
@@ -62,5 +62,6 @@
   "typecheck": true,
   "productionBuild": true,
   "productionGuard": true,
-  "tokenCheck": true
+  "tokenCheck": true,
+  "releaseReceipt": "release.json"
 }

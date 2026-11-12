@@ -1,0 +1,47 @@
+{
+  "deployed": true,
+  "at": "2026-11-12T14:06:41.087044+00:00",
+  "backendCommit": "450a73a58bee0f930a9fcf025e8bfc9c54e56611",
+  "webCommit": "949deeedbf39a0d4b00b89e5f2cbe54a3477b104",
+  "apiRevision": "applendium-backend-prep-450a73a",
+  "apiTraffic": [
+    [
+      "applendium-backend-prep-450a73a",
+      100
+    ]
+  ],
+  "webDeploy": "6af5c6307d4438c9b188387b",
+  "publishLockPreserved": true,
+  "publicAssetHashesVerified": [
+    "assets/index-BR5V5rCG.js",
+    "assets/index-YyX3mOhy.css",
+    "index.html"
+  ],
+  "health": 200,
+  "productionBrowserPassed": true,
+  "anonymousContext": 401,
+  "canonicalTask": 200,
+  "practice": 200,
+  "widths": [
+    1440,
+    390,
+    320
+  ],
+  "migrations": false,
+  "workerOrSchedulerChanges": false,
+  "coreCustomerWrites": false,
+  "rollback": {
+    "api": [
+      [
+        "applendium-backend-ask-e97b125",
+        100
+      ]
+    ],
+    "web": "6af4edec058fdbad0c17836d"
+  },
+  "limits": [
+    "Real invitation branch uses fixture coverage; production check used the owned general task.",
+    "Simulated extension token bridge with normal Firebase/Premium authentication.",
+    "No human usability, installed-extension or fleet-load certification."
+  ]
+}
