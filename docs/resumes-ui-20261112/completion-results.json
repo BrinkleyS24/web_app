@@ -1,7 +1,7 @@
 {
   "date": "2026-11-12",
   "change": "Clear completed resume confirmations from actionable work; retain correctable history",
-  "status": "local_correction_not_deployed",
+  "status": "deployed_verified",
   "previousAGrade": "withdrawn",
   "newGrade": "not_assigned",
   "fullRegression": {
@@ -82,5 +82,6 @@
     "Real-account writes were not performed; mutations use stateful fictional service fixtures.",
     "No automatic A re-award, human usability study or complete accessibility/cross-browser certification."
   ],
-  "sourceSha256": "c3258fd6803d03e0a4231461c3f6851b8f6a2697e97b5e1c57ecb2c475c0b44e"
+  "sourceSha256": "c3258fd6803d03e0a4231461c3f6851b8f6a2697e97b5e1c57ecb2c475c0b44e",
+  "release": "release.json"
 }

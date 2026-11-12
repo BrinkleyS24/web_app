@@ -1,7 +1,7 @@
 {
   "date": "2026-11-12",
   "feature": "Resumes",
-  "status": "local_candidate_not_deployed",
+  "status": "deployed_with_completion_correction",
   "grade": {
     "baseline": "C",
     "candidate": "withdrawn",
@@ -187,5 +187,6 @@
     "numPassedTestSuites": 149,
     "numFailedTestSuites": 0
   },
-  "historicalValidationNote": "The original passing checks did not test task completion with a stateful service. See the follow-up completion review."
+  "historicalValidationNote": "The original passing checks did not test task completion with a stateful service. See the follow-up completion review.",
+  "release": "release.json"
 }

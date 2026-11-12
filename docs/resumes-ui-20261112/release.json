@@ -1,0 +1,86 @@
+{
+  "deployed": true,
+  "at": "2026-11-12T18:11:53.277480+00:00",
+  "webCommit": "e7dc1de2d1886f72ba0759c54917deccd4b470e9",
+  "webDeploy": "6af5ffbfc4f693b982fd0a30",
+  "rollbackWebDeploy": "6af5d66f09633c0372e2af9a",
+  "apiTraffic": [
+    [
+      "applendium-backend-prep-450a73a",
+      100
+    ]
+  ],
+  "backendConfigurationUnchanged": true,
+  "publishLockPreserved": true,
+  "publicAssetHashesVerified": true,
+  "productionBrowserPassed": true,
+  "migrations": false,
+  "coreCustomerWrites": false,
+  "limits": [
+    "Normal Firebase/Premium authentication with simulated extension bridge.",
+    "Stateful mutation fixtures are separate from live read-only verification.",
+    "No human usability, multi-browser, fleet-load or underlying-outcome certification."
+  ],
+  "servingChecks": {
+    "normalFirebaseAuth": true,
+    "simulatedExtensionBridge": true,
+    "sourceWrites": false,
+    "sourcePageSize": 10,
+    "needsConfirmation": 3,
+    "recorded": 7,
+    "hasOlderPages": true,
+    "confirmedEntriesAbsentFromActionableList": true,
+    "correctionOpenedReadOnly": true,
+    "unchangedCorrectionDisabled": true,
+    "lazyHistoryRead": true,
+    "exactResumeHandoff": true,
+    "injectedListFailureAndRecovery": true,
+    "anonymous": {
+      "/api/resumes": 401,
+      "/api/resumes/submissions": 401
+    },
+    "metrics": [
+      {
+        "view": "library",
+        "width": 1440,
+        "overflow": false
+      },
+      {
+        "view": "library",
+        "width": 768,
+        "overflow": false
+      },
+      {
+        "view": "library",
+        "width": 390,
+        "overflow": false
+      },
+      {
+        "view": "library",
+        "width": 320,
+        "overflow": false
+      },
+      {
+        "view": "outcomes",
+        "width": 1440,
+        "overflow": false
+      },
+      {
+        "view": "outcomes",
+        "width": 768,
+        "overflow": false
+      },
+      {
+        "view": "outcomes",
+        "width": 390,
+        "overflow": false
+      },
+      {
+        "view": "outcomes",
+        "width": 320,
+        "overflow": false
+      }
+    ],
+    "errors": []
+  }
+}
