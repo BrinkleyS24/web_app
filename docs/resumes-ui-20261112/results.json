@@ -1,0 +1,188 @@
+{
+  "date": "2026-11-12",
+  "feature": "Resumes",
+  "status": "local_candidate_not_deployed",
+  "grade": {
+    "baseline": "C",
+    "candidate": "A",
+    "kind": "heuristic engineering UI assessment",
+    "scope": "reviewed Library, outcome/submission, evidence/failure and cross-feature workflows",
+    "notCertified": [
+      "human usability",
+      "complete accessibility",
+      "all browsers",
+      "new backend attribution correctness",
+      "live source mutations or concurrency"
+    ]
+  },
+  "sourceWritesOnRealAccount": false,
+  "normalFirebaseAuth": true,
+  "simulatedExtensionBridge": true,
+  "realAccount": {
+    "variants": 2,
+    "archivedRows": 0,
+    "unknownApplications": 509,
+    "scope": "confirmed_application_outcomes",
+    "confirmationPageSize": 10,
+    "healthRows": 2
+  },
+  "measurements": {
+    "viewportHeight": 900,
+    "before": [
+      {
+        "width": 1440,
+        "overflow": false,
+        "height": 1197,
+        "libraryTop": 380.25,
+        "confirmationsTop": 1052.125
+      },
+      {
+        "width": 768,
+        "overflow": false,
+        "height": 1541,
+        "libraryTop": 469.75,
+        "confirmationsTop": 1398.5
+      },
+      {
+        "width": 390,
+        "overflow": false,
+        "height": 1665,
+        "libraryTop": 532.25,
+        "confirmationsTop": 1508
+      },
+      {
+        "width": 320,
+        "overflow": false,
+        "height": 1892,
+        "libraryTop": 592.625,
+        "confirmationsTop": 1735.125
+      }
+    ],
+    "after": [
+      {
+        "width": 1440,
+        "overflow": false,
+        "height": 900,
+        "libraryTop": 319.75,
+        "confirmationsTop": 279.75
+      },
+      {
+        "width": 768,
+        "overflow": false,
+        "height": 985,
+        "libraryTop": 393.25,
+        "confirmationsTop": 353.25
+      },
+      {
+        "width": 390,
+        "overflow": false,
+        "height": 1094,
+        "libraryTop": 414.625,
+        "confirmationsTop": 374.625
+      },
+      {
+        "width": 320,
+        "overflow": false,
+        "height": 1133,
+        "libraryTop": 434.625,
+        "confirmationsTop": 394.625
+      }
+    ],
+    "submissionMetric": "old collapsed confirmation action versus new direct Library shortcut"
+  },
+  "sourceParity": {
+    "passed": true,
+    "excludedOnly": [
+      "requestId"
+    ],
+    "bodies": {
+      "variants": true,
+      "scoreboard": true,
+      "health": true,
+      "submissions": true
+    }
+  },
+  "browser": {
+    "distinctScenariosPassed": 12,
+    "failed": 0,
+    "flaky": 0,
+    "finalOrganizationFailureLayoutRerun": {
+      "startTime": "2026-11-12T15:41:24.951Z",
+      "duration": 145403.066,
+      "expected": 4,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "widths": [
+      320,
+      390,
+      768,
+      1440
+    ],
+    "productionModeAccountPageErrors": [],
+    "realAccountWorkflow": [
+      "Library",
+      "Outcomes",
+      "confirmation panel read",
+      "editor read",
+      "wording comparison"
+    ],
+    "fictionalWriterWorkflow": [
+      "immutable copy and verify",
+      "copy/download plain text",
+      "exact saved version in Apply Gate",
+      "lost confirmation response and same-request retry"
+    ],
+    "fictionalFailureCases": [
+      "library",
+      "health",
+      "outcomes",
+      "unknown attribution",
+      "thin sample",
+      "archived history",
+      "unresolved task context"
+    ],
+    "initialResumeReads": [
+      {
+        "path": "/api/resumes",
+        "status": 200
+      },
+      {
+        "path": "/api/resumes/health",
+        "status": 200
+      }
+    ]
+  },
+  "checks": {
+    "typeScript": true,
+    "productionGuard": true,
+    "tokenCheck": true,
+    "productionBuild": true,
+    "loopbackPreviewBuild": true,
+    "authBypassInProductionBuild": false
+  },
+  "productSourceSha256": {
+    "src/pages/Resumes.tsx": "504b1c929799229567afaaa3d11406f78b5d3e4d34dacef354a507aae2f557d9",
+    "src/components/ResumeSubmissions.tsx": "38b3d45687bcd818ff9ef1a7d0df36213027897acdfe2756503a963abab1e62b",
+    "src/lib/resumeLibraryPresentation.ts": "624fcb4216aa722297e55b2b8b57746e7ac43934867c04c9bc08150d1d662135"
+  },
+  "scopeSafety": {
+    "backendChanged": false,
+    "migrationRequired": false,
+    "extensionEditsPreserved": true,
+    "dashboardRedesigned": false
+  },
+  "fixturesPublished": [
+    "library-initial-1440.png",
+    "library-initial-390.png",
+    "outcomes-390.png",
+    "checks-unavailable-320.png"
+  ],
+  "unitRegression": {
+    "numPassedTests": 801,
+    "numFailedTests": 0,
+    "numPassedTestSuites": 149,
+    "numFailedTestSuites": 0
+  }
+}

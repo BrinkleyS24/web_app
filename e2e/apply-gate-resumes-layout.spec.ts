@@ -101,8 +101,8 @@ for (const width of [390, 768, 1440]) {
     expect(await pageWidth(page)).toBeLessThanOrEqual(width);
     // One line or a few words per line, never one letter per line.
     expect((await title.boundingBox())!.width).toBeGreaterThan(120);
-    await page.getByLabel("Compare Teacher K-12 with a long version name", { exact: true }).check();
-    await page.getByLabel("Compare Teacher to Instructional Designer (Maria test)", { exact: true }).check();
+    await page.getByLabel("Compare wording for Teacher K-12 with a long version name", { exact: true }).check();
+    await page.getByLabel("Compare wording for Teacher to Instructional Designer (Maria test)", { exact: true }).check();
     await expect(page.getByTestId("resume-lines-added").locator("[data-changed]")).toHaveCount(3);
     expect(await pageWidth(page)).toBeLessThanOrEqual(width);
     if (shotDir) await page.screenshot({ path: `${shotDir}/resumes-${width}.png`, fullPage: true });

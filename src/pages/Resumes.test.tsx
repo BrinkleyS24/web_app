@@ -12,6 +12,7 @@ const {
   fetchLegacyResumeForReview,
   fetchResumeVariants,
   fetchResumeSubmissions,
+  confirmSubmittedResume,
   fetchResumeHealth,
   fetchVariantScoreboard,
   fetchApplicationStats,
@@ -24,6 +25,7 @@ const {
   fetchLegacyResumeForReview: vi.fn(),
   fetchResumeVariants: vi.fn(),
   fetchResumeSubmissions: vi.fn(),
+  confirmSubmittedResume: vi.fn(),
   fetchResumeHealth: vi.fn(),
   fetchVariantScoreboard: vi.fn(),
   fetchApplicationStats: vi.fn(),
@@ -46,6 +48,7 @@ vi.mock("@/lib/emails", async () => {
     fetchLegacyResumeForReview,
     fetchResumeVariants,
     fetchResumeSubmissions,
+    confirmSubmittedResume,
     fetchResumeHealth,
     fetchVariantScoreboard,
     fetchApplicationStats,
@@ -56,7 +59,7 @@ vi.mock("@/lib/emails", async () => {
   };
 });
 
-function renderPage(entry = '/resumes') {
+function renderPage(entry = '/resumes?view=outcomes') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return { queryClient, ...render(
     <MemoryRouter initialEntries={[entry]}>
@@ -74,14 +77,18 @@ test('a paused outcome response preserves the saved library and confirmation tas
   renderPage();
   expect(await screen.findByText('Resume outcomes are temporarily paused')).toBeInTheDocument();
   expect(screen.getByText('Your saved resumes and submitted-version confirmations are still available.')).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('tab', { name: 'Library' }));
   expect(screen.getByRole('button', { name: 'Open and edit' })).toBeEnabled();
-  await userEvent.click(screen.getByRole('button', { name: 'Review submitted resumes' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Record which resume you submitted' }));
   expect(await screen.findByLabelText('Submitted resume for application 10')).toBeVisible();
-  expect(screen.queryByText('Which version works')).not.toBeInTheDocument();
+  expect(screen.queryByText('Confirmed outcomes by version')).not.toBeInTheDocument();
 });
 
 beforeEach(() => {
-  useAuth.mockReturnValue({ plan: "premium" });
+  vi.resetAllMocks();
+  useAuth.mockReturnValue({ plan: "premium", user: { uid: "owner" } });
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [] });
+  confirmSubmittedResume.mockResolvedValue({ success: true });
   fetchLegacyResumeForReview.mockResolvedValue({ success: true, resumeText: null });
   fetchResumeHealth.mockResolvedValue({ success: true, resumes: [] });
   fetchResumeSubmissions.mockResolvedValue({ success: true, applications: [{ id: '10', company: 'Fictional Cedar', role: 'QA Engineer', outcomeLabel: 'pending', submission: null }], nextCursor: null });
@@ -99,23 +106,23 @@ beforeEach(() => {
 
 afterEach(() => { vi.clearAllMocks(); });
 
-test('the saved library comes before collapsed application confirmations', async () => {
-  useAuth.mockReturnValue({ plan: 'premium', user: { uid: 'library-owner' } });
-  const versionId = '11111111-1111-4111-8111-111111111111';
-  fetchResumeVariants.mockResolvedValue({ variants: [{ id: versionId, name: 'QA version', isDefault: true }] });
-  const { container } = renderPage();
-  await screen.findByRole('button', { name: 'Review submitted resumes' });
-  await screen.findByRole('button', { name: 'Open and edit' });
-  const library = container.querySelector(`article#resume-${versionId}`)!;
-  const confirmations = container.querySelector('#submitted-resumes')!;
-  expect(library.compareDocumentPosition(confirmations) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(screen.getByRole('button', { name: 'Open and edit' })).toBeVisible();
+test('Library opens first without loading history or confirmations', async () => {
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: '11111111-1111-4111-8111-111111111111', name: 'QA version', isDefault: true }] });
+  renderPage('/resumes');
+  expect(await screen.findByRole('button', { name: 'Open and edit' })).toBeVisible();
+  expect(screen.getByRole('tab', { name: 'Library' })).toHaveAttribute('aria-selected', 'true');
+  expect(fetchVariantScoreboard).not.toHaveBeenCalled();
+  expect(fetchResumeSubmissions).not.toHaveBeenCalled();
+  expect(fetchApplicationStats).not.toHaveBeenCalled();
   expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('tab', { name: 'Outcomes & submissions' }));
+  expect(await screen.findByRole('button', { name: 'Review submitted resumes' })).toBeVisible();
+  expect(fetchVariantScoreboard).toHaveBeenCalledTimes(1);
 });
 
 test('Apply Gate application-confirmation links open the panel on arrival', async () => {
   useAuth.mockReturnValue({ plan: 'premium', user: { uid: 'link-owner' } });
-  fetchResumeVariants.mockResolvedValue({ variants: [{ id: 'A', name: 'QA version', isDefault: true }] });
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'QA version', isDefault: true }] });
   renderPage('/resumes#submitted-resumes');
   expect(await screen.findByRole('combobox', { name: 'Submitted resume for application 10' })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Hide application confirmations' })).toHaveAttribute('aria-expanded', 'true');
@@ -124,33 +131,34 @@ test('Apply Gate application-confirmation links open the panel on arrival', asyn
 
 test('late outcome tables and archived history do not move ahead of the saved library', async () => {
   useAuth.mockReturnValue({ plan: 'premium', user: { uid: 'late-outcomes-owner' } });
-  fetchResumeVariants.mockResolvedValue({ variants: [
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [
     { id: '11111111-1111-4111-8111-111111111111', name: 'QA first', isDefault: true },
     { id: '22222222-2222-4222-8222-222222222222', name: 'QA second', isDefault: false },
   ] });
   let finish: (value: unknown) => void;
   fetchVariantScoreboard.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
   const { container } = renderPage();
-  await screen.findByRole('heading', { name: 'QA first' });
+  await waitFor(() => expect(fetchVariantScoreboard).toHaveBeenCalled());
   await act(async () => finish!({ success: true, scoreboard: { basis: 'confirmed_application_outcomes', minSample: 5,
     perVariant: [{ variantId: 'archived', name: 'Archived QA', sent: 1, matchedToOutcome: 1, interviewed: 1, offered: 0, rejected: 0,
       noResponse: 0, interviewRate: 100, sufficientSample: false }] }, recommendation: null }));
-  const comparison = (await screen.findByRole('heading', { name: 'Which version works' })).closest('section')!;
-  const archived = screen.getByRole('heading', { name: 'Confirmed outcomes for past versions' }).closest('section')!;
-  const library = container.querySelector('article')!;
-  expect(library.compareDocumentPosition(comparison) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(library.compareDocumentPosition(archived) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(await screen.findByRole('heading', { name: 'Confirmed outcomes by version' })).toBeVisible();
+  expect(screen.getByText('Confirmed outcomes for past versions')).toBeVisible();
+  await userEvent.click(screen.getByRole('tab', { name: 'Library' }));
+  expect(screen.getByRole('heading', { name: 'QA first' })).toBeVisible();
+  expect(screen.getByText('Confirmed outcomes for past versions')).not.toBeVisible();
 });
 
 test('empty version outcomes point to application confirmation without requiring Apply Gate', async () => {
-  fetchResumeVariants.mockResolvedValue({ variants: [{ id: 'A', name: 'QA version', isDefault: true }] });
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'QA version', isDefault: true }] });
   renderPage();
+  await userEvent.click(await screen.findByText('Applications behind these outcomes'));
   expect(await screen.findByText(/No confirmed submissions for this version/)).toBeInTheDocument();
   expect(screen.queryByText(/pick it in Apply Gate when you apply/)).not.toBeInTheDocument();
 });
 
 test('a failed refresh hides cached outcome rates and does not claim zero submissions', async () => {
-  fetchResumeVariants.mockResolvedValue({ variants: [{ id: 'A', name: 'QA A', isDefault: true }, { id: 'B', name: 'QA B' }] });
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'QA A', isDefault: true }, { id: 'B', name: 'QA B', isDefault: false }] });
   fetchVariantScoreboard.mockResolvedValueOnce({ success: true, scoreboard: { basis: "confirmed_application_outcomes", minSample: 5, perVariant: [{ variantId: 'A', name: 'QA A', sent: 5, matchedToOutcome: 5, interviewed: 5, offered: 0, rejected: 0, noResponse: 0, interviewRate: 100, sufficientSample: true }] }, recommendation: null }).mockRejectedValue(new Error('Outage after initial data'));
   const { queryClient } = renderPage();
   expect(await screen.findByText('100%')).toBeInTheDocument();
@@ -168,7 +176,7 @@ test('ambiguous attribution is explained instead of displaying inflated resume o
 });
 
 test('a legacy backend response is not relabeled as confirmed history, counts or a recommendation', async () => {
-  fetchResumeVariants.mockResolvedValue({ variants: [{ id: 'A', name: 'Current version', isDefault: true }, { id: 'B', name: 'Other version' }] });
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'Current version', isDefault: true }, { id: 'B', name: 'Other version', isDefault: false }] });
   fetchVariantScoreboard.mockResolvedValue({ success: true, scoreboard: { basis: 'applied_verdict_vs_email_cohort_outcome', minSample: 5,
     perVariant: [{ variantId: 'old', name: 'Resume', sent: 12, matchedToOutcome: 5, interviewed: 1, interviewRate: 20 }] },
     recommendation: { variantId: 'old', name: 'Resume', interviewRate: 20 } });
@@ -176,11 +184,12 @@ test('a legacy backend response is not relabeled as confirmed history, counts or
   expect(await screen.findByText('Resume outcomes could not be loaded')).toBeInTheDocument();
   expect(screen.getByText(/Past checks alone do not confirm which resume you submitted/)).toBeInTheDocument();
   expect(screen.queryByText('Confirmed outcomes for past versions')).not.toBeInTheDocument();
-  expect(screen.queryByText('Which version works')).not.toBeInTheDocument();
+  expect(screen.queryByText('Confirmed outcomes by version')).not.toBeInTheDocument();
   expect(screen.queryByText(/12 confirmed/)).not.toBeInTheDocument();
   expect(screen.queryByText('20%')).not.toBeInTheDocument();
   expect(screen.queryByText(/No confirmed submissions for this version/)).not.toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: 'Current version' })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('tab', { name: 'Library' }));
+  expect(screen.getByRole('heading', { name: 'Current version' })).toBeVisible();
 });
 
 test('a scoreboard arriving before the library does not identify every version as archived', async () => {
@@ -194,9 +203,9 @@ test('a scoreboard arriving before the library does not identify every version a
 });
 
 test('free users manage a default without making premium requests', async () => {
-  useAuth.mockReturnValue({ plan: 'free' });
+  useAuth.mockReturnValue({ plan: 'free', user: { uid: 'owner' } });
   fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'QA', isDefault: false }] });
-  renderPage();
+  renderPage('/resumes');
   await userEvent.click(await screen.findByRole('button', { name: /Make default/ }));
   expect(setDefaultResumeVariant).toHaveBeenCalledWith('A', expect.anything());
   expect(fetchVariantScoreboard).not.toHaveBeenCalled();
@@ -212,7 +221,7 @@ test('the page uses the shared app width, not a narrower column of its own (2026
 
 test('removing the default explains the consequence and waits for confirmation', async () => {
   fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'QA', isDefault: true }] });
-  renderPage();
+  renderPage('/resumes');
   await userEvent.click(await screen.findByRole('button', { name: /^Remove$/ }));
   expect(archiveResumeVariant).not.toHaveBeenCalled();
   expect(screen.getByText(/Extension checks will pause/)).toBeInTheDocument();
@@ -223,7 +232,7 @@ test('removing the default explains the consequence and waits for confirmation',
 test('a default mutation failure stays visible and leaves the document available', async () => {
   fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'QA', isDefault: false }] });
   setDefaultResumeVariant.mockRejectedValueOnce(new Error('Try again later.'));
-  renderPage();
+  renderPage('/resumes');
   await userEvent.click(await screen.findByRole('button', { name: /Make default/ }));
   expect(await screen.findByText('The default did not change')).toBeInTheDocument();
   expect(screen.getByText('QA')).toBeInTheDocument();
@@ -232,7 +241,7 @@ test('a default mutation failure stays visible and leaves the document available
 test('first upload visibly opts into a default and a retry keeps the same request ID', async () => {
   fetchResumeVariants.mockResolvedValue({ success: true, variants: [] });
   createResumeVariant.mockRejectedValueOnce(new Error('Timed out'));
-  renderPage();
+  renderPage('/resumes');
   await userEvent.click(await screen.findByRole('button', { name: /Add a resume/ }));
   expect(screen.getByLabelText('Use as my default for job checks')).toBeChecked();
   await userEvent.type(screen.getByPlaceholderText(/Paste your resume/), 'Software testing experience with Python and Playwright over five years.');
@@ -261,8 +270,9 @@ describe("Resumes page", () => {
     });
     renderPage();
 
+    await userEvent.click(await screen.findByText("Applications behind these outcomes"));
     await waitFor(() => {
-      expect(screen.getByText("QA-focused")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "QA-focused", level: 3 })).toBeInTheDocument();
       expect(screen.getByText(/not enough to call it yet/i)).toBeInTheDocument();
     });
   });
@@ -273,7 +283,7 @@ describe("Resumes page", () => {
       success: true,
       variants: [{ id: "A", name: "QA-focused", isDefault: true, createdAt: "", charCount: 1200 }],
     });
-    renderPage();
+    renderPage('/resumes');
     await screen.findByText("QA-focused");
     expect(screen.queryByText(/chars/)).not.toBeInTheDocument();
   });
@@ -293,6 +303,7 @@ describe("Resumes page", () => {
     });
     renderPage();
 
+    await userEvent.click(await screen.findByText("Applications behind these outcomes"));
     await waitFor(() => {
       expect(screen.getByText(/3 interview-stage outcomes/i)).toBeInTheDocument();
     });
@@ -320,6 +331,7 @@ describe("Resumes page", () => {
     });
     renderPage();
 
+    await userEvent.click(await screen.findByText("Applications behind these outcomes"));
     // Expand the drill-down
     const toggle = await screen.findByRole("button", { name: /Show 2 applications/i });
     await userEvent.click(toggle);
@@ -360,7 +372,7 @@ describe("Resumes page", () => {
     });
     renderPage();
 
-    expect(await screen.findByText("Which version works")).toBeInTheDocument();
+    expect(await screen.findByText("Confirmed outcomes by version")).toBeInTheDocument();
     expect(screen.getByText(/reached interview stage or offer in/)).toBeInTheDocument();
     expect(screen.getAllByText("90%")).toHaveLength(2); // the answer line and its row
     expect(screen.getByText("needs 5 more")).toBeInTheDocument();
@@ -378,11 +390,12 @@ describe("Resumes page", () => {
       ],
     });
     const { container } = renderPage();
-    await screen.findByText("Which version works");
+    await screen.findByText("Confirmed outcomes by version");
     expect(container.innerHTML).not.toContain("overflow-wrap:anywhere");
     for (const header of container.querySelectorAll("thead th")) expect(header.className).toContain("whitespace-nowrap");
     // The count columns wait for lg, where the content column has room.
     expect(screen.getByRole("columnheader", { name: "Sent" }).className).toContain("lg:table-cell");
+    await userEvent.click(screen.getByRole("tab", { name: "Library" }));
     const title = await screen.findByRole("heading", { name: "Math Teacher 7-12" });
     const header = title.closest("article")!.firstElementChild!;
     expect(header.className).not.toMatch(/sm:flex-row|md:flex-row/);
@@ -396,14 +409,14 @@ describe("Resumes page", () => {
       success: true,
       variants: [{ id: "A", name: "QA-focused", isDefault: true, createdAt: "", charCount: 1200 }],
     });
-    renderPage();
+    renderPage('/resumes');
     await screen.findByRole("heading", { name: "QA-focused" });
-    expect(screen.queryByText("Which version works")).not.toBeInTheDocument();
+    expect(screen.queryByText("Confirmed outcomes by version")).not.toBeInTheDocument();
   });
 
   test("creates a new variant from pasted text", async () => {
     fetchResumeVariants.mockResolvedValue({ success: true, variants: [] });
-    renderPage();
+    renderPage('/resumes');
 
     await userEvent.click(await screen.findByRole("button", { name: /Add a resume/i }));
     await userEvent.type(screen.getByPlaceholderText(/Name/i), "Generic");
@@ -437,7 +450,7 @@ describe("Resumes page", () => {
     test("stays hidden with zero rejections", async () => {
       renderPage();
 
-      await waitFor(() => expect(screen.getByText("My resume")).toBeInTheDocument());
+      await waitFor(() => expect(fetchApplicationStats).toHaveBeenCalled());
       expect(screen.queryByText(/Try a different resume next time/i)).not.toBeInTheDocument();
     });
 
@@ -472,7 +485,7 @@ describe("Resumes page", () => {
       expect(screen.queryByText(/Try a different resume next time/i)).not.toBeInTheDocument();
 
       renderPage();
-      await waitFor(() => expect(screen.getByText("My resume")).toBeInTheDocument());
+      await waitFor(() => expect(fetchApplicationStats).toHaveBeenCalled());
       expect(screen.queryByText(/Try a different resume next time/i)).not.toBeInTheDocument();
     });
 
@@ -489,4 +502,79 @@ describe("Resumes page", () => {
       expect(screen.getByPlaceholderText(/Name/i)).toBeInTheDocument();
     });
   });
+});
+
+
+test('keyboard view navigation preserves an unsaved new version and wording selection', async () => {
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: '11111111-1111-4111-8111-111111111111', name: 'Saved QA', isDefault: true }] });
+  renderPage('/resumes?action=original&version=task-version');
+  await userEvent.click(await screen.findByRole('checkbox', { name: 'Compare wording for Saved QA' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Add a resume version' }));
+  await userEvent.type(screen.getByPlaceholderText(/Name/), 'Draft in progress');
+  await userEvent.type(screen.getByPlaceholderText(/Paste your resume/), 'Original fictional wording kept while reviewing outcomes.');
+  const library = screen.getByRole('tab', { name: 'Library' });
+  library.focus();
+  await userEvent.keyboard('{ArrowRight}');
+  expect(screen.getByRole('tab', { name: 'Outcomes & submissions' })).toHaveFocus();
+  expect(screen.getByRole('tab', { name: 'Outcomes & submissions' })).toHaveAttribute('aria-selected', 'true');
+  expect(screen.queryByPlaceholderText(/Paste your resume/)).not.toBeVisible();
+  await userEvent.keyboard('{Home}');
+  expect(library).toHaveFocus();
+  expect(screen.getByPlaceholderText(/Name/)).toHaveValue('Draft in progress');
+  expect(screen.getByPlaceholderText(/Paste your resume/)).toHaveValue('Original fictional wording kept while reviewing outcomes.');
+  expect(screen.getByLabelText('Compare wording for Saved QA')).toBeChecked();
+  expect(createResumeVariant).not.toHaveBeenCalled();
+});
+
+test('switching views during a lost confirmation response preserves its choice and request identity', async () => {
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'Saved QA', isDefault: true }] });
+  let rejectSave: (error: Error) => void;
+  confirmSubmittedResume.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectSave = reject; }));
+  renderPage('/resumes#submitted-resumes');
+  await userEvent.selectOptions(await screen.findByRole('combobox'), 'A');
+  await userEvent.click(screen.getByRole('button', { name: 'Confirm submitted resume' }));
+  await userEvent.click(screen.getByRole('tab', { name: 'Library' }));
+  await act(async () => rejectSave!(new Error('Acknowledgment lost. Retry safely.')));
+  await userEvent.click(screen.getByRole('tab', { name: 'Outcomes & submissions' }));
+  expect(screen.getByRole('combobox')).toHaveValue('A');
+  await userEvent.click(screen.getByRole('button', { name: 'Retry confirmation' }));
+  expect(confirmSubmittedResume.mock.calls[1]).toEqual(confirmSubmittedResume.mock.calls[0]);
+});
+
+test('a failed library refresh retains the confirmation selection but disables unverified choices', async () => {
+  fetchResumeVariants.mockResolvedValueOnce({ success: true, variants: [{ id: 'A', name: 'Saved QA', isDefault: true }] }).mockRejectedValue(new Error('Library unavailable'));
+  const { queryClient } = renderPage('/resumes#submitted-resumes');
+  await userEvent.selectOptions(await screen.findByRole('combobox'), 'A');
+  await act(async () => { await queryClient.invalidateQueries({ queryKey: ['resume-variants'] }); });
+  expect(screen.getByRole('combobox')).toHaveValue('A');
+  await waitFor(() => expect(screen.getByRole('combobox')).toBeDisabled());
+  expect(screen.getByRole('button', { name: 'Confirm submitted resume' })).toBeDisabled();
+  expect(screen.getByText(/Your selection is retained/)).toBeVisible();
+  expect(screen.queryByRole('heading', { name: 'Confirmed outcomes by version' })).not.toBeInTheDocument();
+});
+
+test('a failed health refresh withholds cached clean labels without removing saved documents', async () => {
+  fetchResumeVariants.mockResolvedValue({ success: true, variants: [{ id: 'A', name: 'Saved QA', isDefault: true }] });
+  fetchResumeHealth.mockResolvedValueOnce({ success: true, resumes: [{ variantId: 'A', document: { variantId: 'A', fingerprint: 'abc', characters: 500 }, findings: [] }] }).mockRejectedValue(new Error('Checks unavailable'));
+  const { queryClient } = renderPage('/resumes');
+  expect(await screen.findByText('Nothing flagged on this version.')).toBeVisible();
+  await act(async () => { await queryClient.invalidateQueries({ queryKey: ['resume-health'] }); });
+  await waitFor(() => expect(screen.queryByText('Nothing flagged on this version.')).not.toBeInTheDocument());
+  expect(screen.getByText('Resume checks are unavailable for this version.')).toBeVisible();
+  expect(screen.getByRole('heading', { name: 'Saved QA' })).toBeVisible();
+});
+
+test('legacy profile text from another account or the old global cache is never offered', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+  client.setQueryData(['legacy-resume-review'], { success: true, resumeText: 'Foreign global cached text' });
+  client.setQueryData(['legacy-resume-review', 'previous-owner'], { success: true, resumeText: 'Foreign owner cached text' });
+  let finish: (value: unknown) => void;
+  fetchLegacyResumeForReview.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  render(<MemoryRouter><QueryClientProvider client={client}><Resumes /></QueryClientProvider></MemoryRouter>);
+  await waitFor(() => expect(fetchLegacyResumeForReview).toHaveBeenCalled());
+  expect(screen.queryByRole('button', { name: 'Review previous resume' })).not.toBeInTheDocument();
+  expect(screen.queryByText(/Foreign/)).not.toBeInTheDocument();
+  expect(client.getQueryState(['legacy-resume-review', 'owner'])?.status).toBe('pending');
+  await act(async () => finish!({ success: true, resumeText: null }));
+  expect(screen.queryByRole('button', { name: 'Review previous resume' })).not.toBeInTheDocument();
 });

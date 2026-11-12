@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronDown, CircleCheck, FileText, Loader2, Plus, Star, Trash2, X } from "lucide-react";
 
@@ -29,6 +29,7 @@ import { STATUS_TONE } from "@/lib/statusTone";
 import { ResumeEditor, ResumeTextComparison } from "@/components/ResumeEditor";
 import { ResumeSubmissions } from "@/components/ResumeSubmissions";
 import { readResumeChoice, resumeToolHref, RESUME_ID } from "@/lib/resumeWorkspace";
+import { requireSavedResumes, requireResumeChecks, resumeLibraryHref } from '@/lib/resumeLibraryPresentation';
 import { isConfirmedResumeOutcomes, OUTCOME_CONTRACT_MESSAGE } from '@/lib/resumeOutcomesContract';
 
 const VARIANT_NUDGE_DISMISS_KEY = "variantNudge.dismissed";
@@ -239,12 +240,14 @@ function VariantComparison({
   openFindingsByVariant,
   minSample,
   recommendation,
+  search,
 }: {
   variants: ResumeVariant[];
   scoreByVariant: Map<string, VariantScoreRow>;
   openFindingsByVariant: Map<string, number | null>;
   minSample: number | null;
   recommendation: VariantRecommendation;
+  search: string;
 }) {
   const rows = [...variants].sort((a, b) => {
     if (a.id === recommendation?.variantId) return -1;
@@ -256,7 +259,7 @@ function VariantComparison({
 
   return (
     <Panel
-      title="Which version works"
+      title="Confirmed outcomes by version"
       description={
         recommendation
           ? undefined
@@ -281,7 +284,7 @@ function VariantComparison({
               <th scope="col" className={cn(th, "hidden text-right lg:table-cell")}>Sent</th>
               <th scope="col" className={cn(th, "hidden text-right lg:table-cell")}>With an outcome</th>
               <th scope="col" className={cn(th, "hidden text-right lg:table-cell")}>Interviews</th>
-              <th scope="col" className={cn(th, "text-right")}>Interview rate</th>
+              <th scope="col" className={cn(th, "text-right")}>Interview / offer rate</th>
               <th scope="col" className={cn(th, "hidden sm:table-cell")}>Resume health</th>
             </tr>
           </thead>
@@ -294,9 +297,9 @@ function VariantComparison({
               return (
                 <tr key={variant.id}>
                   <th scope="row" className="px-3 py-2.5 text-left">
-                    <a href={`#resume-${variant.id}`} className="text-[13px] font-semibold text-foreground underline-offset-2 hover:underline">
+                    <Link to={resumeLibraryHref(search,variant.id)} className="text-[13px] font-semibold text-foreground underline-offset-2 hover:underline">
                       {variant.name}
-                    </a>
+                    </Link>
                     <span className="ml-2 inline-flex gap-1.5 align-middle">
                       {variant.id === recommendation?.variantId ? <ToneChip tone="positive">Tracked results</ToneChip> : null}
                       {variant.isDefault ? <ToneChip tone="brand">Default</ToneChip> : null}
@@ -321,9 +324,9 @@ function VariantComparison({
                     ) : open === 0 ? (
                       <span className={TONES.positive.text}>Nothing flagged</span>
                     ) : (
-                      <a href={`#resume-${variant.id}`} className={cn("font-medium underline-offset-2 hover:underline", TONES.attention.text)}>
+                      <Link to={resumeLibraryHref(search, variant.id)} className={cn("font-medium underline-offset-2 hover:underline", TONES.attention.text)}>
                         {open} to fix
-                      </a>
+                      </Link>
                     )}
                   </td>
                 </tr>
@@ -341,21 +344,40 @@ const ResumeWorkspace = () => {
   const { plan, user } = useAuth();
   const location = useLocation();
   const requested = readResumeChoice(location.search);
+  const navigate = useNavigate();
+  const premium = plan === "premium";
+  // Existing Apply Gate links use the hash; new links can select a view directly.
+  const outcomesView = premium && (new URLSearchParams(location.search).get('view') === 'outcomes'
+    || location.hash === '#submitted-resumes');
+  const [outcomesVisited, setOutcomesVisited] = useState(outcomesView);
+  const showOutcomeContent = outcomesVisited || outcomesView;
+  useEffect(() => { if (outcomesView) setOutcomesVisited(true); }, [outcomesView]);
+  const changeView = (view: 'library' | 'outcomes', submissions = false) => {
+    const params = new URLSearchParams(location.search);
+    params.set('view', view);
+    navigate({ pathname: '/resumes', search: '?' + params, hash: submissions ? '#submitted-resumes' : '' });
+  };
+  const navigateTabs = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const view = event.key === 'Home' ? 'library' : event.key === 'End' ? 'outcomes' : outcomesView ? 'library' : 'outcomes';
+    changeView(view);
+    document.getElementById(`resume-${view}-tab`)?.focus();
+  };
   const [editorId, setEditorId] = useState<string | null>(requested.id);
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const requestedSignature=new URLSearchParams(location.search).getAll('resume').join('|');
   useEffect(()=>{if(requested.present)setEditorId(requested.id);},[requested.present,requestedSignature]);
-  const premium = plan === "premium";
   const [comparisonDraft, setComparisonDraft] = useState('');
   const [comparisonTitle, setComparisonTitle] = useState('');
-  const variantsQuery = useQuery({ queryKey: ["resume-variants", user?.uid], queryFn: fetchResumeVariants });
-  const scoreboardQuery = useQuery({ queryKey: ["variant-scoreboard", user?.uid, comparisonTitle], queryFn: () => fetchVariantScoreboard(comparisonTitle || undefined), enabled: premium });
+  const variantsQuery = useQuery({ queryKey: ["resume-variants", user?.uid], queryFn: fetchResumeVariants, select: requireSavedResumes, enabled: Boolean(user?.uid) });
+  const scoreboardQuery = useQuery({ queryKey: ["variant-scoreboard", user?.uid, comparisonTitle], queryFn: () => fetchVariantScoreboard(comparisonTitle || undefined), enabled: premium && showOutcomeContent && Boolean(user?.uid) });
   const incompatibleOutcomes = scoreboardQuery.isSuccess && !isConfirmedResumeOutcomes(scoreboardQuery.data);
   const outcomesUnavailable = scoreboardQuery.isError || incompatibleOutcomes;
   const outcomesPaused = (scoreboardQuery.error as { payload?: { code?: string } } | null)?.payload?.code === 'resume_outcomes_paused';
   const outcomeData = !outcomesUnavailable && variantsQuery.isSuccess && isConfirmedResumeOutcomes(scoreboardQuery.data) ? scoreboardQuery.data : undefined;
-  const statsQuery = useQuery({ queryKey: ["application-stats", user?.uid], queryFn: fetchApplicationStats, enabled: premium });
-  const healthQuery = useQuery({ queryKey: ["resume-health", user?.uid], queryFn: fetchResumeHealth, enabled: premium });
+  const statsQuery = useQuery({ queryKey: ["application-stats", user?.uid], queryFn: fetchApplicationStats, enabled: premium && showOutcomeContent && Boolean(user?.uid) });
+  const healthQuery = useQuery({ queryKey: ["resume-health", user?.uid], queryFn: fetchResumeHealth, select: requireResumeChecks, enabled: premium && Boolean(user?.uid) });
 
   const pendingSave = useRef<{ payload: string; requestId: string } | null>(null);
   const [useAsDefault, setUseAsDefault] = useState(false);
@@ -365,10 +387,22 @@ const ResumeWorkspace = () => {
   const [draft, setDraft] = useState("");
   const [nudgeDismissed, setNudgeDismissed] = useState(readVariantNudgeDismissed);
 
-  const variants = variantsQuery.data?.variants ?? [];
-  const legacyQuery = useQuery({ queryKey: ['legacy-resume-review'], queryFn: fetchLegacyResumeForReview,
-    enabled: variantsQuery.isSuccess && variants.length === 0 });
-  const beginAdd = () => { pendingSave.current = null; setUseAsDefault(variants.length === 0); setAdding(true); };
+  const variants = variantsQuery.isSuccess ? variantsQuery.data.variants : [];
+  // Keep confirmation forms mounted if a later list refresh fails, but disable
+  // their choices until the library can be verified again. The owner-keyed parent
+  // resets this reference on account changes.
+  const verifiedVariants = useRef<ResumeVariant[] | null>(null);
+  if (variantsQuery.isSuccess) verifiedVariants.current = variants;
+  useEffect(() => {
+    if (outcomesView || !location.hash.startsWith('#resume-') || !variantsQuery.isSuccess) return;
+    let id: string;
+    try { id = decodeURIComponent(location.hash.slice(1)); } catch { return; }
+    const handle = requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }));
+    return () => cancelAnimationFrame(handle);
+  }, [outcomesView, location.hash, variantsQuery.isSuccess]);
+  const legacyQuery = useQuery({ queryKey: ['legacy-resume-review', user?.uid], queryFn: fetchLegacyResumeForReview,
+    enabled: Boolean(user?.uid) && variantsQuery.isSuccess && variants.length === 0 });
+  const beginAdd = () => { if(outcomesView)changeView('library'); pendingSave.current = null; setUseAsDefault(variants.length === 0); setAdding(true); };
   const scoreByVariant = new Map(
     (outcomeData?.scoreboard?.perVariant ?? []).map((r) => [r.variantId, r]),
   );
@@ -379,7 +413,7 @@ const ResumeWorkspace = () => {
   // rejection is the natural moment to suggest trying a different version.
   const rejectedCount = statsQuery.data?.stats?.applications?.rejected ?? 0;
   const showVariantNudge =
-    premium && !nudgeDismissed &&
+    premium && outcomesView && !nudgeDismissed &&
     !variantsQuery.isLoading &&
     !statsQuery.isLoading &&
     variants.length === 1 &&
@@ -390,7 +424,7 @@ const ResumeWorkspace = () => {
   };
 
   const healthByVariant = new Map(
-    (healthQuery.data?.resumes ?? []).map((entry) => [entry.variantId, entry]),
+    (!healthQuery.isError ? healthQuery.data?.resumes ?? [] : []).map((entry) => [entry.variantId, entry]),
   );
 
   const invalidate = () => {
@@ -425,36 +459,25 @@ const ResumeWorkspace = () => {
   });
   const pendingHealthKey = healthMut.isPending ? healthMut.variables?.key ?? null : null;
 
-  return (
-    <DashboardLayout>
-      {/* break-words, not overflow-wrap:anywhere (2026-10-14): "anywhere" lowers every flex child's
-          minimum width to one character, so at 768px the resume title rendered one letter per line
-          and table headers split mid-word ("SE NT", "OUTCOM E"). No max-w-4xl of its own
-          (2026-10-15): the page uses the shared app width like every other page (was 896 vs 1056 px). */}
-      <div className="min-w-0 space-y-6 break-words" data-testid="resumes-page">
-        <PageHeader
-          eyebrow="Your resume library"
-          title="Resumes"
-          description="Compare saved wording, edit a new version, and choose exactly which resume to use for a role."
-          actions={
-            !adding && variants.length > 0 ? (
-              <button type="button" className={BUTTON.secondary} onClick={beginAdd}>
-                <Plus className="h-4 w-4" aria-hidden /> Add a resume version
-              </button>
-            ) : null
-          }
-        />
-
+  return <DashboardLayout><div className="min-w-0 space-y-5 break-words" data-testid="resumes-page">
+    <PageHeader eyebrow="Your resume library" title="Resumes" description="Keep your saved wording organized, choose a version for a role, or review confirmed submission outcomes."
+      actions={!adding&&variants.length>0?<button type="button" className={BUTTON.secondary} onClick={beginAdd}><Plus className="h-4 w-4" aria-hidden/>Add a resume version</button>:null}/>
+    {premium?<div role="tablist" aria-label="Resume workspace views" className="flex flex-wrap gap-2" onKeyDown={navigateTabs}>
+      <button type="button" role="tab" id="resume-library-tab" tabIndex={outcomesView?-1:0} aria-selected={!outcomesView} aria-controls="resume-library-view" className={!outcomesView?BUTTON.primary:BUTTON.secondary} onClick={()=>changeView('library')}>Library</button>
+      <button type="button" role="tab" id="resume-outcomes-tab" tabIndex={outcomesView?0:-1} aria-selected={outcomesView} aria-controls="resume-outcomes-view" className={outcomesView?BUTTON.primary:BUTTON.secondary} onClick={()=>changeView('outcomes')}>Outcomes &amp; submissions</button>
+    </div>:null}
+    <section id="resume-library-view" role={premium?"tabpanel":undefined} aria-labelledby={premium?"resume-library-tab":undefined} hidden={outcomesView} className="space-y-5">
+      {premium?<p className="text-sm text-muted-foreground">Saved wording is separate from submitted history. <button type="button" className="font-medium underline" onClick={()=>changeView('outcomes',true)}>Record which resume you submitted</button>.</p>:null}
         {requested.present&&!requested.id?<p role="alert" className="text-sm">This resume link is incomplete. Open a version from your library.</p>:null}
         {editorId&&user?.uid?<ResumeEditor key={`${user.uid}:${editorId}`} id={editorId} owner={user.uid} search={location.search} onSaved={invalidate}/>:null}
-        {compareIds.length>0?<Panel title="Compare two versions"><p className="mb-3 text-sm">{compareIds.length===1?'Select one more version below.':'Two versions selected. Clear the selection to choose a different pair.'}</p><button className={BUTTON.secondary} onClick={()=>setCompareIds([])}>Clear comparison</button></Panel>:null}
+        {compareIds.length>0?<Panel title="Compare saved wording selection"><p className="mb-3 text-sm">{compareIds.length===1?'Select one more version below.':'Two versions selected. Clear the selection to choose a different pair.'}</p><button className={BUTTON.secondary} onClick={()=>setCompareIds([])}>Clear wording selection</button></Panel>:null}
         {compareIds.length===2&&user?.uid?<ResumeTextComparison key={`${user.uid}:${compareIds.join(':')}`} ids={compareIds} owner={user.uid}/>:null}
 
         {variants.length > 0 && !variants.some((v) => v.isDefault) ? (
           <p role="status" className="rounded-xl border border-border p-4 text-sm">No default resume is set. Choose “Make default” below for extension checks. You can still select a resume for an individual check.</p>
         ) : null}
-        {setDefaultMut.isError ? <ErrorState title="The default did not change" detail={setDefaultMut.error.message} /> : null}
-        {archiveMut.isError ? <ErrorState title="The resume could not be removed" detail={archiveMut.error.message} /> : null}
+        {setDefaultMut.isError ? <ErrorState stackRetryOnMobile title="The default did not change" detail={setDefaultMut.error.message} /> : null}
+        {archiveMut.isError ? <ErrorState stackRetryOnMobile title="The resume could not be removed" detail={archiveMut.error.message} /> : null}
         {archiveTarget ? (
           <Panel title={'Remove ' + archiveTarget.name + '?'}>
             <p className="mb-3 text-sm">{archiveTarget.isDefault ? 'This is your default. Extension checks will pause until you choose another default. ' : ''}Past checks will keep their recorded resume reference.</p>
@@ -471,6 +494,161 @@ const ResumeWorkspace = () => {
             <button className={BUTTON.secondary} onClick={() => { beginAdd(); setDraft(legacyQuery.data?.resumeText || ''); }}>Review previous resume</button>
           </Panel>
         ) : null}
+        {adding ? (
+          <Panel title="Add a resume version" description="Paste the text of the version you send. Apply Gate reads this text, not the file.">
+            <div className="space-y-3">
+              <label className="block">
+                <span className={EYEBROW}>Name</span>
+                <input
+                  className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="Name (e.g., Operations focus)"
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                />
+              </label>
+              <label className="block">
+                <span className={EYEBROW}>Resume text</span>
+                <textarea
+                  rows={12}
+                  className="mt-1.5 w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="Paste your resume text here… (plain text, not a file)"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                />
+              </label>
+              {createMut.isError ? <ErrorState stackRetryOnMobile title="That version did not save" detail={createMut.error.message} /> : null}
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={useAsDefault} onChange={(e) => setUseAsDefault(e.target.checked)} />Use as my default for job checks</label>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className={BUTTON.primary}
+                  disabled={draft.trim().length < 50 || draft.length > 50000 || mutationPending}
+                  onClick={() => createMut.mutate({ name: draftName.trim() || "My resume", text: draft })}
+                >
+                  {createMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                  Save
+                </button>
+                <button type="button" className={BUTTON.ghost} onClick={() => setAdding(false)}>Cancel</button>
+              </div>
+            </div>
+          </Panel>
+        ) : null}
+
+        {variantsQuery.isLoading ? (
+          <Panel>
+            <LoadingRows rows={2} />
+          </Panel>
+        ) : variantsQuery.isError ? (
+          <ErrorState stackRetryOnMobile title="Your resumes did not load" onRetry={() => variantsQuery.refetch()} />
+        ) : variants.length === 0 ? (
+          adding ? null : (
+            <EmptyState
+              icon={FileText}
+              title="No resumes saved yet"
+              body="Add the version you send most. Use it for job checks and discovery. You can save another version later; outcomes only use versions you confirm submitting."
+              action={
+                <button type="button" className={BUTTON.primary} onClick={beginAdd}>
+                  <Plus className="h-3.5 w-3.5" aria-hidden /> Add a resume version
+                </button>
+              }
+            />
+          )
+        ) : (
+          <div className="space-y-4">
+            {[...variants].sort((a,b)=>Number(b.isDefault)-Number(a.isDefault)).map((v) => (
+              <article key={v.id} id={`resume-${v.id}`} className={cn(CARD, "scroll-mt-24 space-y-4 p-5")}>
+                {/* Title above, actions below at every width (2026-10-14): side by side, five actions
+                    left the title a sliver of width at 768px and overlapped the icon. */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg", TONES.brand.icon)}>
+                      <FileText className="h-4 w-4" aria-hidden />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-foreground">{v.name}</h2>
+                        {v.isDefault ? <ToneChip tone="brand">Default</ToneChip> : null}
+                      </div>
+                      <p className="mt-0.5 text-[13px] text-muted-foreground">{v.isDefault ? "Starting choice for job checks and resume-based discovery; you can choose another version." : "A saved version you can choose for a role."}</p>
+                    </div>
+                  </div>
+                  <div className="-ml-2 flex min-w-0 flex-wrap items-center gap-1">
+                    {RESUME_ID.test(v.id)?<>
+                      <button className={BUTTON.ghost} onClick={()=>setEditorId(v.id)}>Open and edit</button>
+                      <Link className={BUTTON.ghost} to={resumeToolHref('/apply-gate',v.id,location.search)}>Use in Apply Gate</Link>
+                      <label className="flex items-center gap-2 px-2 text-sm"><input type="checkbox" aria-label={`Compare wording for ${v.name}`} checked={compareIds.includes(v.id)} disabled={!compareIds.includes(v.id)&&compareIds.length>=2} onChange={e=>setCompareIds(current=>e.target.checked?[...current,v.id]:current.filter(id=>id!==v.id))}/>Compare wording</label>
+                    </>:null}
+                    {!v.isDefault ? (
+                      <button type="button" className={BUTTON.ghost} disabled={mutationPending} onClick={() => setDefaultMut.mutate(v.id)}>
+                        <Star className="h-3.5 w-3.5" aria-hidden /> Make default
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className={cn(BUTTON.ghost, "hover:bg-destructive/10 hover:text-destructive")}
+                      disabled={mutationPending} onClick={() => setArchiveTarget(v)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden /> Remove
+                    </button>
+                  </div>
+                </div>
+
+                {premium?<div className="border-t border-border pt-4">
+                  {healthQuery.isError?<p className="text-sm text-muted-foreground">Resume checks are unavailable for this version.</p>:healthQuery.isPending?<p className="text-sm text-muted-foreground">Loading resume checks…</p>:healthByVariant.get(v.id)?.document?<ResumeHealthBlock entry={healthByVariant.get(v.id)} pendingKey={pendingHealthKey} onSetState={(finding,next)=>healthMut.mutate({variantId:v.id,key:finding.key,state:next})}/>:<p className="text-sm text-muted-foreground">This version has not been checked against a readable saved document.</p>}
+                </div>:null}
+
+
+              </article>
+            ))}
+          </div>
+        )}
+
+      {premium?<details className="text-sm"><summary className="min-h-11 cursor-pointer py-3 font-medium">What the resume checks cover</summary><p className="max-w-[75ch] text-muted-foreground">These basic checks look for an email address, readable work dates, gaps in dated history and quantified examples. They do not establish job qualification, explain rejections or certify an ATS score. Dismissed findings remain available to review.</p></details>:null}
+      {healthQuery.isError?<ErrorState stackRetryOnMobile title="Resume checks did not load" detail="Your saved versions remain available. No clean result is inferred from this failure." onRetry={()=>healthQuery.refetch()}/>:null}
+      {healthMut.isError?<ErrorState stackRetryOnMobile title="That check did not update" detail="The change was not confirmed. Review the current finding before retrying."/>:null}
+    </section>
+    {premium?<section id="resume-outcomes-view" role="tabpanel" aria-labelledby="resume-outcomes-tab" hidden={!outcomesView} className="space-y-5">
+      {showOutcomeContent?<>
+      {user?.uid&&verifiedVariants.current?<ResumeSubmissions key={user.uid} owner={user.uid} variants={verifiedVariants.current} choicesAvailable={variantsQuery.isSuccess} openOnArrival={outcomesView&&location.hash==='#submitted-resumes'}/>:variantsQuery.isError?<ErrorState stackRetryOnMobile title="Your saved versions could not be verified" detail="Reload the library before choosing a submitted version." onRetry={()=>variantsQuery.refetch()}/>:<Panel title="Submitted versions"><LoadingRows rows={2}/></Panel>}
+        {premium && variants.length > 0 ? <form className="space-y-2" aria-label="Compare resume outcomes" onSubmit={event => { event.preventDefault(); setComparisonTitle(comparisonDraft.trim()); }}>
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <label className="block min-w-0 text-sm">Compare outcomes for a role (optional)
+              <input className="mt-1 block w-full rounded-lg border border-border bg-background p-2" maxLength={200} value={comparisonDraft} onChange={event => setComparisonDraft(event.target.value)} placeholder="For example, QA Engineer" />
+            </label><button className={cn(BUTTON.secondary, 'justify-self-start whitespace-nowrap')} type="submit">Compare this role</button>
+          </div>
+          <p className="text-xs text-muted-foreground">{comparisonTitle ? `Showing the role family for ${comparisonTitle}.` : 'Showing all roles. Choose a role for a recommendation based on relevant confirmed outcomes.'} This comparison never establishes job qualification. The role filter affects the rates and history below; submitted-version confirmations above include all applications.</p>
+        </form> : null}
+
+      {outcomesUnavailable?<ErrorState stackRetryOnMobile title={outcomesPaused?'Resume outcomes are temporarily paused':'Resume outcomes could not be loaded'} detail={outcomesPaused?'Your saved resumes and submitted-version confirmations are still available.':incompatibleOutcomes||scoreboardQuery.error?.message===OUTCOME_CONTRACT_MESSAGE?OUTCOME_CONTRACT_MESSAGE:'No partial recommendation is shown. Your resume library is still available.'} onRetry={()=>scoreboardQuery.refetch()}/>:variantsQuery.isError?<p role="alert">Reload your saved library before comparing its outcomes.</p>:scoreboardQuery.isPending||variantsQuery.isPending?<Panel title="Confirmed outcomes"><LoadingRows rows={2}/></Panel>:null}
+        {premium && (outcomeData?.scoreboard?.unknownApplications ?? 0) > 0 ? <p role="status" className="text-sm text-muted-foreground">{outcomeData?.scoreboard?.unknownApplications} application(s) in {comparisonTitle ? 'this role family' : 'all tracked roles'} have no confirmed saved resume. No version receives credit for them. <button type="button" className="font-medium underline" onClick={()=>changeView('outcomes',true)}>Review submitted resumes</button></p> : null}
+        {premium && (outcomeData?.scoreboard?.ambiguousCohorts ?? 0) > 0 ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            Some application outcomes are excluded because multiple resume versions or applications match the same role. We cannot tell which resume to credit.
+          </p>
+        ) : null}
+
+        {premium && variants.length > 0 && outcomeData ? (
+          <VariantComparison
+            variants={variants}
+            search={location.search}
+            scoreByVariant={scoreByVariant}
+            openFindingsByVariant={
+              new Map(variants.map((v) => {
+                const entry = healthByVariant.get(v.id);
+                return [v.id, entry?.document ? entry.findings.filter((f) => !f.dismissed).length : null];
+              }))
+            }
+            minSample={outcomeData?.scoreboard?.minSample ?? null}
+            recommendation={outcomeData?.recommendation ?? null}
+          />
+        ) : null}
+
+
+      {outcomeData&&variants.length>0?<details className={cn(CARD,'p-5')}><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">Applications behind these outcomes</summary><div className="space-y-4">{variants.map(v=><section key={v.id} className="border-t border-border pt-4"><h3 className="font-semibold">{v.name}</h3><p className="mt-1 text-sm text-muted-foreground">{recordLine(scoreByVariant.get(v.id))}</p><ApplicationsDrilldown rows={breakdown[v.id]??[]}/></section>)}</div></details>:null}
+        {premium && (outcomeData?.scoreboard?.perVariant ?? []).some(row => !variants.some(v => v.id === row.variantId)) ? <details className={cn(CARD,"p-5")}><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">Confirmed outcomes for past versions</summary>
+          <p className="mb-3 text-sm text-muted-foreground">Archived versions retain their confirmed history. They are excluded from new version recommendations.</p>
+          <ul className="space-y-2">{(outcomeData?.scoreboard?.perVariant ?? []).filter(row => !variants.some(v => v.id === row.variantId)).map(row => <li key={row.variantId} className="text-sm"><strong>{row.name}</strong>: {row.sent} confirmed application(s), {row.matchedToOutcome} with tracked outcomes, {row.interviewed} reaching interview stage and {row.offered} offer(s).</li>)}</ul>
+        </details> : null}
         {showVariantNudge ? (
           <div className={cn("relative rounded-2xl border p-5", TONES.brand.surface)}>
             <button
@@ -500,161 +678,10 @@ const ResumeWorkspace = () => {
           </div>
         ) : null}
 
-        {premium && variants.length > 0 ? <form className="space-y-2" aria-label="Compare resume outcomes" onSubmit={event => { event.preventDefault(); setComparisonTitle(comparisonDraft.trim()); }}>
-          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-            <label className="block min-w-0 text-sm">Compare outcomes for a role (optional)
-              <input className="mt-1 block w-full rounded-lg border border-border bg-background p-2" maxLength={200} value={comparisonDraft} onChange={event => setComparisonDraft(event.target.value)} placeholder="For example, QA Engineer" />
-            </label><button className={cn(BUTTON.secondary, 'justify-self-start whitespace-nowrap')} type="submit">Compare this role</button>
-          </div>
-          <p className="text-xs text-muted-foreground">{comparisonTitle ? `Showing the role family for ${comparisonTitle}.` : 'Showing all roles. Choose a role for a recommendation based on relevant confirmed outcomes.'} This comparison never establishes job qualification.</p>
-        </form> : null}
-        {premium && outcomesUnavailable ? <ErrorState title={outcomesPaused ? 'Resume outcomes are temporarily paused' : 'Resume outcomes could not be loaded'} detail={outcomesPaused ? 'Your saved resumes and submitted-version confirmations are still available.' : incompatibleOutcomes || scoreboardQuery.error?.message === OUTCOME_CONTRACT_MESSAGE ? OUTCOME_CONTRACT_MESSAGE : "No partial recommendation is shown. Your resume library is still available."} onRetry={() => scoreboardQuery.refetch()} /> : null}
-        {premium && (outcomeData?.scoreboard?.unknownApplications ?? 0) > 0 ? <p role="status" className="text-sm text-muted-foreground">{outcomeData?.scoreboard?.unknownApplications} application(s) have no confirmed saved resume. No version receives credit for them.</p> : null}
-        {premium && (outcomeData?.scoreboard?.ambiguousCohorts ?? 0) > 0 ? (
-          <p role="status" className="text-sm text-muted-foreground">
-            Some application outcomes are excluded because multiple resume versions or applications match the same role. We cannot tell which resume to credit.
-          </p>
-        ) : null}
 
-        {adding ? (
-          <Panel title="Add a resume version" description="Paste the text of the version you send. Apply Gate reads this text, not the file.">
-            <div className="space-y-3">
-              <label className="block">
-                <span className={EYEBROW}>Name</span>
-                <input
-                  className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Name (e.g., Operations focus)"
-                  value={draftName}
-                  onChange={(e) => setDraftName(e.target.value)}
-                />
-              </label>
-              <label className="block">
-                <span className={EYEBROW}>Resume text</span>
-                <textarea
-                  rows={12}
-                  className="mt-1.5 w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Paste your resume text here… (plain text, not a file)"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                />
-              </label>
-              {createMut.isError ? <ErrorState title="That version did not save" detail={createMut.error.message} /> : null}
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={useAsDefault} onChange={(e) => setUseAsDefault(e.target.checked)} />Use as my default for job checks</label>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className={BUTTON.primary}
-                  disabled={draft.trim().length < 50 || draft.length > 50000 || mutationPending}
-                  onClick={() => createMut.mutate({ name: draftName.trim() || "My resume", text: draft })}
-                >
-                  {createMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                  Save
-                </button>
-                <button type="button" className={BUTTON.ghost} onClick={() => setAdding(false)}>Cancel</button>
-              </div>
-            </div>
-          </Panel>
-        ) : null}
-
-        {variantsQuery.isLoading ? (
-          <Panel>
-            <LoadingRows rows={2} />
-          </Panel>
-        ) : variantsQuery.isError ? (
-          <ErrorState title="Your resumes did not load" onRetry={() => variantsQuery.refetch()} />
-        ) : variants.length === 0 ? (
-          adding ? null : (
-            <EmptyState
-              icon={FileText}
-              title="No resumes saved yet"
-              body="Add the version you send most. Apply Gate checks every role against it, and once you save a second version it tracks which one gets responses."
-              action={
-                <button type="button" className={BUTTON.primary} onClick={beginAdd}>
-                  <Plus className="h-3.5 w-3.5" aria-hidden /> Add a resume version
-                </button>
-              }
-            />
-          )
-        ) : (
-          <div className="space-y-4">
-            {variants.map((v) => (
-              <article key={v.id} id={`resume-${v.id}`} className={cn(CARD, "scroll-mt-24 space-y-4 p-5")}>
-                {/* Title above, actions below at every width (2026-10-14): side by side, five actions
-                    left the title a sliver of width at 768px and overlapped the icon. */}
-                <div className="flex flex-col gap-3">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg", TONES.brand.icon)}>
-                      <FileText className="h-4 w-4" aria-hidden />
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-foreground">{v.name}</h2>
-                        {v.isDefault ? <ToneChip tone="brand">Default</ToneChip> : null}
-                      </div>
-                      <p className="mt-0.5 text-[13px] text-muted-foreground">{premium ? (outcomesUnavailable ? "Resume outcomes are unavailable. Your saved resume is still available." : !outcomeData ? "Loading confirmed outcomes..." : recordLine(scoreByVariant.get(v.id))) : (v.isDefault ? "Used for your extension job checks." : "Available to choose as your default.")}</p>
-                    </div>
-                  </div>
-                  <div className="-ml-2 flex min-w-0 flex-wrap items-center gap-1">
-                    {RESUME_ID.test(v.id)?<>
-                      <button className={BUTTON.ghost} onClick={()=>setEditorId(v.id)}>Open and edit</button>
-                      <Link className={BUTTON.ghost} to={resumeToolHref('/apply-gate',v.id,location.search)}>Use in Apply Gate</Link>
-                      <label className="flex items-center gap-2 px-2 text-sm"><input type="checkbox" aria-label={`Compare ${v.name}`} checked={compareIds.includes(v.id)} disabled={!compareIds.includes(v.id)&&compareIds.length>=2} onChange={e=>setCompareIds(current=>e.target.checked?[...current,v.id]:current.filter(id=>id!==v.id))}/>Compare</label>
-                    </>:null}
-                    {!v.isDefault ? (
-                      <button type="button" className={BUTTON.ghost} disabled={mutationPending} onClick={() => setDefaultMut.mutate(v.id)}>
-                        <Star className="h-3.5 w-3.5" aria-hidden /> Make default
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className={cn(BUTTON.ghost, "hover:bg-destructive/10 hover:text-destructive")}
-                      disabled={mutationPending} onClick={() => setArchiveTarget(v)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" aria-hidden /> Remove
-                    </button>
-                  </div>
-                </div>
-
-                {healthByVariant.get(v.id) ? (
-                  <div className="border-t border-border pt-4">
-                    <ResumeHealthBlock
-                      entry={healthByVariant.get(v.id)}
-                      pendingKey={pendingHealthKey}
-                      onSetState={(finding, next) =>
-                        healthMut.mutate({ variantId: v.id, key: finding.key, state: next })
-                      }
-                    />
-                  </div>
-                ) : null}
-
-                <ApplicationsDrilldown rows={breakdown[v.id] ?? []} />
-              </article>
-            ))}
-          </div>
-        )}
-        {premium && variants.length >= 2 && outcomeData ? (
-          <VariantComparison
-            variants={variants}
-            scoreByVariant={scoreByVariant}
-            openFindingsByVariant={
-              new Map(variants.map((v) => {
-                const entry = healthByVariant.get(v.id);
-                return [v.id, entry?.document ? entry.findings.filter((f) => !f.dismissed).length : null];
-              }))
-            }
-            minSample={outcomeData?.scoreboard?.minSample ?? null}
-            recommendation={outcomeData?.recommendation ?? null}
-          />
-        ) : null}
-
-        {premium && (outcomeData?.scoreboard?.perVariant ?? []).some(row => !variants.some(v => v.id === row.variantId)) ? <Panel title="Confirmed outcomes for past versions">
-          <p className="mb-3 text-sm text-muted-foreground">Archived versions retain their confirmed history. They are excluded from new version recommendations.</p>
-          <ul className="space-y-2">{(outcomeData?.scoreboard?.perVariant ?? []).filter(row => !variants.some(v => v.id === row.variantId)).map(row => <li key={row.variantId} className="text-sm"><strong>{row.name}</strong>: {row.sent} confirmed application(s), {row.matchedToOutcome} with tracked outcomes, {row.interviewed} reaching interview stage and {row.offered} offer(s).</li>)}</ul>
-        </Panel> : null}
-        {premium && user?.uid ? <ResumeSubmissions key={user.uid} owner={user.uid} variants={variants} openOnArrival={location.hash === '#submitted-resumes' && !variantsQuery.isPending && !scoreboardQuery.isPending} /> : null}
-      </div>
-    </DashboardLayout>
-  );
+      </>:null}
+    </section>:null}
+  </div></DashboardLayout>;
 };
 
 const Resumes = () => {

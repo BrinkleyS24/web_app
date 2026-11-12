@@ -27,6 +27,22 @@ test('no default is selected for an application without a confirmed submission',
   await userEvent.click(screen.getByRole('button', { name: 'Confirm submitted resume' }));
   expect(confirmSubmittedResume).toHaveBeenCalledWith(application.id, { variantId: 'B', expectedRevision: 0, requestId: expect.any(String) });
 });
+
+test('temporarily unverified library choices preserve selection and prevent confirmation until recovery', async () => {
+  const { client, rerender } = setup();
+  await userEvent.selectOptions(await screen.findByRole('combobox'), 'B');
+  const content = (available: boolean) => <QueryClientProvider client={client}><ResumeSubmissions key="owner-a" owner="owner-a" variants={variants} openOnArrival choicesAvailable={available} /></QueryClientProvider>;
+  rerender(content(false));
+  expect(screen.getByRole('combobox')).toHaveValue('B');
+  expect(screen.getByRole('combobox')).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Confirm submitted resume' })).toBeDisabled();
+  expect(confirmSubmittedResume).not.toHaveBeenCalled();
+  rerender(content(true));
+  expect(screen.getByRole('combobox')).toHaveValue('B');
+  await userEvent.click(screen.getByRole('button', { name: 'Confirm submitted resume' }));
+  expect(confirmSubmittedResume).toHaveBeenCalledTimes(1);
+  expect(confirmSubmittedResume).toHaveBeenCalledWith(application.id, expect.objectContaining({ variantId: 'B' }));
+});
 test('returning a confirmed application to unknown explicitly clears version credit', async () => {
   fetchResumeSubmissions.mockResolvedValue({ applications: [{ ...application, submission: { variantId: 'A', name: 'QA at submission', revision: 3, documentAvailable: true } }] });
   setup(); await userEvent.selectOptions(await screen.findByRole('combobox'), 'unknown');

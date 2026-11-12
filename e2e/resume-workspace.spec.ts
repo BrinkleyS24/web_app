@@ -33,8 +33,8 @@ for (const width of [320, 1280]) test(`resume compare edit save and use preserve
   await page.getByRole('link', { name: 'View or edit this version' }).click();
   await expect(page).toHaveURL(new RegExp(`/resumes\\?resume=${id}&action=${logicalKey}&version=${dedupeKey}`));
   await expect(page.getByLabel('Resume text to save')).toHaveValue(original);
-  await page.getByLabel('Compare Front desk', { exact: true }).check(); await page.getByLabel('Compare Warehouse', { exact: true }).check();
-  await expect(page.getByRole('heading', { name: 'Compare saved wording' })).toBeVisible();
+  await page.getByLabel('Compare wording for Front desk', { exact: true }).check(); await page.getByLabel('Compare wording for Warehouse', { exact: true }).check();
+  await expect(page.getByRole('heading', { name: 'Compare saved wording', exact: true })).toBeVisible();
   expect(creates).toHaveLength(0); expect(analyses).toHaveLength(0); expect(completions).toHaveLength(0);
   await page.getByLabel('New version name').fill('Front desk revised'); await page.getByLabel('Resume text to save').fill(edited);
   await expect(page.getByLabel('Use this new version as my default for extension job checks')).not.toBeChecked();
