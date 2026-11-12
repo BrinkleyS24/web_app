@@ -1,5 +1,5 @@
 {
-  "status": "local_verified_not_deployed",
+  "status": "deployed_verified",
   "grade": {
     "ui": "A",
     "assessment": "Engineering judgment for the exercised UI workflows; not an independently adjudicated customer/model/production grade."
@@ -41,5 +41,6 @@
   "liveProviderCalls": false,
   "customerSourceWrites": false,
   "ownerEvidence": "owner-read-only.json",
-  "sourceHashNormalization": "UTF-8 bytes with LF newlines"
+  "sourceHashNormalization": "UTF-8 bytes with LF newlines",
+  "release": "release.json"
 }

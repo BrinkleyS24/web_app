@@ -1,0 +1,66 @@
+{
+  "deployed": true,
+  "at": "2026-11-12T22:24:05.050410+00:00",
+  "webCommit": "130b7d6a7d8c17353fbf24b465eef4108891283d",
+  "webDeploy": "6af63b24847db79fc25468d8",
+  "rollbackWebDeploy": "6af62d7887d0ec064508d383",
+  "apiTraffic": [
+    [
+      "applendium-backend-prep-450a73a",
+      100
+    ]
+  ],
+  "backendConfigurationUnchanged": true,
+  "publishLockPreserved": true,
+  "publicAssetHashesVerified": true,
+  "productionBrowserPassed": true,
+  "migrations": false,
+  "coreCustomerWrites": false,
+  "limits": [
+    "Normal Firebase/Premium authentication with simulated extension bridge.",
+    "Stateful mutation fixtures are separate from live read-only verification.",
+    "No human usability, multi-browser, fleet-load or underlying-outcome certification."
+  ],
+  "readOnlyBrowser": {
+    "normalFirebaseAuth": true,
+    "simulatedExtensionBridge": true,
+    "anonymous": {
+      "/api/emails/apply-gate/history": 401,
+      "/api/resumes": 401
+    },
+    "namedSourceReload": true,
+    "deferredHistory": true,
+    "keptDraft": true,
+    "exactResumeHandoff": true,
+    "sourceQuotationsChecked": 8,
+    "historyFailureVisible": true,
+    "historyRetryRecovered": true,
+    "metrics": [
+      {
+        "width": 1440,
+        "height": 900,
+        "overflow": false,
+        "submitTop": 783.875
+      },
+      {
+        "width": 768,
+        "height": 917,
+        "overflow": false,
+        "submitTop": 808.25
+      },
+      {
+        "width": 390,
+        "height": 924,
+        "overflow": false,
+        "submitTop": 818.75
+      },
+      {
+        "width": 320,
+        "height": 940,
+        "overflow": false,
+        "submitTop": 834.75
+      }
+    ],
+    "errors": []
+  }
+}

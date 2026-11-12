@@ -1,6 +1,6 @@
 # Apply Gate UI and workflow review — November 12, 2026
 
-**Grade: A for the exercised UI workflows, from the baseline C+. Local candidate; not deployed.** This is an engineering assessment of observed task clarity, source identity, error recovery and completion. It is not an independent customer study, model-quality grade, accessibility certification or production capacity/release certificate.
+**Grade: A for the exercised UI workflows, from the baseline C+. Deployed and verified at commit `130b7d6`.** This is an engineering assessment of observed task clarity, source identity, error recovery and completion. It is not an independent customer study, model-quality grade, accessibility certification or production capacity/release certificate.
 
 The customer can now start with a resume and posting, read one decision, record a choice, and move to a genuinely blank next posting. Saved checks have a separate destination rather than forming a second workspace below the form. The result's qualification warning and evidence remain separate from application strategy.
 
@@ -55,6 +55,6 @@ Only fictional screenshots are published: [phone entry](entry-390.png), [narrow 
 - The history service still bounds the returned dataset; Show more does not fetch records the service did not return. The UI labels this loaded scope.
 - Unsubmitted drafts and current unsaved results remain in memory. Reload/sign-out clears unsaved inputs; saved records remain accessible. A recheck uses the stored posting and its original resume selection through the existing backend contract; unavailable originals remain an explicit error.
 - The writer lock applies to this mounted workspace. Server authorization, consistency and behavior across independent tabs continue to depend on existing backend contracts.
-- Production rollout is pending. Before promoting this candidate, freeze the committed source and repeat normal-auth draft/serving checks with the current backend/configuration pinned. The rollback target is the verified Jobs frontend deploy `6af62d7887d0ec064508d383`. No data rollback is needed for these changes.
+- Production deploy `6af63b24847db79fc25468d8` is verified. The frozen commit passed normally authenticated draft and serving checks; public asset hashes, backend specification/traffic and publish lock matched their pins. The rollback target is the Jobs frontend deploy `6af62d7887d0ec064508d383`. No migration or customer source-data write was performed. See [release receipt](release.json). A first saved-source readiness assertion encountered the visible loading state; it passed after waiting for the history read within the 30-second audit budget. This does not establish a history-latency SLO.
 
 Dashboard remains last. This review does not upgrade the grades of other features.
