@@ -1,7 +1,7 @@
 {
   "date": "2026-11-12",
   "feature": "Jobs UI",
-  "status": "local_candidate_not_deployed",
+  "status": "deployed_verified",
   "grade": {
     "value": "A",
     "scope": "engineering assessment of reviewed UI/main customer workflows",
@@ -200,5 +200,6 @@
     "src/pages/Jobs.tsx": "b71121ef30753e0444e01b5196605277131eaded0856082406730176e3c78d8f",
     "src/lib/jobFeedPresentation.ts": "58a947fae05c754fe20bd4f642aa8c05c3f8ffa7dc1cfbafa77741b3a499c50c"
   },
-  "trackerValidation": "Existing /dashboard link verified; full Dashboard workflow is outside this review."
+  "trackerValidation": "Existing /dashboard link verified; full Dashboard workflow is outside this review.",
+  "release": "release.json"
 }

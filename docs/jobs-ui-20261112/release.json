@@ -1,0 +1,66 @@
+{
+  "deployed": true,
+  "at": "2026-11-12T21:32:32.401552+00:00",
+  "webCommit": "d3944efdfa6ddbd990bf722278c3ea1b220bf148",
+  "webDeploy": "6af62d7887d0ec064508d383",
+  "rollbackWebDeploy": "6af5ffbfc4f693b982fd0a30",
+  "apiTraffic": [
+    [
+      "applendium-backend-prep-450a73a",
+      100
+    ]
+  ],
+  "backendConfigurationUnchanged": true,
+  "publishLockPreserved": true,
+  "publicAssetHashesVerified": true,
+  "productionBrowserPassed": true,
+  "migrations": false,
+  "coreCustomerWrites": false,
+  "limits": [
+    "Normal Firebase/Premium authentication with simulated extension bridge.",
+    "Stateful mutation fixtures are separate from live read-only verification.",
+    "No human usability, multi-browser, fleet-load or underlying-outcome certification."
+  ],
+  "servingChecks": {
+    "normalFirebaseAuth": true,
+    "simulatedExtensionBridge": true,
+    "sourceWrites": false,
+    "preferencesSaved": false,
+    "counts": {
+      "recent": 0,
+      "review": 3,
+      "older": 0,
+      "excluded": 24183
+    },
+    "diagnosticsSecondary": true,
+    "routineRefreshSecondary": true,
+    "sourceBackedQuestion": true,
+    "fullNotes": true,
+    "fullEvidence": true,
+    "exactResumeHandoff": true,
+    "injectedHistoryFailureAndRecovery": true,
+    "anonymous": {
+      "/api/jobs/preferences": 401,
+      "/api/jobs/feed": 401
+    },
+    "metrics": [
+      {
+        "width": 1440,
+        "overflow": false
+      },
+      {
+        "width": 768,
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "overflow": false
+      },
+      {
+        "width": 320,
+        "overflow": false
+      }
+    ],
+    "errors": []
+  }
+}
